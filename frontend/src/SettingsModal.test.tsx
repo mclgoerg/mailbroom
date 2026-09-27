@@ -129,10 +129,12 @@ test("server settings (login + shared AI) are admin-only", () => {
   };
   render(<SettingsModal cfg={asUser} account="default" onClose={() => {}}
     onSaved={() => {}} onAccountsChanged={() => {}} />);
-  // no Login section, no shared-AI admin section …
+  // no Server tab at all for non-admins …
+  expect(screen.queryByRole("tab", { name: /Server/ })).toBeNull();
   expect(screen.queryByText(/Login \(optional\)/)).toBeNull();
   expect(screen.queryByText(/Shared AI key/)).toBeNull();
-  // … but the shared-key state is visible in the tenant's AI section
+  // … but the shared-key state is visible in the tenant's AI tab
+  fireEvent.click(screen.getByRole("tab", { name: "AI" }));
   expect(screen.getByText(/shared key/)).toBeTruthy();
   // saving must not send server-level sections (the API would 403)
   fireEvent.click(screen.getByText("Save"));
@@ -153,10 +155,29 @@ test("the admin sees and saves the shared AI section", () => {
   };
   render(<SettingsModal cfg={asAdmin} account="default" onClose={() => {}}
     onSaved={() => {}} onAccountsChanged={() => {}} />);
+  fireEvent.click(screen.getByRole("tab", { name: /Server/ }));
   expect(screen.getByText(/Shared AI key/)).toBeTruthy();
   fireEvent.click(screen.getByText("Save"));
   expect(saveCalls[0].auth.mode).toBe("oidc");
   expect(saveCalls[0].auth.admin).toBe("me@x");
   expect(saveCalls[0].shared_ai.enabled).toBe(true);
   expect(saveCalls[0].shared_ai.default_tenant_budget_usd).toBe(5);
+});
+
+test("tab switches keep unsaved edits and Save persists every tab", () => {
+  saveCalls.length = 0;
+  render(<SettingsModal cfg={cfg} account="default" onClose={() => {}}
+    onSaved={() => {}} onAccountsChanged={() => {}} />);
+  // edit on the account tab …
+  fireEvent.change(hostInput(), { target: { value: "imap.new.example" } });
+  // … wander off and back — the edit must survive
+  fireEvent.click(screen.getByRole("tab", { name: "AI" }));
+  fireEvent.change(screen.getByLabelText(/Model/),
+    { target: { value: "claude-opus-5" } });
+  fireEvent.click(screen.getByRole("tab", { name: "Mail account" }));
+  expect(hostInput().value).toBe("imap.new.example");
+  // Save (from any tab) sends the fields of ALL tabs
+  fireEvent.click(screen.getByText("Save"));
+  expect(saveCalls[0].imap.host).toBe("imap.new.example");
+  expect(saveCalls[0].ai.model).toBe("claude-opus-5");
 });

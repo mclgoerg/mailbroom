@@ -283,10 +283,36 @@ export function SettingsModal({ cfg, account, onClose, onSaved,
   const [pi, po] = cfg.ai.prices_effective;
   const s = cfg.ai_stats;
 
+  // Settings are split into tabs; the SERVER tab (login + shared AI)
+  // exists for the admin only. All form state lives in this component,
+  // so Save always persists every tab, not just the visible one.
+  type Tab = "account" | "general" | "ai" | "server";
+  const [tab, setTab] = useState<Tab>("account");
+  const tabs: [Tab, string][] = [
+    ["account", t("tab.account")],
+    ["general", t("tab.general")],
+    ["ai", t("tab.ai")],
+    ...(cfg.auth.is_admin ? [["server", t("tab.server")] as [Tab, string]]
+      : []),
+  ];
+
   return (
     <Modal onClose={onClose}>
       <PanelHeader title={<>⚙ {t("Settings")}</>} onClose={onClose} />
+      <div role="tablist" className="flex flex-wrap gap-1 border-b
+        border-line px-5 pt-3">
+        {tabs.map(([k, label]) => (
+          <button key={k} role="tab" aria-selected={tab === k}
+            className={`rounded-t-md px-3 py-1.5 text-sm ${tab === k
+              ? "bg-accent text-white"
+              : "bg-panel2 text-body hover:bg-chip"}`}
+            onClick={() => setTab(k)}>
+            {label}
+          </button>
+        ))}
+      </div>
       <div className="grid gap-4 p-5 sm:grid-cols-2">
+        {tab === "general" && (<>
         <Field label={t("Language")}>
           <Select className="w-full" value={getLang()}
             onChange={(e) => {
@@ -316,9 +342,8 @@ export function SettingsModal({ cfg, account, onClose, onSaved,
             }} />
           {t("notify.toggle")}
         </label>
-        <SectionLabel className="sm:col-span-2">
-          {t("Mail server (IMAP)")}
-        </SectionLabel>
+        </>)}
+        {tab === "account" && (<>
         <div className="sm:col-span-2 flex flex-wrap items-end gap-2">
           <Field label={t("account.label")}>
             <Select className="w-full" value={editAcct}
@@ -481,7 +506,9 @@ export function SettingsModal({ cfg, account, onClose, onSaved,
             </div>
           )}
         </div>
+        </>)}
 
+        {tab === "general" && (<>
         <div className="sm:col-span-2">
           <Field label={`🛡️ ${t("Protected senders")}`}>
             <TextArea
@@ -503,8 +530,9 @@ export function SettingsModal({ cfg, account, onClose, onSaved,
           </Field>
           <p className="mt-1 text-xs text-muted">{t("categories.help")}</p>
         </div>
+        </>)}
 
-        {cfg.auth.is_admin && (<>
+        {tab === "server" && cfg.auth.is_admin && (<>
           <SectionLabel className="sm:col-span-2 mt-2">
             {t("login.section")}
           </SectionLabel>
@@ -624,7 +652,8 @@ export function SettingsModal({ cfg, account, onClose, onSaved,
           </>)}
         </>)}
 
-        <SectionLabel className="sm:col-span-2 mt-2">
+        {tab === "ai" && (<>
+        <SectionLabel className="sm:col-span-2">
           {t("AI review (optional)")}
         </SectionLabel>
         <p className="sm:col-span-2 -mt-2 text-xs text-muted">
@@ -708,6 +737,7 @@ export function SettingsModal({ cfg, account, onClose, onSaved,
             {t("Clear AI verdict cache")}
           </Button>
         </div>
+        </>)}
       </div>
       <div className="flex flex-wrap items-center gap-3 border-t border-line
         px-5 py-3">
