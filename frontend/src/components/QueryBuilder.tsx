@@ -5,9 +5,9 @@ import { Button, Input, Select } from "./ui";
 /* Interactive helper for the filter/rule query DSL: instead of
  * remembering the syntax, users click conditions together — each one
  * appends its token to the query (tokens AND together). Renders as a
- * 🧰 toggle plus an INLINE full-width panel (no floating popover: it
- * must survive flex-wrap toolbars and scrolling modals alike), so in a
- * flex-wrap container the panel takes its own row. */
+ * 🧰 toggle plus a panel: a dropdown anchored to the (relative!) parent
+ * on >=sm, but IN-FLOW full-width on phones, where an absolute panel
+ * would overflow the viewport. Parents must set `relative`. */
 
 const TAGS = ["newsletter", "shipping", "finance", "shopping", "social",
   "travel", "dev/cloud", "automated"];
@@ -31,7 +31,7 @@ export function QueryBuilder({ value, onChange, className = "" }: {
     onChange(q ? `${q} ${tok}` : tok);
   };
   const addBtn = (tok: string) => (
-    <Button variant="ghost" className="!min-h-8 !px-2 !text-xs"
+    <Button variant="ghost" className="!min-h-8 shrink-0 !px-2 !text-xs"
       onClick={() => add(tok)}>
       {t("qb.add")}
     </Button>
@@ -53,9 +53,11 @@ export function QueryBuilder({ value, onChange, className = "" }: {
         onClick={() => setOpen(!open)}>
         🧰
       </Button>
+      {/* z-20: must cover the group table's sticky header (z-10). */}
       {open && (
         <div className={`w-full rounded-lg border border-line bg-panel2 p-3
-          ${className}`}>
+          sm:absolute sm:left-0 sm:right-0 sm:top-full sm:z-20 sm:mt-1
+          sm:shadow-lg ${className}`}>
           <div className="mb-2 flex items-center gap-2 text-xs text-muted">
             <span className="font-medium uppercase tracking-wide">
               {t("qb.title")}</span>
@@ -65,20 +67,20 @@ export function QueryBuilder({ value, onChange, className = "" }: {
             <button className="underline-offset-2 hover:underline"
               onClick={() => setOpen(false)}>{t("qb.done")}</button>
           </div>
-          <div className="grid gap-2 sm:grid-cols-2">
-            <div className="flex items-center gap-2 text-sm">
+          <div className="grid gap-2">
+            <div className="flex min-w-0 items-center gap-2 text-sm">
               <span className="w-24 shrink-0 text-xs text-muted">
                 {t("qb.tag")}</span>
-              <Select className="!min-h-8 flex-1 !text-xs" value={tag}
+              <Select className="!min-h-8 min-w-0 flex-1 !text-xs" value={tag}
                 onChange={(e) => setTag(e.target.value)}>
                 {TAGS.map((x) => <option key={x}>{x}</option>)}
               </Select>
               {addBtn(`tag:${tag}`)}
             </div>
-            <div className="flex items-center gap-2 text-sm">
+            <div className="flex min-w-0 items-center gap-2 text-sm">
               <span className="w-24 shrink-0 text-xs text-muted">
                 {t("qb.ai")}</span>
-              <Select className="!min-h-8 flex-1 !text-xs" value={ai}
+              <Select className="!min-h-8 min-w-0 flex-1 !text-xs" value={ai}
                 onChange={(e) => setAi(e.target.value)}>
                 <option value="safe">{t("qb.ai_safe")}</option>
                 <option value="review">{t("qb.ai_review")}</option>
@@ -86,19 +88,19 @@ export function QueryBuilder({ value, onChange, className = "" }: {
               </Select>
               {addBtn(`ai:${ai}`)}
             </div>
-            <div className="flex items-center gap-2 text-sm">
+            <div className="flex min-w-0 items-center gap-2 text-sm">
               <span className="w-24 shrink-0 text-xs text-muted">
                 {t("qb.age")}</span>
               <Input className="!min-h-8 w-14 !text-xs" type="number" min="1"
                 value={age} onChange={(e) => setAge(e.target.value)} />
-              <Select className="!min-h-8 flex-1 !text-xs" value={ageUnit}
+              <Select className="!min-h-8 min-w-0 flex-1 !text-xs" value={ageUnit}
                 onChange={(e) => setAgeUnit(e.target.value as "m" | "y")}>
                 <option value="m">{t("qb.months")}</option>
                 <option value="y">{t("qb.years")}</option>
               </Select>
               {addBtn(`age:>${+age || 1}${ageUnit}`)}
             </div>
-            <div className="flex items-center gap-2 text-sm">
+            <div className="flex min-w-0 items-center gap-2 text-sm">
               <span className="w-24 shrink-0 text-xs text-muted">
                 {t("qb.unread")}</span>
               <Input className="!min-h-8 w-14 !text-xs" type="number"
@@ -107,7 +109,7 @@ export function QueryBuilder({ value, onChange, className = "" }: {
               <span className="text-xs text-muted">%</span>
               {addBtn(`unread:>${+unread || 1}`)}
             </div>
-            <div className="flex items-center gap-2 text-sm">
+            <div className="flex min-w-0 items-center gap-2 text-sm">
               <span className="w-24 shrink-0 text-xs text-muted">
                 {t("qb.att")}</span>
               <Input className="!min-h-8 w-14 !text-xs" type="number" min="1"
@@ -115,8 +117,7 @@ export function QueryBuilder({ value, onChange, className = "" }: {
               <span className="text-xs text-muted">MB</span>
               {addBtn(`att:>${+att || 1}m`)}
             </div>
-            <div className="flex flex-wrap items-center gap-1.5
-              sm:col-span-2">
+            <div className="flex flex-wrap items-center gap-1.5">
               <span className="w-24 shrink-0 text-xs text-muted">
                 {t("qb.flags")}</span>
               {flag("is:unsub", t("qb.is_unsub"))}

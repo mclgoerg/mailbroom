@@ -13,6 +13,11 @@ Foundry) that suggests what's safe to delete and tracks its own cost.
 
 ![Mailbroom group view](docs/screenshots/groups-dark.png)
 
+**In action** — click a filter together, select everything the AI rated
+safe, drill into a group:
+
+![Filter, select, drill down](docs/screenshots/demo.gif)
+
 <details>
 <summary>More screenshots — drill-down, statistics, light theme</summary>
 
@@ -20,9 +25,11 @@ Foundry) that suggests what's safe to delete and tracks its own cost.
 ![Statistics](docs/screenshots/stats.png)
 ![Light theme](docs/screenshots/groups-light.png)
 
-All screenshots show generated demo data (`scripts/demo.py` — run it
-yourself for a zero-setup playground on fake mailboxes).
 </details>
+
+All screenshots show generated demo data (`scripts/demo.py` — run it
+yourself for a zero-setup playground on fake mailboxes; the GIF rig is
+`scripts/demo-gif.mjs`).
 
 ## Supported providers
 

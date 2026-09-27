@@ -530,8 +530,8 @@ export default function App() {
         {/* Filter + builder share one flex-wrap unit: the 🧰 sits right
             next to the input on every width, and the builder panel
             (w-full) wraps to its own line directly underneath. */}
-        <div className="order-last flex w-full flex-wrap items-center gap-2
-          sm:order-none sm:w-auto sm:min-w-24 sm:flex-1">
+        <div className="relative order-last flex w-full flex-wrap
+          items-center gap-2 sm:order-none sm:w-auto sm:min-w-24 sm:flex-1">
           <Input
             ref={filterRef}
             className="min-w-0 flex-1"

@@ -184,7 +184,7 @@ export function RulesModal({ state, onClose, onChanged }: {
               <option value="subject">{t("Subject")}</option>
             </Select>
             <div className="sm:col-span-2">
-              <div className="flex flex-wrap items-center gap-2">
+              <div className="relative flex flex-wrap items-center gap-2">
                 <Input className="min-w-0 flex-1"
                   placeholder="tag:shipping age:>1y is:noreply-ever …"
                   value={form.query} onChange={set("query")} />
