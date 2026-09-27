@@ -76,6 +76,17 @@ export const EN: Record<string, string> = {
   "shared.enabled": "Share this key with all users",
   "shared.budget": "Default monthly budget per user ($)",
   "ai.shared_key_ph": "using the shared server key",
+  "usage.section": "User statistics",
+  "usage.help":
+    "Usage per workspace — counts, AI spend and disk only. Mailbroom "
+    + "never shows you other users' mail data, account names or senders.",
+  "usage.user": "User / workspace",
+  "usage.mails": "Mails (last scan)",
+  "usage.cleaned": "Cleaned (month)",
+  "usage.ai_month": "AI spend (month)",
+  "usage.last_scan": "Last scan",
+  "usage.disk": "Disk",
+  "usage.shared": "shared key",
   "ai.shared_note":
     "No own key — AI runs on the server's shared key "
     + "(your monthly cap: {cap}).",

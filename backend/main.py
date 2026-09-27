@@ -438,6 +438,15 @@ def get_duplicates(account: str | None = Query(None)):
     return mailops.duplicates_list(acc=_acc(account))
 
 
+@app.get("/api/admin/stats")
+def get_admin_stats():
+    """Usage overview over ALL tenants — admin only. Counts, spend and
+    disk footprint; never account names or mail-derived data."""
+    if not cfgmod.is_admin():
+        raise HTTPException(403, "admin only")
+    return {"tenants": statsmod.admin_overview()}
+
+
 @app.get("/api/stats")
 def get_stats(account: str | None = Query(None)):
     acc = _acc(account)

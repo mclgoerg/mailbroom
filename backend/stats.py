@@ -97,6 +97,73 @@ def record_scan(mails: int, size: int, senders: int,
         _write(data)
 
 
+def admin_overview() -> list[dict]:
+    """Per-tenant USAGE numbers for the admin: counts, spend, timestamps
+    and disk footprint only — deliberately NO account names, addresses,
+    folder names or any other mail-derived content. The only identifier
+    is the tenant's storage id."""
+    # Lazy imports: mailops imports this module at load time.
+    from . import config as cfgmod
+    from . import mailops
+    from . import rules as rulesmod
+    from . import verdictstore
+
+    def fsize(path) -> int:
+        try:
+            return path.stat().st_size
+        except OSError:
+            return 0
+
+    month = time.strftime("%Y-%m")
+    out = []
+    for tenant in tenants.known():
+        with tenants.use(tenant):
+            cfg = cfgmod.load_config()
+            ai_eff, ai_source = cfgmod.effective_ai(cfg)
+            usage = cfgmod.load_stats()
+            hist = _load_all()["accounts"]
+            scans = [s for e in hist.values() for s in e.get("scans", [])]
+            mails = size = 0
+            for e in hist.values():
+                if e.get("scans"):
+                    mails += e["scans"][-1].get("mails", 0)
+                    size += e["scans"][-1].get("size", 0)
+            acts = {a: 0 for a in _ACTIONS} | {"freed": 0}
+            for e in hist.values():
+                for k, v in (e.get("actions", {}).get(month) or {}).items():
+                    acts[k] = acts.get(k, 0) + v
+            vdata = verdictstore.load()
+            verdicts = sum(len(v) for acct in vdata["accounts"].values()
+                           for v in acct.values()) + len(vdata["_mails"])
+            disk = sum(fsize(p) for p in (
+                cfgmod.config_path(), cfgmod.stats_path(),
+                verdictstore._path(), rulesmod._path(), _path(),
+                mailops._replied_path(),
+                *(mailops._snap_path(n) for n in cfg["accounts"])))
+            out.append({
+                "id": tenant.id,
+                "is_admin_workspace": tenant.is_default,
+                "accounts": len(cfg["accounts"]),
+                "mails": mails, "size": size,
+                "scans": len(scans),
+                "last_scan_ts": max((s.get("ts", 0) for s in scans),
+                                    default=None),
+                "rules": len(rulesmod.load_rules()),
+                "verdicts": verdicts,
+                "actions_month": acts,
+                "ai": {"source": ai_source,
+                       "runs": usage.get("runs", 0),
+                       "input_tokens": usage.get("input_tokens", 0),
+                       "output_tokens": usage.get("output_tokens", 0),
+                       "cost": usage.get("cost", 0.0),
+                       "month_cost": cfgmod.month_cost(),
+                       "budget_usd": float(ai_eff.get("budget_usd") or 0)},
+                "disk_bytes": disk,
+            })
+    out.sort(key=lambda r: (not r["is_admin_workspace"], r["id"]))
+    return out
+
+
 def record_action(action: str, count: int, size: int,
                   account: str | None = None) -> None:
     """Tally one finished job into the current month. `size` should be the

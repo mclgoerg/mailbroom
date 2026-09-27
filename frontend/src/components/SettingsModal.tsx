@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
 import { api, fmtUsd } from "../api";
 import { getLang, setLang, t, type Lang } from "../i18n";
-import type { AuthMode, Config, FoldersResp, Preset, Security,
-  SmtpSecurity } from "../types";
+import { fmtAgo, fmtSize } from "../lib";
+import type { AdminTenantStats, AuthMode, Config, FoldersResp, Preset,
+  Security, SmtpSecurity } from "../types";
 import { Button, Field, Input, Loading, Modal, PanelHeader,
   SectionLabel, Select, TextArea } from "./ui";
 
@@ -122,6 +123,10 @@ export function SettingsModal({ cfg, account, onClose, onSaved,
     return out;
   };
   const [msg, setMsg] = useState("");
+  // Admin usage overview (Server tab): fetched once when the tab opens.
+  const [tenantStats, setTenantStats] =
+    useState<AdminTenantStats[] | null>(null);
+  const [tenantStatsErr, setTenantStatsErr] = useState("");
   // Folder picker: checked = scanned. Wildcard rules (e.g. Labels/*) are
   // shown as removable chips and win over checkboxes.
   const [folders, setFolders] = useState<FoldersResp | null>(null);
@@ -288,6 +293,13 @@ export function SettingsModal({ cfg, account, onClose, onSaved,
   // so Save always persists every tab, not just the visible one.
   type Tab = "account" | "general" | "ai" | "server";
   const [tab, setTab] = useState<Tab>("account");
+  useEffect(() => {
+    if (tab !== "server" || !cfg.auth.is_admin || tenantStats) return;
+    api.adminStats()
+      .then((r) => setTenantStats(r.tenants))
+      .catch((e) => setTenantStatsErr(String(e.message ?? e)));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tab]);
   const tabs: [Tab, string][] = [
     ["account", t("tab.account")],
     ["general", t("tab.general")],
@@ -654,6 +666,79 @@ export function SettingsModal({ cfg, account, onClose, onSaved,
               </Field>
             </div>
           </>)}
+
+          <SectionLabel className="sm:col-span-2 mt-2">
+            {t("usage.section")}
+          </SectionLabel>
+          <p className="sm:col-span-2 -mt-2 text-xs text-muted">
+            {t("usage.help")}
+          </p>
+          <div className="sm:col-span-2">
+            {!tenantStats && !tenantStatsErr && <Loading className="!p-3" />}
+            {tenantStatsErr && (
+              <div className="text-xs text-rose-400">{tenantStatsErr}</div>
+            )}
+            {tenantStats && (
+              <div className="overflow-x-auto rounded-md border border-line">
+                <table className="w-full min-w-[560px] table-fixed text-xs">
+                  <thead>
+                    <tr className="border-b border-line text-left text-muted">
+                      <th className="w-[26%] px-2 py-1.5 font-medium">
+                        {t("usage.user")}</th>
+                      <th className="w-[16%] px-2 py-1.5 font-medium">
+                        {t("usage.mails")}</th>
+                      <th className="w-[14%] px-2 py-1.5 font-medium">
+                        {t("usage.cleaned")}</th>
+                      <th className="w-[18%] px-2 py-1.5 font-medium">
+                        {t("usage.ai_month")}</th>
+                      <th className="w-[13%] px-2 py-1.5 font-medium">
+                        {t("usage.last_scan")}</th>
+                      <th className="w-[13%] px-2 py-1.5 font-medium">
+                        {t("usage.disk")}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {tenantStats.map((u) => (
+                      <tr key={u.id} className="border-b border-line
+                        last:border-0 align-top">
+                        <td className="truncate px-2 py-1.5"
+                          title={`${u.id} — ${u.accounts} account(s), ${
+                            u.scans} scan(s), ${u.rules} rule(s), ${
+                            u.verdicts} AI verdict(s)`}>
+                          {u.is_admin_workspace ? "★ " : ""}{u.id}
+                        </td>
+                        <td className="px-2 py-1.5">
+                          {u.mails.toLocaleString()}
+                          <span className="text-muted">
+                            {" "}· {fmtSize(u.size)}</span>
+                        </td>
+                        <td className="px-2 py-1.5">
+                          {u.actions_month.trash.toLocaleString()}
+                          <span className="text-muted">
+                            {" "}· {fmtSize(u.actions_month.freed)}</span>
+                        </td>
+                        <td className="px-2 py-1.5">
+                          {fmtUsd(u.ai.month_cost)}
+                          <span className="text-muted">
+                            {u.ai.budget_usd
+                              ? ` / ${fmtUsd(u.ai.budget_usd)}` : ""}
+                            {u.ai.source === "shared"
+                              ? ` (${t("usage.shared")})` : ""}
+                          </span>
+                        </td>
+                        <td className="px-2 py-1.5">
+                          {fmtAgo(u.last_scan_ts) || "—"}
+                        </td>
+                        <td className="px-2 py-1.5">
+                          {fmtSize(u.disk_bytes)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
         </>)}
 
         {tab === "ai" && (<>

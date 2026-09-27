@@ -422,6 +422,18 @@ export const DE: Record<string, string> = {
   "shared.enabled": "Diesen Schlüssel mit allen Nutzern teilen",
   "shared.budget": "Standard-Monatsbudget pro Nutzer ($)",
   "ai.shared_key_ph": "nutzt den gemeinsamen Server-Schlüssel",
+  "usage.section": "Nutzerstatistik",
+  "usage.help":
+    "Nutzung pro Arbeitsbereich — nur Zahlen, AI-Kosten und "
+    + "Speicherplatz. Mailbroom zeigt dir nie Maildaten, Kontonamen "
+    + "oder Absender anderer Nutzer.",
+  "usage.user": "Nutzer / Arbeitsbereich",
+  "usage.mails": "Mails (letzter Scan)",
+  "usage.cleaned": "Aufgeräumt (Monat)",
+  "usage.ai_month": "AI-Kosten (Monat)",
+  "usage.last_scan": "Letzter Scan",
+  "usage.disk": "Speicher",
+  "usage.shared": "geteilter Schlüssel",
   "ai.shared_note":
     "Kein eigener Schlüssel — AI läuft über den gemeinsamen "
     + "Server-Schlüssel (dein Monatslimit: {cap}).",

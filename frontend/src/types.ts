@@ -235,6 +235,27 @@ export interface AuthCfg {
   };
 }
 
+// Admin-only usage overview: one row per tenant workspace. Counts,
+// spend and disk only — the backend never includes account names,
+// addresses or any mail-derived data here.
+export interface AdminTenantStats {
+  id: string;
+  is_admin_workspace: boolean;
+  accounts: number;
+  mails: number;
+  size: number;
+  scans: number;
+  last_scan_ts: number | null;
+  rules: number;
+  verdicts: number;
+  actions_month: { trash: number; archive: number; move: number;
+    mark_read: number; freed: number };
+  ai: { source: "own" | "shared" | null; runs: number;
+    input_tokens: number; output_tokens: number; cost: number;
+    month_cost: number; budget_usd: number };
+  disk_bytes: number;
+}
+
 // Admin-only: the server-side AI key shared with all tenants.
 export interface SharedAiCfg {
   enabled: boolean;

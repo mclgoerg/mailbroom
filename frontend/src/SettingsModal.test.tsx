@@ -17,6 +17,16 @@ vi.mock("./api", () => ({
       saveCalls.push(body);
       return new Promise(() => {});              // response irrelevant here
     },
+    adminStats: () => Promise.resolve({ tenants: [{
+      id: "alice_x.example_ab12cd34", is_admin_workspace: false,
+      accounts: 1, mails: 42, size: 1048576, scans: 3,
+      last_scan_ts: Date.now() / 1000 - 3600, rules: 0, verdicts: 5,
+      actions_month: { trash: 7, archive: 0, move: 0, mark_read: 0,
+        freed: 2048 },
+      ai: { source: "shared" as const, runs: 2, input_tokens: 100,
+        output_tokens: 10, cost: 0.5, month_cost: 0.5, budget_usd: 5 },
+      disk_bytes: 4096,
+    }] }),
   },
   fmtUsd: (n: number) => `$${n.toFixed(2)}`,
 }));
@@ -143,7 +153,7 @@ test("server settings (login + shared AI) are admin-only", () => {
   expect(saveCalls[0].shared_ai).toBeUndefined();
 });
 
-test("the admin sees and saves the shared AI section", () => {
+test("the admin sees and saves the shared AI section", async () => {
   saveCalls.length = 0;
   const asAdmin: Config = {
     ...cfg,
@@ -157,6 +167,9 @@ test("the admin sees and saves the shared AI section", () => {
     onSaved={() => {}} onAccountsChanged={() => {}} />);
   fireEvent.click(screen.getByRole("tab", { name: /Server/ }));
   expect(screen.getByText(/Shared AI key/)).toBeTruthy();
+  // the per-user usage table loads (id + shared-key spend/cap visible)
+  expect(await screen.findByText(/alice_x.example/)).toBeTruthy();
+  expect(screen.getByText(/\$0.50/)).toBeTruthy();
   fireEvent.click(screen.getByText("Save"));
   expect(saveCalls[0].auth.mode).toBe("oidc");
   expect(saveCalls[0].auth.admin).toBe("me@x");

@@ -284,3 +284,42 @@ def test_wrong_tenant_gets_400_on_every_account_endpoint():
                                                      "application/json")
                                                  else {}), \
                 f"{method} {path} leaked another tenant's account"
+
+
+def test_admin_stats_are_usage_only_and_admin_only(bridge):
+    """The admin overview shows per-tenant NUMBERS (mails, spend, disk)
+    but never account names, hosts, addresses or protected entries."""
+    import time
+    _enable_oidc()
+    cfgmod.update_config({"shared_ai": {"enabled": True,
+                                        "api_key": "sk-shared"}})
+    alice = _client_as("alice@x.example")
+    alice.post("/api/config", json={
+        "account": "default",
+        "imap": {"host": "imap.secret-host.example", "password": "alicepw"},
+        "protected": ["secretboss@x.example"]})
+    alice.post("/api/config", json={
+        "rename_account": {"from": "default", "to": "supersecret-acct"}})
+    assert alice.post("/api/scan?account=supersecret-acct").status_code == 200
+    for _ in range(200):
+        if alice.get("/api/state?account=supersecret-acct").json()[
+                "status"] == "done":
+            break
+        time.sleep(0.02)
+
+    # not for tenants
+    assert alice.get("/api/admin/stats").status_code == 403
+
+    r = _client_as(ADMIN).get("/api/admin/stats")
+    assert r.status_code == 200
+    rows = r.json()["tenants"]
+    assert rows[0]["is_admin_workspace"]           # admin sorts first
+    arow = next(t_ for t_ in rows if t_["id"].startswith("alice"))
+    assert arow["accounts"] == 1 and arow["scans"] == 1
+    assert arow["mails"] > 0 and arow["disk_bytes"] > 0
+    assert arow["last_scan_ts"] and arow["ai"]["source"] == "shared"
+
+    # the privacy guarantee, machine-checked
+    for secret in ("supersecret-acct", "secret-host", "alicepw",
+                   "secretboss"):
+        assert secret not in r.text, f"admin stats leaked {secret!r}"
