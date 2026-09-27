@@ -13,7 +13,7 @@ export function setAccount(name: string) {
 }
 
 export function withAccount(path: string): string {
-  if (!ACCOUNT) return path;
+  if (!ACCOUNT || path.includes("account=")) return path;
   const sep = path.includes("?") ? "&" : "?";
   return `${path}${sep}account=${encodeURIComponent(ACCOUNT)}`;
 }
@@ -68,7 +68,10 @@ export const api = {
   clearNotice: () => req<{ ok: boolean }>("/api/notice/clear", {}),
   search: (q: string) =>
     req<Mail[]>(`/api/search?q=${encodeURIComponent(q)}`),
-  folders: () => req<FoldersResp>("/api/folders"),
+  folders: (account?: string) =>
+    req<FoldersResp>(account
+      ? `/api/folders?account=${encodeURIComponent(account)}`
+      : "/api/folders"),
   exportUrl: (grouping: Grouping) =>
     withAccount(`/api/export?grouping=${grouping}`),
   rules: () => req<{ rules: Rule[] }>("/api/rules"),

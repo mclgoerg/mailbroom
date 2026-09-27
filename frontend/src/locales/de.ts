@@ -372,4 +372,15 @@ export const DE: Record<string, string> = {
     'Konto "{name}" entfernen? Seine Regeln behalten den Kontonamen und '
     + "laufen nicht mehr; Mails auf dem Server bleiben unangetastet.",
   "account.switch_tip": "Konto wechseln — jede Ansicht gilt pro Konto",
+  "account.rename": "Umbenennen…",
+  "account.rename_prompt": 'Neuer Name für Konto "{name}":',
+  "account.renamed": 'Konto umbenannt in "{name}".',
+  "folders.title": "Zu scannende Ordner — Konto \u201e{name}\u201c",
+  "folders.discover": "Erkennen",
+  "folders.discover_tip":
+    "Ordnerliste dieses Kontos neu vom Server laden (nutzt die "
+    + "GESPEICHERTEN Zugangsdaten — neue erst speichern)",
+  "folders.err_hint":
+    "— die Ordner-Erkennung braucht gespeicherte, funktionierende "
+    + "Zugangsdaten für dieses Konto; erst speichern, dann Erkennen.",
 };

@@ -191,6 +191,7 @@ export type Preset = "proton" | "gmail" | "icloud" | "fastmail" | "gmx"
   | "mailbox" | "yahoo" | "custom";
 
 export interface ImapAccount {
+  excluded_folders: string[];
   host: string;
   port: number;
   security: Security;
@@ -207,7 +208,6 @@ export interface ImapAccount {
 export interface Config {
   accounts: Record<string, ImapAccount>;
   default_account: string;
-  excluded_folders: string[];
   protected: string[];
   categories: Record<string, string[]>;
   ai: {

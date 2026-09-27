@@ -424,7 +424,7 @@ def get_folders(account: str | None = Query(None)):
                 pass
     except Exception as exc:
         raise HTTPException(500, f"{type(exc).__name__}: {exc}")
-    rules = cfg["excluded_folders"]
+    rules = cfgmod.account_imap(acc.name).get("excluded_folders") or []
     role_of = {name: role for role, name in roles.items()}
     return {
         "folders": [
@@ -477,7 +477,6 @@ def get_export_config():
         "config": {
             "accounts": {n: {k: v for k, v in b.items() if k != "password"}
                          for n, b in cfg["accounts"].items()},
-            "excluded_folders": cfg["excluded_folders"],
             "protected": cfgmod.normalize_protected(cfg.get("protected")),
             "categories": cfg.get("categories") or {},
             "ai": {k: v for k, v in cfg["ai"].items() if k != "api_key"},
@@ -609,6 +608,22 @@ def post_config(body: dict):
         cfg = cfgmod.update_config(body)
     except ValueError as exc:
         raise HTTPException(400, str(exc))
+    if body.get("delete_account"):
+        accountsmod.drop(str(body["delete_account"]))
+    if isinstance(body.get("rename_account"), dict):
+        # The config rename succeeded — carry every per-account artifact
+        # (runtime state, verdicts, replied cache, stats, rules) along.
+        old = str(body["rename_account"].get("from") or "")
+        new = str(body["rename_account"].get("to") or "").strip()[:60]
+        if old != new:
+            accountsmod.rename(old, new)
+            verdictstore.rename_account(old, new)
+            mailops.rename_replied_account(old, new)
+            statsmod.rename_account(old, new)
+            rulesmod.rename_account(old, new)
+            logging.getLogger("pmc.mail").info(
+                "account renamed: %r -> %r (state, verdicts, replied, "
+                "stats, rules migrated)", old, new)
     return cfgmod.masked_config(cfg)
 
 

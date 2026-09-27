@@ -5,25 +5,39 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, expect, test, vi } from "vitest";
 
+const foldersCalls: (string | undefined)[] = [];
+const saveCalls: any[] = [];
 vi.mock("./api", () => ({
-  api: { folders: () => new Promise(() => {}) },   // picker stays loading
+  api: {
+    folders: (account?: string) => {
+      foldersCalls.push(account);
+      return new Promise(() => {});              // picker stays loading
+    },
+    saveConfig: (body: any) => {
+      saveCalls.push(body);
+      return new Promise(() => {});              // response irrelevant here
+    },
+  },
   fmtUsd: (n: number) => `$${n.toFixed(2)}`,
 }));
 
 import { SettingsModal } from "./components/SettingsModal";
 import type { Config } from "./types";
 
+const acct = {
+  excluded_folders: [] as string[],
+  host: "127.0.0.1", port: 1143, security: "ssl" as const,
+  smtp_host: "", smtp_port: 1025, smtp_security: "auto" as const,
+  user: "me@proton.example", password: "", password_set: true,
+  cafile: "/certs/bridge-cert.pem", preset: "proton" as const,
+};
 const cfg: Config = {
   accounts: {
-    default: {
-      host: "127.0.0.1", port: 1143, security: "ssl",
-      smtp_host: "", smtp_port: 1025, smtp_security: "auto",
-      user: "me@proton.example", password: "", password_set: true,
-      cafile: "/certs/bridge-cert.pem", preset: "proton",
-    },
+    default: acct,
+    icloud: { ...acct, host: "imap.mail.me.com", preset: "custom",
+      user: "me@icloud.example" },
   },
   default_account: "default",
-  excluded_folders: [],
   protected: [],
   categories: {},
   ai: {
@@ -72,4 +86,30 @@ test("prefilled fields stay editable", () => {
   fireEvent.change(presetSelect(), { target: { value: "fastmail" } });
   fireEvent.change(hostInput(), { target: { value: "imap.mine.example" } });
   expect(hostInput().value).toBe("imap.mine.example");
+});
+
+test("folder discovery follows the account being edited", () => {
+  foldersCalls.length = 0;
+  render(<SettingsModal cfg={cfg} account="default" onClose={() => {}}
+    onSaved={() => {}} onAccountsChanged={() => {}} />);
+  expect(foldersCalls).toEqual(["default"]);
+  fireEvent.change(
+    screen.getByLabelText(/Account to edit/) as HTMLSelectElement,
+    { target: { value: "icloud" } });
+  expect(foldersCalls).toEqual(["default", "icloud"]);
+  expect(hostInput().value).toBe("imap.mail.me.com");
+  // manual re-discover button
+  fireEvent.click(screen.getByText(/Discover/));
+  expect(foldersCalls).toEqual(["default", "icloud", "icloud"]);
+});
+
+test("rename sends rename_account for the edited account", () => {
+  saveCalls.length = 0;
+  vi.stubGlobal("prompt", () => "bridge");
+  render(<SettingsModal cfg={cfg} account="default" onClose={() => {}}
+    onSaved={() => {}} onAccountsChanged={() => {}} />);
+  fireEvent.click(screen.getByText("Rename…"));
+  expect(saveCalls).toEqual(
+    [{ rename_account: { from: "default", to: "bridge" } }]);
+  vi.unstubAllGlobals();
 });

@@ -97,7 +97,7 @@ class FakeIMAP:
 
     def response(self, key):
         if key == "UIDVALIDITY" and self.selected:
-            return key, [str(self.uv[self.selected]).encode()]
+            return key, [str(self.uv.get(self.selected, 1)).encode()]
         return key, [None]
 
     def status(self, qname, what):

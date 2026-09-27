@@ -111,8 +111,12 @@ export function SettingsModal({ cfg, account, onClose, onSaved,
   const [included, setIncluded] = useState<Set<string>>(new Set());
   const [wildcards, setWildcards] = useState<string[]>([]);
 
-  useEffect(() => {
-    api.folders()
+  // Folder discovery is PER ACCOUNT (each provider names folders
+  // differently) and needs that account's SAVED credentials.
+  const discoverFolders = (name: string) => {
+    setFolders(null);
+    setFoldersErr("");
+    api.folders(name)
       .then((r) => {
         setFolders(r);
         setWildcards(r.wildcards);
@@ -120,7 +124,9 @@ export function SettingsModal({ cfg, account, onClose, onSaved,
           r.folders.filter((x) => !x.excluded).map((x) => x.raw)));
       })
       .catch((e) => setFoldersErr(String(e.message ?? e)));
-  }, []);
+  };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { discoverFolders(editAcct); }, [editAcct]);
 
   const set = (k: keyof typeof f) =>
     (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
@@ -183,8 +189,23 @@ export function SettingsModal({ cfg, account, onClose, onSaved,
   };
 
   const switchEditAccount = (name: string) => {
-    setEditAcct(name);
+    setEditAcct(name);                 // effect above re-discovers folders
     setF({ ...f, ...imapFields(cfg, name) });
+  };
+
+  const renameAccount = async () => {
+    const name = prompt(t("account.rename_prompt", { name: editAcct }),
+      editAcct)?.trim();
+    if (!name || name === editAcct) return;
+    try {
+      const next = await api.saveConfig(
+        { rename_account: { from: editAcct, to: name } });
+      onAccountsChanged(next, account === editAcct ? name : null);
+      setEditAcct(name);
+      setMsg(t("account.renamed", { name }));
+    } catch (e: any) {
+      setMsg(`Error: ${e.message ?? e}`);
+    }
   };
 
   const newAccount = async () => {
@@ -273,6 +294,9 @@ export function SettingsModal({ cfg, account, onClose, onSaved,
           <Button variant="ghost" onClick={newAccount}>
             {t("account.add")}
           </Button>
+          <Button variant="ghost" onClick={renameAccount}>
+            {t("account.rename")}
+          </Button>
           {Object.keys(cfg.accounts).length > 1 && (
             <Button variant="ghost" onClick={deleteAccount}>
               {t("Delete…")}
@@ -348,12 +372,22 @@ export function SettingsModal({ cfg, account, onClose, onSaved,
         </div>
 
         <div className="sm:col-span-2">
-          <span className="mb-1 block text-xs text-muted">
-            {t("Folders to scan")}
-          </span>
+          <div className="mb-1 flex items-center gap-2">
+            <span className="text-xs text-muted">
+              {t("folders.title", { name: editAcct })}
+            </span>
+            <Button variant="ghost" className="!min-h-7 !px-2 !py-0.5 !text-xs"
+              title={t("folders.discover_tip")}
+              onClick={() => discoverFolders(editAcct)}>
+              🔄 {t("folders.discover")}
+            </Button>
+          </div>
           {!folders && !foldersErr && <Loading className="!p-3" />}
           {foldersErr && (
-            <div className="text-xs text-rose-400">{foldersErr}</div>
+            <div className="text-xs text-rose-400">
+              {foldersErr}
+              <span className="ml-1 text-muted">{t("folders.err_hint")}</span>
+            </div>
           )}
           {folders && (
             <div className="rounded-md border border-line bg-panel2 p-3">

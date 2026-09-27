@@ -44,10 +44,11 @@ NEUTRAL_IMAP = {
 }
 
 DEFAULT_CONFIG = {
-    # Multi-account: {name: imap-block}. The FIRST entry is the default
-    # account for API calls without an explicit ?account=.
-    "accounts": {"default": ENV_IMAP},
-    "excluded_folders": DEFAULT_EXCLUDED,
+    # Multi-account: {name: imap-block incl. its own excluded_folders}.
+    # The FIRST entry is the default account for API calls without an
+    # explicit ?account=.
+    "accounts": {"default": {**ENV_IMAP,
+                             "excluded_folders": DEFAULT_EXCLUDED}},
     # Protected senders: addresses ("user@example.com") or domains
     # ("@example.com" / "example.com"). Bulk deletes and selection presets
     # skip them; the AI must never rate their mails delete_safe.
@@ -157,7 +158,9 @@ def _load_accounts(saved: dict) -> dict[str, dict]:
     format (imap + profiles + active_profile) transparently. The first
     account merges over the env bootstrap values (classic Docker setups);
     additional accounts merge over neutral defaults so env secrets never
-    leak into them."""
+    leak into them. Folder exclusions are PER ACCOUNT (providers name
+    their folders differently); a legacy top-level excluded_folders list
+    fills every account that doesn't have its own yet."""
     if isinstance(saved.get("accounts"), dict) and saved["accounts"]:
         blocks = {str(n): (b if isinstance(b, dict) else {})
                   for n, b in saved["accounts"].items()}
@@ -168,11 +171,18 @@ def _load_accounts(saved: dict) -> dict[str, dict]:
             if isinstance(p, dict) and str(n) not in blocks:
                 blocks[str(n)] = p
     else:
-        return {"default": dict(ENV_IMAP)}
+        blocks = {"default": {}}
+    legacy_excluded = (saved.get("excluded_folders")
+                       if isinstance(saved.get("excluded_folders"), list)
+                       else None)
     out: dict[str, dict] = {}
     for i, (name, block) in enumerate(blocks.items()):
         base = ENV_IMAP if i == 0 else NEUTRAL_IMAP
         out[name] = {**base, **block}
+        if not isinstance(out[name].get("excluded_folders"), list):
+            out[name]["excluded_folders"] = list(
+                legacy_excluded if legacy_excluded is not None
+                else DEFAULT_EXCLUDED)
     return out
 
 
@@ -182,8 +192,6 @@ def load_config() -> dict:
         saved = json.loads(CONFIG_PATH.read_text())
         cfg["accounts"] = _load_accounts(saved)
         cfg["ai"].update(saved.get("ai") or {})
-        if isinstance(saved.get("excluded_folders"), list):
-            cfg["excluded_folders"] = saved["excluded_folders"]
         if isinstance(saved.get("protected"), list):
             cfg["protected"] = normalize_protected(saved["protected"])
         if isinstance(saved.get("categories"), dict):
@@ -211,6 +219,9 @@ def _write(path: Path, obj) -> None:
 
 def _apply_imap(block: dict, imap_in: dict) -> None:
     """Fold a partial imap update into one account's block (in place)."""
+    if isinstance(imap_in.get("excluded_folders"), list):
+        block["excluded_folders"] = [str(f)
+                                     for f in imap_in["excluded_folders"]]
     for key in ("host", "user", "smtp_host", "cafile"):
         if key in imap_in:
             block[key] = str(imap_in[key]).strip()
@@ -251,6 +262,19 @@ def update_config(body: dict) -> dict:
             if len(cfg["accounts"]) == 1:
                 raise ValueError("cannot delete the last account")
             cfg["accounts"].pop(name)
+        if isinstance(body.get("rename_account"), dict):
+            old = str(body["rename_account"].get("from") or "")
+            new = str(body["rename_account"].get("to") or "").strip()[:60]
+            if old not in cfg["accounts"]:
+                raise ValueError(f"unknown account {old!r}")
+            if not new:
+                raise ValueError("account needs a name")
+            if new != old and new in cfg["accounts"]:
+                raise ValueError(f"account {new!r} already exists")
+            # Rebuild in place so the account keeps its position (the
+            # FIRST account stays the default one).
+            cfg["accounts"] = {(new if n == old else n): b
+                               for n, b in cfg["accounts"].items()}
 
         # Single-account update: {"account": name, "imap": {...}}.
         if isinstance(body.get("imap"), dict):
@@ -270,8 +294,14 @@ def update_config(body: dict) -> dict:
                 block = cfg["accounts"].setdefault(name, dict(NEUTRAL_IMAP))
                 _apply_imap(block, imap_in)
 
+        # Folder exclusions are per account; top-level stays accepted for
+        # old clients/backups and targets body["account"] (default: first).
         if isinstance(body.get("excluded_folders"), list):
-            cfg["excluded_folders"] = [str(f) for f in body["excluded_folders"]]
+            target = str(body.get("account") or next(iter(cfg["accounts"])))
+            if target not in cfg["accounts"]:
+                raise ValueError(f"unknown account {target!r}")
+            cfg["accounts"][target]["excluded_folders"] = [
+                str(f) for f in body["excluded_folders"]]
         if isinstance(body.get("protected"), list):
             cfg["protected"] = normalize_protected(body["protected"])
         if isinstance(body.get("categories"), dict):
@@ -304,7 +334,6 @@ def masked_config(cfg: dict) -> dict:
             n: {**b, "password": "", "password_set": bool(b["password"])}
             for n, b in cfg["accounts"].items()},
         "default_account": next(iter(cfg["accounts"])),
-        "excluded_folders": cfg["excluded_folders"],
         "protected": normalize_protected(cfg.get("protected")),
         "categories": cfg.get("categories") or {},
         "ai": {"provider": cfg["ai"]["provider"],

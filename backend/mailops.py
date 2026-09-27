@@ -110,6 +110,21 @@ def _read_replied_file() -> dict:
     return {"accounts": {}}
 
 
+def rename_replied_account(old: str, new: str) -> None:
+    """Move one account's replied cache to a new account name."""
+    try:
+        data = _read_replied_file()
+        if old in data["accounts"]:
+            data["accounts"][new] = data["accounts"].pop(old)
+            REPLIED_PATH.parent.mkdir(parents=True, exist_ok=True)
+            tmp = REPLIED_PATH.with_suffix(".tmp")
+            tmp.write_text(json.dumps(data))
+            tmp.chmod(0o600)
+            tmp.replace(REPLIED_PATH)
+    except OSError:
+        log.exception("could not rename replied account")
+
+
 def load_replied(acc=None) -> set[str]:
     acc = acc or accounts.get()
     if not acc.replied_loaded:
@@ -634,7 +649,7 @@ def run_scan(acc=None) -> None:
     try:
         conn = connect(im)
         try:
-            rules = cfg["excluded_folders"]
+            rules = im.get("excluded_folders") or []
             roles = folder_roles(conn, acc)
             # Special folders are excluded by ROLE (works for any provider's
             # names); the user's name/wildcard rules still apply on top.

@@ -198,6 +198,19 @@ def _validate(body: dict, rule: dict) -> dict:
     return rule
 
 
+def rename_account(old: str, new: str) -> None:
+    """Point rules of a renamed account at its new name."""
+    with _LOCK:
+        rules = load_rules()
+        changed = False
+        for r in rules:
+            if r.get("account") == old:
+                r["account"] = new
+                changed = True
+        if changed:
+            _save(rules)
+
+
 def create_rule(body: dict) -> dict:
     rule = {"id": uuid.uuid4().hex[:8], "name": "", "grouping": "sender",
             "query": "", "action": "trash", "dest": "",

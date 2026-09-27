@@ -49,6 +49,15 @@ def _load_all() -> dict:
     return {"accounts": {}}
 
 
+def rename_account(old: str, new: str) -> None:
+    """Move one account's history to a new account name."""
+    with _LOCK:
+        data = _load_all()
+        if old in data["accounts"]:
+            data["accounts"][new] = data["accounts"].pop(old)
+            _write(data)
+
+
 def load(account: str | None = None) -> dict:
     """One account's history (default: the default account)."""
     account = account or accounts.default_name()

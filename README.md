@@ -94,9 +94,11 @@ export is Proton-only and hidden for other presets.
   Empty-Trash button, cancellable scans and AI runs.
 - **Multiple accounts** — connect several providers at once (e.g. Proton
   Bridge + Gmail). Every account is strictly separate: its own scans,
-  groups, rules, statistics and replied/verdict caches — nothing is ever
-  mixed or aggregated. A header toggle switches the whole view between
-  accounts.
+  groups, rules, statistics, folder exclusions and replied/verdict
+  caches — nothing is ever mixed or aggregated. A header toggle switches
+  the whole view between accounts; accounts can be added, renamed
+  (all their data follows) and removed in settings, and each has its
+  own folder-discovery picker.
 - **Safe by design** — deletions are IMAP `MOVE` to Trash (reversible),
   UIDVALIDITY checked before every move, read-only scans, UID bookkeeping
   stays server-side, non-root container.

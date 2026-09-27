@@ -83,6 +83,15 @@ def all_instantiated() -> list[AccountState]:
         return list(_REGISTRY.values())
 
 
+def rename(old: str, new: str) -> None:
+    """Carry a renamed account's runtime state over to its new name."""
+    with _REG_LOCK:
+        acc = _REGISTRY.pop(old, None)
+        if acc is not None:
+            acc.name = new
+            _REGISTRY[new] = acc
+
+
 def drop(name: str) -> None:
     """Forget the runtime state of a deleted account."""
     with _REG_LOCK:

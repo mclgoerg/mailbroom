@@ -208,3 +208,86 @@ def test_migration_old_rules_get_default_account(monkeypatch):
         "last_run": None}]}))
     rules = rulesmod.load_rules()
     assert rules[0]["account"] == "default"
+
+
+def test_rename_account_migrates_everything(monkeypatch):
+    fakes = _two_accounts(monkeypatch)
+    one = accountsmod.get("one")
+    mailops.run_scan(one)                        # replied + stats + state
+    verdictstore.save("sender", {"shop@a.example":
+                                 {"verdict": "keep", "reason": "x"}}, "one")
+    rule = rulesmod.create_rule({"name": "r", "query": "shop",
+                                 "account": "one"})
+
+    r = client.post("/api/config", json={
+        "rename_account": {"from": "one", "to": "uno"}})
+    assert r.status_code == 200
+    body = r.json()
+    assert list(body["accounts"]) == ["uno", "two"]
+    assert body["default_account"] == "uno"      # first slot kept
+
+    # runtime state carried over (scan results still there, no rescan)
+    uno = accountsmod.get("uno")
+    assert uno is one and uno.name == "uno"
+    assert "shop@a.example" in mailops.public_state(uno)["groups"]["sender"]
+    # persisted artifacts all moved
+    assert verdictstore.load_account("uno")["sender"]["shop@a.example"]
+    assert verdictstore.load()["accounts"].get("one") is None
+    assert json.loads(mailops.REPLIED_PATH.read_text())[
+        "accounts"]["uno"]["addrs"] == ["pal-one@y.example"]
+    assert len(statsmod.load("uno")["scans"]) == 1
+    assert rulesmod.load_rules()[0]["account"] == "uno"
+    # old name is gone from the API
+    assert client.get("/api/state?account=one").status_code == 400
+    assert client.get("/api/state?account=uno").json()["account"] == "uno"
+    # collisions and unknowns are rejected
+    assert client.post("/api/config", json={
+        "rename_account": {"from": "uno", "to": "two"}}).status_code == 400
+    assert client.post("/api/config", json={
+        "rename_account": {"from": "ghost", "to": "x"}}).status_code == 400
+    _ = rule, fakes
+
+
+def test_excluded_folders_are_per_account(monkeypatch):
+    fakes = _two_accounts(monkeypatch)
+    fakes["host-one"].mailbox["Receipts"] = [
+        make_msg(50, frm="rcpt@a.example")]
+    fakes["host-two"].mailbox["Receipts"] = [
+        make_msg(50, frm="rcpt@b.example")]
+    # exclude Receipts only for account one
+    r = client.post("/api/config", json={
+        "account": "one", "excluded_folders": ["Receipts"]})
+    accts = r.json()["accounts"]
+    assert accts["one"]["excluded_folders"] == ["Receipts"]
+    assert "Receipts" not in accts["two"]["excluded_folders"]
+
+    one, two = accountsmod.get("one"), accountsmod.get("two")
+    mailops.run_scan(one)
+    mailops.run_scan(two)
+    assert "rcpt@a.example" not in mailops.public_state(one)["groups"]["sender"]
+    assert "rcpt@b.example" in mailops.public_state(two)["groups"]["sender"]
+    # /api/folders reflects each account's own exclusions
+    f1 = {x["raw"]: x for x in
+          client.get("/api/folders?account=one").json()["folders"]}
+    f2 = {x["raw"]: x for x in
+          client.get("/api/folders?account=two").json()["folders"]}
+    assert f1["Receipts"]["excluded"] is True
+    assert f2["Receipts"]["excluded"] is False
+
+
+def test_legacy_global_excluded_folders_migrate():
+    cfgmod.CONFIG_PATH.write_text(json.dumps({
+        "imap": {"user": "a@b.c"},
+        "profiles": {"second": {"host": "h2"}},
+        "excluded_folders": ["Trash", "Newsletters"]}))
+    cfg = cfgmod.load_config()
+    for name in ("default", "second"):
+        assert cfg["accounts"][name]["excluded_folders"] == [
+            "Trash", "Newsletters"]
+    # a per-account update no longer touches the other account
+    cfgmod.update_config({"account": "second",
+                          "excluded_folders": ["Trash"]})
+    cfg = cfgmod.load_config()
+    assert cfg["accounts"]["second"]["excluded_folders"] == ["Trash"]
+    assert cfg["accounts"]["default"]["excluded_folders"] == [
+        "Trash", "Newsletters"]

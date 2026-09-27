@@ -29,6 +29,17 @@ export const EN: Record<string, string> = {
     'Remove account "{name}"? Its rules keep their account name and stop '
     + "running; mails on the server are untouched.",
   "account.switch_tip": "Switch account — every view is per account",
+  "account.rename": "Rename…",
+  "account.rename_prompt": 'New name for account "{name}":',
+  "account.renamed": 'Account renamed to "{name}".',
+  "folders.title": "Folders to scan — account \u201c{name}\u201d",
+  "folders.discover": "Discover",
+  "folders.discover_tip":
+    "Reload this account's folder list from the server (uses the SAVED "
+    + "credentials — save new ones first)",
+  "folders.err_hint":
+    "— folder discovery needs saved, working credentials for this "
+    + "account; save them, then hit Discover.",
   "note.ai_selected": "{note} — selected {n}/{of}",
   "note.ai_truncated": " (first {n} mails only)",
   "note.background": "{verb} — running in the background…",

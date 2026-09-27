@@ -45,6 +45,15 @@ def load() -> dict:
     return out
 
 
+def rename_account(old: str, new: str) -> None:
+    """Move one account's group verdicts to a new account name."""
+    with _LOCK:
+        data = load()
+        if old in data["accounts"]:
+            data["accounts"][new] = data["accounts"].pop(old)
+            _persist(data)
+
+
 def load_account(account: str | None = None) -> dict:
     """{grouping: {key: {verdict, reason}}} of one account."""
     account = account or accounts.default_name()
