@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { api } from "./api";
+import { api, setAccount as apiSetAccount, withAccount } from "./api";
 import { DetailPanel } from "./components/DetailPanel";
 import { AttachmentsPanel } from "./components/AttachmentsPanel";
 import { DuplicatesPanel } from "./components/DuplicatesPanel";
@@ -39,6 +39,9 @@ const actionVerb = (a: string): string =>
 export default function App() {
   const [state, setState] = useState<AppState | null>(null);
   const [cfg, setCfg] = useState<Config | null>(null);
+  // Active account: every view shows EXACTLY one account, never a mix.
+  const [account, setAccountState] = useState(
+    () => localStorage.getItem("pmc_account") || "");
   const [mode, setMode] = useState<Grouping>("sender");
   const [filter, setFilter] = useState("");
   const [sortK, setSortK] = useState<SortKey>("count");
@@ -78,11 +81,32 @@ export default function App() {
     }
   }, []);
 
+  // Drop a stale saved account (e.g. deleted meanwhile) once cfg is known.
   useEffect(() => {
+    if (cfg && (!account || !cfg.accounts[account])) {
+      switchAccount(cfg.default_account);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cfg]);
+
+  const switchAccount = (name: string) => {
+    localStorage.setItem("pmc_account", name);
+    apiSetAccount(name);
+    // Switching swaps the ENTIRE view: no state may leak across accounts.
+    setState(null);
+    setSelected(new Set());
+    setDetail(null);
+    setFilter("");
+    setFocusIdx(-1);
+    setAccountState(name);   // effect below reconnects SSE for this account
+  };
+
+  useEffect(() => {
+    apiSetAccount(account);
     api.getConfig().then(setCfg).catch(() => {});
     // Prefer server-sent events; fall back to polling if they fail.
     try {
-      const es = new EventSource("/api/events");
+      const es = new EventSource(withAccount("/api/events"));
       es.onmessage = (ev) => setState(JSON.parse(ev.data));
       es.onerror = () => {
         es.close();
@@ -99,7 +123,7 @@ export default function App() {
       sse.current?.close();
       sse.current = null;
     };
-  }, [refresh]);
+  }, [refresh, account]);
 
   /* Web notifications (opt-in via settings): fire when a background job
      finishes while the tab is hidden. */
@@ -148,6 +172,7 @@ export default function App() {
   const deleting = state?.delete.status === "running";
   const attsRunning = state?.atts?.status === "running";
   const aiEnabled = !!cfg?.ai.available;
+  const acct = cfg?.accounts[account] ?? null;
   const anyModal = !!detail || searchOpen || settingsOpen || rulesOpen
     || attsOpen || dupsOpen || statsOpen || trashOpen;
 
@@ -364,6 +389,23 @@ export default function App() {
           title={t("Theme")} onClick={toggleTheme}>
           {theme === "dark" ? "☀" : "🌙"}
         </button>
+        {/* Account switcher — only when more than one account exists.
+            Switching swaps the entire view; nothing mixes across accounts. */}
+        {cfg && Object.keys(cfg.accounts).length > 1 && (
+          <div className="flex overflow-hidden rounded-md border border-line"
+            title={t("account.switch_tip")}>
+            {Object.keys(cfg.accounts).map((n) => (
+              <button key={n}
+                onClick={() => n !== account && switchAccount(n)}
+                className={`max-w-32 truncate px-2.5 py-1 text-xs ${
+                  n === account
+                    ? "bg-accent text-white"
+                    : "bg-panel2 text-body hover:bg-chip"}`}>
+                {n}
+              </button>
+            ))}
+          </div>
+        )}
         {state?.trash_count != null && state.trash_count > 0 && (
           <span className="ml-auto flex items-center gap-2 text-xs text-muted">
             <button className="underline-offset-2 hover:underline"
@@ -544,7 +586,7 @@ export default function App() {
             <li>{t("onboard.step_scan")}</li>
           </ol>
           <div className="mt-4 flex items-center gap-3">
-            {cfg.imap.password_set && (
+            {acct?.password_set && (
               <Button variant="ghost" onClick={async () => {
                 setToast(t("onboard.testing"));
                 try {
@@ -555,7 +597,7 @@ export default function App() {
                 }
               }}>{t("onboard.test")}</Button>
             )}
-            <Button onClick={startScan} disabled={!cfg.imap.password_set}>
+            <Button onClick={startScan} disabled={!acct?.password_set}>
               {t("Scan")}
             </Button>
           </div>
@@ -606,7 +648,7 @@ export default function App() {
             ?? detail.protected}
           onProtect={toggleProtect}
           folders={state?.folders_raw ?? []}
-          sieve={(cfg?.imap.preset ?? "proton") === "proton"}
+          sieve={(acct?.preset ?? "proton") === "proton"}
           onClose={() => { setDetail(null); refresh(); }}
           onDeleted={refresh}
         />
@@ -648,8 +690,15 @@ export default function App() {
       {settingsOpen && cfg && (
         <SettingsModal
           cfg={cfg}
+          account={account}
           onClose={() => setSettingsOpen(false)}
           onSaved={setCfg}
+          onAccountsChanged={(next, name) => {
+            setCfg(next);
+            if (name && next.accounts[name]) switchAccount(name);
+            else if (!next.accounts[account])
+              switchAccount(next.default_account);
+          }}
         />
       )}
     </div>

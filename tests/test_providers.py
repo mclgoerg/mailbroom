@@ -145,10 +145,9 @@ def test_connect_starttls(monkeypatch):
             return "OK", [b""]
 
     monkeypatch.setattr(mailops.imaplib, "IMAP4", FakePlainIMAP)
-    cfg = {"imap": {"host": "imap.example", "port": 143,
-                    "security": "starttls", "user": "u", "password": "p",
-                    "cafile": ""}}
-    mailops.connect(cfg)
+    mailops.connect({"host": "imap.example", "port": 143,
+                     "security": "starttls", "user": "u", "password": "p",
+                     "cafile": ""})
     assert calls == {"host": "imap.example", "port": 143,
                      "starttls": True, "login": True}
 
@@ -170,11 +169,11 @@ def test_unsub_smtp_host_override(monkeypatch):
             pass
 
     monkeypatch.setattr(unsub.smtplib, "SMTP_SSL", FakeSMTP)
-    cfg = {"imap": {"host": "imap.gmail.example",
-                    "smtp_host": "smtp.gmail.example", "smtp_port": 465,
-                    "smtp_security": "ssl", "user": "u", "password": "p",
-                    "cafile": ""}}
-    unsub._send_mailto(cfg, "mailto:unsub@list.example")
+    unsub._send_mailto(
+        {"host": "imap.gmail.example", "smtp_host": "smtp.gmail.example",
+         "smtp_port": 465, "smtp_security": "ssl", "user": "u",
+         "password": "p", "cafile": ""},
+        "mailto:unsub@list.example")
     assert seen["host"] == "smtp.gmail.example" and seen["port"] == 465
     assert seen["to"] == ["unsub@list.example"]
 
@@ -183,11 +182,12 @@ def test_config_transport_fields_roundtrip():
     cfg = cfgmod.update_config({"imap": {
         "security": "starttls", "smtp_host": "smtp.example",
         "smtp_security": "starttls", "preset": "gmail", "cafile": ""}})
-    im = cfg["imap"]
+    im = cfg["accounts"]["default"]
     assert im["security"] == "starttls" and im["smtp_host"] == "smtp.example"
     assert im["preset"] == "gmail" and im["cafile"] == ""
     # invalid values are ignored, not stored
     cfg = cfgmod.update_config({"imap": {"security": "plaintext",
                                          "preset": "hotmail"}})
-    assert cfg["imap"]["security"] == "starttls"
-    assert cfg["imap"]["preset"] == "gmail"
+    im = cfg["accounts"]["default"]
+    assert im["security"] == "starttls"
+    assert im["preset"] == "gmail"

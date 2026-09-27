@@ -28,13 +28,16 @@ def test_export_has_state_but_no_secrets():
     text = r.text
     assert "s3cret-pass" not in text and "sk-secret-key" not in text
     data = r.json()
-    assert data["config"]["imap"]["user"] == "me@pm.example"
-    assert "password" not in data["config"]["imap"]
+    acct = data["config"]["accounts"]["default"]
+    assert acct["user"] == "me@pm.example"
+    assert "password" not in acct
     assert "api_key" not in data["config"]["ai"]
     assert data["config"]["protected"] == ["boss@work.example"]
     assert data["rules"][0]["name"] == "r1"
-    assert data["verdicts"]["sender"]["a@b.c"]["verdict"] == "keep"
-    assert data["replied"] == ["friend@x.example"]
+    assert data["rules"][0]["account"] == "default"
+    verd = data["verdicts"]["accounts"]["default"]
+    assert verd["sender"]["a@b.c"]["verdict"] == "keep"
+    assert data["replied"] == {"default": ["friend@x.example"]}
 
 
 def test_import_applies_and_stays_safe():
@@ -61,8 +64,9 @@ def test_import_applies_and_stays_safe():
     assert r.json()["ok"] and r.json()["rules"] == 1
 
     cfg = cfgmod.load_config()
-    assert cfg["imap"]["user"] == "new@pm.example"
-    assert cfg["imap"]["password"] == "keep-me"        # secret untouched
+    im = cfg["accounts"]["default"]
+    assert im["user"] == "new@pm.example"
+    assert im["password"] == "keep-me"                 # secret untouched
     assert cfg["ai"]["api_key"] == "keep-key"
     assert cfg["ai"]["model"] == "claude-haiku-4-5"
     assert cfg["protected"] == ["@bank.example"]
@@ -73,7 +77,8 @@ def test_import_applies_and_stays_safe():
     assert rules[0]["report_runs"] == 0
     assert not any(rl["id"] == old["id"] for rl in rules)
 
-    assert verdictstore.load()["sender"]["x@y.z"]["verdict"] == "review"
+    imported = verdictstore.load_account()      # v1 verdicts -> default acct
+    assert imported["sender"]["x@y.z"]["verdict"] == "review"
     assert verdictstore.load_mails() == {"<a@b>": "keep"}
     assert "pal@x.example" in mailops.load_replied()
     assert "not-an-addr" not in mailops.load_replied()

@@ -18,6 +18,7 @@ from fastapi.responses import (FileResponse, JSONResponse, RedirectResponse,
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
+from . import accounts as accountsmod
 from . import aihelper
 from . import config as cfgmod
 from . import mailops
@@ -105,40 +106,53 @@ def _check_grouping(grouping: str) -> None:
         raise HTTPException(400, "bad grouping")
 
 
+def _acc(account: str | None = None):
+    """AccountState for ?account=… (None = default); 400 on unknown names."""
+    try:
+        return accountsmod.get(account)
+    except KeyError as exc:
+        raise HTTPException(400, str(exc.args[0]))
+
+
 @app.get("/api/state")
-def get_state():
-    return mailops.public_state()
+def get_state(account: str | None = Query(None)):
+    return mailops.public_state(_acc(account))
 
 
 @app.post("/api/scan")
-def post_scan():
+def post_scan(account: str | None = Query(None)):
     try:
-        mailops.start_scan()
+        mailops.start_scan(_acc(account))
     except RuntimeError as exc:
         raise HTTPException(409, str(exc))
     return {"ok": True}
 
 
 @app.get("/api/group")
-def get_group(grouping: str = Query("sender"), key: str = Query(...)):
+def get_group(grouping: str = Query("sender"), key: str = Query(...),
+              account: str | None = Query(None)):
     _check_grouping(grouping)
-    return mailops.group_mails(grouping, key)
+    return mailops.group_mails(grouping, key, acc=_acc(account))
 
 
 @app.get("/api/message")
-def get_message(folder: str = Query(...), uid: int = Query(...)):
+def get_message(folder: str = Query(...), uid: int = Query(...),
+                account: str | None = Query(None)):
+    acc = _acc(account)
     try:
-        return mailops.fetch_message(folder, uid)
+        return mailops.fetch_message(folder, uid, acc)
     except Exception as exc:
         raise HTTPException(500, f"{type(exc).__name__}: {exc}")
 
 
 @app.post("/api/delete")
-def post_delete(body: DeleteBody):
+def post_delete(body: DeleteBody, account: str | None = Query(None)):
     _check_grouping(body.grouping)
+    acc = _acc(account)
     try:
         return mailops.delete_groups(body.grouping, body.keys,
-                                     body.action, body.dest, body.force)
+                                     body.action, body.dest, body.force,
+                                     acc=acc)
     except ValueError as exc:
         raise HTTPException(400, str(exc))
     except RuntimeError as exc:
@@ -148,10 +162,12 @@ def post_delete(body: DeleteBody):
 
 
 @app.post("/api/delete_messages")
-def post_delete_messages(body: DeleteMessagesBody):
+def post_delete_messages(body: DeleteMessagesBody,
+                         account: str | None = Query(None)):
+    acc = _acc(account)
     try:
         return mailops.delete_messages([list(i) for i in body.items],
-                                       body.action, body.dest)
+                                       body.action, body.dest, acc=acc)
     except ValueError as exc:
         raise HTTPException(400, str(exc))
     except RuntimeError as exc:
@@ -161,10 +177,11 @@ def post_delete_messages(body: DeleteMessagesBody):
 
 
 @app.post("/api/ai")
-def post_ai(body: GroupingBody):
+def post_ai(body: GroupingBody, account: str | None = Query(None)):
     _check_grouping(body.grouping)
+    acc = _acc(account)
     try:
-        aihelper.start_group_review(body.grouping)
+        aihelper.start_group_review(body.grouping, acc)
     except ValueError as exc:
         raise HTTPException(400, str(exc))
     except RuntimeError as exc:
@@ -173,11 +190,12 @@ def post_ai(body: GroupingBody):
 
 
 @app.post("/api/ai_group")
-def post_ai_group(body: AiGroupBody):
+def post_ai_group(body: AiGroupBody, account: str | None = Query(None)):
     _check_grouping(body.grouping)
+    acc = _acc(account)
     try:
         return aihelper.ai_group(body.grouping, body.key,
-                                 body.offset, body.limit)
+                                 body.offset, body.limit, acc)
     except ValueError as exc:              # e.g. monthly budget reached
         raise HTTPException(400, str(exc))
     except Exception as exc:
@@ -185,38 +203,40 @@ def post_ai_group(body: AiGroupBody):
 
 
 @app.post("/api/unsubscribe")
-def post_unsubscribe(body: AiGroupBody):
+def post_unsubscribe(body: AiGroupBody, account: str | None = Query(None)):
     _check_grouping(body.grouping)
+    acc = _acc(account)
     try:
-        return unsub.unsubscribe(body.grouping, body.key)
+        return unsub.unsubscribe(body.grouping, body.key, acc)
     except Exception as exc:
         raise HTTPException(500, f"{type(exc).__name__}: {exc}")
 
 
 @app.post("/api/attachments")
-def post_attachments():
+def post_attachments(account: str | None = Query(None)):
     """Start the lazy attachment analysis (BODYSTRUCTURE pass)."""
     try:
-        mailops.start_att_scan()
+        mailops.start_att_scan(_acc(account))
     except RuntimeError as exc:
         raise HTTPException(409, str(exc))
     return {"ok": True}
 
 
 @app.get("/api/attachments")
-def get_attachments():
-    return mailops.attachments_list()
+def get_attachments(account: str | None = Query(None)):
+    return mailops.attachments_list(acc=_acc(account))
 
 
 @app.get("/api/duplicates")
-def get_duplicates():
-    return mailops.duplicates_list()
+def get_duplicates(account: str | None = Query(None)):
+    return mailops.duplicates_list(acc=_acc(account))
 
 
 @app.get("/api/stats")
-def get_stats():
-    history = statsmod.load()
-    return {**mailops.index_stats(),
+def get_stats(account: str | None = Query(None)):
+    acc = _acc(account)
+    history = statsmod.load(acc.name)
+    return {**mailops.index_stats(acc),
             "scans": history["scans"][-30:],
             "actions": history["actions"]}
 
@@ -227,6 +247,7 @@ class RuleBody(BaseModel):
     query: str = ""
     action: str = "trash"
     dest: str = ""
+    account: str | None = None     # None = default account
     schedule: str = "manual"
     mode: str | None = None        # only honoured on update
 
@@ -293,9 +314,10 @@ def post_protect(body: ProtectBody):
 
 
 @app.post("/api/undo")
-def post_undo(body: UndoBody):
+def post_undo(body: UndoBody, account: str | None = Query(None)):
+    acc = _acc(account)
     try:
-        return mailops.undo_last(body.index)
+        return mailops.undo_last(body.index, acc)
     except RuntimeError as exc:
         raise HTTPException(409, str(exc))
     except Exception as exc:
@@ -309,9 +331,10 @@ class TrashRestoreBody(BaseModel):
 
 
 @app.get("/api/trash")
-def get_trash():
+def get_trash(account: str | None = Query(None)):
+    acc = _acc(account)
     try:
-        return mailops.trash_list()
+        return mailops.trash_list(acc=acc)
     except RuntimeError as exc:
         raise HTTPException(409, str(exc))
     except Exception as exc:
@@ -319,9 +342,11 @@ def get_trash():
 
 
 @app.post("/api/trash/restore")
-def post_trash_restore(body: TrashRestoreBody):
+def post_trash_restore(body: TrashRestoreBody,
+                       account: str | None = Query(None)):
+    acc = _acc(account)
     try:
-        return mailops.trash_restore(body.uids, body.dest, body.uv)
+        return mailops.trash_restore(body.uids, body.dest, body.uv, acc)
     except RuntimeError as exc:
         raise HTTPException(409, str(exc))
     except Exception as exc:
@@ -329,9 +354,10 @@ def post_trash_restore(body: TrashRestoreBody):
 
 
 @app.post("/api/empty_trash")
-def post_empty_trash():
+def post_empty_trash(account: str | None = Query(None)):
+    acc = _acc(account)
     try:
-        return mailops.empty_trash()
+        return mailops.empty_trash(acc)
     except RuntimeError as exc:
         raise HTTPException(409, str(exc))
     except Exception as exc:
@@ -343,29 +369,32 @@ class CancelBody(BaseModel):
 
 
 @app.post("/api/cancel")
-def post_cancel(body: CancelBody):
+def post_cancel(body: CancelBody, account: str | None = Query(None)):
+    acc = _acc(account)
     try:
-        mailops.request_cancel(body.target)
+        mailops.request_cancel(body.target, acc)
     except RuntimeError as exc:
         raise HTTPException(400, str(exc))
     return {"ok": True}
 
 
 @app.post("/api/notice/clear")
-def post_notice_clear():
-    with mailops.STATE_LOCK:
-        mailops.STATE["notice"] = None
+def post_notice_clear(account: str | None = Query(None)):
+    acc = _acc(account)
+    with acc.lock:
+        acc.state["notice"] = None
     return {"ok": True}
 
 
 @app.post("/api/test_connection")
-def post_test_connection():
+def post_test_connection(account: str | None = Query(None)):
     """Onboarding helper: can we reach and log into the IMAP server?"""
-    cfg = cfgmod.load_config()
-    if not cfg["imap"]["password"]:
+    acc = _acc(account)
+    im = cfgmod.account_imap(acc.name)
+    if not im["password"]:
         raise HTTPException(400, "no password configured")
     try:
-        conn = mailops.connect(cfg)
+        conn = mailops.connect(im)
         try:
             n = len(mailops.list_folders(conn))
         finally:
@@ -379,14 +408,15 @@ def post_test_connection():
 
 
 @app.get("/api/folders")
-def get_folders():
+def get_folders(account: str | None = Query(None)):
     """Live folder list with exclusion flags, for the settings picker."""
+    acc = _acc(account)
     cfg = cfgmod.load_config()
     try:
-        conn = mailops.connect(cfg)
+        conn = mailops.connect(cfgmod.account_imap(acc.name))
         try:
             names = mailops.list_folders(conn)
-            roles = mailops.folder_roles(conn)
+            roles = mailops.folder_roles(conn, acc)
         finally:
             try:
                 conn.logout()
@@ -409,19 +439,21 @@ def get_folders():
 
 
 @app.get("/api/search")
-def get_search(q: str = Query(...)):
-    return mailops.search_mails(q)
+def get_search(q: str = Query(...), account: str | None = Query(None)):
+    return mailops.search_mails(q, acc=_acc(account))
 
 
 @app.get("/api/export")
-def get_export(grouping: str = Query("sender")):
+def get_export(grouping: str = Query("sender"),
+               account: str | None = Query(None)):
     _check_grouping(grouping)
+    acc = _acc(account)
     buf = io.StringIO()
     w = csv.writer(buf)
     w.writerow(["key", "label", "mails", "size_bytes", "unread", "first",
                 "last", "tags", "ai_verdict", "ai_reason"])
-    with mailops.STATE_LOCK:
-        recs = sorted(mailops.STATE["groups"][grouping].values(),
+    with acc.lock:
+        recs = sorted(acc.state["groups"][grouping].values(),
                       key=lambda r: -r["count"])
         for r in recs:
             w.writerow([r["key"], r["label"], r["count"], r["size"],
@@ -441,13 +473,10 @@ def get_export_config():
     password and AI API key never leave the server."""
     cfg = cfgmod.load_config()
     data = {
-        "version": 1, "app": "mailbroom",
+        "version": 2, "app": "mailbroom",
         "config": {
-            "imap": {k: v for k, v in cfg["imap"].items()
-                     if k != "password"},
-            "profiles": {n: {k: v for k, v in p.items() if k != "password"}
-                         for n, p in cfg["profiles"].items()},
-            "active_profile": cfg["active_profile"],
+            "accounts": {n: {k: v for k, v in b.items() if k != "password"}
+                         for n, b in cfg["accounts"].items()},
             "excluded_folders": cfg["excluded_folders"],
             "protected": cfgmod.normalize_protected(cfg.get("protected")),
             "categories": cfg.get("categories") or {},
@@ -455,7 +484,8 @@ def get_export_config():
         },
         "rules": rulesmod.load_rules(),
         "verdicts": verdictstore.load(),
-        "replied": sorted(mailops.load_replied()),
+        "replied": {n: sorted(mailops.load_replied(accountsmod.get(n)))
+                    for n in accountsmod.names()},
     }
     return StreamingResponse(
         iter([json.dumps(data, indent=1)]), media_type="application/json",
@@ -468,10 +498,14 @@ def post_import_config(body: dict):
     """Apply an exported backup. Secrets are never importable; imported
     rules are forced back to report mode (safety floor)."""
     c = body.get("config") or {}
-    update = {k: c[k] for k in ("imap", "excluded_folders", "protected",
-                                "categories", "ai") if k in c}
-    if isinstance(update.get("imap"), dict):
+    update = {k: c[k] for k in ("accounts", "imap", "excluded_folders",
+                                "protected", "categories", "ai") if k in c}
+    if isinstance(update.get("imap"), dict):        # v1 backup: one account
         update["imap"].pop("password", None)
+    if isinstance(update.get("accounts"), dict):
+        for b in update["accounts"].values():
+            if isinstance(b, dict):
+                b.pop("password", None)
     if isinstance(update.get("ai"), dict):
         update["ai"].pop("api_key", None)
     try:
@@ -492,30 +526,51 @@ def post_import_config(body: dict):
             except ValueError:
                 pass
 
+    def _import_groupings(entries: dict, account: str | None) -> int:
+        n = 0
+        for grouping, verd in entries.items():
+            if grouping in GROUPINGS and isinstance(verd, dict):
+                clean = {k: v for k, v in verd.items()
+                         if isinstance(v, dict) and "verdict" in v}
+                verdictstore.save(grouping, clean, account)
+                n += len(clean)
+        return n
+
     nverdicts = 0
     verdicts = body.get("verdicts")
     if isinstance(verdicts, dict):
-        for grouping, entries in verdicts.items():
-            if not isinstance(entries, dict):
-                continue
-            if grouping == "_mails":
-                clean = {k: v for k, v in entries.items()
-                         if v in ("delete_safe", "review", "keep")}
-                verdictstore.save_mails(clean)
-            else:
-                clean = {k: v for k, v in entries.items()
-                         if isinstance(v, dict) and "verdict" in v}
-                verdictstore.save(grouping, clean)
+        mails = verdicts.get("_mails")
+        if isinstance(mails, dict):
+            clean = {k: v for k, v in mails.items()
+                     if v in ("delete_safe", "review", "keep")}
+            verdictstore.save_mails(clean)
             nverdicts += len(clean)
+        if isinstance(verdicts.get("accounts"), dict):   # v2 backup
+            known = set(accountsmod.names())
+            for name, entries in verdicts["accounts"].items():
+                if name in known and isinstance(entries, dict):
+                    nverdicts += _import_groupings(entries, name)
+        else:                                            # v1: default account
+            nverdicts += _import_groupings(verdicts, None)
+
+    def _import_replied(acc, entries: list) -> int:
+        mailops.load_replied(acc)
+        addrs = {str(a).strip().lower() for a in entries
+                 if isinstance(a, str) and "@" in a}
+        new = len(addrs - acc.replied)
+        acc.replied.update(addrs)
+        mailops.save_replied(acc)
+        return new
 
     nreplied = 0
-    if isinstance(body.get("replied"), list):
-        mailops.load_replied()
-        addrs = {str(a).strip().lower() for a in body["replied"]
-                 if isinstance(a, str) and "@" in a}
-        nreplied = len(addrs - mailops.REPLIED_TO)
-        mailops.REPLIED_TO.update(addrs)
-        mailops.save_replied()
+    replied = body.get("replied")
+    if isinstance(replied, list):                        # v1: default account
+        nreplied = _import_replied(accountsmod.get(), replied)
+    elif isinstance(replied, dict):                      # v2: per account
+        known = set(accountsmod.names())
+        for name, entries in replied.items():
+            if name in known and isinstance(entries, list):
+                nreplied += _import_replied(accountsmod.get(name), entries)
 
     logging.getLogger("pmc.mail").info(
         "config import: %d rules, %d verdicts, %d replied addrs",
@@ -525,11 +580,13 @@ def post_import_config(body: dict):
 
 
 @app.get("/api/events")
-async def get_events():
-    """Server-sent events: streams the app state (~1/s) while connected."""
+async def get_events(account: str | None = Query(None)):
+    """Server-sent events: streams ONE account's state (~1/s)."""
+    acc = _acc(account)
+
     async def gen():
         while True:
-            yield f"data: {json.dumps(mailops.public_state())}\n\n"
+            yield f"data: {json.dumps(mailops.public_state(acc))}\n\n"
             await asyncio.sleep(1.0)
     return StreamingResponse(gen(), media_type="text/event-stream",
                              headers={"Cache-Control": "no-cache",

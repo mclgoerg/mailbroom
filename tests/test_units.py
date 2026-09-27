@@ -71,29 +71,56 @@ def test_record_usage_accumulates():
     assert cfgmod.load_stats()["runs"] == 0
 
 
-def test_config_masking_and_profiles():
+def test_config_masking_and_accounts():
     cfgmod.update_config({"imap": {"user": "a@b.c", "password": "secret"},
                           "ai": {"api_key": "sk-xyz"}})
     masked = cfgmod.masked_config(cfgmod.load_config())
-    assert masked["imap"]["password"] == ""
-    assert masked["imap"]["password_set"] is True
+    assert masked["accounts"]["default"]["password"] == ""
+    assert masked["accounts"]["default"]["password_set"] is True
+    assert masked["default_account"] == "default"
     assert masked["ai"]["api_key"] == ""
     assert masked["ai"]["api_key_set"] is True
 
-    cfgmod.update_config({"save_profile_as": "work"})
+    # add a second account: starts NEUTRAL (no env/default creds leak in)
+    cfgmod.update_config({"add_account": "work"})
     cfg = cfgmod.load_config()
-    assert cfg["active_profile"] == "work"
-    assert cfg["imap"]["user"] == ""            # fresh account
-    assert cfg["profiles"]["default"]["user"] == "a@b.c"
+    assert cfg["accounts"]["work"]["user"] == ""
+    assert cfg["accounts"]["work"]["password"] == ""
+    assert cfg["accounts"]["work"]["preset"] == "custom"
+    assert cfg["accounts"]["default"]["user"] == "a@b.c"   # untouched
 
-    cfgmod.update_config({"switch_profile": "default"})
+    # target an update at the second account
+    cfgmod.update_config({"account": "work",
+                          "imap": {"user": "w@corp.example"}})
     cfg = cfgmod.load_config()
-    assert cfg["active_profile"] == "default"
-    assert cfg["imap"]["user"] == "a@b.c"
-    assert cfg["imap"]["password"] == "secret"
+    assert cfg["accounts"]["work"]["user"] == "w@corp.example"
+    assert cfg["accounts"]["default"]["user"] == "a@b.c"
+
+    cfgmod.update_config({"delete_account": "work"})
+    assert list(cfgmod.load_config()["accounts"]) == ["default"]
+    # the last account may never be deleted
+    try:
+        cfgmod.update_config({"delete_account": "default"})
+        assert False, "should have raised"
+    except ValueError:
+        pass
+
+
+def test_config_old_format_migrates():
+    import json
+    cfgmod.CONFIG_PATH.write_text(json.dumps({
+        "imap": {"user": "old@pm.example", "password": "pw"},
+        "profiles": {"second": {"host": "imap.x", "user": "b@x"}},
+        "active_profile": "main"}))
+    cfg = cfgmod.load_config()
+    assert list(cfg["accounts"]) == ["main", "second"]
+    assert cfg["accounts"]["main"]["user"] == "old@pm.example"
+    assert cfg["accounts"]["main"]["password"] == "pw"
+    assert cfg["accounts"]["second"]["user"] == "b@x"
+    assert cfg["accounts"]["second"]["password"] == ""   # neutral defaults
 
 
 def test_config_bad_port_ignored():
-    before = cfgmod.load_config()["imap"]["port"]
+    before = cfgmod.load_config()["accounts"]["default"]["port"]
     cfgmod.update_config({"imap": {"port": "abc"}})
-    assert cfgmod.load_config()["imap"]["port"] == before
+    assert cfgmod.load_config()["accounts"]["default"]["port"] == before

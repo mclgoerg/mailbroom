@@ -122,6 +122,7 @@ export interface Rule {
 }
 
 export interface AppState {
+  account: string;
   status: "idle" | "scanning" | "done" | "error";
   progress: string;
   error: string;
@@ -189,22 +190,23 @@ export type SmtpSecurity = "auto" | "ssl" | "starttls";
 export type Preset = "proton" | "gmail" | "icloud" | "fastmail" | "gmx"
   | "mailbox" | "yahoo" | "custom";
 
+export interface ImapAccount {
+  host: string;
+  port: number;
+  security: Security;
+  smtp_host: string;
+  smtp_port: number;
+  smtp_security: SmtpSecurity;
+  user: string;
+  password: string;
+  password_set: boolean;
+  cafile: string;
+  preset: Preset;
+}
+
 export interface Config {
-  imap: {
-    host: string;
-    port: number;
-    security: Security;
-    smtp_host: string;
-    smtp_port: number;
-    smtp_security: SmtpSecurity;
-    user: string;
-    password: string;
-    password_set: boolean;
-    cafile: string;
-    preset: Preset;
-  };
-  profiles: string[];
-  active_profile: string;
+  accounts: Record<string, ImapAccount>;
+  default_account: string;
   excluded_folders: string[];
   protected: string[];
   categories: Record<string, string[]>;

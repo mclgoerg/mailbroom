@@ -3,8 +3,23 @@ import type {
   Mail, MessageDetail, Rule, RuleRun, StatsResp, TrashResp, UnsubResult,
 } from "./types";
 
+/* Active account: every API call is scoped to exactly one account (strict
+ * separation — the backend never mixes them). Set once by App on startup
+ * and whenever the user switches. */
+let ACCOUNT = "";
+
+export function setAccount(name: string) {
+  ACCOUNT = name;
+}
+
+export function withAccount(path: string): string {
+  if (!ACCOUNT) return path;
+  const sep = path.includes("?") ? "&" : "?";
+  return `${path}${sep}account=${encodeURIComponent(ACCOUNT)}`;
+}
+
 async function req<T>(path: string, body?: unknown): Promise<T> {
-  const res = await fetch(path, {
+  const res = await fetch(withAccount(path), {
     method: body === undefined ? "GET" : "POST",
     headers: body === undefined ? {} : { "Content-Type": "application/json" },
     body: body === undefined ? undefined : JSON.stringify(body),
@@ -54,7 +69,8 @@ export const api = {
   search: (q: string) =>
     req<Mail[]>(`/api/search?q=${encodeURIComponent(q)}`),
   folders: () => req<FoldersResp>("/api/folders"),
-  exportUrl: (grouping: Grouping) => `/api/export?grouping=${grouping}`,
+  exportUrl: (grouping: Grouping) =>
+    withAccount(`/api/export?grouping=${grouping}`),
   rules: () => req<{ rules: Rule[] }>("/api/rules"),
   createRule: (body: Partial<Rule>) => req<Rule>("/api/rules", body),
   updateRule: (id: string, body: Partial<Rule>) =>

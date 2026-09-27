@@ -26,7 +26,9 @@ def test_config_never_leaks_secrets():
     body = client.get("/api/config").text
     assert "s3cret" not in body and "sk-secret" not in body
     cfg = client.get("/api/config").json()
-    assert cfg["imap"]["password_set"] and cfg["ai"]["api_key_set"]
+    default = cfg["default_account"]
+    assert cfg["accounts"][default]["password_set"]
+    assert cfg["ai"]["api_key_set"]
 
 
 def test_validation_errors():

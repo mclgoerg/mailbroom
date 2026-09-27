@@ -13,10 +13,10 @@ import logging
 import threading
 import time
 
+from . import accounts
 from . import config as cfgmod
 from . import mailops
 from . import verdictstore
-from .mailops import STATE, STATE_LOCK
 
 log = logging.getLogger("pmc.ai")
 
@@ -187,17 +187,19 @@ def _ai_call(cfg: dict, model: str, system: str, payload: dict, schema: dict):
         response.usage.output_tokens
 
 
-def _run_ai(grouping: str) -> None:
+def _run_ai(grouping: str, acc=None) -> None:
+    acc = acc or accounts.get()
     cfg = cfgmod.load_config()
+    STATE, STATE_LOCK = acc.state, acc.lock
     try:
         model = cfg["ai"]["model"] or "claude-sonnet-5"
 
         plist = cfg.get("protected") or []
         with STATE_LOCK:
-            paddrs = mailops._protected_addrs(plist)
+            paddrs = mailops._protected_addrs(plist, acc)
             prot_keys = {r["key"]
                          for r in STATE["groups"][grouping].values()
-                         if mailops._group_protected(r, paddrs)}
+                         if mailops._group_protected(r, paddrs, acc)}
             # Cached verdicts (applied at scan time) are not re-billed.
             batch_src = [
                 {"key": r["key"], "label": r["label"], "count": r["count"],
@@ -227,7 +229,7 @@ def _run_ai(grouping: str) -> None:
         pin, pout = cfgmod.effective_prices(cfg["ai"])
         try:
             for start in range(0, len(batch_src), AI_BATCH):
-                if mailops.cancel_requested("ai"):
+                if mailops.cancel_requested("ai", acc):
                     cancelled = True
                     break
                 # Long runs must not blow through the cap mid-way: usage is
@@ -263,7 +265,7 @@ def _run_ai(grouping: str) -> None:
                             applied[rec["key"]] = rec["ai"]
                     done += len(batch)
                     STATE["ai"]["progress"] = f"{done}/{len(batch_src)} groups"
-                verdictstore.save(grouping, applied)
+                verdictstore.save(grouping, applied, acc.name)
         finally:
             # Tokens of completed batches are billed even if a later batch
             # fails — always record them.
@@ -290,34 +292,38 @@ def _run_ai(grouping: str) -> None:
             STATE["ai"]["error"] = f"{type(exc).__name__}: {exc}"
 
 
-def start_group_review(grouping: str) -> None:
+def start_group_review(grouping: str, acc=None) -> None:
+    acc = acc or accounts.get()
     cfg = cfgmod.load_config()
     if not cfgmod.ai_available(cfg["ai"]):
         raise ValueError("no API key configured")
     cfgmod.check_budget(cfg["ai"])
-    with STATE_LOCK:
-        if STATE["status"] != "done":
+    with acc.lock:
+        if acc.state["status"] != "done":
             raise RuntimeError("scan first")
-        if STATE["ai"]["status"] == "running":
+        if acc.state["ai"]["status"] == "running":
             raise RuntimeError("AI already running")
-        STATE["ai"] = {"status": "running", "grouping": grouping,
-                       "progress": "starting…", "error": "", "usage": None}
-        mailops._CANCEL["ai"] = False
-    threading.Thread(target=_run_ai, args=(grouping,), daemon=True).start()
+        acc.state["ai"] = {"status": "running", "grouping": grouping,
+                           "progress": "starting…", "error": "",
+                           "usage": None}
+        acc.cancel["ai"] = False
+    threading.Thread(target=_run_ai, args=(grouping, acc),
+                     daemon=True).start()
 
 
 def ai_group(grouping: str, key: str, offset: int = 0,
-             limit: int = 200) -> dict:
+             limit: int = 200, acc=None) -> dict:
     """Rate one batch of a group's UNRATED mails (cached verdicts skipped).
     The client calls repeatedly until `remaining` is 0, showing progress."""
+    acc = acc or accounts.get()
     cfg = cfgmod.load_config()
     if not cfgmod.ai_available(cfg["ai"]):
         raise RuntimeError("no API key configured")
     cfgmod.check_budget(cfg["ai"])
-    all_mails = mailops.group_mails(grouping, key, with_msgid=True)
+    all_mails = mailops.group_mails(grouping, key, with_msgid=True, acc=acc)
     if not all_mails:
         raise RuntimeError("unknown or empty group")
-    label = mailops.group_label(grouping, key)
+    label = mailops.group_label(grouping, key, acc)
     unrated = [m for m in all_mails if not m["ai"] and m["msgid"]]
     mails = unrated[:max(1, min(limit, AI_GROUP_MAX))]
     if not mails:
@@ -329,7 +335,7 @@ def ai_group(grouping: str, key: str, offset: int = 0,
     plist = cfg.get("protected") or []
     prot = {(m["folder"], m["uid"]) for m in mails
             if cfgmod.is_protected(m["addr"], plist)}
-    replied_to = mailops.load_replied()
+    replied_to = mailops.load_replied(acc)
     folders = sorted({m["folder"] for m in mails})
     fidx = {f: i for i, f in enumerate(folders)}
     payload = {"mails": [

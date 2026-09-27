@@ -14,14 +14,15 @@ import { SettingsModal } from "./components/SettingsModal";
 import type { Config } from "./types";
 
 const cfg: Config = {
-  imap: {
-    host: "127.0.0.1", port: 1143, security: "ssl",
-    smtp_host: "", smtp_port: 1025, smtp_security: "auto",
-    user: "me@proton.example", password: "", password_set: true,
-    cafile: "/certs/bridge-cert.pem", preset: "proton",
+  accounts: {
+    default: {
+      host: "127.0.0.1", port: 1143, security: "ssl",
+      smtp_host: "", smtp_port: 1025, smtp_security: "auto",
+      user: "me@proton.example", password: "", password_set: true,
+      cafile: "/certs/bridge-cert.pem", preset: "proton",
+    },
   },
-  profiles: ["default"],
-  active_profile: "default",
+  default_account: "default",
   excluded_folders: [],
   protected: [],
   categories: {},
@@ -41,7 +42,8 @@ const presetSelect = () =>
 const hostInput = () => screen.getByLabelText("Host") as HTMLInputElement;
 
 test("gmail preset prefills IMAP + SMTP fields", () => {
-  render(<SettingsModal cfg={cfg} onClose={() => {}} onSaved={() => {}} />);
+  render(<SettingsModal cfg={cfg} account="default" onClose={() => {}}
+    onSaved={() => {}} onAccountsChanged={() => {}} />);
   expect(hostInput().value).toBe("127.0.0.1");
   fireEvent.change(presetSelect(), { target: { value: "gmail" } });
   expect(hostInput().value).toBe("imap.gmail.com");
@@ -57,14 +59,16 @@ test("gmail preset prefills IMAP + SMTP fields", () => {
 });
 
 test("custom preset keeps the current fields", () => {
-  render(<SettingsModal cfg={cfg} onClose={() => {}} onSaved={() => {}} />);
+  render(<SettingsModal cfg={cfg} account="default" onClose={() => {}}
+    onSaved={() => {}} onAccountsChanged={() => {}} />);
   fireEvent.change(presetSelect(), { target: { value: "custom" } });
   expect(hostInput().value).toBe("127.0.0.1");
   expect(presetSelect().value).toBe("custom");
 });
 
 test("prefilled fields stay editable", () => {
-  render(<SettingsModal cfg={cfg} onClose={() => {}} onSaved={() => {}} />);
+  render(<SettingsModal cfg={cfg} account="default" onClose={() => {}}
+    onSaved={() => {}} onAccountsChanged={() => {}} />);
   fireEvent.change(presetSelect(), { target: { value: "fastmail" } });
   fireEvent.change(hostInput(), { target: { value: "imap.mine.example" } });
   expect(hostInput().value).toBe("imap.mine.example");

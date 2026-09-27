@@ -92,7 +92,11 @@ export is Proton-only and hidden for other presets.
 - **Bulk workflows** — background deletion queue with live progress and
   cancel, "select inactive since…" presets, global mail search, CSV export,
   Empty-Trash button, cancellable scans and AI runs.
-- **Multi-account** — switchable connection profiles.
+- **Multiple accounts** — connect several providers at once (e.g. Proton
+  Bridge + Gmail). Every account is strictly separate: its own scans,
+  groups, rules, statistics and replied/verdict caches — nothing is ever
+  mixed or aggregated. A header toggle switches the whole view between
+  accounts.
 - **Safe by design** — deletions are IMAP `MOVE` to Trash (reversible),
   UIDVALIDITY checked before every move, read-only scans, UID bookkeeping
   stays server-side, non-root container.

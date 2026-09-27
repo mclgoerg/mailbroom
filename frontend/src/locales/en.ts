@@ -19,7 +19,16 @@ export const EN: Record<string, string> = {
     "PERMANENTLY delete all {n} mails in Trash? This cannot be undone.",
   "confirm.clear_verdicts": "Clear all cached AI verdicts?",
   "confirm.reset_spend": "Reset the AI spend counter?",
-  "confirm.switch_profile": 'Switch to account profile "{name}"? Rescan afterwards.',
+  "account.label": "Account to edit",
+  "account.add": "Add account",
+  "account.hint":
+    "Each account is scanned and cleaned separately — views never mix. "
+    + "Switch accounts in the header once more than one is set up.",
+  "account.new_prompt": "Name for the new account (e.g. \"gmail\"):",
+  "account.confirm_delete":
+    'Remove account "{name}"? Its rules keep their account name and stop '
+    + "running; mails on the server are untouched.",
+  "account.switch_tip": "Switch account — every view is per account",
   "note.ai_selected": "{note} — selected {n}/{of}",
   "note.ai_truncated": " (first {n} mails only)",
   "note.background": "{verb} — running in the background…",

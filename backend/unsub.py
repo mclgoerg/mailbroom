@@ -21,6 +21,7 @@ import ssl
 import urllib.parse
 import urllib.request
 
+from . import accounts
 from . import config as cfgmod
 from . import mailops
 
@@ -79,13 +80,12 @@ def _post_one_click(url: str) -> None:
             raise RuntimeError(f"unsubscribe endpoint returned {res.status}")
 
 
-def _send_mailto(cfg: dict, uri: str) -> None:
+def _send_mailto(im: dict, uri: str) -> None:
     parsed = urllib.parse.urlparse(uri)
     to_addr = urllib.parse.unquote(parsed.path)
     params = dict(urllib.parse.parse_qsl(parsed.query))
     subject = params.get("subject", "unsubscribe")
     body = params.get("body", "unsubscribe")
-    im = cfg["imap"]
     sender = im["user"]
     msg = (f"From: {sender}\r\nTo: {to_addr}\r\nSubject: {subject}\r\n"
            f"\r\n{body}\r\n")
@@ -114,17 +114,17 @@ def _send_mailto(cfg: dict, uri: str) -> None:
             pass
 
 
-def unsubscribe(grouping: str, key: str) -> dict:
+def unsubscribe(grouping: str, key: str, acc=None) -> dict:
     """Unsubscribe from a group using its newest mail's List-Unsubscribe."""
-    cfg = cfgmod.load_config()
-    mails = mailops.group_mails(grouping, key)
-    with mailops.STATE_LOCK:
-        rec = mailops.STATE["groups"][grouping].get(key)
+    acc = acc or accounts.get()
+    mails = mailops.group_mails(grouping, key, acc=acc)
+    with acc.lock:
+        rec = acc.state["groups"][grouping].get(key)
         if not rec:
             raise RuntimeError("unknown group")
         newest = None
         for m in mails:  # newest first
-            idx = mailops.INDEX.get(mailops.ikey(m["folder"], m["uid"]))
+            idx = acc.index.get(mailops.ikey(m["folder"], m["uid"]))
             if idx and idx.get("unsub"):
                 newest = dict(idx)
                 break
@@ -140,7 +140,7 @@ def unsubscribe(grouping: str, key: str) -> dict:
         return {"action": "done", "method": "one-click POST",
                 "detail": parts["http"]}
     if parts["mailto"]:
-        _send_mailto(cfg, parts["mailto"])
+        _send_mailto(cfgmod.account_imap(acc.name), parts["mailto"])
         return {"action": "done", "method": "unsubscribe mail sent",
                 "detail": parts["mailto"]}
     if parts["http"]:

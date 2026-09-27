@@ -37,7 +37,7 @@ def test_clear_ai_verdicts_via_api(bridge):
     assert mailops.STATE["groups"]["sender"]["noreply@dhl.example"]["ai"]
 
     client.post("/api/config", json={"clear_ai_verdicts": True})
-    assert verdictstore.load() == {}
+    assert verdictstore.load() == {"accounts": {}, "_mails": {}}
     assert verdictstore.load_mails() == {}
     assert mailops.STATE["groups"]["sender"]["noreply@dhl.example"]["ai"] is None
 

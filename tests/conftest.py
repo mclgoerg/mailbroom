@@ -10,6 +10,7 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+from backend import accounts as accountsmod   # noqa: E402
 from backend import config as cfgmod          # noqa: E402
 from backend import mailops                   # noqa: E402
 from backend import rules as rulesmod         # noqa: E402
@@ -19,37 +20,21 @@ from backend import verdictstore              # noqa: E402
 
 @pytest.fixture(autouse=True)
 def isolate(tmp_path, monkeypatch):
-    """Every test gets fresh config paths and empty global state."""
+    """Every test gets fresh config paths and empty per-account state
+    (the accounts registry is cleared, so mailops' default-account aliases
+    resolve to a brand-new AccountState)."""
     monkeypatch.setattr(cfgmod, "CONFIG_PATH", tmp_path / "config.json")
     monkeypatch.setattr(cfgmod, "STATS_PATH", tmp_path / "stats.json")
     monkeypatch.setattr(verdictstore, "VERDICTS_PATH",
                         tmp_path / "verdicts.json")
     monkeypatch.setattr(mailops, "REPLIED_PATH", tmp_path / "replied.json")
-    monkeypatch.setattr(mailops, "_replied_loaded", False)
     monkeypatch.setattr(rulesmod, "RULES_PATH", tmp_path / "rules.json")
     monkeypatch.setattr(statsmod, "HISTORY_PATH",
                         tmp_path / "stats_history.json")
-    mailops.REPLIED_TO.clear()
     verdictstore._mails_cache = None
-    with mailops.STATE_LOCK:
-        mailops.STATE.update(
-            status="idle", progress="", error="", folders=[],
-            trash_count=None, notice=None, undo=[])
-        mailops.STATE["groups"] = {g: {} for g in mailops.GROUPINGS}
-        mailops.STATE["ai"] = {"status": "idle", "grouping": "",
-                               "progress": "", "error": "", "usage": None}
-        mailops.STATE["delete"] = {"status": "idle", "progress": "",
-                                   "error": "", "moved": 0}
-        mailops.STATE["folders_raw"] = []
-        mailops.STATE["rules"] = []
-        mailops.INDEX.clear()
-        mailops.FOLDER_UV.clear()
-        mailops.FOLDER_ROLES.clear()
-        mailops.UNDO_LOG.clear()
-        mailops._DELETE_PENDING.clear()
-        for k in mailops._CANCEL:
-            mailops._CANCEL[k] = False
+    accountsmod.reset()
     yield
+    accountsmod.reset()
 
 
 def make_msg(uid, frm='"Shop News" <news@shop.example>',

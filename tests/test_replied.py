@@ -4,6 +4,7 @@ import json
 
 from backend import aihelper
 from backend import config as cfgmod
+from backend import accounts as accountsmod
 from backend import mailops
 
 from test_ai_unsub import FakeClient
@@ -23,13 +24,15 @@ def test_scan_sets_replied_flags_and_persists(bridge):
     assert not st["groups"]["domain"]["dhl.example"]["replied"]
 
     data = json.loads(mailops.REPLIED_PATH.read_text())
-    assert "alice@friends.example" in data["addrs"] and data["ts"] > 0
+    entry = data["accounts"]["default"]
+    assert "alice@friends.example" in entry["addrs"] and entry["ts"] > 0
 
     # the cache is merged, not replaced: mail deleted from Sent later must
     # not flip a sender back to "never replied"
     bridge.mailbox["Sent"] = []
-    mailops.REPLIED_TO.clear()
-    mailops._replied_loaded = False
+    acc = accountsmod.get()
+    acc.replied.clear()
+    acc.replied_loaded = False
     mailops.run_scan()
     assert "alice@friends.example" in mailops.REPLIED_TO
     st = mailops.public_state()

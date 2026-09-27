@@ -23,9 +23,9 @@ import time
 import uuid
 from pathlib import Path
 
+from . import accounts
 from . import config as cfgmod
 from . import mailops
-from .mailops import STATE, STATE_LOCK
 
 log = logging.getLogger("pmc.rules")
 
@@ -128,9 +128,14 @@ def match_group(g: dict, f: dict, now: float | None = None) -> bool:
 def load_rules() -> list[dict]:
     try:
         data = json.loads(RULES_PATH.read_text())
-        return data.get("rules", []) if isinstance(data, dict) else []
+        rules = data.get("rules", []) if isinstance(data, dict) else []
     except (OSError, json.JSONDecodeError):
         return []
+    # Migration: pre-multi-account rules belong to the default account.
+    default = accounts.default_name()
+    for r in rules:
+        r.setdefault("account", default)
+    return rules
 
 
 def _save(rules: list[dict]) -> None:
@@ -139,14 +144,20 @@ def _save(rules: list[dict]) -> None:
     tmp.write_text(json.dumps({"rules": rules}, indent=1))
     tmp.chmod(0o600)
     tmp.replace(RULES_PATH)
-    with STATE_LOCK:
-        STATE["rules"] = rules
+    _publish(rules)
+
+
+def _publish(rules: list[dict]) -> None:
+    """Mirror each account's rules into its state so SSE clients see them."""
+    for name in accounts.names():
+        acc = accounts.get(name)
+        mine = [r for r in rules if r.get("account", name) == name]
+        with acc.lock:
+            acc.state["rules"] = mine
 
 
 def publish() -> None:
-    """Mirror the saved rules into STATE so SSE clients see them."""
-    with STATE_LOCK:
-        STATE["rules"] = load_rules()
+    _publish(load_rules())
 
 
 def _validate(body: dict, rule: dict) -> dict:
@@ -168,6 +179,10 @@ def _validate(body: dict, rule: dict) -> dict:
         if body["schedule"] not in SCHEDULES:
             raise ValueError("bad schedule")
         rule["schedule"] = body["schedule"]
+    if "account" in body and body["account"]:
+        if body["account"] not in accounts.names():
+            raise ValueError(f"unknown account {body['account']!r}")
+        rule["account"] = body["account"]
     if "mode" in body:
         if body["mode"] not in ("report", "execute"):
             raise ValueError("bad mode")
@@ -186,6 +201,7 @@ def _validate(body: dict, rule: dict) -> dict:
 def create_rule(body: dict) -> dict:
     rule = {"id": uuid.uuid4().hex[:8], "name": "", "grouping": "sender",
             "query": "", "action": "trash", "dest": "",
+            "account": accounts.default_name(),
             "schedule": "manual", "mode": "report",   # ALWAYS starts report
             "report_runs": 0, "created": int(time.time()), "last_run": None}
     body = dict(body)
@@ -235,12 +251,12 @@ def _record_run(rule_id: str, result: dict) -> None:
 
 # --------------------------------------------------------------------- engine
 
-def _wait_scan(timeout: float = 600) -> bool:
+def _wait_scan(acc, timeout: float = 600) -> bool:
     end = time.time() + timeout
     while time.time() < end:
-        with STATE_LOCK:
-            if STATE["status"] != "scanning":
-                return STATE["status"] == "done"
+        with acc.lock:
+            if acc.state["status"] != "scanning":
+                return acc.state["status"] == "done"
         time.sleep(0.05)
     return False
 
@@ -250,24 +266,28 @@ def run_rule(rule_id: str, rescan: bool = True) -> dict:
     rule = next((r for r in load_rules() if r["id"] == rule_id), None)
     if not rule:
         raise KeyError(rule_id)
+    try:
+        acc = accounts.get(rule.get("account"))
+    except KeyError as exc:
+        raise RuntimeError(str(exc))
     if not _RUN_LOCK.acquire(blocking=False):
         raise RuntimeError("busy: another rule is running")
     try:
         result = {"ts": int(time.time()), "mode": rule["mode"],
                   "groups": 0, "mails": 0, "acted": 0, "capped": 0,
                   "skipped_protected": 0, "preview": [], "error": ""}
-        with STATE_LOCK:
-            scan_ok = STATE["status"] == "done"
+        with acc.lock:
+            scan_ok = acc.state["status"] == "done"
         if rescan or not scan_ok:
             try:
-                mailops.start_scan()
+                mailops.start_scan(acc)
             except RuntimeError as exc:      # busy with user-triggered work
                 raise RuntimeError(f"cannot scan now: {exc}")
-            if not _wait_scan():
+            if not _wait_scan(acc):
                 raise RuntimeError("scan did not finish")
 
         f = parse_filter(rule["query"])
-        snapshot = mailops.public_state()["groups"][rule["grouping"]]
+        snapshot = mailops.public_state(acc)["groups"][rule["grouping"]]
         matched = [g for g in snapshot.values() if match_group(g, f)]
         # Protected groups never take part in rule actions, not even in
         # report numbers for trash-like actions — they are counted apart.
@@ -288,22 +308,22 @@ def run_rule(rule_id: str, rescan: bool = True) -> dict:
             for g in sorted(picked, key=lambda g: -g["count"])[:10]]
 
         if rule["mode"] == "execute" and rule["action"] == "move":
-            with STATE_LOCK:
-                if rule["dest"] not in STATE["folders_raw"]:
+            with acc.lock:
+                if rule["dest"] not in acc.state["folders_raw"]:
                     raise RuntimeError(
                         f"unknown target folder {rule['dest']!r}")
         if rule["mode"] == "execute" and picked:
             r = mailops.delete_groups(
                 rule["grouping"], [g["key"] for g in picked],
-                rule["action"], rule["dest"])
+                rule["action"], rule["dest"], acc=acc)
             result["acted"] = r["queued"]
         log.info("rule %s (%r, %s) ran: %d groups / %d mails matched, "
                  "%d acted, %d capped, %d protected skipped",
                  rule["id"], rule["name"], rule["mode"], result["groups"],
                  result["mails"], result["acted"], result["capped"],
                  result["skipped_protected"])
-        with STATE_LOCK:
-            STATE["notice"] = {
+        with acc.lock:
+            acc.state["notice"] = {
                 "key": "rule_executed" if rule["mode"] == "execute"
                        else "rule_report",
                 "params": {"name": rule["name"], "groups": result["groups"],
@@ -330,15 +350,19 @@ def due(rule: dict, now: float | None = None) -> bool:
 
 
 def _tick() -> None:
-    with STATE_LOCK:
-        busy = (STATE["status"] == "scanning"
-                or STATE["ai"]["status"] == "running"
-                or STATE["delete"]["status"] == "running"
-                or STATE["atts"]["status"] == "running")
-    if busy:
-        return
     for rule in load_rules():
         if due(rule):
+            try:
+                acc = accounts.get(rule.get("account"))
+            except KeyError:
+                continue                     # account was deleted
+            with acc.lock:
+                busy = (acc.state["status"] == "scanning"
+                        or acc.state["ai"]["status"] == "running"
+                        or acc.state["delete"]["status"] == "running"
+                        or acc.state["atts"]["status"] == "running")
+            if busy:
+                continue
             log.info("scheduler: rule %s (%r) is due", rule["id"],
                      rule["name"])
             try:

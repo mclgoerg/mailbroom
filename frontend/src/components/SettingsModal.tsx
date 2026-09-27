@@ -43,22 +43,39 @@ const PRESET_LABELS: Record<Preset, string> = {
   yahoo: "Yahoo Mail", custom: "Custom (any IMAP server)",
 };
 
-export function SettingsModal({ cfg, onClose, onSaved }: {
+export function SettingsModal({ cfg, account, onClose, onSaved,
+  onAccountsChanged }: {
   cfg: Config;
+  account: string;                       // the ACTIVE account
   onClose: () => void;
   onSaved: (c: Config) => void;
+  /** Accounts were added/removed. `switchTo` names a new account to
+   *  activate (or null to let App re-validate the current one). */
+  onAccountsChanged: (c: Config, switchTo: string | null) => void;
 }) {
+  // Which account the connection fields below edit (defaults to the
+  // active one; independent of the header switcher).
+  const [editAcct, setEditAcct] = useState(
+    cfg.accounts[account] ? account : cfg.default_account);
+  const imapOf = (c: Config, name: string) =>
+    c.accounts[name] ?? c.accounts[c.default_account];
+  const imapFields = (c: Config, name: string) => {
+    const im = imapOf(c, name);
+    return {
+      preset: (im.preset ?? "proton") as Preset,
+      host: im.host,
+      port: String(im.port),
+      security: (im.security ?? "ssl") as Security,
+      smtpHost: im.smtp_host ?? "",
+      smtpPort: String(im.smtp_port ?? 1025),
+      smtpSecurity: (im.smtp_security ?? "auto") as SmtpSecurity,
+      cafile: im.cafile ?? "",
+      user: im.user,
+      password: "",
+    };
+  };
   const [f, setF] = useState({
-    preset: (cfg.imap.preset ?? "proton") as Preset,
-    host: cfg.imap.host,
-    port: String(cfg.imap.port),
-    security: (cfg.imap.security ?? "ssl") as Security,
-    smtpHost: cfg.imap.smtp_host ?? "",
-    smtpPort: String(cfg.imap.smtp_port ?? 1025),
-    smtpSecurity: (cfg.imap.smtp_security ?? "auto") as SmtpSecurity,
-    cafile: cfg.imap.cafile ?? "",
-    user: cfg.imap.user,
-    password: "",
+    ...imapFields(cfg, cfg.accounts[account] ? account : cfg.default_account),
     provider: cfg.ai.provider,
     endpoint: cfg.ai.foundry_endpoint,
     model: cfg.ai.model,
@@ -134,6 +151,7 @@ export function SettingsModal({ cfg, onClose, onSaved }: {
     try {
       const excluded = excludedList();
       const body: Record<string, unknown> = {
+        account: editAcct,
         imap: { host: f.host, port: +f.port || 1143,
           security: f.security, smtp_host: f.smtpHost,
           smtp_port: +f.smtpPort || 1025, smtp_security: f.smtpSecurity,
@@ -152,13 +170,7 @@ export function SettingsModal({ cfg, onClose, onSaved }: {
       };
       const next = await api.saveConfig(body);
       onSaved(next);
-      setF({ ...f, password: "", apiKey: "",
-        preset: next.imap.preset, host: next.imap.host,
-        port: String(next.imap.port), security: next.imap.security,
-        smtpHost: next.imap.smtp_host,
-        smtpPort: String(next.imap.smtp_port),
-        smtpSecurity: next.imap.smtp_security,
-        cafile: next.imap.cafile, user: next.imap.user });
+      setF({ ...f, apiKey: "", ...imapFields(next, editAcct) });
       setProtectedText((next.protected ?? []).join("\n"));
       setCategoriesText(catText(next.categories));
       setMsg(t("Saved."));
@@ -170,24 +182,34 @@ export function SettingsModal({ cfg, onClose, onSaved }: {
     }
   };
 
-  const switchProfile = async (name: string) => {
-    if (name === cfg.active_profile) return;
-    if (!confirm(t("confirm.switch_profile", { name }))) return;
-    // Persist current fields into the old profile, then switch.
-    await save({ switch_profile: name });
+  const switchEditAccount = (name: string) => {
+    setEditAcct(name);
+    setF({ ...f, ...imapFields(cfg, name) });
   };
 
-  const newProfile = async () => {
-    const name = prompt(t("Name for the new account profile:"))?.trim();
+  const newAccount = async () => {
+    const name = prompt(t("account.new_prompt"))?.trim();
     if (!name) return;
-    await save({ save_profile_as: name });
+    try {
+      const next = await api.saveConfig({ add_account: name });
+      onAccountsChanged(next, name);
+      setEditAcct(name);
+      setF({ ...f, ...imapFields(next, name) });
+    } catch (e: any) {
+      setMsg(`Error: ${e.message ?? e}`);
+    }
   };
 
-  const deleteProfile = async () => {
-    const name = prompt(
-      `${t("Delete…")} (≠ "${cfg.active_profile}"):`)?.trim();
-    if (!name || name === cfg.active_profile) return;
-    onSaved(await api.saveConfig({ delete_profile: name }));
+  const deleteAccount = async () => {
+    if (!confirm(t("account.confirm_delete", { name: editAcct }))) return;
+    try {
+      const next = await api.saveConfig({ delete_account: editAcct });
+      onAccountsChanged(next, null);
+      setEditAcct(next.default_account);
+      setF({ ...f, ...imapFields(next, next.default_account) });
+    } catch (e: any) {
+      setMsg(`Error: ${e.message ?? e}`);
+    }
   };
 
   const resetStats = async () => {
@@ -237,24 +259,29 @@ export function SettingsModal({ cfg, onClose, onSaved }: {
             }} />
           {t("notify.toggle")}
         </label>
-        <div className="flex flex-wrap items-end gap-2">
-          <Field label={t("Account profile")}>
-            <Select className="w-full" value={cfg.active_profile}
-              onChange={(e) => switchProfile(e.target.value)}>
-              {cfg.profiles.map((p) => <option key={p}>{p}</option>)}
-            </Select>
-          </Field>
-          <Button variant="ghost" onClick={newProfile}>{t("New")}</Button>
-          {cfg.profiles.length > 1 && (
-            <Button variant="ghost" onClick={deleteProfile}>
-              {t("Delete…")}
-            </Button>
-          )}
-        </div>
-
         <SectionLabel className="sm:col-span-2">
           {t("Mail server (IMAP)")}
         </SectionLabel>
+        <div className="sm:col-span-2 flex flex-wrap items-end gap-2">
+          <Field label={t("account.label")}>
+            <Select className="w-full" value={editAcct}
+              onChange={(e) => switchEditAccount(e.target.value)}>
+              {Object.keys(cfg.accounts).map((n) =>
+                <option key={n}>{n}</option>)}
+            </Select>
+          </Field>
+          <Button variant="ghost" onClick={newAccount}>
+            {t("account.add")}
+          </Button>
+          {Object.keys(cfg.accounts).length > 1 && (
+            <Button variant="ghost" onClick={deleteAccount}>
+              {t("Delete…")}
+            </Button>
+          )}
+          <span className="pb-2 text-xs text-muted">
+            {t("account.hint")}
+          </span>
+        </div>
         <div className="sm:col-span-2">
           <Field label={t("preset.label")}>
             <Select className="w-full" value={f.preset}
@@ -289,7 +316,7 @@ export function SettingsModal({ cfg, onClose, onSaved }: {
         </Field>
         <Field label={t("Password")}>
           <Input className="w-full" type="password" value={f.password}
-            placeholder={cfg.imap.password_set
+            placeholder={imapOf(cfg, editAcct).password_set
               ? t("(unchanged)") : t("required")}
             onChange={set("password")} />
         </Field>

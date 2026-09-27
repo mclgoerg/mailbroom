@@ -18,25 +18,35 @@ STATS_PATH = Path(os.environ.get("STATS_PATH", "/data/ai_usage.json"))
 DEFAULT_EXCLUDED = ["Trash", "Spam", "Sent", "Drafts", "All Mail",
                     "Starred", "Labels", "Labels/*"]
 
+# Env-based bootstrap values — used for the FIRST account only (classic
+# single-account Docker setups pass Bridge creds via env).
+ENV_IMAP = {
+    "host": os.environ.get("IMAP_HOST", "127.0.0.1"),
+    "port": int(os.environ.get("IMAP_PORT", "1143")),
+    "security": os.environ.get("IMAP_SECURITY", "ssl"),   # ssl | starttls
+    "smtp_host": os.environ.get("SMTP_HOST", ""),    # "" = the IMAP host
+    "smtp_port": int(os.environ.get("SMTP_PORT", "1025")),
+    "smtp_security": os.environ.get("SMTP_SECURITY", "auto"),
+    "user": os.environ.get("IMAP_USER", ""),
+    "password": os.environ.get("IMAP_PASSWORD", ""),
+    "cafile": os.environ.get("IMAP_CAFILE", "/certs/bridge-cert.pem"),
+    # Which provider preset filled the fields (UI prefill + Proton-only
+    # features like Sieve export). Existing configs default to proton.
+    "preset": "proton",
+}
+
+# Blank slate for ADDITIONAL accounts — env values (e.g. the Bridge
+# password) must never leak into them.
+NEUTRAL_IMAP = {
+    "host": "", "port": 993, "security": "ssl",
+    "smtp_host": "", "smtp_port": 465, "smtp_security": "auto",
+    "user": "", "password": "", "cafile": "", "preset": "custom",
+}
+
 DEFAULT_CONFIG = {
-    "imap": {
-        "host": os.environ.get("IMAP_HOST", "127.0.0.1"),
-        "port": int(os.environ.get("IMAP_PORT", "1143")),
-        "security": os.environ.get("IMAP_SECURITY", "ssl"),  # ssl | starttls
-        "smtp_host": os.environ.get("SMTP_HOST", ""),   # "" = the IMAP host
-        "smtp_port": int(os.environ.get("SMTP_PORT", "1025")),
-        "smtp_security": os.environ.get("SMTP_SECURITY", "auto"),
-        "user": os.environ.get("IMAP_USER", ""),
-        "password": os.environ.get("IMAP_PASSWORD", ""),
-        "cafile": os.environ.get("IMAP_CAFILE", "/certs/bridge-cert.pem"),
-        # Which provider preset filled the fields (UI prefill + Proton-only
-        # features like Sieve export). Existing configs default to proton.
-        "preset": "proton",
-    },
-    # Multi-account: named copies of the "imap" block. "imap" is always the
-    # ACTIVE account so the rest of the code never has to care.
-    "profiles": {},
-    "active_profile": "default",
+    # Multi-account: {name: imap-block}. The FIRST entry is the default
+    # account for API calls without an explicit ?account=.
+    "accounts": {"default": ENV_IMAP},
     "excluded_folders": DEFAULT_EXCLUDED,
     # Protected senders: addresses ("user@example.com") or domains
     # ("@example.com" / "example.com"). Bulk deletes and selection presets
@@ -142,25 +152,53 @@ EMPTY_STATS = {"input_tokens": 0, "output_tokens": 0, "cost": 0.0,
 _LOCK = threading.Lock()
 
 
+def _load_accounts(saved: dict) -> dict[str, dict]:
+    """Accounts from a saved config, migrating the old single-account
+    format (imap + profiles + active_profile) transparently. The first
+    account merges over the env bootstrap values (classic Docker setups);
+    additional accounts merge over neutral defaults so env secrets never
+    leak into them."""
+    if isinstance(saved.get("accounts"), dict) and saved["accounts"]:
+        blocks = {str(n): (b if isinstance(b, dict) else {})
+                  for n, b in saved["accounts"].items()}
+    elif "imap" in saved or "profiles" in saved:
+        active = str(saved.get("active_profile") or "default")
+        blocks = {active: saved.get("imap") or {}}
+        for n, p in (saved.get("profiles") or {}).items():
+            if isinstance(p, dict) and str(n) not in blocks:
+                blocks[str(n)] = p
+    else:
+        return {"default": dict(ENV_IMAP)}
+    out: dict[str, dict] = {}
+    for i, (name, block) in enumerate(blocks.items()):
+        base = ENV_IMAP if i == 0 else NEUTRAL_IMAP
+        out[name] = {**base, **block}
+    return out
+
+
 def load_config() -> dict:
     cfg = json.loads(json.dumps(DEFAULT_CONFIG))  # deep copy
     try:
         saved = json.loads(CONFIG_PATH.read_text())
-        for section in ("imap", "ai"):
-            cfg[section].update(saved.get(section) or {})
+        cfg["accounts"] = _load_accounts(saved)
+        cfg["ai"].update(saved.get("ai") or {})
         if isinstance(saved.get("excluded_folders"), list):
             cfg["excluded_folders"] = saved["excluded_folders"]
         if isinstance(saved.get("protected"), list):
             cfg["protected"] = normalize_protected(saved["protected"])
         if isinstance(saved.get("categories"), dict):
             cfg["categories"] = saved["categories"]
-        if isinstance(saved.get("profiles"), dict):
-            cfg["profiles"] = saved["profiles"]
-        if saved.get("active_profile"):
-            cfg["active_profile"] = str(saved["active_profile"])
     except (OSError, json.JSONDecodeError):
         pass
     return cfg
+
+
+def account_imap(name: str) -> dict:
+    """The imap block of one account; raises ValueError for unknown names."""
+    accounts = load_config()["accounts"]
+    if name not in accounts:
+        raise ValueError(f"unknown account {name!r}")
+    return accounts[name]
 
 
 def _write(path: Path, obj) -> None:
@@ -171,49 +209,67 @@ def _write(path: Path, obj) -> None:
     tmp.replace(path)
 
 
+def _apply_imap(block: dict, imap_in: dict) -> None:
+    """Fold a partial imap update into one account's block (in place)."""
+    for key in ("host", "user", "smtp_host", "cafile"):
+        if key in imap_in:
+            block[key] = str(imap_in[key]).strip()
+    for key in ("port", "smtp_port"):
+        if key in imap_in:
+            try:
+                block[key] = int(
+                    imap_in[key] or (1143 if key == "port" else 1025))
+            except (TypeError, ValueError):
+                pass
+    if imap_in.get("security") in IMAP_SECURITY:
+        block["security"] = imap_in["security"]
+    if imap_in.get("smtp_security") in SMTP_SECURITY:
+        block["smtp_security"] = imap_in["smtp_security"]
+    if imap_in.get("preset") in PRESETS:
+        block["preset"] = imap_in["preset"]
+    if imap_in.get("password"):
+        block["password"] = str(imap_in["password"])
+
+
 def update_config(body: dict) -> dict:
     """Apply a partial update from the UI; empty secrets keep old values."""
     with _LOCK:
         cfg = load_config()
 
-        # Profile management: switch/save-as/delete, before field updates.
-        if body.get("switch_profile"):
-            name = str(body["switch_profile"])
-            if name not in cfg["profiles"] and name != cfg["active_profile"]:
-                raise ValueError(f"unknown profile {name!r}")
-            if name in cfg["profiles"]:
-                cfg["profiles"][cfg["active_profile"]] = cfg["imap"]
-                cfg["imap"] = cfg["profiles"].pop(name)
-                cfg["active_profile"] = name
-        if body.get("save_profile_as"):
-            name = str(body["save_profile_as"]).strip()
-            if name and name != cfg["active_profile"]:
-                # Stash the current account, start the new one empty-ish.
-                cfg["profiles"][cfg["active_profile"]] = dict(cfg["imap"])
-                cfg["imap"] = {**cfg["imap"], "user": "", "password": ""}
-                cfg["active_profile"] = name
-        if body.get("delete_profile"):
-            cfg["profiles"].pop(str(body["delete_profile"]), None)
+        # Account management, before field updates.
+        if body.get("add_account"):
+            name = str(body["add_account"]).strip()[:60]
+            if not name:
+                raise ValueError("account needs a name")
+            if name in cfg["accounts"]:
+                raise ValueError(f"account {name!r} already exists")
+            cfg["accounts"][name] = dict(NEUTRAL_IMAP)
+        if body.get("delete_account"):
+            name = str(body["delete_account"])
+            if name not in cfg["accounts"]:
+                raise ValueError(f"unknown account {name!r}")
+            if len(cfg["accounts"]) == 1:
+                raise ValueError("cannot delete the last account")
+            cfg["accounts"].pop(name)
 
-        imap_in = body.get("imap") or {}
-        for key in ("host", "user", "smtp_host", "cafile"):
-            if key in imap_in:
-                cfg["imap"][key] = str(imap_in[key]).strip()
-        for key in ("port", "smtp_port"):
-            if key in imap_in:
-                try:
-                    cfg["imap"][key] = int(
-                        imap_in[key] or (1143 if key == "port" else 1025))
-                except (TypeError, ValueError):
-                    pass
-        if imap_in.get("security") in IMAP_SECURITY:
-            cfg["imap"]["security"] = imap_in["security"]
-        if imap_in.get("smtp_security") in SMTP_SECURITY:
-            cfg["imap"]["smtp_security"] = imap_in["smtp_security"]
-        if imap_in.get("preset") in PRESETS:
-            cfg["imap"]["preset"] = imap_in["preset"]
-        if imap_in.get("password"):
-            cfg["imap"]["password"] = str(imap_in["password"])
+        # Single-account update: {"account": name, "imap": {...}}.
+        if isinstance(body.get("imap"), dict):
+            target = str(body.get("account") or next(iter(cfg["accounts"])))
+            if target not in cfg["accounts"]:
+                raise ValueError(f"unknown account {target!r}")
+            _apply_imap(cfg["accounts"][target], body["imap"])
+        # Bulk shape (config import): {"accounts": {name: {...}}} — creates
+        # missing accounts; passwords only change when explicitly provided.
+        if isinstance(body.get("accounts"), dict):
+            for name, imap_in in body["accounts"].items():
+                if not isinstance(imap_in, dict):
+                    continue
+                name = str(name).strip()[:60]
+                if not name:
+                    continue
+                block = cfg["accounts"].setdefault(name, dict(NEUTRAL_IMAP))
+                _apply_imap(block, imap_in)
+
         if isinstance(body.get("excluded_folders"), list):
             cfg["excluded_folders"] = [str(f) for f in body["excluded_folders"]]
         if isinstance(body.get("protected"), list):
@@ -244,10 +300,10 @@ def update_config(body: dict) -> dict:
 
 def masked_config(cfg: dict) -> dict:
     return {
-        "imap": {**cfg["imap"], "password": "",
-                 "password_set": bool(cfg["imap"]["password"])},
-        "profiles": sorted([cfg["active_profile"], *cfg["profiles"]]),
-        "active_profile": cfg["active_profile"],
+        "accounts": {
+            n: {**b, "password": "", "password_set": bool(b["password"])}
+            for n, b in cfg["accounts"].items()},
+        "default_account": next(iter(cfg["accounts"])),
         "excluded_folders": cfg["excluded_folders"],
         "protected": normalize_protected(cfg.get("protected")),
         "categories": cfg.get("categories") or {},

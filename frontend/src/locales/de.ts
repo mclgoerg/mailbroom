@@ -362,4 +362,14 @@ export const DE: Record<string, string> = {
   "cafile.label": "Eigene CA-Datei (optional, z.\u202fB. das Bridge-Zertifikat)",
   "folder.role_excluded":
     "Spezialordner (per Rolle erkannt) — wird nie mitgescannt",
+  "account.label": "Zu bearbeitendes Konto",
+  "account.add": "Konto hinzufügen",
+  "account.hint":
+    "Jedes Konto wird getrennt gescannt und aufgeräumt — Ansichten "
+    + "vermischen sich nie. Bei mehreren Konten oben im Kopf umschalten.",
+  "account.new_prompt": "Name für das neue Konto (z. B. \"gmail\"):",
+  "account.confirm_delete":
+    'Konto "{name}" entfernen? Seine Regeln behalten den Kontonamen und '
+    + "laufen nicht mehr; Mails auf dem Server bleiben unangetastet.",
+  "account.switch_tip": "Konto wechseln — jede Ansicht gilt pro Konto",
 };
