@@ -45,6 +45,7 @@ DEFAULT_CONFIG = {
         "foundry_endpoint": "",           # endpoint / base URL (foundry, ollama)
         "price_in": 0.0,                  # USD per 1M input tokens; 0 = auto
         "price_out": 0.0,                 # USD per 1M output tokens; 0 = auto
+        "budget_usd": 0.0,                # monthly AI spend cap; 0 = none
     },
 }
 
@@ -121,7 +122,8 @@ MODEL_PRICES = {
     "gpt-5": (1.25, 10.00),
 }
 
-EMPTY_STATS = {"input_tokens": 0, "output_tokens": 0, "cost": 0.0, "runs": 0}
+EMPTY_STATS = {"input_tokens": 0, "output_tokens": 0, "cost": 0.0,
+               "runs": 0, "months": {}}
 
 _LOCK = threading.Lock()
 
@@ -200,7 +202,7 @@ def update_config(body: dict) -> dict:
         for key in ("model", "foundry_endpoint"):
             if key in ai_in:
                 cfg["ai"][key] = str(ai_in[key]).strip()
-        for key in ("price_in", "price_out"):
+        for key in ("price_in", "price_out", "budget_usd"):
             if key in ai_in:
                 try:
                     cfg["ai"][key] = max(0.0, float(ai_in[key] or 0))
@@ -225,6 +227,8 @@ def masked_config(cfg: dict) -> dict:
                "foundry_endpoint": cfg["ai"]["foundry_endpoint"],
                "price_in": cfg["ai"].get("price_in") or 0,
                "price_out": cfg["ai"].get("price_out") or 0,
+               "budget_usd": cfg["ai"].get("budget_usd") or 0,
+               "month_cost": month_cost(),
                "prices_effective": effective_prices(cfg["ai"]),
                "api_key": "", "api_key_set": bool(cfg["ai"]["api_key"]),
                "available": ai_available(cfg["ai"])},
@@ -247,9 +251,13 @@ def effective_prices(ai_cfg: dict) -> tuple[float, float]:
 
 def load_stats() -> dict:
     try:
-        return {**EMPTY_STATS, **json.loads(STATS_PATH.read_text())}
+        saved = json.loads(STATS_PATH.read_text())
     except (OSError, json.JSONDecodeError):
-        return dict(EMPTY_STATS)
+        saved = {}
+    stats = {**EMPTY_STATS, **saved}
+    # never hand out the shared EMPTY_STATS["months"] dict for mutation
+    stats["months"] = dict(stats.get("months") or {})
+    return stats
 
 
 def reset_stats() -> None:
@@ -259,13 +267,32 @@ def reset_stats() -> None:
 
 def record_usage(ai_cfg: dict, tokens_in: int, tokens_out: int) -> dict:
     """Add one AI run to the persistent totals; returns {cost, total}."""
+    import time
     pin, pout = effective_prices(ai_cfg)
     cost = tokens_in / 1e6 * pin + tokens_out / 1e6 * pout
+    month = time.strftime("%Y-%m")
     with _LOCK:
         stats = load_stats()
         stats["input_tokens"] += tokens_in
         stats["output_tokens"] += tokens_out
         stats["cost"] = round(stats["cost"] + cost, 6)
         stats["runs"] += 1
+        months = stats.setdefault("months", {})
+        months[month] = round(months.get(month, 0) + cost, 6)
         _write(STATS_PATH, stats)
     return {"cost": round(cost, 6), "total": stats}
+
+
+def month_cost() -> float:
+    import time
+    return load_stats().get("months", {}).get(time.strftime("%Y-%m"), 0.0)
+
+
+def check_budget(ai_cfg: dict) -> None:
+    """Raise before an AI call when this month's spend has reached the cap.
+    Already-started runs still record their usage — bills don't un-happen."""
+    budget = float(ai_cfg.get("budget_usd") or 0)
+    if budget and month_cost() >= budget:
+        raise ValueError(
+            f"monthly AI budget reached (${month_cost():.2f} of "
+            f"${budget:.2f}) — raise it in settings to continue")

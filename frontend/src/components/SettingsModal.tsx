@@ -35,6 +35,7 @@ export function SettingsModal({ cfg, onClose, onSaved }: {
     apiKey: "",
     priceIn: cfg.ai.price_in ? String(cfg.ai.price_in) : "",
     priceOut: cfg.ai.price_out ? String(cfg.ai.price_out) : "",
+    budget: cfg.ai.budget_usd ? String(cfg.ai.budget_usd) : "",
   });
   const [protectedText, setProtectedText] =
     useState((cfg.protected ?? []).join("\n"));
@@ -82,6 +83,7 @@ export function SettingsModal({ cfg, onClose, onSaved }: {
         ai: { provider: f.provider, model: f.model,
           foundry_endpoint: f.endpoint,
           price_in: +f.priceIn || 0, price_out: +f.priceOut || 0,
+          budget_usd: +f.budget || 0,
           ...(f.apiKey ? { api_key: f.apiKey } : {}) },
         ...extra,
       };
@@ -307,6 +309,14 @@ export function SettingsModal({ cfg, onClose, onSaved }: {
             value={f.priceOut} placeholder={`auto: ${po}`}
             onChange={set("priceOut")} />
         </Field>
+        <Field label={t("budget.label")}>
+          <input className={input} type="number" step="0.5" min="0"
+            value={f.budget} placeholder={t("budget.none")}
+            onChange={set("budget")} />
+        </Field>
+        <div className="self-end pb-2 text-xs text-muted">
+          {t("budget.month", { spent: fmtUsd(cfg.ai.month_cost ?? 0) })}
+        </div>
 
         <div className="sm:col-span-2 flex flex-wrap items-center gap-3
           rounded-lg bg-panel2 px-4 py-3 text-xs text-muted">

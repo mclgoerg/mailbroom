@@ -158,6 +158,12 @@ const EN: Record<string, string> = {
   "trash.restored": "Restored {n} mails — rescan to see them in the views.",
   "trash.newest_shown": "newest {n} shown",
   "trash.empty": "Trash is empty.",
+  "notice.ai_budget":
+    "AI review stopped after {done}/{total} groups — monthly budget "
+    + "reached (raise it in settings).",
+  "budget.label": "Monthly AI budget ($, 0 = unlimited)",
+  "budget.none": "no cap",
+  "budget.month": "spent this month: {spent}",
 };
 
 const DE: Record<string, string> = {
@@ -440,6 +446,12 @@ const DE: Record<string, string> = {
     "{n} Mails wiederhergestellt — zum Anzeigen neu scannen.",
   "trash.newest_shown": "neueste {n} angezeigt",
   "trash.empty": "Der Papierkorb ist leer.",
+  "notice.ai_budget":
+    "KI-Prüfung nach {done}/{total} Gruppen gestoppt — Monatsbudget "
+    + "erreicht (in den Einstellungen erhöhen).",
+  "budget.label": "Monatliches KI-Budget ($, 0 = unbegrenzt)",
+  "budget.none": "kein Limit",
+  "budget.month": "diesen Monat ausgegeben: {spent}",
 };
 
 let lang: Lang =

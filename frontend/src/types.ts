@@ -191,6 +191,8 @@ export interface Config {
     foundry_endpoint: string;
     price_in: number;
     price_out: number;
+    budget_usd: number;
+    month_cost: number;
     prices_effective: [number, number];
     api_key: string;
     api_key_set: boolean;

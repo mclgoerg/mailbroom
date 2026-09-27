@@ -178,6 +178,8 @@ def post_ai_group(body: AiGroupBody):
     try:
         return aihelper.ai_group(body.grouping, body.key,
                                  body.offset, body.limit)
+    except ValueError as exc:              # e.g. monthly budget reached
+        raise HTTPException(400, str(exc))
     except Exception as exc:
         raise HTTPException(500, f"{type(exc).__name__}: {exc}")
 

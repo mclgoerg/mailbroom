@@ -222,10 +222,20 @@ def _run_ai(grouping: str) -> None:
         usage_in = usage_out = 0
         done = 0
         cancelled = False
+        over_budget = False
+        budget = float(cfg["ai"].get("budget_usd") or 0)
+        pin, pout = cfgmod.effective_prices(cfg["ai"])
         try:
             for start in range(0, len(batch_src), AI_BATCH):
                 if mailops.cancel_requested("ai"):
                     cancelled = True
+                    break
+                # Long runs must not blow through the cap mid-way: usage is
+                # only persisted at the end, so add this run's own spend.
+                if budget and cfgmod.month_cost() \
+                        + usage_in / 1e6 * pin \
+                        + usage_out / 1e6 * pout >= budget:
+                    over_budget = True
                     break
                 batch = batch_src[start:start + AI_BATCH]
                 t0 = time.time()
@@ -265,6 +275,9 @@ def _run_ai(grouping: str) -> None:
             if cancelled:
                 STATE["notice"] = {"key": "ai_cancelled", "params": {
                     "done": done, "total": len(batch_src)}}
+            elif over_budget:
+                STATE["notice"] = {"key": "ai_budget", "params": {
+                    "done": done, "total": len(batch_src)}}
             STATE["ai"]["usage"] = {"input_tokens": usage_in,
                                     "output_tokens": usage_out,
                                     "cost": spent["cost"] if spent else 0,
@@ -281,6 +294,7 @@ def start_group_review(grouping: str) -> None:
     cfg = cfgmod.load_config()
     if not cfgmod.ai_available(cfg["ai"]):
         raise ValueError("no API key configured")
+    cfgmod.check_budget(cfg["ai"])
     with STATE_LOCK:
         if STATE["status"] != "done":
             raise RuntimeError("scan first")
@@ -299,6 +313,7 @@ def ai_group(grouping: str, key: str, offset: int = 0,
     cfg = cfgmod.load_config()
     if not cfgmod.ai_available(cfg["ai"]):
         raise RuntimeError("no API key configured")
+    cfgmod.check_budget(cfg["ai"])
     all_mails = mailops.group_mails(grouping, key, with_msgid=True)
     if not all_mails:
         raise RuntimeError("unknown or empty group")
