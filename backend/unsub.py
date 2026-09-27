@@ -72,7 +72,7 @@ def _post_one_click(url: str) -> None:
     req = urllib.request.Request(
         url, data=b"List-Unsubscribe=One-Click",
         headers={"Content-Type": "application/x-www-form-urlencoded",
-                 "User-Agent": "proton-mail-cleaner"},
+                 "User-Agent": "mailbroom"},
         method="POST")
     with urllib.request.urlopen(req, timeout=20) as res:
         if res.status >= 400:

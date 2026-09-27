@@ -1,13 +1,22 @@
-# Proton Mail Cleaner
+# Mailbroom
 
-Declutter a Proton mailbox: scan everything over IMAP, group mails **by
+**Sweep any IMAP mailbox** — built with love for
+[Proton Mail Bridge](https://proton.me/mail/bridge).
+
+Declutter a mailbox: scan everything over IMAP, group mails **by
 sender, domain, or subject** with counts, sizes, and unread ratios, drill
 into any group down to the full mail text, and move whole groups or single
 mails to Trash — with optional AI assistance (Anthropic API or Microsoft
 Foundry) that suggests what's safe to delete and tracks its own cost.
 
-Built for [Proton Mail Bridge](https://proton.me/mail/bridge) (requires a
-paid Proton plan), but it speaks plain IMAP, so other providers work too.
+## Supported providers
+
+Mailbroom speaks plain IMAP. Proton Mail (via Bridge, requires a paid
+Proton plan) is the featured setup; a provider preset table with hosts
+and auth notes for Gmail, iCloud, Fastmail, GMX, mailbox.org, Yahoo and
+custom servers is coming with the generic-IMAP release.
+Outlook.com/Microsoft 365 is **not supported** (Microsoft requires
+OAuth for IMAP, which Mailbroom does not implement).
 
 ## Features
 
@@ -83,13 +92,13 @@ paid Proton plan), but it speaks plain IMAP, so other providers work too.
 ## Running
 
 ```bash
-docker build -t proton-mail-cleaner .
+docker build -t mailbroom .
 docker run -d --name mailcleaner \
   -e IMAP_HOST=127.0.0.1 -e IMAP_PORT=1143 \
   -e IMAP_USER=you@proton.me -e IMAP_PASSWORD=bridge-password \
   -e IMAP_CAFILE=/certs/bridge-cert.pem \
   -v mailcleaner_data:/data \
-  -p 127.0.0.1:8765:8765 proton-mail-cleaner
+  -p 127.0.0.1:8765:8765 mailbroom
 ```
 
 With Proton Mail Bridge, run this container in the Bridge container's

@@ -24,7 +24,7 @@ services:
       - protonbridge_data:/root
 
   mailcleaner:
-    image: ghcr.io/OWNER/proton-mail-cleaner:latest   # or build: .
+    image: ghcr.io/OWNER/mailbroom:latest   # or build: .
     container_name: mailcleaner
     restart: unless-stopped
     # Shares the bridge's network namespace so 127.0.0.1 matches the SAN of

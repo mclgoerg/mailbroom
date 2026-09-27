@@ -111,7 +111,7 @@ export default function App() {
       if (typeof Notification === "undefined"
           || Notification.permission !== "granted" || !document.hidden) return;
       try {
-        new Notification("Proton Mail Cleaner", { body, icon: "/icon.svg" });
+        new Notification("Mailbroom", { body, icon: "/icon.svg" });
       } catch { /* not supported */ }
     };
     const p = prevJobs.current;
@@ -358,7 +358,7 @@ export default function App() {
     <div className="mx-auto max-w-6xl p-3 sm:p-5">
       <header className="mb-4 flex items-center gap-3">
         <h1 className="text-lg font-bold tracking-tight">
-          Proton Mail Cleaner
+          Mailbroom
         </h1>
         <button className="text-sm text-muted hover:text-body"
           title={t("Theme")} onClick={toggleTheme}>

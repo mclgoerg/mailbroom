@@ -40,7 +40,7 @@ async def _lifespan(app: FastAPI):
     rulesmod.start_scheduler()
     yield
 
-app = FastAPI(title="proton-mail-cleaner", docs_url=None, redoc_url=None,
+app = FastAPI(title="mailbroom", docs_url=None, redoc_url=None,
               lifespan=_lifespan)
 
 STATIC_DIR = Path(__file__).resolve().parent.parent / "static"
@@ -437,7 +437,7 @@ def get_export_config():
     password and AI API key never leave the server."""
     cfg = cfgmod.load_config()
     data = {
-        "version": 1, "app": "proton-mail-cleaner",
+        "version": 1, "app": "mailbroom",
         "config": {
             "imap": {k: v for k, v in cfg["imap"].items()
                      if k != "password"},

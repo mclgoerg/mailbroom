@@ -1,7 +1,7 @@
 {
-  "name": "Proton Mail Cleaner",
-  "short_name": "MailCleaner",
-  "description": "Group, review and clean up your Proton mailbox.",
+  "name": "Mailbroom",
+  "short_name": "Mailbroom",
+  "description": "Sweep any IMAP mailbox — group, review, clean up.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
