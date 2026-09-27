@@ -5,7 +5,7 @@ import { fmtSize, fmtUsd, mailKey, olderThan, sieveSnippet,
   type SieveAction } from "../lib";
 import type { AppState, Group, Grouping, Mail } from "../types";
 import { MailRows, MessageView } from "./MailList";
-import { Button, ensureAiAck, Modal, ProtectButton, Spinner } from "./ui";
+import { Button, ensureAiAck, Loading, Modal, ProtectButton, Spinner } from "./ui";
 
 export function DetailPanel({ grouping, group, aiEnabled, protectedNow,
   onProtect, folders, onClose, onDeleted }: {
@@ -318,9 +318,7 @@ export function DetailPanel({ grouping, group, aiEnabled, protectedNow,
           </div>
           <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-4">
             {error && <div className="p-4 text-sm text-rose-400">{error}</div>}
-            {!shown && !error && (
-              <div className="p-4 text-sm text-muted"><Spinner /> {t("loading…")}</div>
-            )}
+            {!shown && !error && <Loading />}
             {shown && (
               <MailRows mails={shown} sel={sel} onToggle={toggle}
                 onOpen={setView} />

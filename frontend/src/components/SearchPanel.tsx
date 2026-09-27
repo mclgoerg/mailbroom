@@ -66,7 +66,7 @@ export function SearchPanel({ onClose, onDeleted }: {
           onKeyDown={(e) => e.key === "Enter" && run()}
         />
         <Button onClick={run} disabled={busy || q.trim().length < 2}>
-          {busy ? <Spinner /> : t("Search")}
+          {busy ? <Spinner className="!text-white" /> : t("Search")}
         </Button>
         <Button variant="ghost" onClick={onClose}>✕</Button>
       </div>

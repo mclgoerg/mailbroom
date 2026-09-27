@@ -72,10 +72,35 @@ export function ProtectButton({ on, onClick, className = "" }: {
 }
 
 
-export function Spinner() {
+/** The app-wide loading animation (see .pmc-spinner in index.css).
+ *  Colored via currentColor — defaults to the accent; pass e.g.
+ *  className="text-white" inside primary buttons. */
+export function Spinner({ size = "sm", className = "" }: {
+  size?: "sm" | "md" | "lg"; className?: string;
+}) {
+  const s = {
+    sm: "size-3.5 [--pmc-thickness:2px]",
+    md: "size-6 [--pmc-thickness:2.5px]",
+    lg: "size-9 [--pmc-thickness:3px]",
+  }[size];
   return (
-    <span className="inline-block size-3.5 animate-spin rounded-full
-      border-2 border-line border-t-accent align-middle" />
+    <span aria-label="loading" role="status"
+      className={`pmc-spinner inline-block align-middle text-accent
+        ${s} ${className}`} />
+  );
+}
+
+/** Standard block-level loading state: big spinner + muted label,
+ *  centered, with a short fade-in delay. Use this in every panel. */
+export function Loading({ label, className = "" }: {
+  label?: string; className?: string;
+}) {
+  return (
+    <div className={`pmc-loading flex flex-col items-center justify-center
+      gap-3 p-8 text-sm text-muted ${className}`}>
+      <Spinner size="lg" />
+      <span>{label ?? t("loading…")}</span>
+    </div>
   );
 }
 

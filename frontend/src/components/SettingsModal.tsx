@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { api, fmtUsd } from "../api";
 import { getLang, setLang, t, type Lang } from "../i18n";
 import type { Config, FoldersResp } from "../types";
-import { Button, Modal, Spinner } from "./ui";
+import { Button, Loading, Modal } from "./ui";
 
 function Field({ label, children }: {
   label: string; children: React.ReactNode;
@@ -236,9 +236,7 @@ export function SettingsModal({ cfg, onClose, onSaved }: {
           <span className="mb-1 block text-xs text-muted">
             {t("Folders to scan")}
           </span>
-          {!folders && !foldersErr && (
-            <div className="text-xs text-muted"><Spinner /></div>
-          )}
+          {!folders && !foldersErr && <Loading className="!p-3" />}
           {foldersErr && (
             <div className="text-xs text-rose-400">{foldersErr}</div>
           )}

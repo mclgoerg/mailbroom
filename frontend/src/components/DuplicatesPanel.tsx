@@ -3,7 +3,7 @@ import { api, fmtSize, mailKey } from "../api";
 import { t } from "../i18n";
 import type { DupSet, Mail } from "../types";
 import { MessageView } from "./MailList";
-import { Button, Modal, Spinner, Tag } from "./ui";
+import { Button, Loading, Modal, Tag } from "./ui";
 
 /** Duplicate finder: same Message-ID anywhere, or identical
  *  (sender, subject, size). "Keep newest" selects everything else. */
@@ -96,11 +96,7 @@ export function DuplicatesPanel({ onClose, onDeleted }: {
           </div>
           <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-4">
             {error && <div className="p-4 text-sm text-rose-400">{error}</div>}
-            {!sets && !error && (
-              <div className="p-4 text-sm text-muted">
-                <Spinner /> {t("loading…")}
-              </div>
-            )}
+            {!sets && !error && <Loading />}
             {sets && sets.length === 0 && (
               <div className="p-4 text-sm text-muted">{t("dups.none")}</div>
             )}

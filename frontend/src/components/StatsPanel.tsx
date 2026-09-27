@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { api, fmtSize } from "../api";
 import { t } from "../i18n";
 import type { StatsResp } from "../types";
-import { Button, Modal, Spinner } from "./ui";
+import { Button, Loading, Modal } from "./ui";
 
 const month = () => new Date().toISOString().slice(0, 7);
 
@@ -33,7 +33,7 @@ export function StatsPanel({ onClose }: { onClose: () => void }) {
       </div>
       <div className="space-y-5 p-5 text-sm">
         {error && <div className="text-rose-400">{error}</div>}
-        {!stats && !error && <Spinner />}
+        {!stats && !error && <Loading />}
         {stats && (
           <>
             <div className="text-muted">

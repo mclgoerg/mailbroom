@@ -35,3 +35,33 @@ html[data-theme="light"] {
 body {
   @apply bg-surface text-body antialiased;
 }
+
+/* Shared loading animation: a "comet" ring in currentColor (defaults to
+   the accent via the Spinner component), used by every loading state. */
+@keyframes pmc-spin {
+  to { transform: rotate(1turn); }
+}
+
+@keyframes pmc-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.pmc-spinner {
+  border-radius: 9999px;
+  background: conic-gradient(from 0.25turn,
+    transparent 0turn, currentColor 0.9turn, transparent 0.9turn);
+  -webkit-mask: radial-gradient(farthest-side,
+    transparent calc(100% - var(--pmc-thickness, 2px)),
+    #000 calc(100% - var(--pmc-thickness, 2px) + 0.5px));
+  mask: radial-gradient(farthest-side,
+    transparent calc(100% - var(--pmc-thickness, 2px)),
+    #000 calc(100% - var(--pmc-thickness, 2px) + 0.5px));
+  animation: pmc-spin 0.8s linear infinite;
+}
+
+/* Block-level loading rows fade in after a short delay, so anything that
+   finishes within a blink never flashes a spinner. */
+.pmc-loading {
+  animation: pmc-fade 0.25s ease 0.15s both;
+}

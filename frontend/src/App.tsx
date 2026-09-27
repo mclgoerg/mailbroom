@@ -383,7 +383,7 @@ export default function App() {
       <div className="mb-2 flex flex-wrap items-center gap-2">
         <Button onClick={startScan}
           disabled={scanning || aiRunning || deleting || attsRunning}>
-          {scanning ? <Spinner /> : t("Scan")}
+          {scanning ? <Spinner className="!text-white" /> : t("Scan")}
         </Button>
         {/* order-2 + w-full: on phones the grouping toggle gets a full line
             of its own instead of being shrunk by the icon strip. */}

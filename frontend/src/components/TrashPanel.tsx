@@ -3,7 +3,7 @@ import { api, fmtSize, mailKey } from "../api";
 import { t } from "../i18n";
 import type { AppState, Mail, TrashResp } from "../types";
 import { MessageView } from "./MailList";
-import { Button, Modal, Spinner } from "./ui";
+import { Button, Loading, Modal, Spinner } from "./ui";
 
 /** Trash browser: live Trash contents (also mail deleted outside the app),
  *  with search and restore-to-folder. */
@@ -106,9 +106,7 @@ export function TrashPanel({ state, onClose, onChanged }: {
           </div>
           <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-4">
             {error && <div className="p-4 text-sm text-rose-400">{error}</div>}
-            {!shown && !error && (
-              <div className="p-4 text-sm text-muted"><Spinner /></div>
-            )}
+            {!shown && !error && <Loading />}
             {shown && shown.length === 0 && (
               <div className="p-4 text-sm text-muted">{t("trash.empty")}</div>
             )}

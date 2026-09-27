@@ -3,7 +3,7 @@ import { api, fmtSize, mailKey } from "../api";
 import { t } from "../i18n";
 import type { AppState, AttMail, Mail } from "../types";
 import { MessageView } from "./MailList";
-import { Button, Modal, Spinner, Tag } from "./ui";
+import { Button, Loading, Modal, Spinner, Tag } from "./ui";
 
 /** Attachment explorer: lazy BODYSTRUCTURE analysis, then the mailbox's
  *  attachment-heaviest mails. Proton IMAP cannot strip attachments, so the
@@ -117,14 +117,10 @@ export function AttachmentsPanel({ state, onClose, onDeleted }: {
               <div className="p-4 text-sm text-muted">{t("atts.intro")}</div>
             )}
             {running && (
-              <div className="p-4 text-sm text-muted">
-                <Spinner /> {starting ? t("Starting…") : atts.progress}
-              </div>
+              <Loading label={starting ? t("Starting…") : atts.progress} />
             )}
             {!running && atts?.status === "done" && mails === null && (
-              <div className="p-4 text-sm text-muted">
-                <Spinner /> {t("loading…")}
-              </div>
+              <Loading />
             )}
             {mails && mails.length === 0 && (
               <div className="p-4 text-sm text-muted">{t("atts.none")}</div>
