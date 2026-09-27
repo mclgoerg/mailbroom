@@ -527,17 +527,21 @@ export default function App() {
             </button>
           ))}
         </div>
-        <Input
-          ref={filterRef}
-          className="order-last w-full sm:order-none sm:w-auto sm:min-w-24
-            sm:flex-1"
-          placeholder={t("filter groups…")}
-          title="Combinable: tag:shipping ai:safe age:>1y unread:>80 is:unsub text"
-          value={filter}
-          onChange={(e) => setFilter(e.target.value)}
-        />
-        <QueryBuilder value={filter} onChange={setFilter}
-          className="order-last sm:order-none" />
+        {/* Filter + builder share one flex-wrap unit: the 🧰 sits right
+            next to the input on every width, and the builder panel
+            (w-full) wraps to its own line directly underneath. */}
+        <div className="order-last flex w-full flex-wrap items-center gap-2
+          sm:order-none sm:w-auto sm:min-w-24 sm:flex-1">
+          <Input
+            ref={filterRef}
+            className="min-w-0 flex-1"
+            placeholder={t("filter groups…")}
+            title="Combinable: tag:shipping ai:safe age:>1y unread:>80 is:unsub text"
+            value={filter}
+            onChange={(e) => setFilter(e.target.value)}
+          />
+          <QueryBuilder value={filter} onChange={setFilter} />
+        </div>
         {/* One wrap unit; tighter padding on phones so the strip fits next
             to Scan on one line. */}
         <div className="ml-auto flex items-center gap-1.5 sm:ml-0 sm:gap-2">
@@ -561,7 +565,11 @@ export default function App() {
       </div>
       {/* Row 2: selection / sorting / bulk tools. */}
       <div className="mb-3 flex flex-wrap items-center gap-2">
-        <Select className="flex-1 sm:flex-none" value=""
+        {/* min-w-[42%/46%]: on phones the two selects claim the whole
+            first line together, so AI review/CSV/… wrap to the next one
+            instead of squeezing the sort control to nothing. */}
+        <Select className="min-w-[42%] flex-1 sm:min-w-0 sm:flex-none"
+          value=""
           onChange={(e) => selectPreset(e.target.value)}>
           <option value="" disabled>{t("Select…")}</option>
           <option value="aisafe">{t("AI-safe groups")}</option>
@@ -572,8 +580,8 @@ export default function App() {
         </Select>
         {/* Sort: field select + direction toggle as one segmented
             control; the arrow rotates instead of swapping glyphs. */}
-        <div className="flex flex-1 items-stretch overflow-hidden rounded-md
-          border border-line sm:flex-none">
+        <div className="flex min-w-[46%] flex-1 items-stretch overflow-hidden
+          rounded-md border border-line sm:min-w-0 sm:flex-none">
           <Select className="min-w-0 flex-1 !rounded-none !border-0"
             value={sortK}
             onChange={(e) => {
@@ -627,8 +635,10 @@ export default function App() {
             <option value="mark_read">{t("Mark read")}</option>
           </Select>
         )}
+        {/* Desktop: pinned right (destructive, away from the rest).
+            Phones: fills its wrapped row instead of floating alone. */}
         <Button variant="danger" disabled={selected.size === 0}
-          className="ml-auto"
+          className="flex-1 sm:ml-auto sm:flex-none"
           onClick={() => act([...selected], "trash")}>
           {selected.size ? `${t("Trash")} ${selCount}` : t("Trash")}
         </Button>
