@@ -33,6 +33,9 @@ paid Proton plan), but it speaks plain IMAP, so other providers work too.
   names, adds a 📎 aggregate to groups, and enables the `att:>10m` filter.
   Proton IMAP can't strip single attachments, so cleanup means deleting
   the whole mail (reversible as always).
+- **Duplicate finder** — mails with the same Message-ID (e.g. copies
+  across folders) or identical sender + subject + size, grouped into sets
+  with one click to select everything but the newest copy.
 - **Rules + scheduler** — save a filter query (same syntax as the filter
   box) plus an action as a rule, run it manually or daily/weekly. Rules
   always start in **report mode** (they only tell you what they would do);

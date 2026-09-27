@@ -1138,6 +1138,43 @@ def attachments_list(limit: int = 300) -> list[dict]:
     return out[:limit]
 
 
+# -------------------------------------------------------------- duplicates
+
+def duplicates_list(limit: int = 200) -> list[dict]:
+    """Duplicate sets from the scanned index: same Message-ID anywhere, or
+    (for mails without a usable Message-ID match) the same exact
+    (sender, subject, size) tuple. Newest mail first inside each set;
+    'wasted' is what deleting all but the newest would free."""
+    with STATE_LOCK:
+        mails = list(INDEX.values())
+    by_msgid: dict[str, list] = {}
+    for m in mails:
+        if m["msgid"]:
+            by_msgid.setdefault(m["msgid"], []).append(m)
+    sets = [v for v in by_msgid.values() if len(v) > 1]
+    in_set = {id(m) for s in sets for m in s}
+    by_tuple: dict[tuple, list] = {}
+    for m in mails:
+        if id(m) in in_set or not m["subject"] or not m["size"]:
+            continue
+        by_tuple.setdefault((m["addr"], m["subject"], m["size"]),
+                            []).append(m)
+    sets += [v for v in by_tuple.values() if len(v) > 1]
+
+    out = []
+    for s in sets:
+        s = sorted(s, key=lambda m: -m["ts"])
+        out.append({
+            "wasted": sum(m["size"] for m in s[1:]),
+            "mails": [{"uid": m["uid"], "folder": m["folder"],
+                       "date": m["date"], "ts": m["ts"],
+                       "subject": m["subject"], "addr": m["addr"],
+                       "size": m["size"], "seen": m["seen"], "ai": None}
+                      for m in s]})
+    out.sort(key=lambda x: -x["wasted"])
+    return out[:limit]
+
+
 # ----------------------------------------------------------- undo & trash
 
 def undo_last(index: int = -1) -> dict:

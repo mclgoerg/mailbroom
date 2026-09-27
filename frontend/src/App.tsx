@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api } from "./api";
 import { DetailPanel } from "./components/DetailPanel";
 import { AttachmentsPanel } from "./components/AttachmentsPanel";
+import { DuplicatesPanel } from "./components/DuplicatesPanel";
 import { GroupTable, type SortKey } from "./components/GroupTable";
 import { RulesModal } from "./components/RulesModal";
 import { SearchPanel } from "./components/SearchPanel";
@@ -45,6 +46,7 @@ export default function App() {
   const [searchOpen, setSearchOpen] = useState(false);
   const [rulesOpen, setRulesOpen] = useState(false);
   const [attsOpen, setAttsOpen] = useState(false);
+  const [dupsOpen, setDupsOpen] = useState(false);
   const [undoOpen, setUndoOpen] = useState(false);
   const [moveDest, setMoveDest] = useState("");
   const [focusIdx, setFocusIdx] = useState(-1);
@@ -115,8 +117,8 @@ export default function App() {
   const aiRunning = state?.ai.status === "running";
   const deleting = state?.delete.status === "running";
   const aiEnabled = !!cfg?.ai.available;
-  const anyModal =
-    !!detail || searchOpen || settingsOpen || rulesOpen || attsOpen;
+  const anyModal = !!detail || searchOpen || settingsOpen || rulesOpen
+    || attsOpen || dupsOpen;
 
   const startScan = async () => {
     setSelected(new Set());
@@ -374,6 +376,9 @@ export default function App() {
           onClick={() => setRulesOpen(true)}>📋</Button>
         <Button variant="ghost" title={t("Attachments")}
           onClick={() => setAttsOpen(true)}>📎</Button>
+        <Button variant="ghost" title={t("Duplicates")}
+          disabled={state?.status !== "done"}
+          onClick={() => setDupsOpen(true)}>📑</Button>
         <Button variant="ghost" title={t("Settings")}
           onClick={() => setSettingsOpen(true)}>⚙</Button>
       </div>
@@ -520,6 +525,12 @@ export default function App() {
       {searchOpen && (
         <SearchPanel
           onClose={() => { setSearchOpen(false); refresh(); }}
+          onDeleted={refresh}
+        />
+      )}
+      {dupsOpen && (
+        <DuplicatesPanel
+          onClose={() => { setDupsOpen(false); refresh(); }}
           onDeleted={refresh}
         />
       )}

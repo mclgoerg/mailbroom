@@ -205,6 +205,11 @@ def get_attachments():
     return mailops.attachments_list()
 
 
+@app.get("/api/duplicates")
+def get_duplicates():
+    return mailops.duplicates_list()
+
+
 class RuleBody(BaseModel):
     name: str = ""
     grouping: str = "sender"

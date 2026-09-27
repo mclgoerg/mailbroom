@@ -128,6 +128,12 @@ const EN: Record<string, string> = {
     + "att:>10m filter also works on groups. Proton cannot strip single "
     + "attachments over IMAP — deleting removes the whole mail (undoable).",
   "atts.none": "No attachments found in the scanned folders.",
+  "dups.hint": "Same Message-ID, or identical sender + subject + size.",
+  "dups.summary": "{n} duplicate sets · {size} reclaimable",
+  "dups.keep_newest": "Select all but newest",
+  "dups.wasted": "{size} reclaimable",
+  "dups.newest": "newest",
+  "dups.none": "No duplicates found — nice and tidy.",
 };
 
 const DE: Record<string, string> = {
@@ -373,6 +379,14 @@ const DE: Record<string, string> = {
     + "IMAP keine einzelnen Anhänge entfernen — Löschen entfernt die ganze "
     + "Mail (rückgängig machbar).",
   "atts.none": "Keine Anhänge in den gescannten Ordnern gefunden.",
+  "Duplicates": "Duplikate",
+  "dups.hint":
+    "Gleiche Message-ID oder identischer Absender + Betreff + Größe.",
+  "dups.summary": "{n} Duplikat-Gruppen · {size} freigebbar",
+  "dups.keep_newest": "Alle außer der neuesten auswählen",
+  "dups.wasted": "{size} freigebbar",
+  "dups.newest": "neueste",
+  "dups.none": "Keine Duplikate gefunden — schön aufgeräumt.",
 };
 
 let lang: Lang =

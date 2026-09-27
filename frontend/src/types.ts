@@ -61,6 +61,11 @@ export interface AttMail extends Mail {
   atts: { name: string; size: number }[];
 }
 
+export interface DupSet {
+  wasted: number;
+  mails: Mail[];    // newest first
+}
+
 export interface RuleRun {
   ts: number;
   mode: "report" | "execute";
