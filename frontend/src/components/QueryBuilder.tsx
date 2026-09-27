@@ -1,0 +1,132 @@
+import { useState } from "react";
+import { t } from "../i18n";
+import { Button, Input, Select } from "./ui";
+
+/* Interactive helper for the filter/rule query DSL: instead of
+ * remembering the syntax, users click conditions together — each one
+ * appends its token to the query (tokens AND together). Renders as a
+ * 🧰 toggle plus an INLINE full-width panel (no floating popover: it
+ * must survive flex-wrap toolbars and scrolling modals alike), so in a
+ * flex-wrap container the panel takes its own row. */
+
+const TAGS = ["newsletter", "shipping", "finance", "shopping", "social",
+  "travel", "dev/cloud", "automated"];
+
+export function QueryBuilder({ value, onChange, className = "" }: {
+  value: string;
+  onChange: (q: string) => void;
+  className?: string;                    // extra classes for the trigger
+}) {
+  const [open, setOpen] = useState(false);
+  const [tag, setTag] = useState("newsletter");
+  const [ai, setAi] = useState("safe");
+  const [age, setAge] = useState("1");
+  const [ageUnit, setAgeUnit] = useState<"m" | "y">("y");
+  const [unread, setUnread] = useState("80");
+  const [att, setAtt] = useState("10");
+
+  const add = (tok: string) => {
+    const q = value.trim();
+    if (q.split(/\s+/).includes(tok)) return;      // no duplicate tokens
+    onChange(q ? `${q} ${tok}` : tok);
+  };
+  const addBtn = (tok: string) => (
+    <Button variant="ghost" className="!min-h-8 !px-2 !text-xs"
+      onClick={() => add(tok)}>
+      {t("qb.add")}
+    </Button>
+  );
+  const flag = (tok: string, label: string) => (
+    <button key={tok}
+      className={`rounded-md border border-line px-2 py-1 text-xs ${
+        value.split(/\s+/).includes(tok)
+          ? "bg-accent text-white" : "bg-panel2 text-body hover:bg-chip"}`}
+      onClick={() => add(tok)}>
+      {label}
+    </button>
+  );
+
+  return (
+    <>
+      <Button variant="ghost" className={`!px-2 ${className}`}
+        title={t("qb.tip")} aria-expanded={open}
+        onClick={() => setOpen(!open)}>
+        🧰
+      </Button>
+      {open && (
+        <div className={`w-full rounded-lg border border-line bg-panel2 p-3
+          ${className}`}>
+          <div className="mb-2 flex items-center gap-2 text-xs text-muted">
+            <span className="font-medium uppercase tracking-wide">
+              {t("qb.title")}</span>
+            <span>{t("qb.hint")}</span>
+            <button className="ml-auto underline-offset-2 hover:underline"
+              onClick={() => onChange("")}>{t("qb.clear")}</button>
+            <button className="underline-offset-2 hover:underline"
+              onClick={() => setOpen(false)}>{t("qb.done")}</button>
+          </div>
+          <div className="grid gap-2 sm:grid-cols-2">
+            <div className="flex items-center gap-2 text-sm">
+              <span className="w-24 shrink-0 text-xs text-muted">
+                {t("qb.tag")}</span>
+              <Select className="!min-h-8 flex-1 !text-xs" value={tag}
+                onChange={(e) => setTag(e.target.value)}>
+                {TAGS.map((x) => <option key={x}>{x}</option>)}
+              </Select>
+              {addBtn(`tag:${tag}`)}
+            </div>
+            <div className="flex items-center gap-2 text-sm">
+              <span className="w-24 shrink-0 text-xs text-muted">
+                {t("qb.ai")}</span>
+              <Select className="!min-h-8 flex-1 !text-xs" value={ai}
+                onChange={(e) => setAi(e.target.value)}>
+                <option value="safe">{t("qb.ai_safe")}</option>
+                <option value="review">{t("qb.ai_review")}</option>
+                <option value="keep">{t("qb.ai_keep")}</option>
+              </Select>
+              {addBtn(`ai:${ai}`)}
+            </div>
+            <div className="flex items-center gap-2 text-sm">
+              <span className="w-24 shrink-0 text-xs text-muted">
+                {t("qb.age")}</span>
+              <Input className="!min-h-8 w-14 !text-xs" type="number" min="1"
+                value={age} onChange={(e) => setAge(e.target.value)} />
+              <Select className="!min-h-8 flex-1 !text-xs" value={ageUnit}
+                onChange={(e) => setAgeUnit(e.target.value as "m" | "y")}>
+                <option value="m">{t("qb.months")}</option>
+                <option value="y">{t("qb.years")}</option>
+              </Select>
+              {addBtn(`age:>${+age || 1}${ageUnit}`)}
+            </div>
+            <div className="flex items-center gap-2 text-sm">
+              <span className="w-24 shrink-0 text-xs text-muted">
+                {t("qb.unread")}</span>
+              <Input className="!min-h-8 w-14 !text-xs" type="number"
+                min="1" max="100" value={unread}
+                onChange={(e) => setUnread(e.target.value)} />
+              <span className="text-xs text-muted">%</span>
+              {addBtn(`unread:>${+unread || 1}`)}
+            </div>
+            <div className="flex items-center gap-2 text-sm">
+              <span className="w-24 shrink-0 text-xs text-muted">
+                {t("qb.att")}</span>
+              <Input className="!min-h-8 w-14 !text-xs" type="number" min="1"
+                value={att} onChange={(e) => setAtt(e.target.value)} />
+              <span className="text-xs text-muted">MB</span>
+              {addBtn(`att:>${+att || 1}m`)}
+            </div>
+            <div className="flex flex-wrap items-center gap-1.5
+              sm:col-span-2">
+              <span className="w-24 shrink-0 text-xs text-muted">
+                {t("qb.flags")}</span>
+              {flag("is:unsub", t("qb.is_unsub"))}
+              {flag("is:noreply-ever", t("qb.is_noreply"))}
+              {flag("is:replied", t("qb.is_replied"))}
+              {flag("is:protected", t("qb.is_protected"))}
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  );
+}

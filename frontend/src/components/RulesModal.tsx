@@ -3,6 +3,7 @@ import { api } from "../api";
 import { t } from "../i18n";
 import { matchGroup, parseFilter } from "../lib";
 import type { AppState, Grouping, Rule } from "../types";
+import { QueryBuilder } from "./QueryBuilder";
 import { Button, EmptyState, Input, Modal, PanelHeader, SectionLabel,
   Select, Spinner, Tag } from "./ui";
 
@@ -183,9 +184,13 @@ export function RulesModal({ state, onClose, onChanged }: {
               <option value="subject">{t("Subject")}</option>
             </Select>
             <div className="sm:col-span-2">
-              <Input className="w-full"
-                placeholder="tag:shipping age:>1y is:noreply-ever …"
-                value={form.query} onChange={set("query")} />
+              <div className="flex flex-wrap items-center gap-2">
+                <Input className="min-w-0 flex-1"
+                  placeholder="tag:shipping age:>1y is:noreply-ever …"
+                  value={form.query} onChange={set("query")} />
+                <QueryBuilder value={form.query}
+                  onChange={(q) => setForm({ ...form, query: q })} />
+              </div>
               <div className="mt-1 text-xs text-muted">
                 {matchCount
                   ? t("rule.match_count", matchCount)

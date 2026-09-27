@@ -705,7 +705,8 @@ export function SettingsModal({ cfg, account, onClose, onSaved,
                           title={`${u.id} — ${u.accounts} account(s), ${
                             u.scans} scan(s), ${u.rules} rule(s), ${
                             u.verdicts} AI verdict(s)`}>
-                          {u.is_admin_workspace ? "★ " : ""}{u.id}
+                          {u.is_admin_workspace ? "★ " : ""}
+                          {u.label || u.id}
                         </td>
                         <td className="px-2 py-1.5">
                           {u.mails.toLocaleString()}

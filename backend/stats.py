@@ -142,6 +142,12 @@ def admin_overview() -> list[dict]:
                 *(mailops._snap_path(n) for n in cfg["accounts"])))
             out.append({
                 "id": tenant.id,
+                # "default" is just the storage id of the pre-tenancy
+                # workspace — display the admin identity instead. Other
+                # tenants keep their directory id (their subject is not
+                # recoverable from the slug, by design).
+                "label": (cfgmod.load_server()["auth"].get("admin") or "")
+                if tenant.is_default else "",
                 "is_admin_workspace": tenant.is_default,
                 "accounts": len(cfg["accounts"]),
                 "mails": mails, "size": size,

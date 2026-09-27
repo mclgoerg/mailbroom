@@ -240,6 +240,7 @@ export interface AuthCfg {
 // addresses or any mail-derived data here.
 export interface AdminTenantStats {
   id: string;
+  label: string;              // display name (admin identity); "" = use id
   is_admin_workspace: boolean;
   accounts: number;
   mails: number;

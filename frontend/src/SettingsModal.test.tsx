@@ -18,7 +18,7 @@ vi.mock("./api", () => ({
       return new Promise(() => {});              // response irrelevant here
     },
     adminStats: () => Promise.resolve({ tenants: [{
-      id: "alice_x.example_ab12cd34", is_admin_workspace: false,
+      id: "alice_x.example_ab12cd34", label: "", is_admin_workspace: false,
       accounts: 1, mails: 42, size: 1048576, scans: 3,
       last_scan_ts: Date.now() / 1000 - 3600, rules: 0, verdicts: 5,
       actions_month: { trash: 7, archive: 0, move: 0, mark_read: 0,

@@ -9,6 +9,7 @@ import { RulesModal } from "./components/RulesModal";
 import { SearchPanel } from "./components/SearchPanel";
 import { SettingsModal } from "./components/SettingsModal";
 import { StatsPanel } from "./components/StatsPanel";
+import { QueryBuilder } from "./components/QueryBuilder";
 import { TrashPanel } from "./components/TrashPanel";
 import { applyTheme, Button, currentTheme, ensureAiAck, Input, Menu,
   MenuHeading, MenuItem, Select, Spinner } from "./components/ui";
@@ -524,6 +525,8 @@ export default function App() {
           value={filter}
           onChange={(e) => setFilter(e.target.value)}
         />
+        <QueryBuilder value={filter} onChange={setFilter}
+          className="order-last sm:order-none" />
         {/* One wrap unit; tighter padding on phones so the strip fits next
             to Scan on one line. */}
         <div className="ml-auto flex items-center gap-1.5 sm:ml-0 sm:gap-2">
@@ -543,9 +546,6 @@ export default function App() {
           <Button variant="ghost" className="!px-2 sm:!px-3"
             title={t("Statistics")}
             onClick={() => setStatsOpen(true)}>📊</Button>
-          <Button variant="ghost" className="!px-2 sm:!px-3"
-            title={t("Settings")}
-            onClick={() => setSettingsOpen(true)}>⚙</Button>
         </div>
       </div>
       {/* Row 2: selection / sorting / bulk tools. */}

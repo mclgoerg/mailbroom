@@ -314,6 +314,7 @@ def test_admin_stats_are_usage_only_and_admin_only(bridge):
     assert r.status_code == 200
     rows = r.json()["tenants"]
     assert rows[0]["is_admin_workspace"]           # admin sorts first
+    assert rows[0]["label"] == ADMIN               # not the raw "default" id
     arow = next(t_ for t_ in rows if t_["id"].startswith("alice"))
     assert arow["accounts"] == 1 and arow["scans"] == 1
     assert arow["mails"] > 0 and arow["disk_bytes"] > 0
