@@ -300,6 +300,32 @@ def post_undo(body: UndoBody):
         raise HTTPException(500, f"{type(exc).__name__}: {exc}")
 
 
+class TrashRestoreBody(BaseModel):
+    uids: list[int] = Field(min_length=1)
+    dest: str
+    uv: int = 0
+
+
+@app.get("/api/trash")
+def get_trash():
+    try:
+        return mailops.trash_list()
+    except RuntimeError as exc:
+        raise HTTPException(409, str(exc))
+    except Exception as exc:
+        raise HTTPException(500, f"{type(exc).__name__}: {exc}")
+
+
+@app.post("/api/trash/restore")
+def post_trash_restore(body: TrashRestoreBody):
+    try:
+        return mailops.trash_restore(body.uids, body.dest, body.uv)
+    except RuntimeError as exc:
+        raise HTTPException(409, str(exc))
+    except Exception as exc:
+        raise HTTPException(500, f"{type(exc).__name__}: {exc}")
+
+
 @app.post("/api/empty_trash")
 def post_empty_trash():
     try:

@@ -66,6 +66,13 @@ export interface DupSet {
   mails: Mail[];    // newest first
 }
 
+export interface TrashResp {
+  folder: string;
+  uv: number;
+  total: number;
+  mails: Mail[];
+}
+
 export interface StatsResp {
   mails: number;
   size: number;

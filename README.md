@@ -62,6 +62,8 @@ paid Proton plan), but it speaks plain IMAP, so other providers work too.
   domain (move to folder / delete on arrival / mark read) with a copy
   button, so future mail never clutters the mailbox again.
 - **Undo** — restore the last deletions from Trash (matched by Message-ID).
+- **Trash browser** — inspect the live Trash (also mail deleted outside
+  the app), search it, and restore selected mails to any folder.
 - **Bulk workflows** — background deletion queue with live progress and
   cancel, "select inactive since…" presets, global mail search, CSV export,
   Empty-Trash button, cancellable scans and AI runs.

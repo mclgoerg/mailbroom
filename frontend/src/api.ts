@@ -1,6 +1,6 @@
 import type {
   AiGroupResult, AppState, AttMail, Config, DupSet, FoldersResp, Grouping,
-  Mail, MessageDetail, Rule, RuleRun, StatsResp, UnsubResult,
+  Mail, MessageDetail, Rule, RuleRun, StatsResp, TrashResp, UnsubResult,
 } from "./types";
 
 async function req<T>(path: string, body?: unknown): Promise<T> {
@@ -68,6 +68,9 @@ export const api = {
   attachments: () => req<AttMail[]>("/api/attachments"),
   duplicates: () => req<DupSet[]>("/api/duplicates"),
   stats: () => req<StatsResp>("/api/stats"),
+  trash: () => req<TrashResp>("/api/trash"),
+  trashRestore: (uids: number[], dest: string, uv: number) =>
+    req<{ restored: number }>("/api/trash/restore", { uids, dest, uv }),
 };
 
 export { fmtSize, fmtUsd, mailKey } from "./lib";

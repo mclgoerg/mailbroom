@@ -1272,6 +1272,79 @@ def undo_last(index: int = -1) -> dict:
     return {"restored": restored, "of": entry["count"]}
 
 
+def trash_list(limit: int = 1000) -> dict:
+    """Live Trash contents (Trash stays out of the cleanup INDEX). The
+    returned uv must be sent back on restore so we never MOVE stale UIDs."""
+    cfg = cfgmod.load_config()
+    conn = connect(cfg)
+    try:
+        trash = next((f for f in list_folders(conn)
+                      if f.lower() == "trash"), None)
+        if not trash:
+            raise RuntimeError("No Trash folder found on the server")
+        messages: list = []
+        scan_folder(conn, trash, messages, lambda *a: None)
+    finally:
+        try:
+            conn.logout()
+        except Exception:
+            pass
+    messages.sort(key=lambda m: -m["ts"])
+    with STATE_LOCK:
+        STATE["trash_count"] = len(messages)
+    return {"folder": trash, "uv": FOLDER_UV.get(trash, 0),
+            "total": len(messages),
+            "mails": [{"uid": m["uid"], "folder": trash, "date": m["date"],
+                       "ts": m["ts"], "subject": m["subject"],
+                       "addr": m["addr"], "size": m["size"],
+                       "seen": m["seen"], "ai": None}
+                      for m in messages[:limit]]}
+
+
+def trash_restore(uids: list[int], dest: str, uv: int = 0) -> dict:
+    """Move mails out of Trash into `dest` (raw folder name)."""
+    with STATE_LOCK:
+        if STATE["delete"]["status"] == "running":
+            raise RuntimeError("busy: a deletion is running")
+    cfg = cfgmod.load_config()
+    restored = 0
+    conn = connect(cfg)
+    try:
+        folders = list_folders(conn)
+        trash = next((f for f in folders if f.lower() == "trash"), None)
+        if not trash:
+            raise RuntimeError("No Trash folder found on the server")
+        if dest not in folders:
+            raise RuntimeError(f"unknown target folder {decode_mutf7(dest)!r}")
+        if dest == trash:
+            raise RuntimeError("target is the Trash folder itself")
+        status, _ = conn.select(quote_folder(trash), readonly=False)
+        if status != "OK":
+            raise RuntimeError("cannot open Trash")
+        if uv and uidvalidity(conn) not in (0, uv):
+            raise RuntimeError("Trash changed on the server — reload it "
+                               "before restoring")
+        clean = sorted({int(u) for u in uids})
+        for start in range(0, len(clean), MOVE_CHUNK):
+            chunk = clean[start:start + MOVE_CHUNK]
+            status, _ = conn.uid("MOVE", ",".join(str(u) for u in chunk),
+                                 quote_folder(dest))
+            if status == "OK":
+                restored += len(chunk)
+    finally:
+        try:
+            conn.logout()
+        except Exception:
+            pass
+    log.info("trash restore: %d mails -> %r", restored, decode_mutf7(dest))
+    with STATE_LOCK:
+        if STATE["trash_count"] is not None:
+            STATE["trash_count"] = max(0, STATE["trash_count"] - restored)
+        STATE["notice"] = {"key": "trash_restored", "params": {
+            "n": restored, "dest": decode_mutf7(dest)}}
+    return {"restored": restored}
+
+
 def empty_trash() -> dict:
     """Permanently delete everything in Trash."""
     with STATE_LOCK:
@@ -1388,7 +1461,9 @@ def extract_text(msg) -> str:
 
 
 def fetch_message(folder: str, uid: int) -> dict:
-    if ikey(folder, uid) not in INDEX:
+    # Trash mails are never in INDEX (excluded from scans) but the Trash
+    # browser still needs to open them.
+    if ikey(folder, uid) not in INDEX and folder.lower() != "trash":
         raise RuntimeError("unknown message")
     cfg = cfgmod.load_config()
     conn = connect(cfg)

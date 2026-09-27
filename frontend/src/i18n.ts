@@ -151,6 +151,13 @@ const EN: Record<string, string> = {
   "sieve.copied": "Sieve filter copied — paste it in Proton's filter settings.",
   "sieve.open_proton": "Proton filter settings ↗",
   "Copy": "Copy",
+  "notice.trash_restored": "Restored {n} mails from Trash to {dest}.",
+  "trash.browse": "Browse Trash",
+  "trash.search": "search subject / sender…",
+  "trash.restore_to": "Restore to…",
+  "trash.restored": "Restored {n} mails — rescan to see them in the views.",
+  "trash.newest_shown": "newest {n} shown",
+  "trash.empty": "Trash is empty.",
 };
 
 const DE: Record<string, string> = {
@@ -424,6 +431,15 @@ const DE: Record<string, string> = {
     "Sieve-Filter kopiert — in Protons Filter-Einstellungen einfügen.",
   "sieve.open_proton": "Proton-Filtereinstellungen ↗",
   "Copy": "Kopieren",
+  "notice.trash_restored":
+    "{n} Mails aus dem Papierkorb nach {dest} wiederhergestellt.",
+  "trash.browse": "Papierkorb durchsuchen",
+  "trash.search": "Betreff / Absender suchen…",
+  "trash.restore_to": "Wiederherstellen nach…",
+  "trash.restored":
+    "{n} Mails wiederhergestellt — zum Anzeigen neu scannen.",
+  "trash.newest_shown": "neueste {n} angezeigt",
+  "trash.empty": "Der Papierkorb ist leer.",
 };
 
 let lang: Lang =

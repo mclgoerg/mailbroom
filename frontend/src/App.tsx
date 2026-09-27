@@ -8,6 +8,7 @@ import { RulesModal } from "./components/RulesModal";
 import { SearchPanel } from "./components/SearchPanel";
 import { SettingsModal } from "./components/SettingsModal";
 import { StatsPanel } from "./components/StatsPanel";
+import { TrashPanel } from "./components/TrashPanel";
 import { applyTheme, Button, currentTheme, ensureAiAck, Spinner } from "./components/ui";
 import { t } from "./i18n";
 import { fmtSize, fmtUsd, matchGroup, parseFilter } from "./lib";
@@ -49,6 +50,7 @@ export default function App() {
   const [attsOpen, setAttsOpen] = useState(false);
   const [dupsOpen, setDupsOpen] = useState(false);
   const [statsOpen, setStatsOpen] = useState(false);
+  const [trashOpen, setTrashOpen] = useState(false);
   const [undoOpen, setUndoOpen] = useState(false);
   const [moveDest, setMoveDest] = useState("");
   const [focusIdx, setFocusIdx] = useState(-1);
@@ -120,7 +122,7 @@ export default function App() {
   const deleting = state?.delete.status === "running";
   const aiEnabled = !!cfg?.ai.available;
   const anyModal = !!detail || searchOpen || settingsOpen || rulesOpen
-    || attsOpen || dupsOpen || statsOpen;
+    || attsOpen || dupsOpen || statsOpen || trashOpen;
 
   const startScan = async () => {
     setSelected(new Set());
@@ -335,7 +337,11 @@ export default function App() {
         </button>
         {state?.trash_count != null && state.trash_count > 0 && (
           <span className="ml-auto flex items-center gap-2 text-xs text-muted">
-            {t("Trash")}: {state.trash_count}
+            <button className="underline-offset-2 hover:underline"
+              title={t("trash.browse")}
+              onClick={() => setTrashOpen(true)}>
+              {t("Trash")}: {state.trash_count}
+            </button>
             <Button variant="ghost" className="!min-h-7 !px-2 !py-0.5 !text-xs"
               onClick={emptyTrash}>{t("Empty Trash")}</Button>
           </span>
@@ -533,6 +539,13 @@ export default function App() {
         />
       )}
       {statsOpen && <StatsPanel onClose={() => setStatsOpen(false)} />}
+      {trashOpen && state && (
+        <TrashPanel
+          state={state}
+          onClose={() => { setTrashOpen(false); refresh(); }}
+          onChanged={refresh}
+        />
+      )}
       {dupsOpen && (
         <DuplicatesPanel
           onClose={() => { setDupsOpen(false); refresh(); }}
