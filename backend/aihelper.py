@@ -1,0 +1,318 @@
+"""Optional AI review via the official Anthropic SDK.
+
+Two modes: a coarse per-group triage over a whole grouping, and a
+fine-grained pass over one group that marks individual deletable mails.
+Provider is either the first-party Anthropic API or Microsoft Foundry.
+Only metadata leaves the machine: addresses, names, counts, subject lines.
+"""
+
+from __future__ import annotations
+
+import json
+import logging
+import threading
+import time
+
+from . import config as cfgmod
+from . import mailops
+from . import verdictstore
+from .mailops import STATE, STATE_LOCK
+
+log = logging.getLogger("pmc.ai")
+
+AI_BATCH = 80
+AI_GROUP_MAX = 400                       # hard cap per fine-grained AI call
+
+AI_SYSTEM = """You help clean up a cluttered personal mailbox. You get a list
+of email groups (grouped by {grouping}) with mail counts, total size, unread
+counts, date ranges, heuristic tags, and samples (subject lines, or sender
+addresses when grouped by subject).
+For EACH group decide whether all its mails are safe to bulk-delete:
+
+- delete_safe: marketing, newsletters, social-media notifications, shipping/
+  delivery status mails, promotional shop mails, automated notifications with
+  no lasting value.
+- review: mixed or unclear groups, order confirmations and receipts,
+  anything money- or account-related that might be worth keeping (invoices,
+  bookings, tickets, contracts, security notices).
+- keep: personal correspondence, employers, government, doctors, lawyers,
+  banks' document mails, anything that looks important or irreplaceable.
+
+Be conservative: when unsure, prefer review over delete_safe. Broad groups
+(a whole domain, a vague subject) deserve extra caution. Give a reason of at
+most 12 words per group. Answer for every group in the input."""
+
+AI_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "verdicts": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "key": {"type": "string"},
+                    "verdict": {"type": "string",
+                                "enum": ["delete_safe", "review", "keep"]},
+                    "reason": {"type": "string"},
+                },
+                "required": ["key", "verdict", "reason"],
+                "additionalProperties": False,
+            },
+        },
+    },
+    "required": ["verdicts"],
+    "additionalProperties": False,
+}
+
+AI_GROUP_SYSTEM = """You help clean up one group of mails from a personal
+mailbox (all from the same {grouping}: {label!r}). You get every mail's uid,
+date, subject, read state and size. Rate EACH mail:
+
+- delete_safe: clearly disposable — marketing, promotions, shipping status,
+  social notifications, expired offers, outdated automated notices.
+- review: possibly worth keeping — receipts, order confirmations, tickets,
+  bookings, account or security notices, anything unclear.
+- keep: personal messages, documents, contracts, anything important.
+
+Be conservative: when unsure, prefer review. Also return a one-sentence note
+summarizing what this group contains."""
+
+AI_GROUP_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "items": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "uid": {"type": "integer"},
+                    "folder_i": {"type": "integer"},
+                    "verdict": {"type": "string",
+                                "enum": ["delete_safe", "review", "keep"]},
+                },
+                "required": ["uid", "folder_i", "verdict"],
+                "additionalProperties": False,
+            },
+        },
+        "note": {"type": "string"},
+    },
+    "required": ["items", "note"],
+    "additionalProperties": False,
+}
+
+
+def ai_client(cfg: dict):
+    """Anthropic-family client (first-party API or Microsoft Foundry)."""
+    import anthropic
+    ai = cfg["ai"]
+    if ai["provider"] == "foundry":
+        endpoint = (ai["foundry_endpoint"] or "").rstrip("/")
+        if not endpoint:
+            raise RuntimeError("Foundry endpoint not configured")
+        return anthropic.AnthropicFoundry(api_key=ai["api_key"],
+                                          base_url=endpoint)
+    return anthropic.Anthropic(api_key=ai["api_key"])
+
+
+def _openai_client(cfg: dict):
+    """OpenAI, or any OpenAI-compatible endpoint (Ollama, LM Studio, vLLM)."""
+    import openai
+    ai = cfg["ai"]
+    if ai["provider"] == "ollama":
+        base = (ai["foundry_endpoint"] or "http://localhost:11434").rstrip("/")
+        if not base.endswith("/v1"):
+            base += "/v1"
+        return openai.OpenAI(base_url=base, api_key=ai["api_key"] or "ollama")
+    return openai.OpenAI(api_key=ai["api_key"])
+
+
+def _ai_call(cfg: dict, model: str, system: str, payload: dict, schema: dict):
+    """Run one structured-output call; returns (data, tokens_in, tokens_out)."""
+    user = json.dumps(payload, ensure_ascii=False)
+
+    if cfg["ai"]["provider"] in ("openai", "ollama"):
+        client = _openai_client(cfg)
+        kwargs = dict(
+            model=model,
+            messages=[{"role": "system", "content": system},
+                      {"role": "user", "content": user}],
+            response_format={"type": "json_schema", "json_schema": {
+                "name": "result", "schema": schema, "strict": True}},
+        )
+        try:
+            response = client.chat.completions.create(**kwargs)
+        except Exception:
+            # Older OpenAI-compatible servers only know json_object mode.
+            kwargs["response_format"] = {"type": "json_object"}
+            kwargs["messages"][0]["content"] += (
+                "\nAnswer ONLY with JSON matching this schema: "
+                + json.dumps(schema))
+            response = client.chat.completions.create(**kwargs)
+        data = json.loads(response.choices[0].message.content)
+        usage = response.usage
+        return (data, getattr(usage, "prompt_tokens", 0) or 0,
+                getattr(usage, "completion_tokens", 0) or 0)
+
+    client = ai_client(cfg)
+    response = client.messages.create(
+        model=model,
+        max_tokens=16000,
+        system=system,
+        messages=[{"role": "user", "content": user}],
+        output_config={"format": {"type": "json_schema", "schema": schema}},
+    )
+    if response.stop_reason not in ("end_turn", "stop_sequence"):
+        raise RuntimeError(f"unexpected stop_reason {response.stop_reason!r}")
+    text = next(b.text for b in response.content if b.type == "text")
+    return json.loads(text), response.usage.input_tokens, \
+        response.usage.output_tokens
+
+
+def _run_ai(grouping: str) -> None:
+    cfg = cfgmod.load_config()
+    try:
+        model = cfg["ai"]["model"] or "claude-sonnet-5"
+
+        with STATE_LOCK:
+            # Cached verdicts (applied at scan time) are not re-billed.
+            batch_src = [
+                {"key": r["key"], "label": r["label"], "count": r["count"],
+                 "total_size_kb": r["size"] // 1024,
+                 "unread": r["unread"], "first": r["first"],
+                 "last": r["last"], "tags": r["tags"],
+                 "samples": r["samples"]}
+                for r in STATE["groups"][grouping].values()
+                if r["ai"] is None]
+
+        if not batch_src:
+            with STATE_LOCK:
+                STATE["ai"]["status"] = "done"
+                STATE["ai"]["progress"] = ""
+                STATE["notice"] = {"key": "ai_all_cached", "params": {}}
+            return
+
+        usage_in = usage_out = 0
+        done = 0
+        cancelled = False
+        try:
+            for start in range(0, len(batch_src), AI_BATCH):
+                if mailops.cancel_requested("ai"):
+                    cancelled = True
+                    break
+                batch = batch_src[start:start + AI_BATCH]
+                t0 = time.time()
+                data, tin, tout = _ai_call(
+                    cfg, model, AI_SYSTEM.format(grouping=grouping),
+                    {"groups": batch}, AI_SCHEMA)
+                log.info("group review batch: %d groups, %d/%d tokens, %.1fs "
+                         "(%s/%s)", len(batch), tin, tout, time.time() - t0,
+                         cfg["ai"]["provider"], model)
+                usage_in += tin
+                usage_out += tout
+                applied: dict[str, dict] = {}
+                with STATE_LOCK:
+                    recs = STATE["groups"][grouping]
+                    for v in data["verdicts"]:
+                        rec = recs.get(v["key"]) or recs.get(v["key"].lower())
+                        if rec:
+                            rec["ai"] = {"verdict": v["verdict"],
+                                         "reason": v["reason"][:160]}
+                            applied[rec["key"]] = rec["ai"]
+                    done += len(batch)
+                    STATE["ai"]["progress"] = f"{done}/{len(batch_src)} groups"
+                verdictstore.save(grouping, applied)
+        finally:
+            # Tokens of completed batches are billed even if a later batch
+            # fails — always record them.
+            spent = (cfgmod.record_usage(cfg["ai"], usage_in, usage_out)
+                     if usage_in or usage_out else None)
+        with STATE_LOCK:
+            STATE["ai"]["status"] = "done"
+            STATE["ai"]["progress"] = ""
+            if cancelled:
+                STATE["notice"] = {"key": "ai_cancelled", "params": {
+                    "done": done, "total": len(batch_src)}}
+            STATE["ai"]["usage"] = {"input_tokens": usage_in,
+                                    "output_tokens": usage_out,
+                                    "cost": spent["cost"] if spent else 0,
+                                    "total_cost": spent["total"]["cost"]
+                                    if spent else 0}
+    except Exception as exc:
+        log.exception("AI review failed")
+        with STATE_LOCK:
+            STATE["ai"]["status"] = "error"
+            STATE["ai"]["error"] = f"{type(exc).__name__}: {exc}"
+
+
+def start_group_review(grouping: str) -> None:
+    cfg = cfgmod.load_config()
+    if not cfgmod.ai_available(cfg["ai"]):
+        raise ValueError("no API key configured")
+    with STATE_LOCK:
+        if STATE["status"] != "done":
+            raise RuntimeError("scan first")
+        if STATE["ai"]["status"] == "running":
+            raise RuntimeError("AI already running")
+        STATE["ai"] = {"status": "running", "grouping": grouping,
+                       "progress": "starting…", "error": "", "usage": None}
+        mailops._CANCEL["ai"] = False
+    threading.Thread(target=_run_ai, args=(grouping,), daemon=True).start()
+
+
+def ai_group(grouping: str, key: str, offset: int = 0,
+             limit: int = 200) -> dict:
+    """Rate one batch of a group's UNRATED mails (cached verdicts skipped).
+    The client calls repeatedly until `remaining` is 0, showing progress."""
+    cfg = cfgmod.load_config()
+    if not cfgmod.ai_available(cfg["ai"]):
+        raise RuntimeError("no API key configured")
+    all_mails = mailops.group_mails(grouping, key, with_msgid=True)
+    if not all_mails:
+        raise RuntimeError("unknown or empty group")
+    label = mailops.group_label(grouping, key)
+    unrated = [m for m in all_mails if not m["ai"] and m["msgid"]]
+    mails = unrated[:max(1, min(limit, AI_GROUP_MAX))]
+    if not mails:
+        return {"verdicts": [], "note": "", "reviewed": 0, "remaining": 0,
+                "total": len(all_mails),
+                "usage": {"input_tokens": 0, "output_tokens": 0, "cost": 0,
+                          "total_cost": 0}}
+
+    folders = sorted({m["folder"] for m in mails})
+    fidx = {f: i for i, f in enumerate(folders)}
+    payload = {"mails": [
+        {"uid": m["uid"], "folder_i": fidx[m["folder"]], "date": m["date"],
+         "subject": m["subject"], "unread": not m["seen"],
+         "size_kb": m["size"] // 1024}
+        for m in mails]}
+    model = cfg["ai"]["model"] or "claude-sonnet-5"
+    t0 = time.time()
+    data, tin, tout = _ai_call(
+        cfg, model, AI_GROUP_SYSTEM.format(grouping=grouping, label=label),
+        payload, AI_GROUP_SCHEMA)
+    log.info("rated %d mails of %r: %d/%d tokens, %.1fs (%s/%s)",
+             len(mails), key, tin, tout, time.time() - t0,
+             cfg["ai"]["provider"], model)
+
+    known = {(m["folder"], m["uid"]): m["msgid"] for m in mails}
+    verdicts_out: list = []
+    to_store: dict[str, str] = {}
+    for it in data["items"]:
+        if it.get("verdict") not in ("delete_safe", "review", "keep"):
+            continue
+        if not (0 <= it.get("folder_i", -1) < len(folders)):
+            continue
+        pos = (folders[it["folder_i"]], it["uid"])
+        if pos not in known:
+            continue
+        verdicts_out.append([pos[0], pos[1], it["verdict"]])
+        to_store[known[pos]] = it["verdict"]
+    verdictstore.save_mails(to_store)
+    spent = cfgmod.record_usage(cfg["ai"], tin, tout)
+    return {"verdicts": verdicts_out, "note": data["note"][:400],
+            "reviewed": len(mails),
+            "remaining": len(unrated) - len(mails),
+            "total": len(all_mails),
+            "usage": {"input_tokens": tin, "output_tokens": tout,
+                      "cost": spent["cost"],
+                      "total_cost": spent["total"]["cost"]}}
