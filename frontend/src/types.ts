@@ -22,6 +22,7 @@ export interface Group {
   ai: GroupAi | null;
   ratings: { delete_safe: number; review: number; keep: number } | null;
   protected: boolean;
+  replied: boolean;
 }
 
 export interface AiUsage {

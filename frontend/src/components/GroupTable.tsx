@@ -102,6 +102,11 @@ function DesktopTable({ slice, baseIdx, selected, focusedKey, onToggle,
             </td>
             <td className="hidden px-2 py-2 align-top lg:table-cell">
               <div className="flex flex-wrap gap-1 overflow-hidden">
+                {g.replied && (
+                  <Tag className="!bg-sky-950 !text-sky-300">
+                    <span title={t("replied.tip")}>↩ {t("replied")}</span>
+                  </Tag>
+                )}
                 {g.tags.map((t) => <Tag key={t}>{t}</Tag>)}
               </div>
             </td>
@@ -163,6 +168,11 @@ function MobileCards({ slice, baseIdx, selected, focusedKey, onToggle,
               {t("unread")} · {g.last}
             </div>
             <div className="mt-1 flex flex-wrap items-center gap-1">
+              {g.replied && (
+                <Tag className="!bg-sky-950 !text-sky-300">
+                  <span title={t("replied.tip")}>↩ {t("replied")}</span>
+                </Tag>
+              )}
               {g.tags.map((t) => <Tag key={t}>{t}</Tag>)}
               {g.ai && <AiTag ai={g.ai} />}
               {g.ratings && <RatingChips ratings={g.ratings} />}

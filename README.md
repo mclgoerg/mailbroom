@@ -28,6 +28,11 @@ paid Proton plan), but it speaks plain IMAP, so other providers work too.
   Providers: Anthropic API, OpenAI, Claude on Microsoft Foundry, or any
   OpenAI-compatible local endpoint (Ollama, LM Studio, vLLM). Token usage
   and cost are tracked with a built-in price table.
+- **"Never replied" signal** — each scan also reads the To/Cc headers of
+  your Sent folder (headers only, cached across scans): groups you have
+  written to get a ↩ replied tag, filter with `is:replied` /
+  `is:noreply-ever`, and the AI leans towards keeping senders you actually
+  correspond with.
 - **Protected senders** — mark addresses or whole domains (🛡️ in the group
   row, or a list in settings) as never-bulk-delete: selection presets and
   bulk trash skip them (trashing one explicitly asks first), and the AI is

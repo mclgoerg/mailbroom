@@ -38,6 +38,10 @@ For EACH group decide whether all its mails are safe to bulk-delete:
 - keep: personal correspondence, employers, government, doctors, lawyers,
   banks' document mails, anything that looks important or irreplaceable.
 
+"replied": true means the user has written to this sender before — lean
+towards keep. Groups the user NEVER replied to, with mostly unread mail,
+lean towards delete_safe (still stay careful with money/account mail).
+
 Be conservative: when unsure, prefer review over delete_safe. Broad groups
 (a whole domain, a vague subject) deserve extra caution. Give a reason of at
 most 12 words per group. Answer for every group in the input."""
@@ -84,6 +88,10 @@ date, subject, read state and size. Rate EACH mail:
 - review: possibly worth keeping — receipts, order confirmations, tickets,
   bookings, account or security notices, anything unclear.
 - keep: personal messages, documents, contracts, anything important.
+
+"replied": true on a mail means the user has written to its sender before —
+lean towards keep for those; senders the user never replied to lean
+towards delete_safe.
 
 Be conservative: when unsure, prefer review. Also return a one-sentence note
 summarizing what this group contains."""
@@ -197,6 +205,7 @@ def _run_ai(grouping: str) -> None:
                  "unread": r["unread"], "first": r["first"],
                  "last": r["last"], "tags": r["tags"],
                  "samples": r["samples"],
+                 **({"replied": True} if r.get("replied") else {}),
                  **({"protected": True} if r["key"] in prot_keys else {})}
                 for r in STATE["groups"][grouping].values()
                 if r["ai"] is None]
@@ -305,12 +314,14 @@ def ai_group(grouping: str, key: str, offset: int = 0,
     plist = cfg.get("protected") or []
     prot = {(m["folder"], m["uid"]) for m in mails
             if cfgmod.is_protected(m["addr"], plist)}
+    replied_to = mailops.load_replied()
     folders = sorted({m["folder"] for m in mails})
     fidx = {f: i for i, f in enumerate(folders)}
     payload = {"mails": [
         {"uid": m["uid"], "folder_i": fidx[m["folder"]], "date": m["date"],
          "subject": m["subject"], "unread": not m["seen"],
          "size_kb": m["size"] // 1024,
+         **({"replied": True} if m["addr"] in replied_to else {}),
          **({"protected": True} if (m["folder"], m["uid"]) in prot else {})}
         for m in mails]}
     model = cfg["ai"]["model"] or "claude-sonnet-5"

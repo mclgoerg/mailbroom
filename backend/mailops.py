@@ -11,12 +11,15 @@ import base64
 import email
 import email.header
 import html as html_mod
+import json
 import logging
+import os
 import re
 import ssl
 import threading
 import time
-from email.utils import parseaddr
+from email.utils import getaddresses, parseaddr
+from pathlib import Path
 
 import imaplib
 imaplib._MAXLINE = 10_000_000  # bulk FETCH responses exceed the default 1MB
@@ -75,6 +78,38 @@ INDEX: dict[str, dict] = {}   # "folder\x00uid" -> per-message metadata
 FOLDER_UV: dict[str, int] = {}  # folder -> UIDVALIDITY seen during the scan
 UNDO_LOG: list[dict] = []       # {ts,label,count,items:[(folder,msgid)]}
 UNDO_MAX = 10
+
+# "Never replied" signal: every address the user has ever written to
+# (To/Cc of the Sent folder), merged across scans and persisted — mail
+# later deleted from Sent must not flip senders back to "never replied".
+REPLIED_PATH = Path(os.environ.get("REPLIED_PATH", "/data/replied.json"))
+REPLIED_TO: set[str] = set()
+_replied_loaded = False
+
+
+def load_replied() -> set[str]:
+    global _replied_loaded
+    if not _replied_loaded:
+        try:
+            data = json.loads(REPLIED_PATH.read_text())
+            REPLIED_TO.update(a for a in data.get("addrs", [])
+                              if isinstance(a, str))
+        except (OSError, json.JSONDecodeError):
+            pass
+        _replied_loaded = True
+    return REPLIED_TO
+
+
+def save_replied() -> None:
+    try:
+        REPLIED_PATH.parent.mkdir(parents=True, exist_ok=True)
+        tmp = REPLIED_PATH.with_suffix(".tmp")
+        tmp.write_text(json.dumps(
+            {"ts": int(time.time()), "addrs": sorted(REPLIED_TO)}))
+        tmp.chmod(0o600)
+        tmp.replace(REPLIED_PATH)
+    except OSError:
+        log.exception("could not persist replied.json")
 
 
 class Cancelled(Exception):
@@ -276,6 +311,45 @@ def scan_folder(conn, folder: str, messages: list, progress_cb) -> None:
             })
 
 
+def scan_sent_recipients(conn, progress_cb=None) -> set[str]:
+    """Addresses in To/Cc of the Sent folder (headers only). Sent stays
+    excluded from the cleanup views; this pass only feeds REPLIED_TO."""
+    target = next((f for f in list_folders(conn)
+                   if f.lower() == "sent"), None)
+    if not target:
+        return set()
+    status, _ = conn.select(quote_folder(target), readonly=True)
+    if status != "OK":
+        return set()
+    status, data = conn.uid("SEARCH", None, "ALL")
+    if status != "OK" or not data or not data[0]:
+        return set()
+    uids = data[0].split()
+    total = len(uids)
+    out: set[str] = set()
+    for start in range(0, total, FETCH_CHUNK):
+        if cancel_requested("scan"):
+            raise Cancelled()
+        if progress_cb:
+            progress_cb(target, min(start + FETCH_CHUNK, total), total)
+        chunk = uids[start:start + FETCH_CHUNK]
+        status, data = conn.uid(
+            "FETCH", b",".join(chunk).decode(),
+            "(UID BODY.PEEK[HEADER.FIELDS (TO CC)])")
+        if status != "OK":
+            continue
+        for item in data or []:
+            if not isinstance(item, tuple) or len(item) < 2:
+                continue
+            msg = email.message_from_bytes(item[1])
+            for _, addr in getaddresses(
+                    msg.get_all("To", []) + msg.get_all("Cc", [])):
+                addr = addr.strip().lower()
+                if addr and "@" in addr:
+                    out.add(addr)
+    return out
+
+
 # ------------------------------------------------------------------- groups
 
 _SUBJ_PREFIX_RE = re.compile(r"^\s*((re|fw|fwd|aw|wg)\s*:\s*)+", re.IGNORECASE)
@@ -296,7 +370,8 @@ def _rec(groups: dict, grouping: str, key: str, label: str) -> dict:
         "_senders": set(), "_names": {}, "_hay": "", "_min": 0, "_max": 0})
 
 
-def build_groups(messages: list) -> dict:
+def build_groups(messages: list, replied_to: set[str] | None = None) -> dict:
+    replied_to = replied_to or set()
     groups: dict = {g: {} for g in GROUPINGS}
     for m in messages:
         addr, name, subj = m["addr"], m["name"], m["subject"]
@@ -331,7 +406,9 @@ def build_groups(messages: list) -> dict:
     day = lambda ts: time.strftime("%Y-%m-%d", time.localtime(ts)) if ts else ""
     for grouping, recs in groups.items():
         for rec in recs.values():
-            nsenders = len(rec.pop("_senders"))
+            senders = rec.pop("_senders")
+            nsenders = len(senders)
+            rec["replied"] = any(a in replied_to for a in senders)
             localpart = rec["key"].split("@", 1)[0] if grouping == "sender" else ""
             rec["tags"] = categorize(rec.pop("_hay"), localpart, rec["bulk"])
             names = rec.pop("_names")
@@ -421,7 +498,12 @@ def run_scan() -> None:
             for folder in folders:
                 scan_folder(conn, folder, messages, progress_cb)
             trash_count = folder_message_count(conn, "Trash")
-            groups = build_groups(messages)
+            replied = load_replied()
+            new_replied = scan_sent_recipients(conn, progress_cb)
+            if new_replied - replied:
+                replied |= new_replied
+                save_replied()
+            groups = build_groups(messages, replied)
             cached = verdictstore.apply_to_groups(groups)
             with STATE_LOCK:
                 INDEX.clear()
@@ -437,9 +519,10 @@ def run_scan() -> None:
                                        "params": {"n": cached}}
                 STATE["ai"] = {"status": "idle", "grouping": "",
                                "progress": "", "error": "", "usage": None}
-            log.info("scan done: %d folders, %d mails, %d senders in %.1fs",
-                     len(folders), len(messages),
-                     len(groups["sender"]), time.time() - t0)
+            log.info("scan done: %d folders, %d mails, %d senders, "
+                     "%d replied-to addrs in %.1fs",
+                     len(folders), len(messages), len(groups["sender"]),
+                     len(replied), time.time() - t0)
         finally:
             try:
                 conn.logout()

@@ -35,12 +35,13 @@ const EN: Record<string, string> = {
     + "(e.g. Anthropic, OpenAI, Microsoft Foundry, or your local model): "
     + "sender names and addresses, "
     + "mail counts, sizes, dates, read state, category tags, subject "
-    + "lines and protected-sender markers. Mail bodies and attachments "
-    + "are NEVER sent. Continue?",
+    + "lines, protected-sender markers and whether you ever replied to a "
+    + "sender. Mail bodies and attachments are NEVER sent. Continue?",
   "ai.data_note":
     "Sent to the AI provider: sender names/addresses, counts, sizes, "
-    + "dates, read state, tags, subject lines and protected-sender "
-    + "markers — never mail bodies or attachments.",
+    + "dates, read state, tags, subject lines, protected-sender markers "
+    + "and whether you ever replied to a sender — never mail bodies or "
+    + "attachments.",
   "confirm.trash_protected":
     'The group "{label}" is protected. Move its mails to Trash anyway?',
   "confirm.protected_skipped": "({n} protected group(s) skipped.)",
@@ -50,6 +51,9 @@ const EN: Record<string, string> = {
     "Protect this sender — bulk deletes and AI suggestions will skip it",
   "unprotect.tip": "Protected — click to remove protection",
   "protected": "protected",
+  "replied": "replied",
+  "replied.tip":
+    "You have written to this sender before (found in your Sent folder)",
   "protected.help":
     "One entry per line: an address (user@example.com) or a domain "
     + "(@example.com). Protected senders are skipped by bulk deletions and "
@@ -105,12 +109,18 @@ const DE: Record<string, string> = {
     + "KI-Anbieter (z. B. Anthropic, OpenAI, Microsoft Foundry oder ein "
     + "lokales Modell): Absendernamen "
     + "und -adressen, Anzahl, Größen, Daten, Lesestatus, Kategorien, "
-    + "Betreffzeilen und Schutz-Markierungen. Mail-Inhalte und Anhänge "
-    + "werden NIE gesendet. Fortfahren?",
+    + "Betreffzeilen, Schutz-Markierungen und ob Sie einem Absender je "
+    + "geantwortet haben. Mail-Inhalte und Anhänge werden NIE gesendet. "
+    + "Fortfahren?",
   "ai.data_note":
     "An den KI-Anbieter gesendet: Absendernamen/-adressen, Anzahl, "
-    + "Größen, Daten, Lesestatus, Kategorien, Betreffzeilen und "
-    + "Schutz-Markierungen — niemals Mail-Inhalte oder Anhänge.",
+    + "Größen, Daten, Lesestatus, Kategorien, Betreffzeilen, "
+    + "Schutz-Markierungen und ob Sie einem Absender je geantwortet "
+    + "haben — niemals Mail-Inhalte oder Anhänge.",
+  "replied": "geantwortet",
+  "replied.tip":
+    "Sie haben diesem Absender schon geschrieben (aus Ihrem "
+    + "Gesendet-Ordner ermittelt)",
   "confirm.trash_protected":
     "Die Gruppe „{label}“ ist geschützt. Mails trotzdem in den "
     + "Papierkorb verschieben?",

@@ -22,6 +22,9 @@ def isolate(tmp_path, monkeypatch):
     monkeypatch.setattr(cfgmod, "STATS_PATH", tmp_path / "stats.json")
     monkeypatch.setattr(verdictstore, "VERDICTS_PATH",
                         tmp_path / "verdicts.json")
+    monkeypatch.setattr(mailops, "REPLIED_PATH", tmp_path / "replied.json")
+    monkeypatch.setattr(mailops, "_replied_loaded", False)
+    mailops.REPLIED_TO.clear()
     verdictstore._mails_cache = None
     with mailops.STATE_LOCK:
         mailops.STATE.update(
@@ -45,11 +48,11 @@ def isolate(tmp_path, monkeypatch):
 def make_msg(uid, frm='"Shop News" <news@shop.example>',
              subject="Big Sale 42", unsub=None, unsub_post=False,
              msgid=None, size=1000, seen=False,
-             date="26-Sep-2026 12:00:00 +0000"):
+             date="26-Sep-2026 12:00:00 +0000", to=None, cc=None):
     return {"uid": uid, "from": frm, "subject": subject, "unsub": unsub,
             "unsub_post": unsub_post,
             "msgid": msgid or f"<m{uid}@shop.example>",
-            "size": size, "seen": seen, "date": date}
+            "size": size, "seen": seen, "date": date, "to": to, "cc": cc}
 
 
 class FakeIMAP:
@@ -99,6 +102,10 @@ class FakeIMAP:
     def _header_blob(self, m) -> bytes:
         lines = [f"From: {m['from']}", f"Subject: {m['subject']}",
                  f"Message-ID: {m['msgid']}"]
+        if m.get("to"):
+            lines.append(f"To: {m['to']}")
+        if m.get("cc"):
+            lines.append(f"Cc: {m['cc']}")
         if m["unsub"]:
             lines.append(f"List-Unsubscribe: {m['unsub']}")
         if m["unsub_post"]:
@@ -193,6 +200,14 @@ def bridge(monkeypatch):
                      subject="Ihre Sendung 789 wurde zugestellt",
                      size=6000, seen=True,
                      date="01-Jan-2025 09:00:00 +0000"),
+        ],
+        # Sent is excluded from cleanup views but feeds the "never replied"
+        # signal (To/Cc addresses -> REPLIED_TO).
+        "Sent": [
+            make_msg(20, frm="Me <me@self.example>",
+                     subject="Re: Dinner on Friday?",
+                     to="Alice <alice@friends.example>",
+                     cc="bob@corp.example", seen=True),
         ],
         "Trash": [],
         "Spam": [],
