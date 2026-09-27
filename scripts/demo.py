@@ -35,6 +35,8 @@ os.environ.update(
     RULES_PATH=str(DATA / "rules.json"),
     STATS_HISTORY_PATH=str(DATA / "stats_history.json"),
     SNAPSHOT_DIR=str(DATA),
+    SERVER_PATH=str(DATA / "server.json"),
+    TENANTS_DIR=str(DATA / "tenants"),
     SESSION_SECRET_PATH=str(DATA / "session_secret"),
     IMAP_CAFILE="", IMAP_USER="demo@example.com", IMAP_PASSWORD="demo",
     LOG_LEVEL="INFO",

@@ -399,6 +399,24 @@ export const DE: Record<string, string> = {
   "login.submit": "Anmelden",
   "login.sso": "Mit SSO anmelden",
   "login.logout": "Abmelden",
+  "login.admin_tip": "Admin — verwaltet die Server-Einstellungen",
+  "login.oidc_admin": "Admin-Identität (E-Mail oder Subject)",
+  "login.oidc_admin_ph": "leer: erste Anmeldung übernimmt sie",
+  "login.tenancy_note":
+    "Mit SSO bekommt jeder Nutzer einen EIGENEN Arbeitsbereich (Konten, "
+    + "Scans, Einstellungen). Der Admin behält diesen hier.",
+  "shared.section": "Gemeinsamer AI-Schlüssel (alle Nutzer)",
+  "shared.help":
+    "Optional einen serverseitigen AI-Schlüssel teilen: Nutzer ohne "
+    + "eigenen Schlüssel verwenden ihn automatisch, begrenzt pro Nutzer "
+    + "und Monat durch das Standard-Budget unten (Nutzer dürfen ihr "
+    + "Limit senken, nie erhöhen).",
+  "shared.enabled": "Diesen Schlüssel mit allen Nutzern teilen",
+  "shared.budget": "Standard-Monatsbudget pro Nutzer ($)",
+  "ai.shared_key_ph": "nutzt den gemeinsamen Server-Schlüssel",
+  "ai.shared_note":
+    "Kein eigener Schlüssel — AI läuft über den gemeinsamen "
+    + "Server-Schlüssel (dein Monatslimit: {cap}).",
   "account.rename": "Umbenennen…",
   "account.rename_prompt": 'Neuer Name für Konto "{name}":',
   "account.renamed": 'Konto umbenannt in "{name}".',

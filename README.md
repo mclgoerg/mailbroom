@@ -180,10 +180,31 @@ in the UI; they persist in `/data`. Env bootstrap for other providers:
 > `https://your-host/api/oidc/callback`, then enter issuer, client ID
 > and secret; an optional allow-list restricts which IdP accounts get
 > in). Both can also be bootstrapped via env (`AUTH_MODE`,
-> `AUTH_PASSWORD`, `OIDC_*` — see `deploy/.env.example`). Note that all
-> logins share ONE workspace: several people may sign in via OIDC, but
-> they see the same mail accounts — Mailbroom is a single-tenant tool.
+> `AUTH_PASSWORD`, `OIDC_*` — see `deploy/.env.example`).
 > Remember that Docker published ports bypass ufw.
+
+### Multi-user (SSO mode)
+
+With SSO enabled, **every signed-in identity gets its own isolated
+workspace**: their own mail accounts, scans, AI verdicts, rules,
+statistics and settings — nothing is shared or visible across users.
+One identity is the **admin** (set `OIDC_ADMIN`, enter it in settings,
+or let the first login claim it): the admin owns the workspace that
+existed before SSO was enabled, plus the server-level settings (login
+config and the optional **shared AI key** — users without their own AI
+key can use the admin's, capped by a per-user monthly budget; everyone
+else brings their own key). Password mode and mode "none" stay
+single-workspace.
+
+### Secrets encryption at rest
+
+Set `MAILBROOM_SECRET_KEY` (e.g. `openssl rand -base64 32`) and every
+stored secret — IMAP passwords, AI API keys, the OIDC client secret —
+is encrypted on disk (Fernet/AES). That protects **volume backups**:
+without the key, a copied `/data` contains no usable credentials. Keep
+the key in the environment only, never in the backups; if it is lost,
+re-enter the secrets. Unset = plaintext as before (a startup log line
+reminds you).
 
 ## Development
 

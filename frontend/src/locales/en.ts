@@ -54,6 +54,23 @@ export const EN: Record<string, string> = {
   "login.submit": "Sign in",
   "login.sso": "Sign in with SSO",
   "login.logout": "Logout",
+  "login.admin_tip": "admin — owns the server settings",
+  "login.oidc_admin": "Admin identity (email or subject)",
+  "login.oidc_admin_ph": "empty: first login claims it",
+  "login.tenancy_note":
+    "With SSO every user gets their OWN workspace (accounts, scans, "
+    + "settings). The admin keeps this one.",
+  "shared.section": "Shared AI key (all users)",
+  "shared.help":
+    "Optionally share one server-side AI key: users without their own "
+    + "key use it automatically, capped per user and month by the "
+    + "default budget below (users may lower their cap, never raise it).",
+  "shared.enabled": "Share this key with all users",
+  "shared.budget": "Default monthly budget per user ($)",
+  "ai.shared_key_ph": "using the shared server key",
+  "ai.shared_note":
+    "No own key — AI runs on the server's shared key "
+    + "(your monthly cap: {cap}).",
   "account.rename": "Rename…",
   "account.rename_prompt": 'New name for account "{name}":',
   "account.renamed": 'Account renamed to "{name}".',

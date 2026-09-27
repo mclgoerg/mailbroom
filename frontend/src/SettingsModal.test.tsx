@@ -39,7 +39,7 @@ const cfg: Config = {
   },
   default_account: "default",
   auth: {
-    mode: "none", password_set: false,
+    mode: "none", is_admin: true, password_set: false,
     oidc: { issuer: "", client_id: "", client_secret_set: false,
       redirect_base: "", allowed: [] },
   },
@@ -49,7 +49,7 @@ const cfg: Config = {
     provider: "anthropic", model: "claude-sonnet-5", foundry_endpoint: "",
     price_in: 0, price_out: 0, budget_usd: 0, month_cost: 0,
     prices_effective: [2, 10], api_key: "", api_key_set: false,
-    available: false,
+    available: false, source: null, shared_budget_usd: 0,
   },
   ai_stats: { input_tokens: 0, output_tokens: 0, cost: 0, runs: 0 },
 };
@@ -117,4 +117,46 @@ test("rename sends rename_account for the edited account", () => {
   expect(saveCalls).toEqual(
     [{ rename_account: { from: "default", to: "bridge" } }]);
   vi.unstubAllGlobals();
+});
+
+test("server settings (login + shared AI) are admin-only", () => {
+  saveCalls.length = 0;
+  const asUser: Config = {
+    ...cfg,
+    auth: { mode: "oidc", is_admin: false },
+    ai: { ...cfg.ai, available: true, source: "shared",
+      shared_budget_usd: 5 },
+  };
+  render(<SettingsModal cfg={asUser} account="default" onClose={() => {}}
+    onSaved={() => {}} onAccountsChanged={() => {}} />);
+  // no Login section, no shared-AI admin section …
+  expect(screen.queryByText(/Login \(optional\)/)).toBeNull();
+  expect(screen.queryByText(/Shared AI key/)).toBeNull();
+  // … but the shared-key state is visible in the tenant's AI section
+  expect(screen.getByText(/shared key/)).toBeTruthy();
+  // saving must not send server-level sections (the API would 403)
+  fireEvent.click(screen.getByText("Save"));
+  expect(saveCalls.length).toBe(1);
+  expect(saveCalls[0].auth).toBeUndefined();
+  expect(saveCalls[0].shared_ai).toBeUndefined();
+});
+
+test("the admin sees and saves the shared AI section", () => {
+  saveCalls.length = 0;
+  const asAdmin: Config = {
+    ...cfg,
+    auth: { ...cfg.auth, mode: "oidc", is_admin: true, admin: "me@x" },
+    shared_ai: { enabled: true, provider: "anthropic",
+      model: "claude-sonnet-5", foundry_endpoint: "", price_in: 0,
+      price_out: 0, default_tenant_budget_usd: 5, api_key: "",
+      api_key_set: true },
+  };
+  render(<SettingsModal cfg={asAdmin} account="default" onClose={() => {}}
+    onSaved={() => {}} onAccountsChanged={() => {}} />);
+  expect(screen.getByText(/Shared AI key/)).toBeTruthy();
+  fireEvent.click(screen.getByText("Save"));
+  expect(saveCalls[0].auth.mode).toBe("oidc");
+  expect(saveCalls[0].auth.admin).toBe("me@x");
+  expect(saveCalls[0].shared_ai.enabled).toBe(true);
+  expect(saveCalls[0].shared_ai.default_tenant_budget_usd).toBe(5);
 });

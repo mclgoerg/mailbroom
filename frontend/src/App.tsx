@@ -435,6 +435,13 @@ export default function App() {
           title={t("Theme")} onClick={toggleTheme}>
           {theme === "dark" ? "☀" : "🌙"}
         </button>
+        {auth.mode === "oidc" && !!auth.sub && (
+          <span className="max-w-40 truncate text-xs text-muted"
+            title={auth.is_admin
+              ? `${auth.sub} — ${t("login.admin_tip")}` : auth.sub}>
+            {auth.sub}{auth.is_admin ? " ★" : ""}
+          </span>
+        )}
         {auth.mode !== "none" && (
           <button className="text-xs text-muted underline-offset-2
             hover:underline"

@@ -85,11 +85,22 @@ export function SettingsModal({ cfg, account, onClose, onSaved,
     budget: cfg.ai.budget_usd ? String(cfg.ai.budget_usd) : "",
     authMode: cfg.auth.mode as AuthMode,
     authPassword: "",
-    oidcIssuer: cfg.auth.oidc.issuer,
-    oidcClientId: cfg.auth.oidc.client_id,
+    // Server-level fields: only the admin receives them (cfg.auth.oidc /
+    // cfg.shared_ai are absent for other users, whose UI hides the
+    // sections anyway).
+    oidcIssuer: cfg.auth.oidc?.issuer ?? "",
+    oidcClientId: cfg.auth.oidc?.client_id ?? "",
     oidcSecret: "",
-    oidcRedirect: cfg.auth.oidc.redirect_base,
-    oidcAllowed: (cfg.auth.oidc.allowed ?? []).join("\n"),
+    oidcRedirect: cfg.auth.oidc?.redirect_base ?? "",
+    oidcAllowed: (cfg.auth.oidc?.allowed ?? []).join("\n"),
+    oidcAdmin: cfg.auth.admin ?? "",
+    sharedEnabled: cfg.shared_ai?.enabled ?? false,
+    sharedProvider: cfg.shared_ai?.provider ?? "anthropic",
+    sharedModel: cfg.shared_ai?.model ?? "claude-sonnet-5",
+    sharedEndpoint: cfg.shared_ai?.foundry_endpoint ?? "",
+    sharedKey: "",
+    sharedBudget: cfg.shared_ai?.default_tenant_budget_usd
+      ? String(cfg.shared_ai.default_tenant_budget_usd) : "",
   });
   const [protectedText, setProtectedText] =
     useState((cfg.protected ?? []).join("\n"));
@@ -179,19 +190,29 @@ export function SettingsModal({ cfg, account, onClose, onSaved,
           price_in: +f.priceIn || 0, price_out: +f.priceOut || 0,
           budget_usd: +f.budget || 0,
           ...(f.apiKey ? { api_key: f.apiKey } : {}) },
-        auth: { mode: f.authMode,
-          ...(f.authPassword ? { password: f.authPassword } : {}),
-          oidc: { issuer: f.oidcIssuer, client_id: f.oidcClientId,
-            redirect_base: f.oidcRedirect,
-            allowed: f.oidcAllowed.split("\n")
-              .map((a) => a.trim()).filter(Boolean),
-            ...(f.oidcSecret ? { client_secret: f.oidcSecret } : {}) } },
+        // Server-level settings ride along for the admin only — the
+        // backend rejects them (403) from anyone else.
+        ...(cfg.auth.is_admin ? {
+          auth: { mode: f.authMode, admin: f.oidcAdmin.trim(),
+            ...(f.authPassword ? { password: f.authPassword } : {}),
+            oidc: { issuer: f.oidcIssuer, client_id: f.oidcClientId,
+              redirect_base: f.oidcRedirect,
+              allowed: f.oidcAllowed.split("\n")
+                .map((a) => a.trim()).filter(Boolean),
+              ...(f.oidcSecret ? { client_secret: f.oidcSecret } : {}) } },
+          shared_ai: { enabled: f.sharedEnabled,
+            provider: f.sharedProvider, model: f.sharedModel,
+            foundry_endpoint: f.sharedEndpoint,
+            default_tenant_budget_usd: +f.sharedBudget || 0,
+            ...(f.sharedKey ? { api_key: f.sharedKey } : {}) },
+        } : {}),
         ...extra,
       };
       const next = await api.saveConfig(body);
       onSaved(next);
       setF({ ...f, apiKey: "", authPassword: "", oidcSecret: "",
-        authMode: next.auth.mode, ...imapFields(next, editAcct) });
+        sharedKey: "", authMode: next.auth.mode,
+        ...imapFields(next, editAcct) });
       setProtectedText((next.protected ?? []).join("\n"));
       setCategoriesText(catText(next.categories));
       setMsg(t("Saved."));
@@ -483,63 +504,125 @@ export function SettingsModal({ cfg, account, onClose, onSaved,
           <p className="mt-1 text-xs text-muted">{t("categories.help")}</p>
         </div>
 
-        <SectionLabel className="sm:col-span-2 mt-2">
-          {t("login.section")}
-        </SectionLabel>
-        <p className="sm:col-span-2 -mt-2 text-xs text-muted">
-          {t("login.help")}
-        </p>
-        <Field label={t("login.mode")}>
-          <Select className="w-full" value={f.authMode}
-            onChange={set("authMode")}>
-            <option value="none">{t("login.mode_none")}</option>
-            <option value="password">{t("login.mode_password")}</option>
-            <option value="oidc">{t("login.mode_oidc")}</option>
-          </Select>
-        </Field>
-        {f.authMode === "password" && (
-          <Field label={t("login.password_label")}>
-            <Input className="w-full" type="password" value={f.authPassword}
-              placeholder={cfg.auth.password_set
-                ? t("(unchanged)") : t("required")}
-              onChange={set("authPassword")} />
+        {cfg.auth.is_admin && (<>
+          <SectionLabel className="sm:col-span-2 mt-2">
+            {t("login.section")}
+          </SectionLabel>
+          <p className="sm:col-span-2 -mt-2 text-xs text-muted">
+            {t("login.help")}
+          </p>
+          <Field label={t("login.mode")}>
+            <Select className="w-full" value={f.authMode}
+              onChange={set("authMode")}>
+              <option value="none">{t("login.mode_none")}</option>
+              <option value="password">{t("login.mode_password")}</option>
+              <option value="oidc">{t("login.mode_oidc")}</option>
+            </Select>
           </Field>
-        )}
-        {f.authMode === "oidc" && (
-          <>
-            <Field label={t("login.oidc_issuer")}>
-              <Input className="w-full" value={f.oidcIssuer}
-                placeholder="https://id.example.com"
-                onChange={set("oidcIssuer")} />
-            </Field>
-            <Field label={t("login.oidc_client")}>
-              <Input className="w-full" value={f.oidcClientId}
-                onChange={set("oidcClientId")} />
-            </Field>
-            <Field label={t("login.oidc_secret")}>
-              <Input className="w-full" type="password" value={f.oidcSecret}
-                placeholder={cfg.auth.oidc.client_secret_set
+          {f.authMode === "password" && (
+            <Field label={t("login.password_label")}>
+              <Input className="w-full" type="password" value={f.authPassword}
+                placeholder={cfg.auth.password_set
                   ? t("(unchanged)") : t("required")}
-                onChange={set("oidcSecret")} />
+                onChange={set("authPassword")} />
             </Field>
-            <Field label={t("login.oidc_redirect")}>
-              <Input className="w-full" value={f.oidcRedirect}
-                placeholder={t("login.oidc_redirect_ph")}
-                onChange={set("oidcRedirect")} />
-            </Field>
-            <div className="sm:col-span-2">
-              <Field label={t("login.oidc_allowed")}>
-                <TextArea className="!min-h-16" value={f.oidcAllowed}
-                  placeholder={"me@corp.example"}
-                  onChange={(e) =>
-                    setF({ ...f, oidcAllowed: e.target.value })} />
+          )}
+          {f.authMode === "oidc" && (
+            <>
+              <Field label={t("login.oidc_issuer")}>
+                <Input className="w-full" value={f.oidcIssuer}
+                  placeholder="https://id.example.com"
+                  onChange={set("oidcIssuer")} />
               </Field>
-              <p className="mt-1 text-xs text-muted">
-                {t("login.oidc_allowed_help")}
-              </p>
+              <Field label={t("login.oidc_client")}>
+                <Input className="w-full" value={f.oidcClientId}
+                  onChange={set("oidcClientId")} />
+              </Field>
+              <Field label={t("login.oidc_secret")}>
+                <Input className="w-full" type="password" value={f.oidcSecret}
+                  placeholder={cfg.auth.oidc?.client_secret_set
+                    ? t("(unchanged)") : t("required")}
+                  onChange={set("oidcSecret")} />
+              </Field>
+              <Field label={t("login.oidc_redirect")}>
+                <Input className="w-full" value={f.oidcRedirect}
+                  placeholder={t("login.oidc_redirect_ph")}
+                  onChange={set("oidcRedirect")} />
+              </Field>
+              <Field label={t("login.oidc_admin")}>
+                <Input className="w-full" value={f.oidcAdmin}
+                  placeholder={t("login.oidc_admin_ph")}
+                  onChange={set("oidcAdmin")} />
+              </Field>
+              <div className="self-end pb-2 text-xs text-muted">
+                {t("login.tenancy_note")}
+              </div>
+              <div className="sm:col-span-2">
+                <Field label={t("login.oidc_allowed")}>
+                  <TextArea className="!min-h-16" value={f.oidcAllowed}
+                    placeholder={"me@corp.example"}
+                    onChange={(e) =>
+                      setF({ ...f, oidcAllowed: e.target.value })} />
+                </Field>
+                <p className="mt-1 text-xs text-muted">
+                  {t("login.oidc_allowed_help")}
+                </p>
+              </div>
+            </>
+          )}
+
+          <SectionLabel className="sm:col-span-2 mt-2">
+            {t("shared.section")}
+          </SectionLabel>
+          <p className="sm:col-span-2 -mt-2 text-xs text-muted">
+            {t("shared.help")}
+          </p>
+          <label className="flex items-center gap-2 text-sm">
+            <input type="checkbox" checked={f.sharedEnabled}
+              onChange={(e) =>
+                setF({ ...f, sharedEnabled: e.target.checked })} />
+            {t("shared.enabled")}
+          </label>
+          <Field label={t("shared.budget")}>
+            <Input className="w-full" type="number" step="0.5" min="0"
+              value={f.sharedBudget} placeholder={t("budget.none")}
+              onChange={set("sharedBudget")} />
+          </Field>
+          {f.sharedEnabled && (<>
+            <Field label={t("Provider")}>
+              <Select className="w-full" value={f.sharedProvider}
+                onChange={set("sharedProvider")}>
+                <option value="anthropic">Anthropic API</option>
+                <option value="openai">OpenAI</option>
+                <option value="foundry">Microsoft Foundry</option>
+                <option value="ollama">
+                  Ollama / local (OpenAI-compatible)
+                </option>
+              </Select>
+            </Field>
+            <Field label={t("Model")}>
+              <Input className="w-full" value={f.sharedModel}
+                onChange={set("sharedModel")} />
+            </Field>
+            {(f.sharedProvider === "foundry"
+              || f.sharedProvider === "ollama") && (
+              <div className="sm:col-span-2">
+                <Field label={t("endpoint.label")}>
+                  <Input className="w-full" value={f.sharedEndpoint}
+                    onChange={set("sharedEndpoint")} />
+                </Field>
+              </div>
+            )}
+            <div className="sm:col-span-2">
+              <Field label={t("API key")}>
+                <Input className="w-full" type="password" value={f.sharedKey}
+                  placeholder={cfg.shared_ai?.api_key_set
+                    ? t("(unchanged)") : t("required")}
+                  onChange={set("sharedKey")} />
+              </Field>
             </div>
-          </>
-        )}
+          </>)}
+        </>)}
 
         <SectionLabel className="sm:col-span-2 mt-2">
           {t("AI review (optional)")}
@@ -576,9 +659,19 @@ export function SettingsModal({ cfg, account, onClose, onSaved,
                 ? t("(unchanged)")
                 : f.provider === "ollama"
                   ? t("key.optional")
-                  : t("(no key — AI features hidden)")}
+                  : cfg.ai.source === "shared"
+                    ? t("ai.shared_key_ph")
+                    : t("(no key — AI features hidden)")}
               onChange={set("apiKey")} />
           </Field>
+          {cfg.ai.source === "shared" && (
+            <p className="mt-1 text-xs text-muted">
+              {t("ai.shared_note", {
+                cap: cfg.ai.shared_budget_usd
+                  ? fmtUsd(cfg.ai.shared_budget_usd) : t("budget.none"),
+              })}
+            </p>
+          )}
         </div>
         <Field label={`$ / 1M in (auto: ${pi})`}>
           <Input className="w-full" type="number" step="0.01" min="0"

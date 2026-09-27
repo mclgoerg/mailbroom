@@ -215,18 +215,37 @@ export type AuthMode = "none" | "password" | "oidc";
 export interface AuthProbe {
   mode: AuthMode;
   authed: boolean;
+  sub?: string;        // OIDC identity of the session (empty otherwise)
+  is_admin?: boolean;  // may edit server-level settings (auth, shared AI)
 }
 
+// Non-admins only ever receive {mode, is_admin} — the server-side login
+// details (incl. the allow-list) are admin-only.
 export interface AuthCfg {
   mode: AuthMode;
-  password_set: boolean;
-  oidc: {
+  is_admin: boolean;
+  password_set?: boolean;
+  admin?: string;
+  oidc?: {
     issuer: string;
     client_id: string;
     client_secret_set: boolean;
     redirect_base: string;
     allowed: string[];
   };
+}
+
+// Admin-only: the server-side AI key shared with all tenants.
+export interface SharedAiCfg {
+  enabled: boolean;
+  provider: "anthropic" | "foundry" | "openai" | "ollama";
+  model: string;
+  foundry_endpoint: string;
+  price_in: number;
+  price_out: number;
+  default_tenant_budget_usd: number;
+  api_key: string;
+  api_key_set: boolean;
 }
 
 export interface Config {
@@ -247,7 +266,10 @@ export interface Config {
     api_key: string;
     api_key_set: boolean;
     available: boolean;
+    source: "own" | "shared" | null;   // which key AI runs would use
+    shared_budget_usd: number;         // effective cap when on the shared key
   };
+  shared_ai?: SharedAiCfg;             // present for the admin only
   ai_stats: {
     input_tokens: number;
     output_tokens: number;
