@@ -140,7 +140,7 @@ export function AttachmentsPanel({ state, onClose, onDeleted }: {
                       `${a.name} (${fmtSize(a.size)})`).join(", ")}
                   </span>
                 </button>
-                <Tag className="!bg-indigo-950 !text-indigo-300">
+                <Tag className="!bg-orange-950 !text-orange-300">
                   📎 {fmtSize(m.att_size)}
                 </Tag>
               </div>

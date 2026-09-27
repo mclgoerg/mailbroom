@@ -110,7 +110,7 @@ export function Button({ children, onClick, disabled, variant = "primary",
   variant?: "primary" | "ghost" | "danger"; className?: string; title?: string;
 }) {
   const styles = {
-    primary: "bg-accent hover:bg-indigo-500 text-white",
+    primary: "bg-accent hover:bg-accenth text-white",
     ghost: "bg-chip hover:bg-chiph text-body",
     danger: "bg-red-700 hover:bg-red-600 text-white",
   }[variant];

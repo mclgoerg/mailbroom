@@ -108,7 +108,7 @@ function DesktopTable({ slice, baseIdx, selected, focusedKey, onToggle,
                   </Tag>
                 )}
                 {g.att_size > 0 && (
-                  <Tag className="!bg-indigo-950 !text-indigo-300">
+                  <Tag className="!bg-orange-950 !text-orange-300">
                     📎 {fmtSize(g.att_size)}
                   </Tag>
                 )}
@@ -179,7 +179,7 @@ function MobileCards({ slice, baseIdx, selected, focusedKey, onToggle,
                 </Tag>
               )}
               {g.att_size > 0 && (
-                <Tag className="!bg-indigo-950 !text-indigo-300">
+                <Tag className="!bg-orange-950 !text-orange-300">
                   📎 {fmtSize(g.att_size)}
                 </Tag>
               )}
