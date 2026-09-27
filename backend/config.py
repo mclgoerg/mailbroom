@@ -14,6 +14,7 @@ import os
 import threading
 from pathlib import Path
 
+from . import secretbox
 from . import tenants
 
 CONFIG_PATH = Path(os.environ.get("CONFIG_PATH", "/data/config.json"))
@@ -132,12 +133,27 @@ def load_server() -> dict:
             server["auth"]["oidc"].update(auth_saved["oidc"])
     if isinstance(saved.get("shared_ai"), dict):
         server["shared_ai"].update(saved["shared_ai"])
+    server["auth"]["oidc"]["client_secret"] = secretbox.unseal(
+        server["auth"]["oidc"].get("client_secret"))
+    server["shared_ai"]["api_key"] = secretbox.unseal(
+        server["shared_ai"].get("api_key"))
     return server
+
+
+def _write_server(server: dict) -> None:
+    """Persist server.json with its secret fields sealed (no-op copies
+    when MAILBROOM_SECRET_KEY is unset)."""
+    out = json.loads(json.dumps(server))
+    out["auth"]["oidc"]["client_secret"] = secretbox.seal(
+        out["auth"]["oidc"].get("client_secret"))
+    out["shared_ai"]["api_key"] = secretbox.seal(
+        out["shared_ai"].get("api_key"))
+    _write(SERVER_PATH, out)
 
 
 def save_server(server: dict) -> None:
     with _LOCK:
-        _write(SERVER_PATH, server)
+        _write_server(server)
 
 
 def is_admin() -> bool:
@@ -159,7 +175,7 @@ def claim_admin(subject: str) -> bool:
         if server["auth"].get("admin"):
             return False
         server["auth"]["admin"] = subject
-        _write(SERVER_PATH, server)
+        _write_server(server)
         return True
 
 
@@ -330,6 +346,9 @@ def load_config() -> dict:
             cfg["categories"] = saved["categories"]
     except (OSError, json.JSONDecodeError):
         pass
+    for block in cfg["accounts"].values():
+        block["password"] = secretbox.unseal(block.get("password"))
+    cfg["ai"]["api_key"] = secretbox.unseal(cfg["ai"].get("api_key"))
     cfg["auth"] = load_server()["auth"]
     return cfg
 
@@ -352,8 +371,14 @@ def _write(path: Path, obj) -> None:
 
 def _write_tenant_config(cfg: dict) -> None:
     """Persist the tenant's config file — WITHOUT the merged-in
-    server-level auth section (that lives in server.json)."""
-    _write(config_path(), {k: v for k, v in cfg.items() if k != "auth"})
+    server-level auth section (that lives in server.json), and with the
+    secret fields sealed when MAILBROOM_SECRET_KEY is set."""
+    out = json.loads(json.dumps(
+        {k: v for k, v in cfg.items() if k != "auth"}))
+    for block in out.get("accounts", {}).values():
+        block["password"] = secretbox.seal(block.get("password"))
+    out["ai"]["api_key"] = secretbox.seal(out["ai"].get("api_key"))
+    _write(config_path(), out)
 
 
 def _apply_imap(block: dict, imap_in: dict) -> None:
@@ -502,7 +527,7 @@ def update_config(body: dict) -> dict:
             if shared_in.get("api_key"):
                 scfg["api_key"] = str(shared_in["api_key"])
         if server is not None:
-            _write(SERVER_PATH, server)
+            _write_server(server)
             cfg["auth"] = server["auth"]
         ai_in = body.get("ai") or {}
         if ai_in.get("provider") in AI_PROVIDERS:

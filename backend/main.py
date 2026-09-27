@@ -40,6 +40,13 @@ from contextlib import asynccontextmanager
 
 @asynccontextmanager
 async def _lifespan(app: FastAPI):
+    from . import secretbox
+    if not secretbox.enabled():
+        logging.getLogger("pmc.secrets").warning(
+            "MAILBROOM_SECRET_KEY is not set — IMAP passwords and API keys "
+            "are stored in plaintext in /data (they would be readable in "
+            "volume backups). Generate a key with `openssl rand -base64 32` "
+            "and keep it OUT of the backups.")
     # Show the last scan of every tenant's accounts right away instead of
     # an empty view (safe: moves re-check UIDVALIDITY; undo works by
     # Message-ID).
