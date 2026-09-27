@@ -1,6 +1,8 @@
 # Mailbroom
 
-**Sweep any IMAP mailbox** — built with love for
+**Tired of cleaning up your mailbox? Grab the broom.** 🧹
+
+Mailbroom sweeps any IMAP mailbox — built with love for
 [Proton Mail Bridge](https://proton.me/mail/bridge).
 
 Declutter a mailbox: scan everything over IMAP, group mails **by
@@ -8,6 +10,19 @@ sender, domain, or subject** with counts, sizes, and unread ratios, drill
 into any group down to the full mail text, and move whole groups or single
 mails to Trash — with optional AI assistance (Anthropic API or Microsoft
 Foundry) that suggests what's safe to delete and tracks its own cost.
+
+![Mailbroom group view](docs/screenshots/groups-dark.png)
+
+<details>
+<summary>More screenshots — drill-down, statistics, light theme</summary>
+
+![Group drill-down](docs/screenshots/detail.png)
+![Statistics](docs/screenshots/stats.png)
+![Light theme](docs/screenshots/groups-light.png)
+
+All screenshots show generated demo data (`scripts/demo.py` — run it
+yourself for a zero-setup playground on fake mailboxes).
+</details>
 
 ## Supported providers
 
@@ -117,13 +132,28 @@ export is Proton-only and hidden for other presets.
 
 ## Running
 
+The quickest start is the starter kit in [`deploy/`](deploy/):
+
+```bash
+cd deploy
+cp .env.example .env        # fill in your provider + credentials
+docker compose up -d        # generic IMAP (Gmail, iCloud, Fastmail, …)
+# or, for Proton Mail via the Bridge (setup steps in the file header):
+docker compose -f docker-compose.proton.yml up -d
+```
+
+Then open http://localhost:8765. Everything in `.env` is just the
+bootstrap — the settings UI can change all of it at runtime.
+
+Plain `docker run`, if you prefer:
+
 ```bash
 docker build -t mailbroom .
-docker run -d --name mailcleaner \
+docker run -d --name mailbroom \
   -e IMAP_HOST=127.0.0.1 -e IMAP_PORT=1143 \
   -e IMAP_USER=you@proton.me -e IMAP_PASSWORD=bridge-password \
   -e IMAP_CAFILE=/certs/bridge-cert.pem \
-  -v mailcleaner_data:/data \
+  -v mailbroom_data:/data \
   -p 127.0.0.1:8765:8765 mailbroom
 ```
 
@@ -149,7 +179,11 @@ in the UI; they persist in `/data`. Env bootstrap for other providers:
 > register the app there with callback URL
 > `https://your-host/api/oidc/callback`, then enter issuer, client ID
 > and secret; an optional allow-list restricts which IdP accounts get
-> in). Remember that Docker published ports bypass ufw.
+> in). Both can also be bootstrapped via env (`AUTH_MODE`,
+> `AUTH_PASSWORD`, `OIDC_*` — see `deploy/.env.example`). Note that all
+> logins share ONE workspace: several people may sign in via OIDC, but
+> they see the same mail accounts — Mailbroom is a single-tenant tool.
+> Remember that Docker published ports bypass ufw.
 
 ## Development
 

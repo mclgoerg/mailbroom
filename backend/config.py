@@ -43,6 +43,32 @@ NEUTRAL_IMAP = {
     "user": "", "password": "", "cafile": "", "preset": "custom",
 }
 
+def _env_auth() -> dict:
+    """Auth defaults from env (AUTH_MODE, AUTH_PASSWORD, OIDC_*). The
+    password is hashed ONCE at import so verification is stable; a mode
+    whose prerequisites are missing falls back to "none"."""
+    from . import auth as authmod
+    password = os.environ.get("AUTH_PASSWORD", "")
+    oidc = {
+        "issuer": os.environ.get("OIDC_ISSUER", "").rstrip("/"),
+        "client_id": os.environ.get("OIDC_CLIENT_ID", ""),
+        "client_secret": os.environ.get("OIDC_CLIENT_SECRET", ""),
+        "redirect_base": os.environ.get("OIDC_REDIRECT_BASE", "").rstrip("/"),
+        "allowed": [a.strip().lower() for a in
+                    os.environ.get("OIDC_ALLOWED", "").split(",")
+                    if a.strip()],
+    }
+    mode = os.environ.get("AUTH_MODE", "none")
+    if mode not in authmod.AUTH_MODES             or (mode == "password" and not password)             or (mode == "oidc" and not (oidc["issuer"] and oidc["client_id"]
+                                        and oidc["client_secret"])):
+        mode = "none"
+    return {"mode": mode,
+            "password_hash": authmod.hash_password(password)
+            if password else "",
+            "oidc": oidc}
+
+
+
 DEFAULT_CONFIG = {
     # Multi-account: {name: imap-block incl. its own excluded_folders}.
     # The FIRST entry is the default account for API calls without an
@@ -60,12 +86,8 @@ DEFAULT_CONFIG = {
     # Native login. "none" (default) trusts the network / reverse proxy;
     # "password" = single shared password (scrypt hash); "oidc" = any
     # OpenID Connect provider (empty "allowed" admits every IdP user).
-    "auth": {
-        "mode": "none",
-        "password_hash": "",
-        "oidc": {"issuer": "", "client_id": "", "client_secret": "",
-                 "redirect_base": "", "allowed": []},
-    },
+    # Env bootstrap like everything else; the settings UI overrides.
+    "auth": _env_auth(),
     "ai": {
         # anthropic | foundry | openai | ollama (any OpenAI-compatible
         # endpoint works via "ollama" + base URL, e.g. LM Studio, vLLM).

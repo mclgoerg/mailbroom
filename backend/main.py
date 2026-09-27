@@ -49,7 +49,8 @@ async def _lifespan(app: FastAPI):
 app = FastAPI(title="mailbroom", docs_url=None, redoc_url=None,
               lifespan=_lifespan)
 
-STATIC_DIR = Path(__file__).resolve().parent.parent / "static"
+STATIC_DIR = Path(os.environ.get(
+    "STATIC_DIR", Path(__file__).resolve().parent.parent / "static"))
 
 # Optional shared-secret auth for deployments without a reverse-proxy auth
 # layer. Set AUTH_TOKEN, then open the app once as /?token=<value> (stores a

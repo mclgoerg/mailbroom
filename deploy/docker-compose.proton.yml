@@ -1,0 +1,47 @@
+# Mailbroom + Proton Mail Bridge (paid Proton plan required).
+#
+# One-time interactive Bridge setup:
+#   docker compose -f docker-compose.proton.yml run --rm -it protonbridge init
+#   -> login, then in the Bridge CLI:
+#      change imap-security   (answer yes: switch STARTTLS -> SSL)
+#      cert export            (path: /root/exported-certs)
+#      info                   (note the IMAP username + bridge password)
+# Put those credentials into .env (or the settings UI), then:
+#   docker compose -f docker-compose.proton.yml up -d
+
+services:
+  protonbridge:
+    # No official image: build one from Proton's source, e.g.
+    # https://github.com/mk1337/protonmail-bridge-docker-arm64 (ARM64)
+    # or shenxn/protonmail-bridge (x86_64, verify it is maintained).
+    image: protonmail-bridge:local
+    container_name: protonbridge
+    restart: unless-stopped
+    volumes:
+      - protonbridge_data:/root
+    ports:
+      # The UI port lives on the BRIDGE service (shared namespace below).
+      - "127.0.0.1:8765:8765"
+
+  mailbroom:
+    image: ghcr.io/mclgoerg/mailbroom:latest
+    container_name: mailbroom
+    restart: unless-stopped
+    # Shares the bridge's network namespace so 127.0.0.1 matches the SAN
+    # of the bridge's self-signed TLS certificate.
+    network_mode: service:protonbridge
+    depends_on:
+      - protonbridge
+    env_file: .env
+    volumes:
+      - mailbroom_data:/data
+      - type: volume
+        source: protonbridge_data
+        target: /certs/bridge-cert.pem
+        read_only: true
+        volume:
+          subpath: exported-certs/cert.pem
+
+volumes:
+  protonbridge_data:
+  mailbroom_data:

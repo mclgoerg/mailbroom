@@ -1,0 +1,22 @@
+# Mailbroom starter — any IMAP provider (Gmail, iCloud, Fastmail, …).
+#
+#   cp .env.example .env    # edit it
+#   docker compose up -d    # open http://localhost:8765
+#
+# For Proton Mail via the Bridge use docker-compose.proton.yml instead.
+
+services:
+  mailbroom:
+    image: ghcr.io/mclgoerg/mailbroom:latest
+    container_name: mailbroom
+    restart: unless-stopped
+    ports:
+      # Localhost only unless you enabled AUTH_MODE in .env or run a
+      # reverse proxy with auth in front. Docker ports bypass ufw!
+      - "127.0.0.1:8765:8765"
+    env_file: .env
+    volumes:
+      - mailbroom_data:/data
+
+volumes:
+  mailbroom_data:

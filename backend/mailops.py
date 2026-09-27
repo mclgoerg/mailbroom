@@ -493,14 +493,27 @@ def quote_folder(name: str) -> str:
     return '"' + name.replace("\\", "\\\\").replace('"', '\\"') + '"'
 
 
-def decode_mime(raw: str) -> str:
+def decode_mime(raw) -> str:
+    # msg.get() returns a Header OBJECT (not str) for malformed/raw-8bit
+    # headers, and decode_header may report the bogus charset
+    # "unknown-8bit" — both crashed whole scans before. decode_header
+    # must see the ORIGINAL object (str()-ing it first loses the bytes).
+    if raw is None:
+        return ""
+
+    def dec(p, enc):
+        if not isinstance(p, bytes):
+            return p
+        try:
+            return p.decode(enc or "utf-8", "replace")
+        except LookupError:                  # e.g. "unknown-8bit"
+            return p.decode("utf-8", "replace")
+
     try:
         parts = email.header.decode_header(raw)
-        return "".join(
-            p.decode(enc or "utf-8", "replace") if isinstance(p, bytes) else p
-            for p, enc in parts).strip()
+        return "".join(dec(p, enc) for p, enc in parts).strip()
     except Exception:
-        return (raw or "").strip()
+        return str(raw).strip()
 
 
 _UID_RE = re.compile(rb"UID (\d+)")

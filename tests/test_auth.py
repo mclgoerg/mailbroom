@@ -126,3 +126,54 @@ def test_auth_secrets_never_exported():
     text = client.get("/api/export_config").text
     assert "password_hash" not in text and "scrypt" not in text
     assert "sst" not in text
+
+
+def test_every_api_route_is_locked_without_a_session():
+    """The guarantee behind the login screen: with auth enabled, EVERY
+    /api route except the login machinery answers 401 (no data, no
+    actions) until a session exists. Walks the live route table so a
+    future endpoint can't be forgotten."""
+    from backend.main import _PUBLIC_API
+    cfgmod.update_config({"auth": {"mode": "password", "password": "pw"}})
+    c = TestClient(app)
+    checked = []
+    for route in app.routes:
+        path = getattr(route, "path", "")
+        if not path.startswith("/api/") or path in _PUBLIC_API:
+            continue
+        for method in (getattr(route, "methods", None) or {"GET"}) \
+                - {"HEAD", "OPTIONS"}:
+            url = path.replace("{rule_id}", "deadbeef")
+            r = c.request(method, url,
+                          json={} if method in ("POST", "PUT") else None)
+            assert r.status_code == 401, f"{method} {path}: {r.status_code}"
+            assert r.json() == {"detail": "login required"}
+            checked.append(f"{method} {path}")
+    assert len(checked) >= 25, checked
+
+    # the public probe leaks nothing but the mode
+    assert set(c.get("/api/auth").json()) == {"mode", "authed"}
+    # ... and the SSE stream is locked too (it is in the route walk, but
+    # make the flagship data stream explicit)
+    assert c.get("/api/events").status_code == 401
+
+
+def test_env_bootstrap_password_mode(monkeypatch):
+    import importlib
+    monkeypatch.setenv("AUTH_MODE", "password")
+    monkeypatch.setenv("AUTH_PASSWORD", "envpw")
+    import backend.config as cfg2
+    importlib.reload(cfg2)
+    try:
+        loaded = cfg2.load_config()
+        assert loaded["auth"]["mode"] == "password"
+        assert authmod.verify_password("envpw",
+                                       loaded["auth"]["password_hash"])
+        # missing prerequisites fall back to none
+        monkeypatch.setenv("AUTH_MODE", "oidc")   # no issuer/client set
+        importlib.reload(cfg2)
+        assert cfg2.load_config()["auth"]["mode"] == "none"
+    finally:
+        monkeypatch.delenv("AUTH_MODE")
+        monkeypatch.delenv("AUTH_PASSWORD")
+        importlib.reload(cfg2)
