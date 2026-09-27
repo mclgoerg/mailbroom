@@ -366,8 +366,39 @@ export function SettingsModal({ cfg, onClose, onSaved }: {
           </Button>
         </div>
       </div>
-      <div className="flex items-center gap-3 border-t border-line px-5 py-3">
+      <div className="flex flex-wrap items-center gap-3 border-t border-line
+        px-5 py-3">
         <Button onClick={() => save()}>{t("Save")}</Button>
+        <a href="/api/export_config" download
+          className="min-h-9 rounded-md bg-chip px-3 py-1.5 text-sm
+            font-medium text-body hover:bg-chiph"
+          title={t("export.tip")}>{t("Export")}</a>
+        <label className="min-h-9 cursor-pointer rounded-md bg-chip px-3
+          py-1.5 text-sm font-medium text-body hover:bg-chiph">
+          {t("Import…")}
+          <input type="file" accept="application/json" className="hidden"
+            onChange={async (e) => {
+              const file = e.target.files?.[0];
+              e.target.value = "";
+              if (!file) return;
+              if (!confirm(t("import.confirm"))) return;
+              try {
+                const body = JSON.parse(await file.text());
+                const res = await fetch("/api/import_config", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify(body),
+                });
+                if (!res.ok) throw new Error(await res.text());
+                const r = await res.json();
+                onSaved(await api.getConfig());
+                setMsg(t("import.done", { rules: r.rules,
+                  verdicts: r.verdicts }));
+              } catch (err: any) {
+                setMsg(`Error: ${err.message ?? err}`);
+              }
+            }} />
+        </label>
         <span className="text-xs text-muted">{msg}</span>
       </div>
     </Modal>

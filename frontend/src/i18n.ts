@@ -169,6 +169,14 @@ const EN: Record<string, string> = {
     + "a built-in category (shipping, finance, shopping, social, travel, "
     + "dev/cloud) replaces its keywords; an empty keyword list disables "
     + "it; new names add categories. Applies on the next scan.",
+  "export.tip":
+    "Download settings, rules, AI verdicts and the replied cache "
+    + "(passwords and API keys are never exported)",
+  "import.confirm":
+    "Import this backup? Settings are overwritten, rules are replaced "
+    + "(back in report mode), verdicts and replied data are merged. "
+    + "Passwords/API keys are never imported.",
+  "import.done": "Imported: {rules} rules, {verdicts} verdicts.",
 };
 
 const DE: Record<string, string> = {
@@ -464,6 +472,17 @@ const DE: Record<string, string> = {
     + "travel, dev/cloud) ersetzt deren Stichwörter; eine leere Liste "
     + "deaktiviert sie; neue Namen ergänzen Kategorien. Gilt ab dem "
     + "nächsten Scan.",
+  "Export": "Exportieren",
+  "Import…": "Importieren…",
+  "export.tip":
+    "Einstellungen, Regeln, KI-Bewertungen und Antwort-Cache "
+    + "herunterladen (Passwörter und API-Schlüssel nie enthalten)",
+  "import.confirm":
+    "Dieses Backup importieren? Einstellungen werden überschrieben, "
+    + "Regeln ersetzt (wieder im Bericht-Modus), Bewertungen und "
+    + "Antwortdaten zusammengeführt. Passwörter/API-Schlüssel werden nie "
+    + "importiert.",
+  "import.done": "Importiert: {rules} Regeln, {verdicts} Bewertungen.",
 };
 
 let lang: Lang =

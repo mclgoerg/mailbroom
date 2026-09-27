@@ -411,6 +411,95 @@ def get_export(grouping: str = Query("sender")):
                  f'attachment; filename="mail-groups-{grouping}.csv"'})
 
 
+@app.get("/api/export_config")
+def get_export_config():
+    """Portable backup of settings + learned state. NO secrets: the IMAP
+    password and AI API key never leave the server."""
+    cfg = cfgmod.load_config()
+    data = {
+        "version": 1, "app": "proton-mail-cleaner",
+        "config": {
+            "imap": {k: v for k, v in cfg["imap"].items()
+                     if k != "password"},
+            "profiles": {n: {k: v for k, v in p.items() if k != "password"}
+                         for n, p in cfg["profiles"].items()},
+            "active_profile": cfg["active_profile"],
+            "excluded_folders": cfg["excluded_folders"],
+            "protected": cfgmod.normalize_protected(cfg.get("protected")),
+            "categories": cfg.get("categories") or {},
+            "ai": {k: v for k, v in cfg["ai"].items() if k != "api_key"},
+        },
+        "rules": rulesmod.load_rules(),
+        "verdicts": verdictstore.load(),
+        "replied": sorted(mailops.load_replied()),
+    }
+    return StreamingResponse(
+        iter([json.dumps(data, indent=1)]), media_type="application/json",
+        headers={"Content-Disposition":
+                 'attachment; filename="mailcleaner-config.json"'})
+
+
+@app.post("/api/import_config")
+def post_import_config(body: dict):
+    """Apply an exported backup. Secrets are never importable; imported
+    rules are forced back to report mode (safety floor)."""
+    c = body.get("config") or {}
+    update = {k: c[k] for k in ("imap", "excluded_folders", "protected",
+                                "categories", "ai") if k in c}
+    if isinstance(update.get("imap"), dict):
+        update["imap"].pop("password", None)
+    if isinstance(update.get("ai"), dict):
+        update["ai"].pop("api_key", None)
+    try:
+        cfgmod.update_config(update)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc))
+
+    nrules = 0
+    if isinstance(body.get("rules"), list):
+        for r in rulesmod.load_rules():
+            rulesmod.delete_rule(r["id"])
+        for r in body["rules"]:
+            if not isinstance(r, dict):
+                continue
+            try:
+                rulesmod.create_rule(r)      # always lands in report mode
+                nrules += 1
+            except ValueError:
+                pass
+
+    nverdicts = 0
+    verdicts = body.get("verdicts")
+    if isinstance(verdicts, dict):
+        for grouping, entries in verdicts.items():
+            if not isinstance(entries, dict):
+                continue
+            if grouping == "_mails":
+                clean = {k: v for k, v in entries.items()
+                         if v in ("delete_safe", "review", "keep")}
+                verdictstore.save_mails(clean)
+            else:
+                clean = {k: v for k, v in entries.items()
+                         if isinstance(v, dict) and "verdict" in v}
+                verdictstore.save(grouping, clean)
+            nverdicts += len(clean)
+
+    nreplied = 0
+    if isinstance(body.get("replied"), list):
+        mailops.load_replied()
+        addrs = {str(a).strip().lower() for a in body["replied"]
+                 if isinstance(a, str) and "@" in a}
+        nreplied = len(addrs - mailops.REPLIED_TO)
+        mailops.REPLIED_TO.update(addrs)
+        mailops.save_replied()
+
+    logging.getLogger("pmc.mail").info(
+        "config import: %d rules, %d verdicts, %d replied addrs",
+        nrules, nverdicts, nreplied)
+    return {"ok": True, "rules": nrules, "verdicts": nverdicts,
+            "replied": nreplied}
+
+
 @app.get("/api/events")
 async def get_events():
     """Server-sent events: streams the app state (~1/s) while connected."""
