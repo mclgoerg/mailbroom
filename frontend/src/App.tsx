@@ -377,8 +377,10 @@ export default function App() {
         <Button onClick={startScan} disabled={scanning || aiRunning || deleting}>
           {scanning ? <Spinner /> : t("Scan")}
         </Button>
-        <div className="flex flex-1 overflow-hidden rounded-md border
-          border-line sm:flex-none">
+        {/* order-2 + w-full: on phones the grouping toggle gets a full line
+            of its own instead of being shrunk by the icon strip. */}
+        <div className="order-2 flex w-full overflow-hidden rounded-md border
+          border-line sm:order-none sm:w-auto">
           {(Object.keys(GROUPING_LABEL) as Grouping[]).map((g) => (
             <button key={g}
               onClick={() => {
@@ -402,19 +404,29 @@ export default function App() {
           value={filter}
           onChange={(e) => setFilter(e.target.value)}
         />
-        <Button variant="ghost" title={t("Search all mails")}
-          onClick={() => setSearchOpen(true)}>🔍</Button>
-        <Button variant="ghost" title={t("Rules")}
-          onClick={() => setRulesOpen(true)}>📋</Button>
-        <Button variant="ghost" title={t("Attachments")}
-          onClick={() => setAttsOpen(true)}>📎</Button>
-        <Button variant="ghost" title={t("Duplicates")}
-          disabled={state?.status !== "done"}
-          onClick={() => setDupsOpen(true)}>📑</Button>
-        <Button variant="ghost" title={t("Statistics")}
-          onClick={() => setStatsOpen(true)}>📊</Button>
-        <Button variant="ghost" title={t("Settings")}
-          onClick={() => setSettingsOpen(true)}>⚙</Button>
+        {/* One wrap unit; tighter padding on phones so the strip fits next
+            to Scan on one line. */}
+        <div className="ml-auto flex items-center gap-1.5 sm:ml-0 sm:gap-2">
+          <Button variant="ghost" className="!px-2 sm:!px-3"
+            title={t("Search all mails")}
+            onClick={() => setSearchOpen(true)}>🔍</Button>
+          <Button variant="ghost" className="!px-2 sm:!px-3"
+            title={t("Rules")}
+            onClick={() => setRulesOpen(true)}>📋</Button>
+          <Button variant="ghost" className="!px-2 sm:!px-3"
+            title={t("Attachments")}
+            onClick={() => setAttsOpen(true)}>📎</Button>
+          <Button variant="ghost" className="!px-2 sm:!px-3"
+            title={t("Duplicates")}
+            disabled={state?.status !== "done"}
+            onClick={() => setDupsOpen(true)}>📑</Button>
+          <Button variant="ghost" className="!px-2 sm:!px-3"
+            title={t("Statistics")}
+            onClick={() => setStatsOpen(true)}>📊</Button>
+          <Button variant="ghost" className="!px-2 sm:!px-3"
+            title={t("Settings")}
+            onClick={() => setSettingsOpen(true)}>⚙</Button>
+        </div>
       </div>
       {/* Row 2: selection / sorting / bulk tools. */}
       <div className="mb-3 flex flex-wrap items-center gap-2">
