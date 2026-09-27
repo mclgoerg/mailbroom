@@ -244,6 +244,8 @@ export const DE: Record<string, string> = {
     + "IMAP keine einzelnen Anhänge entfernen — Löschen entfernt die ganze "
     + "Mail (rückgängig machbar).",
   "atts.none": "Keine Anhänge in den gescannten Ordnern gefunden.",
+  "atts.running": "Analysiere Anhänge…",
+  "Starting…": "Starte…",
   "Duplicates": "Duplikate",
   "dups.hint":
     "Gleiche Message-ID oder identischer Absender + Betreff + Größe.",

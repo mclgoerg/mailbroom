@@ -17,23 +17,32 @@ export function AttachmentsPanel({ state, onClose, onDeleted }: {
   const [sel, setSel] = useState<Set<string>>(new Set());
   const [view, setView] = useState<Mail | null>(null);
   const [note, setNote] = useState("");
+  // Covers the gap between clicking Analyze and the next state update, so
+  // there is feedback within a blink even before the job reports progress.
+  const [starting, setStarting] = useState(false);
 
   const atts = state.atts;
-  const running = atts?.status === "running";
+  const running = starting || atts?.status === "running";
 
-  // When the analysis finishes (SSE tick), load the result list.
+  // When the analysis finishes (state tick), load the result list.
   useEffect(() => {
-    if (atts?.status === "done" && mails === null) {
+    if (!starting && atts?.status === "done" && mails === null) {
       api.attachments().then(setMails).catch((e) =>
         setNote(`Error: ${e.message ?? e}`));
     }
-  }, [atts?.status, mails]);
+  }, [starting, atts?.status, mails]);
 
   const analyze = async () => {
     setNote("");
-    setMails(null);
-    try { await api.startAttachments(); }
-    catch (e: any) { setNote(`Error: ${e.message ?? e}`); }
+    setStarting(true);
+    try {
+      await api.startAttachments();
+      await onDeleted();   // pull fresh state: job now shows as running
+      setMails(null);      // ready for the fresh list once it's done
+    } catch (e: any) {
+      setNote(`Error: ${e.message ?? e}`);
+    }
+    setStarting(false);
   };
 
   const cancel = async () => {
@@ -76,7 +85,8 @@ export function AttachmentsPanel({ state, onClose, onDeleted }: {
         </div>
         {running ? (
           <Button variant="ghost" onClick={cancel}>
-            <Spinner /> {atts.progress} — {t("cancel")}
+            <Spinner /> {starting ? t("Starting…") : atts.progress}{" "}
+            — {t("cancel")}
           </Button>
         ) : (
           <Button variant="ghost" onClick={analyze}
@@ -108,7 +118,12 @@ export function AttachmentsPanel({ state, onClose, onDeleted }: {
             )}
             {running && (
               <div className="p-4 text-sm text-muted">
-                <Spinner /> {atts.progress}
+                <Spinner /> {starting ? t("Starting…") : atts.progress}
+              </div>
+            )}
+            {!running && atts?.status === "done" && mails === null && (
+              <div className="p-4 text-sm text-muted">
+                <Spinner /> {t("loading…")}
               </div>
             )}
             {mails && mails.length === 0 && (

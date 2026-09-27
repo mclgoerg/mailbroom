@@ -67,7 +67,8 @@ export default function App() {
       setState(st);
       // Polling fallback only drives itself when SSE isn't connected.
       if (!sse.current && (st.status === "scanning"
-          || st.ai.status === "running" || st.delete.status === "running")) {
+          || st.ai.status === "running" || st.delete.status === "running"
+          || st.atts?.status === "running")) {
         timer.current = setTimeout(refresh, 1200);
       }
     } catch (e: any) {
@@ -144,26 +145,29 @@ export default function App() {
   const scanning = state?.status === "scanning";
   const aiRunning = state?.ai.status === "running";
   const deleting = state?.delete.status === "running";
+  const attsRunning = state?.atts?.status === "running";
   const aiEnabled = !!cfg?.ai.available;
   const anyModal = !!detail || searchOpen || settingsOpen || rulesOpen
     || attsOpen || dupsOpen || statsOpen || trashOpen;
 
   const startScan = async () => {
     setSelected(new Set());
-    setToast("");
-    try { await api.scan(); refresh(); }
+    // Instant feedback: the real progress replaces this on the next tick.
+    setToast(t("Starting…"));
+    try { await api.scan(); setToast(""); refresh(); }
     catch (e: any) { setToast(`Error: ${e.message ?? e}`); }
   };
 
   const startAi = async () => {
     if (!ensureAiAck()) return;
-    setToast("");
-    try { await api.aiReview(mode); refresh(); }
+    setToast(t("Starting…"));
+    try { await api.aiReview(mode); setToast(""); refresh(); }
     catch (e: any) { setToast(`AI error: ${e.message ?? e}`); }
   };
 
   const cancel = async () => {
-    const target = scanning ? "scan" : aiRunning ? "ai" : "delete";
+    const target = scanning ? "scan" : aiRunning ? "ai"
+      : attsRunning ? "atts" : "delete";
     try { await api.cancel(target); refresh(); } catch { /* too late */ }
   };
 
@@ -323,6 +327,9 @@ export default function App() {
       return <>AI ({state.ai.grouping})… {state.ai.progress}{" "}
         <Spinner /> <button className="underline" onClick={cancel}>
         {t("cancel")}</button></>;
+    if (attsRunning)
+      return <>📎 {t("atts.running")} {state.atts.progress} <Spinner />{" "}
+        <button className="underline" onClick={cancel}>{t("cancel")}</button></>;
     const parts: string[] = [];
     if (groups.length) {
       const mails = groups.reduce((n, g) => n + g.count, 0);
@@ -374,7 +381,8 @@ export default function App() {
 
       {/* Row 1: primary actions — identical in every grouping mode. */}
       <div className="mb-2 flex flex-wrap items-center gap-2">
-        <Button onClick={startScan} disabled={scanning || aiRunning || deleting}>
+        <Button onClick={startScan}
+          disabled={scanning || aiRunning || deleting || attsRunning}>
           {scanning ? <Spinner /> : t("Scan")}
         </Button>
         {/* order-2 + w-full: on phones the grouping toggle gets a full line

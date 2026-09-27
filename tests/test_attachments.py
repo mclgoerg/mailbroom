@@ -95,3 +95,14 @@ def test_analysis_annotates_index_and_groups(bridge):
 
 def test_analysis_requires_scan():
     assert client.post("/api/attachments", json={}).status_code == 409
+
+
+def test_scan_refused_while_analysis_runs(bridge):
+    import pytest
+    mailops.run_scan()
+    with mailops.STATE_LOCK:
+        mailops.STATE["atts"]["status"] = "running"
+    with pytest.raises(RuntimeError, match="busy"):
+        mailops.start_scan()
+    with mailops.STATE_LOCK:
+        mailops.STATE["atts"]["status"] = "idle"

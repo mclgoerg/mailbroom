@@ -333,7 +333,8 @@ def _tick() -> None:
     with STATE_LOCK:
         busy = (STATE["status"] == "scanning"
                 or STATE["ai"]["status"] == "running"
-                or STATE["delete"]["status"] == "running")
+                or STATE["delete"]["status"] == "running"
+                or STATE["atts"]["status"] == "running")
     if busy:
         return
     for rule in load_rules():

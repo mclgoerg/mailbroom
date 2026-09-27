@@ -125,6 +125,7 @@ export const EN: Record<string, string> = {
     + "att:>10m filter also works on groups. Proton cannot strip single "
     + "attachments over IMAP — deleting removes the whole mail (undoable).",
   "atts.none": "No attachments found in the scanned folders.",
+  "atts.running": "Analyzing attachments…",
   "dups.hint": "Same Message-ID, or identical sender + subject + size.",
   "dups.summary": "{n} duplicate sets · {size} reclaimable",
   "dups.keep_newest": "Select all but newest",

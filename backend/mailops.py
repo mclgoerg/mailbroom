@@ -594,7 +594,8 @@ def start_scan() -> None:
     with STATE_LOCK:
         if STATE["status"] == "scanning" \
                 or STATE["ai"]["status"] == "running" \
-                or STATE["delete"]["status"] == "running":
+                or STATE["delete"]["status"] == "running" \
+                or STATE["atts"]["status"] == "running":
             raise RuntimeError("busy")
         STATE.update(status="scanning", progress="connecting…", error="",
                      notice=None, groups={g: {} for g in GROUPINGS})
