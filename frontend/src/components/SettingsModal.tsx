@@ -39,6 +39,23 @@ export function SettingsModal({ cfg, onClose, onSaved }: {
   });
   const [protectedText, setProtectedText] =
     useState((cfg.protected ?? []).join("\n"));
+  const catText = (cats: Record<string, string[]>) =>
+    Object.entries(cats ?? {})
+      .map(([k, v]) => `${k}: ${v.join(", ")}`).join("\n");
+  const [categoriesText, setCategoriesText] =
+    useState(catText(cfg.categories));
+  const parseCategories = (): Record<string, string[]> => {
+    const out: Record<string, string[]> = {};
+    for (const line of categoriesText.split("\n")) {
+      const i = line.indexOf(":");
+      if (i < 1) continue;
+      const name = line.slice(0, i).trim().toLowerCase();
+      if (!name) continue;
+      out[name] = line.slice(i + 1).split(",")
+        .map((s) => s.trim().toLowerCase()).filter(Boolean);
+    }
+    return out;
+  };
   const [msg, setMsg] = useState("");
   // Folder picker: checked = scanned. Wildcard rules (e.g. Labels/*) are
   // shown as removable chips and win over checkboxes.
@@ -80,6 +97,7 @@ export function SettingsModal({ cfg, onClose, onSaved }: {
         ...(excluded ? { excluded_folders: excluded } : {}),
         protected: protectedText.split("\n")
           .map((s) => s.trim()).filter(Boolean),
+        categories: parseCategories(),
         ai: { provider: f.provider, model: f.model,
           foundry_endpoint: f.endpoint,
           price_in: +f.priceIn || 0, price_out: +f.priceOut || 0,
@@ -93,6 +111,7 @@ export function SettingsModal({ cfg, onClose, onSaved }: {
         host: next.imap.host, port: String(next.imap.port),
         smtpPort: String(next.imap.smtp_port), user: next.imap.user });
       setProtectedText((next.protected ?? []).join("\n"));
+      setCategoriesText(catText(next.categories));
       setMsg(t("Saved."));
       setTimeout(() => setMsg(""), 2500);
       return next;
@@ -259,6 +278,18 @@ export function SettingsModal({ cfg, onClose, onSaved }: {
             />
           </Field>
           <p className="mt-1 text-xs text-muted">{t("protected.help")}</p>
+        </div>
+
+        <div className="sm:col-span-2">
+          <Field label={t("Custom categories")}>
+            <textarea
+              className={`${input} min-h-16 font-mono`}
+              value={categoriesText}
+              placeholder={"insurance: allianz, huk, versicherung\nshipping: dhl, dpd"}
+              onChange={(e) => setCategoriesText(e.target.value)}
+            />
+          </Field>
+          <p className="mt-1 text-xs text-muted">{t("categories.help")}</p>
         </div>
 
         <div className="sm:col-span-2 mt-2 text-xs font-semibold uppercase

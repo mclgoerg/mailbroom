@@ -164,6 +164,11 @@ const EN: Record<string, string> = {
   "budget.label": "Monthly AI budget ($, 0 = unlimited)",
   "budget.none": "no cap",
   "budget.month": "spent this month: {spent}",
+  "categories.help":
+    "One category per line: \"name: keyword1, keyword2\". A name matching "
+    + "a built-in category (shipping, finance, shopping, social, travel, "
+    + "dev/cloud) replaces its keywords; an empty keyword list disables "
+    + "it; new names add categories. Applies on the next scan.",
 };
 
 const DE: Record<string, string> = {
@@ -452,6 +457,13 @@ const DE: Record<string, string> = {
   "budget.label": "Monatliches KI-Budget ($, 0 = unbegrenzt)",
   "budget.none": "kein Limit",
   "budget.month": "diesen Monat ausgegeben: {spent}",
+  "Custom categories": "Eigene Kategorien",
+  "categories.help":
+    "Eine Kategorie pro Zeile: „name: stichwort1, stichwort2“. Ein Name "
+    + "einer eingebauten Kategorie (shipping, finance, shopping, social, "
+    + "travel, dev/cloud) ersetzt deren Stichwörter; eine leere Liste "
+    + "deaktiviert sie; neue Namen ergänzen Kategorien. Gilt ab dem "
+    + "nächsten Scan.",
 };
 
 let lang: Lang =

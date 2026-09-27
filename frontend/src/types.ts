@@ -185,6 +185,7 @@ export interface Config {
   active_profile: string;
   excluded_folders: string[];
   protected: string[];
+  categories: Record<string, string[]>;
   ai: {
     provider: "anthropic" | "foundry" | "openai" | "ollama";
     model: string;

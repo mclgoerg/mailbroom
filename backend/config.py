@@ -36,6 +36,10 @@ DEFAULT_CONFIG = {
     # ("@example.com" / "example.com"). Bulk deletes and selection presets
     # skip them; the AI must never rate their mails delete_safe.
     "protected": [],
+    # Category overrides: {name: [keywords]}. A name matching a built-in
+    # category replaces its keyword list (empty list disables it); other
+    # names become new categories. Applied at scan time.
+    "categories": {},
     "ai": {
         # anthropic | foundry | openai | ollama (any OpenAI-compatible
         # endpoint works via "ollama" + base URL, e.g. LM Studio, vLLM).
@@ -138,6 +142,8 @@ def load_config() -> dict:
             cfg["excluded_folders"] = saved["excluded_folders"]
         if isinstance(saved.get("protected"), list):
             cfg["protected"] = normalize_protected(saved["protected"])
+        if isinstance(saved.get("categories"), dict):
+            cfg["categories"] = saved["categories"]
         if isinstance(saved.get("profiles"), dict):
             cfg["profiles"] = saved["profiles"]
         if saved.get("active_profile"):
@@ -196,6 +202,12 @@ def update_config(body: dict) -> dict:
             cfg["excluded_folders"] = [str(f) for f in body["excluded_folders"]]
         if isinstance(body.get("protected"), list):
             cfg["protected"] = normalize_protected(body["protected"])
+        if isinstance(body.get("categories"), dict):
+            cfg["categories"] = {
+                str(k).strip().lower(): [str(p).strip().lower()
+                                         for p in v if str(p).strip()]
+                for k, v in body["categories"].items()
+                if str(k).strip() and isinstance(v, list)}
         ai_in = body.get("ai") or {}
         if ai_in.get("provider") in AI_PROVIDERS:
             cfg["ai"]["provider"] = ai_in["provider"]
@@ -222,6 +234,7 @@ def masked_config(cfg: dict) -> dict:
         "active_profile": cfg["active_profile"],
         "excluded_folders": cfg["excluded_folders"],
         "protected": normalize_protected(cfg.get("protected")),
+        "categories": cfg.get("categories") or {},
         "ai": {"provider": cfg["ai"]["provider"],
                "model": cfg["ai"]["model"],
                "foundry_endpoint": cfg["ai"]["foundry_endpoint"],

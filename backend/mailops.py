@@ -150,9 +150,31 @@ def ikey(folder: str, uid: int) -> str:
     return f"{folder}\x00{uid}"
 
 
-def categorize(hay: str, localpart: str = "", bulk: bool = False) -> list[str]:
+def effective_categories(custom: dict | None) -> list[tuple[str, list[str]]]:
+    """CATEGORY_RULES with user overrides applied: a custom entry whose name
+    matches a built-in category replaces its keywords (empty list disables
+    it); unknown names append as new categories."""
+    if not custom:
+        return CATEGORY_RULES
+    out: list[tuple[str, list[str]]] = []
+    builtin = {cat for cat, _ in CATEGORY_RULES}
+    for cat, pats in CATEGORY_RULES:
+        if cat in custom:
+            pats = [p for p in custom[cat] if p]
+        if pats:
+            out.append((cat, pats))
+    for cat, pats in custom.items():
+        pats = [p for p in pats if p]
+        if cat not in builtin and pats:
+            out.append((cat, pats))
+    return out
+
+
+def categorize(hay: str, localpart: str = "", bulk: bool = False,
+               rules: list[tuple[str, list[str]]] | None = None) -> list[str]:
     hay = hay.lower()
-    tags = [cat for cat, pats in CATEGORY_RULES if any(p in hay for p in pats)]
+    tags = [cat for cat, pats in (rules or CATEGORY_RULES)
+            if any(p in hay for p in pats)]
     if localpart and AUTOMATED_RE.match(localpart):
         tags.append("automated")
     if bulk:
@@ -375,7 +397,9 @@ def _rec(groups: dict, grouping: str, key: str, label: str) -> dict:
         "_senders": set(), "_names": {}, "_hay": "", "_min": 0, "_max": 0})
 
 
-def build_groups(messages: list, replied_to: set[str] | None = None) -> dict:
+def build_groups(messages: list, replied_to: set[str] | None = None,
+                 categories: list[tuple[str, list[str]]] | None = None,
+                 ) -> dict:
     replied_to = replied_to or set()
     groups: dict = {g: {} for g in GROUPINGS}
     for m in messages:
@@ -415,7 +439,8 @@ def build_groups(messages: list, replied_to: set[str] | None = None) -> dict:
             nsenders = len(senders)
             rec["replied"] = any(a in replied_to for a in senders)
             localpart = rec["key"].split("@", 1)[0] if grouping == "sender" else ""
-            rec["tags"] = categorize(rec.pop("_hay"), localpart, rec["bulk"])
+            rec["tags"] = categorize(rec.pop("_hay"), localpart, rec["bulk"],
+                                     categories)
             names = rec.pop("_names")
             rec["first"] = day(rec.pop("_min"))
             rec["last"] = day(rec.pop("_max"))
@@ -508,7 +533,8 @@ def run_scan() -> None:
             if new_replied - replied:
                 replied |= new_replied
                 save_replied()
-            groups = build_groups(messages, replied)
+            groups = build_groups(messages, replied,
+                                  effective_categories(cfg.get("categories")))
             cached = verdictstore.apply_to_groups(groups)
             with STATE_LOCK:
                 INDEX.clear()
