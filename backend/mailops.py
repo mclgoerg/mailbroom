@@ -150,6 +150,112 @@ def save_replied(acc=None) -> None:
         log.exception("could not persist replied.json")
 
 
+# ------------------------------------------------------- scan snapshots
+# Scan results are cached to disk PER ACCOUNT so restarts and account
+# switches show the last data instantly (with its scan timestamp) instead
+# of an empty view. Acting on cached data stays safe: every move re-checks
+# UIDVALIDITY against the server and refuses when the mailbox changed, and
+# undo works by Message-ID.
+
+SNAPSHOT_DIR = Path(os.environ.get("SNAPSHOT_DIR", "/data"))
+_SNAP_VERSION = 1
+
+
+def _snap_path(name: str) -> Path:
+    slug = re.sub(r"[^A-Za-z0-9._-]", "_", name)[:40]
+    h = __import__("hashlib").sha1(name.encode()).hexdigest()[:8]
+    return SNAPSHOT_DIR / f"scan_{slug}_{h}.json"
+
+
+def save_snapshot(acc) -> None:
+    """Persist the account's scan state (called after scans/actions)."""
+    with acc.lock:
+        if acc.state["status"] != "done":
+            return
+        data = {
+            "version": _SNAP_VERSION, "account": acc.name,
+            "ts": acc.state.get("scanned_ts") or int(time.time()),
+            "folders": acc.state["folders"],
+            "folders_raw": acc.state["folders_raw"],
+            "folder_uv": acc.folder_uv,
+            "folder_roles": acc.folder_roles,
+            "trash_count": acc.state["trash_count"],
+            "index": list(acc.index.values()),
+            "groups": acc.state["groups"],
+        }
+        blob = json.dumps(data)
+    try:
+        SNAPSHOT_DIR.mkdir(parents=True, exist_ok=True)
+        path = _snap_path(acc.name)
+        tmp = path.with_suffix(".tmp")
+        tmp.write_text(blob)
+        tmp.chmod(0o600)
+        tmp.replace(path)
+    except OSError:
+        log.exception("[%s] could not persist scan snapshot", acc.name)
+
+
+def load_snapshot(acc) -> bool:
+    """Restore the last scan from disk into an idle, empty account.
+    Cached AI verdicts are re-applied like after a real scan."""
+    try:
+        data = json.loads(_snap_path(acc.name).read_text())
+    except (OSError, json.JSONDecodeError):
+        return False
+    if not isinstance(data, dict) or data.get("version") != _SNAP_VERSION:
+        return False
+    try:
+        cached = verdictstore.apply_to_groups(data["groups"], acc.name)
+        with acc.lock:
+            if acc.state["status"] != "idle" or acc.index:
+                return False              # never clobber live state
+            acc.index.update({ikey(m["folder"], m["uid"]): m
+                              for m in data["index"]})
+            acc.folder_uv.update(data.get("folder_uv") or {})
+            acc.folder_roles.update(data.get("folder_roles") or {})
+            acc.state["groups"] = data["groups"]
+            acc.state["folders"] = data.get("folders") or []
+            acc.state["folders_raw"] = data.get("folders_raw") or []
+            acc.state["trash_count"] = data.get("trash_count")
+            acc.state["scanned_ts"] = data.get("ts")
+            acc.state["status"] = "done"
+            acc.state["groups_rev"] += 1
+        log.info("[%s] scan snapshot restored: %d mails, %d senders "
+                 "(scanned %s), %d cached verdicts", acc.name,
+                 len(data["index"]), len(data["groups"].get("sender", {})),
+                 time.strftime("%Y-%m-%d %H:%M",
+                               time.localtime(data.get("ts") or 0)), cached)
+        return True
+    except (KeyError, TypeError, AttributeError):
+        log.exception("[%s] scan snapshot unusable — ignored", acc.name)
+        return False
+
+
+def rename_snapshot(old: str, new: str) -> None:
+    try:
+        path = _snap_path(old)
+        if path.exists():
+            data = json.loads(path.read_text())
+            data["account"] = new
+            npath = _snap_path(new)
+            tmp = npath.with_suffix(".tmp")
+            tmp.write_text(json.dumps(data))
+            tmp.chmod(0o600)
+            tmp.replace(npath)
+            path.unlink()
+    except (OSError, json.JSONDecodeError):
+        log.exception("could not rename scan snapshot")
+
+
+def drop_snapshot(name: str) -> None:
+    try:
+        _snap_path(name).unlink()
+    except FileNotFoundError:
+        pass
+    except OSError:
+        log.exception("could not drop scan snapshot")
+
+
 class Cancelled(Exception):
     """Raised inside workers when the user cancelled the operation."""
 
@@ -178,6 +284,7 @@ def clear_ai_marks() -> None:
             for recs in acc.state["groups"].values():
                 for rec in recs.values():
                     rec["ai"] = None
+            acc.state["groups_rev"] += 1
 
 
 def ikey(folder: str, uid: int) -> str:
@@ -635,6 +742,18 @@ def public_state(acc=None) -> dict:
         return out
 
 
+def public_status(acc=None) -> dict:
+    """Small live-update payload: everything EXCEPT the (big) group lists.
+    SSE clients watch groups_rev and refetch the full state only when it
+    moves — that keeps the stream at a few KB/s instead of ~700 KB/s."""
+    acc = acc or accounts.get()
+    with acc.lock:
+        out = json.loads(json.dumps(
+            {k: v for k, v in acc.state.items() if k != "groups"}))
+        out["account"] = acc.name
+        return out
+
+
 def run_scan(acc=None) -> None:
     acc = acc or accounts.get()
 
@@ -686,6 +805,8 @@ def run_scan(acc=None) -> None:
                                        "params": {"n": cached}}
                 acc.state["ai"] = {"status": "idle", "grouping": "",
                                "progress": "", "error": "", "usage": None}
+                acc.state["scanned_ts"] = int(time.time())
+                acc.state["groups_rev"] += 1
             log.info("[%s] scan done: %d folders, %d mails, %d senders, "
                      "%d replied-to addrs in %.1fs",
                      acc.name, len(folders), len(messages),
@@ -693,6 +814,7 @@ def run_scan(acc=None) -> None:
             statsmod.record_scan(len(messages),
                                  sum(m["size"] for m in messages),
                                  len(groups["sender"]), acc.name)
+            save_snapshot(acc)
         finally:
             try:
                 conn.logout()
@@ -733,7 +855,9 @@ def start_scan(acc=None) -> None:
                 or acc.state["atts"]["status"] == "running":
             raise RuntimeError("busy")
         acc.state.update(status="scanning", progress="connecting…", error="",
-                     notice=None, groups={g: {} for g in GROUPINGS})
+                     notice=None, groups={g: {} for g in GROUPINGS},
+                     scanned_ts=None)
+        acc.state["groups_rev"] += 1
         acc.state["delete"] = {"status": "idle", "progress": "", "error": "",
                            "moved": 0}
         # Attachment analysis is per-scan; a new scan invalidates it.
@@ -787,6 +911,7 @@ def _apply_removal(moved_uids: dict[str, set[int]], acc) -> dict:
             rec["att_size"] = max(0, rec.get("att_size", 0) - removed_att)
             if rec["count"] <= 0:
                 recs.pop(key)
+    acc.state["groups_rev"] += 1
     return meta
 
 
@@ -898,6 +1023,7 @@ def _apply_seen(folder: str, uids: list[int], acc) -> None:
                            if u in newly_read)
                 if hits:
                     rec["unread"] = max(0, rec["unread"] - hits)
+        acc.state["groups_rev"] += 1
 
 
 # Deletions are queued and processed by one worker at a time: jobs snapshot
@@ -924,15 +1050,21 @@ def _record_undo(label: str, meta: dict, action: str, dest: str,
 def _delete_worker(acc) -> None:
     while True:
         with acc.lock:
+            done_persist = None      # None = queue not empty, keep working
             if not acc.delete_pending:
                 st = acc.state["delete"]
                 st["status"] = ("error" if st["error"] and not st["moved"]
                                 else "done")
                 st["progress"] = ""
                 acc.inflight = {}
-                return
-            job = acc.delete_pending.pop(0)
-            acc.inflight = job["by_folder"]
+                done_persist = st["status"] == "done" and st["moved"] > 0
+            else:
+                job = acc.delete_pending.pop(0)
+                acc.inflight = job["by_folder"]
+        if done_persist is not None:
+            if done_persist:         # groups/index changed — cache them
+                save_snapshot(acc)
+            return
         by_folder, label = job["by_folder"], job["label"]
         action, dest = job["action"], job["dest"]
 
@@ -1271,8 +1403,10 @@ def _run_atts(acc) -> None:
             size = sum(m.get("att_size", 0) for m in acc.index.values())
             acc.state["atts"] = {"status": "done", "progress": "", "error": "",
                              "mails": n, "size": size}
+            acc.state["groups_rev"] += 1
         log.info("attachment analysis done: %d mails with attachments, "
                  "%s total, %.1fs", n, size, time.time() - t0)
+        save_snapshot(acc)
     except Cancelled:
         with acc.lock:
             acc.state["atts"].update(status="idle", progress="")

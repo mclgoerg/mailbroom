@@ -372,6 +372,7 @@ export const DE: Record<string, string> = {
     'Konto "{name}" entfernen? Seine Regeln behalten den Kontonamen und '
     + "laufen nicht mehr; Mails auf dem Server bleiben unangetastet.",
   "account.switch_tip": "Konto wechseln — jede Ansicht gilt pro Konto",
+  "scan.age": "gescannt vor {ago}",
   "account.rename": "Umbenennen…",
   "account.rename_prompt": 'Neuer Name für Konto "{name}":',
   "account.renamed": 'Konto umbenannt in "{name}".',

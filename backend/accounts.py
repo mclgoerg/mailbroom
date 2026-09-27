@@ -26,6 +26,10 @@ def _initial_state() -> dict:
                  "mails": 0, "size": 0},   # attachment analysis (lazy)
         "trash_count": None,   # mails currently in Trash (None = unknown)
         "notice": None,        # one-shot info for the UI: {key, params}|None
+        "scanned_ts": None,    # when the current groups were scanned
+        "groups_rev": 1,       # bumped whenever groups/index change — SSE
+                               # clients refetch the (big) group list only
+                               # when this moves
         "undo": [],            # summaries of undoable move jobs (newest last)
         "folders_raw": [],     # raw IMAP folder names (targets for move-to)
         "rules": [],           # this account's rules (mirrored for SSE)

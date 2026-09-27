@@ -12,6 +12,27 @@ export const fmtUsd = (c: number): string =>
 export const mailKey = (m: { folder: string; uid: number }): string =>
   `${m.folder} ${m.uid}`;
 
+/** Compact relative age: "3m", "2h", "5d" (empty for missing/future). */
+export const fmtAgo = (ts: number | null | undefined,
+                       now = Date.now() / 1000): string => {
+  if (!ts || ts > now) return "";
+  const s = now - ts;
+  if (s < 90) return "1m";
+  if (s < 3600) return `${Math.round(s / 60)}m`;
+  if (s < 86400) return `${Math.round(s / 3600)}h`;
+  return `${Math.round(s / 86400)}d`;
+};
+
+/** Merge a slim SSE status message into the current state. Returns the
+ *  merged state, or null when a FULL fetch is needed instead (no state
+ *  yet, another account, or the group lists changed on the server). */
+export const applyStatus = <S extends { account: string; groups_rev: number;
+    groups: unknown }>(prev: S | null, slim: Omit<S, "groups">): S | null => {
+  if (!prev || prev.account !== slim.account
+      || prev.groups_rev !== slim.groups_rev) return null;
+  return { ...prev, ...slim, groups: prev.groups };
+};
+
 export const olderThan = (m: { ts: number }, months: number): boolean =>
   m.ts > 0 && m.ts < Date.now() / 1000 - months * 30.44 * 86400;
 

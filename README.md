@@ -99,6 +99,10 @@ export is Proton-only and hidden for other presets.
   the whole view between accounts; accounts can be added, renamed
   (all their data follows) and removed in settings, and each has its
   own folder-discovery picker.
+- **Fast to open** — each account's last scan is cached on disk and shown
+  instantly after a restart or account switch (with its age); a rescan
+  refreshes it. Live updates stream only small status deltas — the full
+  group list is re-fetched just when it actually changed.
 - **Safe by design** — deletions are IMAP `MOVE` to Trash (reversible),
   UIDVALIDITY checked before every move, read-only scans, UID bookkeeping
   stays server-side, non-root container.

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { fmtSize, fmtUsd, mailKey, matchGroup, olderThan, parseFilter,
-  sieveSnippet } from "./lib";
+import { applyStatus, fmtAgo, fmtSize, fmtUsd, mailKey, matchGroup,
+  olderThan, parseFilter, sieveSnippet } from "./lib";
 import type { Group } from "./types";
 
 const g = (over: Partial<Group> = {}): Group => ({
@@ -122,5 +122,40 @@ describe("matchGroup", () => {
     expect(matchGroup(g({ last: "2024-06-01" }), f, NOW)).toBe(true);
     expect(matchGroup(g({ last: "2025-12-30" }), f, NOW)).toBe(false);
     expect(matchGroup(g({ last: "" }), f, NOW)).toBe(false);
+  });
+});
+
+describe("fmtAgo", () => {
+  const now = 1_000_000;
+  it("formats relative ages compactly", () => {
+    expect(fmtAgo(now - 30, now)).toBe("1m");
+    expect(fmtAgo(now - 600, now)).toBe("10m");
+    expect(fmtAgo(now - 7200, now)).toBe("2h");
+    expect(fmtAgo(now - 3 * 86400, now)).toBe("3d");
+  });
+  it("is empty for missing or future timestamps", () => {
+    expect(fmtAgo(null, now)).toBe("");
+    expect(fmtAgo(now + 60, now)).toBe("");
+  });
+});
+
+describe("applyStatus (slim SSE merge)", () => {
+  const prev = { account: "a", groups_rev: 3, status: "done",
+    groups: { sender: { x: 1 } } } as any;
+  it("merges status fields and keeps the groups", () => {
+    const merged = applyStatus(prev,
+      { account: "a", groups_rev: 3, status: "scanning" } as any)!;
+    expect(merged.status).toBe("scanning");
+    expect(merged.groups).toBe(prev.groups);
+  });
+  it("demands a full fetch when groups changed server-side", () => {
+    expect(applyStatus(prev,
+      { account: "a", groups_rev: 4, status: "done" } as any)).toBeNull();
+  });
+  it("demands a full fetch without state or across accounts", () => {
+    expect(applyStatus(null,
+      { account: "a", groups_rev: 3 } as any)).toBeNull();
+    expect(applyStatus(prev,
+      { account: "b", groups_rev: 3 } as any)).toBeNull();
   });
 });

@@ -121,9 +121,14 @@ export interface Rule {
   last_run: RuleRun | null;
 }
 
+/** Slim live-update payload (SSE): AppState without `groups`. */
+export type StatusMsg = Omit<AppState, "groups">;
+
 export interface AppState {
   account: string;
   status: "idle" | "scanning" | "done" | "error";
+  scanned_ts: number | null;
+  groups_rev: number;
   progress: string;
   error: string;
   folders: string[];

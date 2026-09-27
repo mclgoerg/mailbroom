@@ -12,8 +12,9 @@ import { TrashPanel } from "./components/TrashPanel";
 import { applyTheme, Button, currentTheme, ensureAiAck, Input, Select,
   Spinner } from "./components/ui";
 import { t } from "./i18n";
-import { fmtSize, fmtUsd, matchGroup, parseFilter } from "./lib";
-import type { AppState, Config, Group, Grouping } from "./types";
+import { applyStatus, fmtAgo, fmtSize, fmtUsd, matchGroup, parseFilter }
+  from "./lib";
+import type { AppState, Config, Group, Grouping, StatusMsg } from "./types";
 
 const GROUPING_LABEL: Record<Grouping, string> = {
   sender: "Sender", domain: "Domain", subject: "Subject",
@@ -64,10 +65,16 @@ export default function App() {
   const sse = useRef<EventSource | null>(null);
   const filterRef = useRef<HTMLInputElement>(null);
 
+  const fetching = useRef(false);   // one full-state fetch at a time
+  const stateRef = useRef<AppState | null>(null);
+
   const refresh = useCallback(async () => {
     clearTimeout(timer.current);
+    if (fetching.current) return;
+    fetching.current = true;
     try {
       const st = await api.state();
+      stateRef.current = st;
       setState(st);
       // Polling fallback only drives itself when SSE isn't connected.
       if (!sse.current && (st.status === "scanning"
@@ -78,6 +85,8 @@ export default function App() {
     } catch (e: any) {
       setToast(`Connection error: ${e.message ?? e}`);
       if (!sse.current) timer.current = setTimeout(refresh, 4000);
+    } finally {
+      fetching.current = false;
     }
   }, []);
 
@@ -93,6 +102,7 @@ export default function App() {
     localStorage.setItem("pmc_account", name);
     apiSetAccount(name);
     // Switching swaps the ENTIRE view: no state may leak across accounts.
+    stateRef.current = null;
     setState(null);
     setSelected(new Set());
     setDetail(null);
@@ -107,7 +117,18 @@ export default function App() {
     // Prefer server-sent events; fall back to polling if they fail.
     try {
       const es = new EventSource(withAccount("/api/events"));
-      es.onmessage = (ev) => setState(JSON.parse(ev.data));
+      // The stream carries only the slim status (a few KB); the big group
+      // lists are fetched once and again whenever groups_rev moves.
+      es.onmessage = (ev) => {
+        const slim = JSON.parse(ev.data) as StatusMsg;
+        const merged = applyStatus(stateRef.current, slim);
+        if (merged) {
+          stateRef.current = merged;
+          setState(merged);
+        } else {
+          refresh();
+        }
+      };
       es.onerror = () => {
         es.close();
         if (sse.current === es) sse.current = null;
@@ -360,8 +381,10 @@ export default function App() {
     if (groups.length) {
       const mails = groups.reduce((n, g) => n + g.count, 0);
       const size = groups.reduce((n, g) => n + g.size, 0);
+      const ago = fmtAgo(state.scanned_ts);
       parts.push(`${groups.length} ${t("groups")} · ${mails} ${t("mails")}`
-        + ` · ${fmtSize(size)}` + (filter ? ` ${t("(filtered)")}` : ""));
+        + ` · ${fmtSize(size)}` + (filter ? ` ${t("(filtered)")}` : "")
+        + (ago ? ` · ${t("scan.age", { ago })}` : ""));
     }
     if (state.delete.status === "error")
       parts.push(`Error: ${state.delete.error}`);

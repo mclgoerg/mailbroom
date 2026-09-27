@@ -28,6 +28,7 @@ def isolate(tmp_path, monkeypatch):
     monkeypatch.setattr(verdictstore, "VERDICTS_PATH",
                         tmp_path / "verdicts.json")
     monkeypatch.setattr(mailops, "REPLIED_PATH", tmp_path / "replied.json")
+    monkeypatch.setattr(mailops, "SNAPSHOT_DIR", tmp_path / "snapshots")
     monkeypatch.setattr(rulesmod, "RULES_PATH", tmp_path / "rules.json")
     monkeypatch.setattr(statsmod, "HISTORY_PATH",
                         tmp_path / "stats_history.json")

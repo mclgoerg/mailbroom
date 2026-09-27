@@ -38,6 +38,10 @@ from contextlib import asynccontextmanager
 
 @asynccontextmanager
 async def _lifespan(app: FastAPI):
+    # Show the last scan of every account right away instead of an empty
+    # view (safe: moves re-check UIDVALIDITY; undo works by Message-ID).
+    for name in accountsmod.names():
+        mailops.load_snapshot(accountsmod.get(name))
     rulesmod.start_scheduler()
     yield
 
@@ -580,12 +584,14 @@ def post_import_config(body: dict):
 
 @app.get("/api/events")
 async def get_events(account: str | None = Query(None)):
-    """Server-sent events: streams ONE account's state (~1/s)."""
+    """Server-sent events: streams ONE account's slim status (~1/s).
+    Group lists are NOT included — clients refetch /api/state when the
+    payload's groups_rev changes."""
     acc = _acc(account)
 
     async def gen():
         while True:
-            yield f"data: {json.dumps(mailops.public_state(acc))}\n\n"
+            yield f"data: {json.dumps(mailops.public_status(acc))}\n\n"
             await asyncio.sleep(1.0)
     return StreamingResponse(gen(), media_type="text/event-stream",
                              headers={"Cache-Control": "no-cache",
@@ -610,6 +616,7 @@ def post_config(body: dict):
         raise HTTPException(400, str(exc))
     if body.get("delete_account"):
         accountsmod.drop(str(body["delete_account"]))
+        mailops.drop_snapshot(str(body["delete_account"]))
     if isinstance(body.get("rename_account"), dict):
         # The config rename succeeded — carry every per-account artifact
         # (runtime state, verdicts, replied cache, stats, rules) along.
@@ -617,6 +624,7 @@ def post_config(body: dict):
         new = str(body["rename_account"].get("to") or "").strip()[:60]
         if old != new:
             accountsmod.rename(old, new)
+            mailops.rename_snapshot(old, new)
             verdictstore.rename_account(old, new)
             mailops.rename_replied_account(old, new)
             statsmod.rename_account(old, new)

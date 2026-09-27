@@ -265,6 +265,7 @@ def _run_ai(grouping: str, acc=None) -> None:
                             applied[rec["key"]] = rec["ai"]
                     done += len(batch)
                     STATE["ai"]["progress"] = f"{done}/{len(batch_src)} groups"
+                    STATE["groups_rev"] += 1
                 verdictstore.save(grouping, applied, acc.name)
         finally:
             # Tokens of completed batches are billed even if a later batch
@@ -373,6 +374,9 @@ def ai_group(grouping: str, key: str, offset: int = 0,
         verdicts_out.append([pos[0], pos[1], verdict])
         to_store[known[pos]] = verdict
     verdictstore.save_mails(to_store)
+    if to_store:
+        with acc.lock:
+            acc.state["groups_rev"] += 1
     spent = cfgmod.record_usage(cfg["ai"], tin, tout)
     return {"verdicts": verdicts_out, "note": data["note"][:400],
             "reviewed": len(mails),
