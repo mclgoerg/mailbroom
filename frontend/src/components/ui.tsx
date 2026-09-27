@@ -1,4 +1,4 @@
-import { useEffect, type ReactNode } from "react";
+import { useEffect, type ComponentProps, type ReactNode } from "react";
 import { t } from "../i18n";
 import type { GroupAi } from "../types";
 
@@ -124,6 +124,97 @@ export function Button({ children, onClick, disabled, variant = "primary",
         ${styles} ${className}`}>
       {children}
     </button>
+  );
+}
+
+/* ----------------------- form controls (ONE look) -----------------------
+ * Every input/select/textarea in the app uses these — never restyle them
+ * locally. They accept all native props incl. ref (React 19). */
+
+const CONTROL = `min-h-9 rounded-md border border-line bg-panel2 px-3 py-1.5
+  text-sm outline-none focus:border-accent`;
+
+export function Input({ className = "", ...rest }:
+  ComponentProps<"input">) {
+  return <input className={`${CONTROL} ${className}`} {...rest} />;
+}
+
+export function Select({ className = "", ...rest }:
+  ComponentProps<"select">) {
+  return <select className={`${CONTROL} ${className}`} {...rest} />;
+}
+
+export function TextArea({ className = "", ...rest }:
+  ComponentProps<"textarea">) {
+  return (
+    <textarea
+      className={`${CONTROL} min-h-20 w-full font-mono ${className}`}
+      {...rest} />
+  );
+}
+
+/** Labelled form control (label above, muted). */
+export function Field({ label, children }: {
+  label: string; children: ReactNode;
+}) {
+  return (
+    <label className="block">
+      <span className="mb-1 block text-xs text-muted">{label}</span>
+      {children}
+    </label>
+  );
+}
+
+/* --------------------------- layout primitives --------------------------- */
+
+/** Standard panel/modal header: title (+optional subtitle) left, optional
+ *  action elements, close button right. Used by every modal. */
+export function PanelHeader({ title, sub, actions, onClose }: {
+  title: ReactNode; sub?: ReactNode; actions?: ReactNode;
+  onClose: () => void;
+}) {
+  return (
+    <div className="flex items-center gap-3 border-b border-line px-4 py-3">
+      <div className="min-w-0 flex-1">
+        <div className="truncate font-semibold">{title}</div>
+        {sub != null && sub !== "" && (
+          <div className="truncate text-xs text-muted">{sub}</div>
+        )}
+      </div>
+      {actions}
+      <Button variant="ghost" onClick={onClose}>✕</Button>
+    </div>
+  );
+}
+
+/** Standard action row under a panel header. */
+export function Toolbar({ children, className = "" }: {
+  children: ReactNode; className?: string;
+}) {
+  return (
+    <div className={`flex flex-wrap items-center gap-2 border-b border-line
+      px-4 py-2 ${className}`}>
+      {children}
+    </div>
+  );
+}
+
+/** Uppercase section label used to group form/panel content. */
+export function SectionLabel({ children, className = "" }: {
+  children: ReactNode; className?: string;
+}) {
+  return (
+    <div className={`text-xs font-semibold uppercase tracking-wide
+      text-muted ${className}`}>
+      {children}
+    </div>
+  );
+}
+
+/** Standard "nothing here" message for empty lists/results. */
+export function EmptyState({ children }: { children: ReactNode }) {
+  return (
+    <div className="p-6 text-center text-sm text-muted">{children}</div>
   );
 }
 

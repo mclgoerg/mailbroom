@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { api, fmtSize } from "../api";
 import { t } from "../i18n";
 import type { StatsResp } from "../types";
-import { Button, Loading, Modal } from "./ui";
+import { Loading, Modal, PanelHeader, SectionLabel } from "./ui";
 
 const month = () => new Date().toISOString().slice(0, 7);
 
@@ -26,11 +26,7 @@ export function StatsPanel({ onClose }: { onClose: () => void }) {
 
   return (
     <Modal onClose={onClose}>
-      <div className="flex items-center justify-between border-b border-line
-        px-5 py-3">
-        <h2 className="font-semibold">📊 {t("Statistics")}</h2>
-        <Button variant="ghost" onClick={onClose}>✕</Button>
-      </div>
+      <PanelHeader title={<>📊 {t("Statistics")}</>} onClose={onClose} />
       <div className="space-y-5 p-5 text-sm">
         {error && <div className="text-rose-400">{error}</div>}
         {!stats && !error && <Loading />}
@@ -46,8 +42,7 @@ export function StatsPanel({ onClose }: { onClose: () => void }) {
             </div>
 
             <div>
-              <div className="mb-2 text-xs font-semibold uppercase
-                tracking-wide text-muted">{t("stats.per_year")}</div>
+              <SectionLabel className="mb-2">{t("stats.per_year")}</SectionLabel>
               {stats.years.map((y) => (
                 <div key={y.year} className="mb-1 flex items-center gap-2">
                   <span className="w-14 text-xs tabular-nums text-muted">
@@ -64,8 +59,7 @@ export function StatsPanel({ onClose }: { onClose: () => void }) {
             </div>
 
             <div>
-              <div className="mb-2 text-xs font-semibold uppercase
-                tracking-wide text-muted">{t("stats.top_domains")}</div>
+              <SectionLabel className="mb-2">{t("stats.top_domains")}</SectionLabel>
               {stats.top_domains.map((d) => (
                 <div key={d.domain}
                   className="flex items-baseline gap-2 border-b
@@ -80,8 +74,7 @@ export function StatsPanel({ onClose }: { onClose: () => void }) {
 
             {months.length > 0 && (
               <div>
-                <div className="mb-2 text-xs font-semibold uppercase
-                  tracking-wide text-muted">{t("stats.cleanup")}</div>
+                <SectionLabel className="mb-2">{t("stats.cleanup")}</SectionLabel>
                 {months.slice(0, 6).map((m) => {
                   const a = stats.actions[m];
                   return (
@@ -101,8 +94,7 @@ export function StatsPanel({ onClose }: { onClose: () => void }) {
 
             {stats.scans.length > 1 && (
               <div>
-                <div className="mb-2 text-xs font-semibold uppercase
-                  tracking-wide text-muted">{t("stats.scans")}</div>
+                <SectionLabel className="mb-2">{t("stats.scans")}</SectionLabel>
                 {stats.scans.slice(-8).reverse().map((s) => (
                   <div key={s.ts} className="flex items-baseline gap-2 py-0.5
                     text-xs text-muted">

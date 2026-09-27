@@ -9,7 +9,8 @@ import { SearchPanel } from "./components/SearchPanel";
 import { SettingsModal } from "./components/SettingsModal";
 import { StatsPanel } from "./components/StatsPanel";
 import { TrashPanel } from "./components/TrashPanel";
-import { applyTheme, Button, currentTheme, ensureAiAck, Spinner } from "./components/ui";
+import { applyTheme, Button, currentTheme, ensureAiAck, Input, Select,
+  Spinner } from "./components/ui";
 import { t } from "./i18n";
 import { fmtSize, fmtUsd, matchGroup, parseFilter } from "./lib";
 import type { AppState, Config, Group, Grouping } from "./types";
@@ -353,9 +354,6 @@ export default function App() {
     return parts.join(" — ") || t("No scan yet — hit “Scan”.");
   };
 
-  const select = `min-h-9 rounded-md border border-line bg-panel2 px-2
-    py-1.5 text-sm`;
-
   return (
     <div className="mx-auto max-w-6xl p-3 sm:p-5">
       <header className="mb-4 flex items-center gap-3">
@@ -401,11 +399,9 @@ export default function App() {
             </button>
           ))}
         </div>
-        <input
+        <Input
           ref={filterRef}
-          className="order-last min-h-9 w-full rounded-md border
-            border-line bg-panel2 px-3 py-1.5 text-sm outline-none
-            focus:border-indigo-500 sm:order-none sm:w-auto sm:min-w-24
+          className="order-last w-full sm:order-none sm:w-auto sm:min-w-24
             sm:flex-1"
           placeholder={t("filter groups…")}
           title="Combinable: tag:shipping ai:safe age:>1y unread:>80 is:unsub text"
@@ -438,7 +434,7 @@ export default function App() {
       </div>
       {/* Row 2: selection / sorting / bulk tools. */}
       <div className="mb-3 flex flex-wrap items-center gap-2">
-        <select className={`${select} flex-1 sm:flex-none`} value=""
+        <Select className="flex-1 sm:flex-none" value=""
           onChange={(e) => selectPreset(e.target.value)}>
           <option value="" disabled>{t("Select…")}</option>
           <option value="aisafe">{t("AI-safe groups")}</option>
@@ -446,8 +442,8 @@ export default function App() {
           <option value="older12">{t("Inactive > 1 year")}</option>
           <option value="older24">{t("Inactive > 2 years")}</option>
           <option value="none">{t("Clear selection")}</option>
-        </select>
-        <select className={`${select} flex-1 sm:flex-none`} value={sortK}
+        </Select>
+        <Select className="flex-1 sm:flex-none" value={sortK}
           onChange={(e) => {
             const k = e.target.value as SortKey;
             setSortK(k);
@@ -456,7 +452,7 @@ export default function App() {
           {SORT_OPTIONS.map((o) => (
             <option key={o.k} value={o.k}>{t(o.label)}</option>
           ))}
-        </select>
+        </Select>
         {aiEnabled && (
           <Button variant="ghost" onClick={startAi}
             disabled={scanning || aiRunning || state?.status !== "done"}>
@@ -468,7 +464,7 @@ export default function App() {
             font-medium text-body hover:bg-chiph"
           title="Export current grouping as CSV">CSV</a>
         {moveDest === "?" ? (
-          <select className={select} value=""
+          <Select value=""
             onChange={(e) => {
               setMoveDest("");
               if (e.target.value) act([...selected], "move", e.target.value);
@@ -477,15 +473,15 @@ export default function App() {
             {(state?.folders_raw ?? []).map((f, i) => (
               <option key={f} value={f}>{state?.folders[i] ?? f}</option>
             ))}
-          </select>
+          </Select>
         ) : (
-          <select className={select} value="" disabled={!selected.size}
+          <Select value="" disabled={!selected.size}
             onChange={(e) => onAction(e.target.value)}>
             <option value="" disabled>{t("Action…")}</option>
             <option value="archive">{t("Archive")}</option>
             <option value="move">{t("Move to folder…")}</option>
             <option value="mark_read">{t("Mark read")}</option>
-          </select>
+          </Select>
         )}
         <Button variant="danger" disabled={selected.size === 0}
           className="ml-auto"

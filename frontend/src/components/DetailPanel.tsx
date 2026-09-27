@@ -5,7 +5,8 @@ import { fmtSize, fmtUsd, mailKey, olderThan, sieveSnippet,
   type SieveAction } from "../lib";
 import type { AppState, Group, Grouping, Mail } from "../types";
 import { MailRows, MessageView } from "./MailList";
-import { Button, ensureAiAck, Loading, Modal, ProtectButton, Spinner } from "./ui";
+import { Button, ensureAiAck, Input, Loading, Modal, PanelHeader,
+  ProtectButton, Select, Spinner, Toolbar } from "./ui";
 
 export function DetailPanel({ grouping, group, aiEnabled, protectedNow,
   onProtect, folders, onClose, onDeleted }: {
@@ -178,36 +179,30 @@ export function DetailPanel({ grouping, group, aiEnabled, protectedNow,
     else if (v) act(v);
   };
 
-  const sel9 = `min-h-9 rounded-md border border-line bg-panel2 px-2 py-1.5
-    text-sm`;
-
   return (
     <Modal onClose={onClose} full>
-      <div className="flex items-center gap-3 border-b border-line px-4 py-3">
-        <div className="min-w-0 flex-1">
-          <div className="truncate font-semibold">{group.label}</div>
-          <div className="text-xs text-muted">
-            {shown && mails && shown.length !== mails.length
-              ? `${shown.length} / ${mails.length}`
-              : mails ? mails.length : group.count} {t("mails")} ·{" "}
-            {fmtSize(group.size)}
-            {protectedNow && <> · 🛡️ {t("protected")}</>}
-          </div>
-        </div>
-        {onProtect && (
+      <PanelHeader
+        title={group.label}
+        sub={<>
+          {shown && mails && shown.length !== mails.length
+            ? `${shown.length} / ${mails.length}`
+            : mails ? mails.length : group.count} {t("mails")} ·{" "}
+          {fmtSize(group.size)}
+          {protectedNow && <> · 🛡️ {t("protected")}</>}
+        </>}
+        actions={onProtect && (
           <ProtectButton on={protectedNow}
             onClick={() => onProtect({ ...group, protected: protectedNow })} />
         )}
-        <Button variant="ghost" onClick={onClose}>✕</Button>
-      </div>
+        onClose={onClose}
+      />
 
       {view ? (
         <MessageView mail={view} onBack={() => setView(null)} />
       ) : (
         <>
-          <div className="flex flex-wrap items-center gap-2 border-b
-            border-line px-4 py-2">
-            <select className={sel9} value=""
+          <Toolbar>
+            <Select value=""
               onChange={(e) => selectPreset(e.target.value)}>
               <option value="" disabled>{t("Select…")}</option>
               <option value="all">{t("All / none")}</option>
@@ -215,13 +210,13 @@ export function DetailPanel({ grouping, group, aiEnabled, protectedNow,
               <option value="older12">{t("Older than 1 year")}</option>
               <option value="older24">{t("Older than 2 years")}</option>
               <option value="none">{t("Clear selection")}</option>
-            </select>
-            <select className={sel9} value={sortBy}
+            </Select>
+            <Select value={sortBy}
               onChange={(e) => setSortBy(e.target.value as "date" | "size")}>
               <option value="date">{t("Date")}</option>
               <option value="size">{t("Size")}</option>
-            </select>
-            <select className={sel9} value={vFilter}
+            </Select>
+            <Select value={vFilter}
               onChange={(e) => {
                 setVFilter(e.target.value);
                 setSel(new Set());   // never keep hidden mails selected
@@ -237,7 +232,7 @@ export function DetailPanel({ grouping, group, aiEnabled, protectedNow,
               <option value="unrated">
                 {t("v.unrated")} ({vCounts.unrated})
               </option>
-            </select>
+            </Select>
             {aiEnabled && (busy ? (
               <Button variant="ghost"
                 onClick={() => { cancelAi.current = true; }}>
@@ -259,20 +254,20 @@ export function DetailPanel({ grouping, group, aiEnabled, protectedNow,
               </Button>
             )}
             {moveDest === "?" ? (
-              <select className={sel9} value=""
+              <Select value=""
                 onChange={(e) => { setMoveDest(""); act("move", e.target.value); }}>
                 <option value="" disabled>{t("Move to folder…")}</option>
                 {folders.map((f) => <option key={f} value={f}>{f}</option>)}
-              </select>
+              </Select>
             ) : (
-              <select className={sel9} value=""
+              <Select value=""
                 disabled={sel.size === 0}
                 onChange={(e) => { onAction(e.target.value); }}>
                 <option value="" disabled>{t("Action…")}</option>
                 <option value="archive">{t("Archive")}</option>
                 <option value="move">{t("Move to folder…")}</option>
                 <option value="mark_read">{t("Mark read")}</option>
-              </select>
+              </Select>
             )}
             <Button variant="danger" onClick={() => act("trash")}
               disabled={busy || sel.size === 0}>
@@ -286,15 +281,15 @@ export function DetailPanel({ grouping, group, aiEnabled, protectedNow,
                 bg-panel2 p-3">
                 <div className="mb-2 flex flex-wrap items-center gap-2">
                   <span className="text-xs text-muted">{t("sieve.intro")}</span>
-                  <select className={sel9} value={sieveAction}
+                  <Select value={sieveAction}
                     onChange={(e) =>
                       setSieveAction(e.target.value as SieveAction)}>
                     <option value="fileinto">{t("sieve.fileinto")}</option>
                     <option value="discard">{t("sieve.discard")}</option>
                     <option value="markread">{t("sieve.markread")}</option>
-                  </select>
+                  </Select>
                   {sieveAction === "fileinto" && (
-                    <input className={`${sel9} w-40`} value={sieveFolder}
+                    <Input className="w-40" value={sieveFolder}
                       placeholder="Archive"
                       onChange={(e) => setSieveFolder(e.target.value)} />
                   )}
@@ -315,7 +310,7 @@ export function DetailPanel({ grouping, group, aiEnabled, protectedNow,
                 </pre>
               </div>
             )}
-          </div>
+          </Toolbar>
           <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-4">
             {error && <div className="p-4 text-sm text-rose-400">{error}</div>}
             {!shown && !error && <Loading />}

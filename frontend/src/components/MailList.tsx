@@ -77,8 +77,8 @@ export function MailRows({ mails, sel, onToggle, onOpen }: {
       {mails.length > cap && (
         <div className="py-3 text-center">
           <Button variant="ghost" onClick={() => setCap(cap + RENDER_CAP)}>
-            Show {Math.min(RENDER_CAP, mails.length - cap)} more
-            ({mails.length - cap} hidden)
+            {t("show_more", { n: Math.min(RENDER_CAP, mails.length - cap),
+              hidden: mails.length - cap })}
           </Button>
         </div>
       )}

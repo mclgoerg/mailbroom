@@ -3,7 +3,8 @@ import { api, fmtSize, mailKey } from "../api";
 import { t } from "../i18n";
 import type { AppState, AttMail, Mail } from "../types";
 import { MessageView } from "./MailList";
-import { Button, Loading, Modal, Spinner, Tag } from "./ui";
+import { Button, EmptyState, Loading, Modal, PanelHeader, Spinner, Tag,
+  Toolbar } from "./ui";
 
 /** Attachment explorer: lazy BODYSTRUCTURE analysis, then the mailbox's
  *  attachment-heaviest mails. Proton IMAP cannot strip attachments, so the
@@ -74,16 +75,12 @@ export function AttachmentsPanel({ state, onClose, onDeleted }: {
 
   return (
     <Modal onClose={onClose} full>
-      <div className="flex items-center gap-3 border-b border-line px-4 py-3">
-        <div className="min-w-0 flex-1">
-          <div className="font-semibold">📎 {t("Attachments")}</div>
-          <div className="text-xs text-muted">
-            {atts?.status === "done"
-              ? t("atts.summary", { n: atts.mails, size: fmtSize(atts.size) })
-              : t("atts.hint")}
-          </div>
-        </div>
-        {running ? (
+      <PanelHeader
+        title={<>📎 {t("Attachments")}</>}
+        sub={atts?.status === "done"
+          ? t("atts.summary", { n: atts.mails, size: fmtSize(atts.size) })
+          : t("atts.hint")}
+        actions={running ? (
           <Button variant="ghost" onClick={cancel}>
             <Spinner /> {starting ? t("Starting…") : atts.progress}{" "}
             — {t("cancel")}
@@ -94,15 +91,14 @@ export function AttachmentsPanel({ state, onClose, onDeleted }: {
             {atts?.status === "done" ? t("atts.reanalyze") : t("atts.analyze")}
           </Button>
         )}
-        <Button variant="ghost" onClick={onClose}>✕</Button>
-      </div>
+        onClose={onClose}
+      />
 
       {view ? (
         <MessageView mail={view} onBack={() => setView(null)} />
       ) : (
         <>
-          <div className="flex flex-wrap items-center gap-2 border-b
-            border-line px-4 py-2">
+          <Toolbar>
             <Button variant="danger" disabled={sel.size === 0}
               onClick={() => act("trash")}>
               {t("Trash selected")}{sel.size > 0 && ` (${sel.size})`}
@@ -111,10 +107,10 @@ export function AttachmentsPanel({ state, onClose, onDeleted }: {
               <span className="text-xs text-rose-400">{atts.error}</span>
             )}
             {note && <span className="text-xs text-muted">{note}</span>}
-          </div>
+          </Toolbar>
           <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-4">
             {!mails && !running && atts?.status !== "done" && (
-              <div className="p-4 text-sm text-muted">{t("atts.intro")}</div>
+              <EmptyState>{t("atts.intro")}</EmptyState>
             )}
             {running && (
               <Loading label={starting ? t("Starting…") : atts.progress} />
@@ -123,7 +119,7 @@ export function AttachmentsPanel({ state, onClose, onDeleted }: {
               <Loading />
             )}
             {mails && mails.length === 0 && (
-              <div className="p-4 text-sm text-muted">{t("atts.none")}</div>
+              <EmptyState>{t("atts.none")}</EmptyState>
             )}
             {mails?.map((m) => (
               <div key={mailKey(m)}

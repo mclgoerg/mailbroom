@@ -3,15 +3,13 @@ import { api } from "../api";
 import { t } from "../i18n";
 import { matchGroup, parseFilter } from "../lib";
 import type { AppState, Grouping, Rule } from "../types";
-import { Button, Modal, Spinner, Tag } from "./ui";
+import { Button, EmptyState, Input, Modal, PanelHeader, SectionLabel,
+  Select, Spinner, Tag } from "./ui";
 
 const EMPTY = {
   name: "", grouping: "sender" as Grouping, query: "", action: "trash",
   dest: "", schedule: "manual" as Rule["schedule"],
 };
-
-const input = `w-full rounded-md border border-line bg-panel2 px-3 py-2
-  text-sm outline-none focus:border-indigo-500`;
 
 function RunSummary({ rule }: { rule: Rule }) {
   const r = rule.last_run;
@@ -120,11 +118,7 @@ export function RulesModal({ state, onClose, onChanged }: {
 
   return (
     <Modal onClose={onClose}>
-      <div className="flex items-center justify-between border-b border-line
-        px-5 py-3">
-        <h2 className="font-semibold">{t("Rules")}</h2>
-        <Button variant="ghost" onClick={onClose}>✕</Button>
-      </div>
+      <PanelHeader title={<>📋 {t("Rules")}</>} onClose={onClose} />
       <div className="space-y-4 p-5">
         <p className="text-xs text-muted">{t("rules.help")}</p>
 
@@ -173,26 +167,23 @@ export function RulesModal({ state, onClose, onChanged }: {
             </div>
           </div>
         ))}
-        {!rules.length && (
-          <div className="text-sm text-muted">{t("rules.empty")}</div>
-        )}
+        {!rules.length && <EmptyState>{t("rules.empty")}</EmptyState>}
 
         <div className="rounded-lg border border-line p-3">
-          <div className="mb-2 text-xs font-semibold uppercase tracking-wide
-            text-muted">
+          <SectionLabel className="mb-2">
             {editId ? t("rule.edit_title") : t("rule.new_title")}
-          </div>
+          </SectionLabel>
           <div className="grid gap-3 sm:grid-cols-2">
-            <input className={input} placeholder={t("rule.name")}
+            <Input className="w-full" placeholder={t("rule.name")}
               value={form.name} onChange={set("name")} />
-            <select className={input} value={form.grouping}
+            <Select className="w-full" value={form.grouping}
               onChange={set("grouping")}>
               <option value="sender">{t("Sender")}</option>
               <option value="domain">{t("Domain")}</option>
               <option value="subject">{t("Subject")}</option>
-            </select>
+            </Select>
             <div className="sm:col-span-2">
-              <input className={input}
+              <Input className="w-full"
                 placeholder="tag:shipping age:>1y is:noreply-ever …"
                 value={form.query} onChange={set("query")} />
               <div className="mt-1 text-xs text-muted">
@@ -201,27 +192,27 @@ export function RulesModal({ state, onClose, onChanged }: {
                   : t("rule.match_unknown")}
               </div>
             </div>
-            <select className={input} value={form.action}
+            <Select className="w-full" value={form.action}
               onChange={set("action")}>
               <option value="trash">{t("action.trash")}</option>
               <option value="archive">{t("action.archive")}</option>
               <option value="move">{t("action.move")}</option>
               <option value="mark_read">{t("action.mark_read")}</option>
-            </select>
-            <select className={input} value={form.schedule}
+            </Select>
+            <Select className="w-full" value={form.schedule}
               onChange={set("schedule")}>
               <option value="manual">{t("sched.manual")}</option>
               <option value="daily">{t("sched.daily")}</option>
               <option value="weekly">{t("sched.weekly")}</option>
-            </select>
+            </Select>
             {form.action === "move" && (
-              <select className={`${input} sm:col-span-2`} value={form.dest}
+              <Select className="w-full sm:col-span-2" value={form.dest}
                 onChange={set("dest")}>
                 <option value="">{t("Move to folder…")}</option>
                 {(state.folders_raw ?? []).map((f, i) => (
                   <option key={f} value={f}>{state.folders[i] ?? f}</option>
                 ))}
-              </select>
+              </Select>
             )}
           </div>
           <div className="mt-3 flex items-center gap-3">

@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { fmtSize } from "../api";
 import type { Group } from "../types";
 import { t } from "../i18n";
-import { AiTag, Button, ProtectButton, RatingChips, Tag } from "./ui";
+import { AiTag, Button, ProtectButton, RatingChips, Select, Tag } from "./ui";
 
 export type SortKey = "count" | "size" | "label" | "last" | "unreadPct";
 
@@ -227,9 +227,6 @@ export function GroupTable(props: Props) {
   const baseIdx = page * perPage;
   const slice = groups.slice(baseIdx, baseIdx + perPage);
 
-  const nav = `min-h-8 rounded-md bg-chip px-2.5 py-1 text-sm text-body
-    hover:bg-chiph disabled:cursor-default disabled:opacity-40`;
-
   return (
     <>
       <div className="hidden sm:block">
@@ -241,20 +238,18 @@ export function GroupTable(props: Props) {
       {(groups.length > Math.min(perPage, ...PAGE_SIZES)) && (
         <div className="flex flex-wrap items-center justify-center gap-2
           py-3 text-sm text-muted">
-          <button className={nav} disabled={page === 0}
-            onClick={() => setPage(0)}>«</button>
-          <button className={nav} disabled={page === 0}
-            onClick={() => setPage(page - 1)}>‹</button>
+          <Button variant="ghost" className="!min-h-8 !px-2.5 !py-1"
+              disabled={page === 0} onClick={() => setPage(0)}>«</Button>
+          <Button variant="ghost" className="!min-h-8 !px-2.5 !py-1"
+              disabled={page === 0} onClick={() => setPage(page - 1)}>‹</Button>
           <span className="tabular-nums">
             {t("page.of", { p: page + 1, n: maxPage + 1 })}
           </span>
-          <button className={nav} disabled={page >= maxPage}
-            onClick={() => setPage(page + 1)}>›</button>
-          <button className={nav} disabled={page >= maxPage}
-            onClick={() => setPage(maxPage)}>»</button>
-          <select
-            className="min-h-8 rounded-md border border-line bg-panel2 px-2
-              py-1 text-sm"
+          <Button variant="ghost" className="!min-h-8 !px-2.5 !py-1"
+              disabled={page >= maxPage} onClick={() => setPage(page + 1)}>›</Button>
+          <Button variant="ghost" className="!min-h-8 !px-2.5 !py-1"
+              disabled={page >= maxPage} onClick={() => setPage(maxPage)}>»</Button>
+          <Select className="!min-h-8 !py-1"
             value={perPage}
             onChange={(e) => {
               const n = Number(e.target.value);
@@ -266,7 +261,7 @@ export function GroupTable(props: Props) {
               <option key={n} value={n}>{n} {t("per page")}</option>
             ))}
             <option value={ALL}>{t("All")}</option>
-          </select>
+          </Select>
         </div>
       )}
     </>

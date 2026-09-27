@@ -3,7 +3,7 @@ import { api, mailKey } from "../api";
 import { t } from "../i18n";
 import type { Mail } from "../types";
 import { MailRows, MessageView } from "./MailList";
-import { Button, Modal, Spinner } from "./ui";
+import { Button, EmptyState, Input, Modal, Spinner, Toolbar } from "./ui";
 
 export function SearchPanel({ onClose, onDeleted }: {
   onClose: () => void;
@@ -56,10 +56,9 @@ export function SearchPanel({ onClose, onDeleted }: {
   return (
     <Modal onClose={onClose} full>
       <div className="flex items-center gap-2 border-b border-line px-4 py-3">
-        <input
+        <Input
           autoFocus
-          className="min-h-9 flex-1 rounded-md border border-line
-            bg-panel2 px-3 py-1.5 text-sm outline-none focus:border-indigo-500"
+          className="flex-1"
           placeholder={t("search all scanned mails (subject / sender)…")}
           value={q}
           onChange={(e) => setQ(e.target.value)}
@@ -75,8 +74,7 @@ export function SearchPanel({ onClose, onDeleted }: {
         <MessageView mail={view} onBack={() => setView(null)} />
       ) : (
         <>
-          <div className="flex flex-wrap items-center gap-2 border-b
-            border-line px-4 py-2">
+          <Toolbar>
             <Button variant="ghost" disabled={!mails?.length}
               onClick={() => setSel(sel.size === (mails?.length ?? 0)
                 ? new Set() : new Set((mails ?? []).map(mailKey)))}>
@@ -89,12 +87,12 @@ export function SearchPanel({ onClose, onDeleted }: {
             <span className="text-xs text-muted">
               {mails !== null && `${mails.length} ${t("matches")}`} {note}
             </span>
-          </div>
+          </Toolbar>
           <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-4">
             {mails === null && (
-              <div className="p-6 text-center text-sm text-muted">
+              <EmptyState>
                 {t("Search every scanned mail by subject or sender.")}
-              </div>
+              </EmptyState>
             )}
             {mails && (
               <MailRows mails={mails} sel={sel} onToggle={toggle}

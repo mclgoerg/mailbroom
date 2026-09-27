@@ -3,7 +3,8 @@ import { api, fmtSize, mailKey } from "../api";
 import { t } from "../i18n";
 import type { DupSet, Mail } from "../types";
 import { MessageView } from "./MailList";
-import { Button, Loading, Modal, Tag } from "./ui";
+import { Button, EmptyState, Loading, Modal, PanelHeader, Tag,
+  Toolbar } from "./ui";
 
 /** Duplicate finder: same Message-ID anywhere, or identical
  *  (sender, subject, size). "Keep newest" selects everything else. */
@@ -65,25 +66,19 @@ export function DuplicatesPanel({ onClose, onDeleted }: {
 
   return (
     <Modal onClose={onClose} full>
-      <div className="flex items-center gap-3 border-b border-line px-4 py-3">
-        <div className="min-w-0 flex-1">
-          <div className="font-semibold">📑 {t("Duplicates")}</div>
-          <div className="text-xs text-muted">
-            {sets
-              ? t("dups.summary",
-                  { n: sets.length, size: fmtSize(wastedTotal) })
-              : t("dups.hint")}
-          </div>
-        </div>
-        <Button variant="ghost" onClick={onClose}>✕</Button>
-      </div>
+      <PanelHeader
+        title={<>📑 {t("Duplicates")}</>}
+        sub={sets
+          ? t("dups.summary", { n: sets.length, size: fmtSize(wastedTotal) })
+          : t("dups.hint")}
+        onClose={onClose}
+      />
 
       {view ? (
         <MessageView mail={view} onBack={() => setView(null)} />
       ) : (
         <>
-          <div className="flex flex-wrap items-center gap-2 border-b
-            border-line px-4 py-2">
+          <Toolbar>
             <Button variant="ghost" onClick={selectAllButNewest}
               disabled={!sets?.length}>
               {t("dups.keep_newest")}
@@ -93,12 +88,12 @@ export function DuplicatesPanel({ onClose, onDeleted }: {
               {t("Trash selected")}{sel.size > 0 && ` (${sel.size})`}
             </Button>
             {note && <span className="text-xs text-muted">{note}</span>}
-          </div>
+          </Toolbar>
           <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-4">
             {error && <div className="p-4 text-sm text-rose-400">{error}</div>}
             {!sets && !error && <Loading />}
             {sets && sets.length === 0 && (
-              <div className="p-4 text-sm text-muted">{t("dups.none")}</div>
+              <EmptyState>{t("dups.none")}</EmptyState>
             )}
             {sets?.map((s, si) => (
               <div key={si}

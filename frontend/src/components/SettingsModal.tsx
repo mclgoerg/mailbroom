@@ -2,21 +2,8 @@ import { useEffect, useState } from "react";
 import { api, fmtUsd } from "../api";
 import { getLang, setLang, t, type Lang } from "../i18n";
 import type { Config, FoldersResp } from "../types";
-import { Button, Loading, Modal } from "./ui";
-
-function Field({ label, children }: {
-  label: string; children: React.ReactNode;
-}) {
-  return (
-    <label className="block">
-      <span className="mb-1 block text-xs text-muted">{label}</span>
-      {children}
-    </label>
-  );
-}
-
-const input = `w-full rounded-md border border-line bg-panel2 px-3 py-2
-  text-sm outline-none focus:border-indigo-500`;
+import { Button, Field, Input, Loading, Modal, PanelHeader,
+  SectionLabel, Select, TextArea } from "./ui";
 
 export function SettingsModal({ cfg, onClose, onSaved }: {
   cfg: Config;
@@ -157,21 +144,17 @@ export function SettingsModal({ cfg, onClose, onSaved }: {
 
   return (
     <Modal onClose={onClose}>
-      <div className="flex items-center justify-between border-b border-line
-        px-5 py-3">
-        <h2 className="font-semibold">{t("Settings")}</h2>
-        <Button variant="ghost" onClick={onClose}>✕</Button>
-      </div>
+      <PanelHeader title={<>⚙ {t("Settings")}</>} onClose={onClose} />
       <div className="grid gap-4 p-5 sm:grid-cols-2">
         <Field label={t("Language")}>
-          <select className={input} value={getLang()}
+          <Select className="w-full" value={getLang()}
             onChange={(e) => {
               setLang(e.target.value as Lang);
               window.location.reload();
             }}>
             <option value="en">English</option>
             <option value="de">Deutsch</option>
-          </select>
+          </Select>
         </Field>
         <label className="flex items-center gap-2 text-sm sm:col-span-2">
           <input type="checkbox"
@@ -194,10 +177,10 @@ export function SettingsModal({ cfg, onClose, onSaved }: {
         </label>
         <div className="flex flex-wrap items-end gap-2">
           <Field label={t("Account profile")}>
-            <select className={input} value={cfg.active_profile}
+            <Select className="w-full" value={cfg.active_profile}
               onChange={(e) => switchProfile(e.target.value)}>
               {cfg.profiles.map((p) => <option key={p}>{p}</option>)}
-            </select>
+            </Select>
           </Field>
           <Button variant="ghost" onClick={newProfile}>{t("New")}</Button>
           {cfg.profiles.length > 1 && (
@@ -207,26 +190,27 @@ export function SettingsModal({ cfg, onClose, onSaved }: {
           )}
         </div>
 
-        <div className="sm:col-span-2 text-xs font-semibold uppercase
-          tracking-wide text-muted">{t("IMAP (Proton Mail Bridge)")}</div>
+        <SectionLabel className="sm:col-span-2">
+          {t("IMAP (Proton Mail Bridge)")}
+        </SectionLabel>
         <Field label={t("Host")}>
-          <input className={input} value={f.host} onChange={set("host")} />
+          <Input className="w-full" value={f.host} onChange={set("host")} />
         </Field>
         <div className="grid grid-cols-2 gap-3">
           <Field label={t("IMAP port")}>
-            <input className={input} type="number" value={f.port}
+            <Input className="w-full" type="number" value={f.port}
               onChange={set("port")} />
           </Field>
           <Field label={t("SMTP port (unsubscribe mails)")}>
-            <input className={input} type="number" value={f.smtpPort}
+            <Input className="w-full" type="number" value={f.smtpPort}
               onChange={set("smtpPort")} />
           </Field>
         </div>
         <Field label={t("User")}>
-          <input className={input} value={f.user} onChange={set("user")} />
+          <Input className="w-full" value={f.user} onChange={set("user")} />
         </Field>
         <Field label={t("Password")}>
-          <input className={input} type="password" value={f.password}
+          <Input className="w-full" type="password" value={f.password}
             placeholder={cfg.imap.password_set
               ? t("(unchanged)") : t("required")}
             onChange={set("password")} />
@@ -287,8 +271,7 @@ export function SettingsModal({ cfg, onClose, onSaved }: {
 
         <div className="sm:col-span-2">
           <Field label={`🛡️ ${t("Protected senders")}`}>
-            <textarea
-              className={`${input} min-h-20 font-mono`}
+            <TextArea
               value={protectedText}
               placeholder={"boss@work.example\n@mybank.example"}
               onChange={(e) => setProtectedText(e.target.value)}
@@ -299,8 +282,7 @@ export function SettingsModal({ cfg, onClose, onSaved }: {
 
         <div className="sm:col-span-2">
           <Field label={t("Custom categories")}>
-            <textarea
-              className={`${input} min-h-16 font-mono`}
+            <TextArea className="!min-h-16"
               value={categoriesText}
               placeholder={"insurance: allianz, huk, versicherung\nshipping: dhl, dpd"}
               onChange={(e) => setCategoriesText(e.target.value)}
@@ -309,36 +291,37 @@ export function SettingsModal({ cfg, onClose, onSaved }: {
           <p className="mt-1 text-xs text-muted">{t("categories.help")}</p>
         </div>
 
-        <div className="sm:col-span-2 mt-2 text-xs font-semibold uppercase
-          tracking-wide text-muted">{t("AI review (optional)")}</div>
+        <SectionLabel className="sm:col-span-2 mt-2">
+          {t("AI review (optional)")}
+        </SectionLabel>
         <p className="sm:col-span-2 -mt-2 text-xs text-muted">
           {t("ai.data_note")}
         </p>
         <Field label={t("Provider")}>
-          <select className={input} value={f.provider}
+          <Select className="w-full" value={f.provider}
             onChange={set("provider")}>
             <option value="anthropic">Anthropic API</option>
             <option value="openai">OpenAI</option>
             <option value="foundry">Microsoft Foundry</option>
             <option value="ollama">Ollama / local (OpenAI-compatible)</option>
-          </select>
+          </Select>
         </Field>
         <Field label={t("Model")}>
-          <input className={input} value={f.model} onChange={set("model")} />
+          <Input className="w-full" value={f.model} onChange={set("model")} />
         </Field>
         {(f.provider === "foundry" || f.provider === "ollama") && (
           <div className="sm:col-span-2">
             <Field label={f.provider === "foundry"
               ? "Foundry endpoint (https://…services.ai.azure.com/anthropic)"
               : `${t("endpoint.label")} (http://…:11434)`}>
-              <input className={input} value={f.endpoint}
+              <Input className="w-full" value={f.endpoint}
                 onChange={set("endpoint")} />
             </Field>
           </div>
         )}
         <div className="sm:col-span-2">
           <Field label={t("API key")}>
-            <input className={input} type="password" value={f.apiKey}
+            <Input className="w-full" type="password" value={f.apiKey}
               placeholder={cfg.ai.api_key_set
                 ? t("(unchanged)")
                 : f.provider === "ollama"
@@ -348,17 +331,17 @@ export function SettingsModal({ cfg, onClose, onSaved }: {
           </Field>
         </div>
         <Field label={`$ / 1M in (auto: ${pi})`}>
-          <input className={input} type="number" step="0.01" min="0"
+          <Input className="w-full" type="number" step="0.01" min="0"
             value={f.priceIn} placeholder={`auto: ${pi}`}
             onChange={set("priceIn")} />
         </Field>
         <Field label={`$ / 1M out (auto: ${po})`}>
-          <input className={input} type="number" step="0.01" min="0"
+          <Input className="w-full" type="number" step="0.01" min="0"
             value={f.priceOut} placeholder={`auto: ${po}`}
             onChange={set("priceOut")} />
         </Field>
         <Field label={t("budget.label")}>
-          <input className={input} type="number" step="0.5" min="0"
+          <Input className="w-full" type="number" step="0.5" min="0"
             value={f.budget} placeholder={t("budget.none")}
             onChange={set("budget")} />
         </Field>
