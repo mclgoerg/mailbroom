@@ -71,6 +71,12 @@ paid Proton plan), but it speaks plain IMAP, so other providers work too.
 - **Safe by design** — deletions are IMAP `MOVE` to Trash (reversible),
   UIDVALIDITY checked before every move, read-only scans, UID bookkeeping
   stays server-side, non-root container.
+- **Polish** — installable as a PWA (manifest + icon), optional desktop
+  notifications when background jobs finish, monthly AI budget cap,
+  onboarding wizard on first run, config/verdict backup export+import.
+- **Languages** — English and German. Translations live in
+  `frontend/src/locales/`; to contribute one, copy `de.ts`, translate the
+  values and register the locale in `frontend/src/i18n.ts`.
 - **Stack** — FastAPI backend (SSE live updates), React + TypeScript +
   Tailwind frontend, single container, no external assets at runtime.
 

@@ -99,6 +99,30 @@ export default function App() {
     };
   }, [refresh]);
 
+  /* Web notifications (opt-in via settings): fire when a background job
+     finishes while the tab is hidden. */
+  const prevJobs = useRef<{ d?: string; a?: string; t?: string }>({});
+  useEffect(() => {
+    if (!state) return;
+    const fire = (body: string) => {
+      if (localStorage.getItem("pmc_notify") !== "1") return;
+      if (typeof Notification === "undefined"
+          || Notification.permission !== "granted" || !document.hidden) return;
+      try {
+        new Notification("Proton Mail Cleaner", { body, icon: "/icon.svg" });
+      } catch { /* not supported */ }
+    };
+    const p = prevJobs.current;
+    if (p.d === "running" && state.delete.status === "done")
+      fire(t("notify.delete_done", { n: state.delete.moved }));
+    if (p.a === "running" && state.ai.status === "done")
+      fire(t("notify.ai_done"));
+    if (p.t === "running" && state.atts?.status === "done")
+      fire(t("notify.atts_done"));
+    prevJobs.current = { d: state.delete.status, a: state.ai.status,
+      t: state.atts?.status };
+  }, [state]);
+
   const groups = useMemo(() => {
     const all = Object.values(state?.groups?.[mode] ?? {});
     const f = parseFilter(filter);

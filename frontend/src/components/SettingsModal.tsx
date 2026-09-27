@@ -173,6 +173,25 @@ export function SettingsModal({ cfg, onClose, onSaved }: {
             <option value="de">Deutsch</option>
           </select>
         </Field>
+        <label className="flex items-center gap-2 text-sm sm:col-span-2">
+          <input type="checkbox"
+            defaultChecked={localStorage.getItem("pmc_notify") === "1"}
+            onChange={async (e) => {
+              if (!e.target.checked) {
+                localStorage.setItem("pmc_notify", "0");
+                return;
+              }
+              const perm = typeof Notification !== "undefined"
+                ? await Notification.requestPermission() : "denied";
+              if (perm === "granted") {
+                localStorage.setItem("pmc_notify", "1");
+              } else {
+                e.target.checked = false;
+                setMsg(t("notify.denied"));
+              }
+            }} />
+          {t("notify.toggle")}
+        </label>
         <div className="flex flex-wrap items-end gap-2">
           <Field label={t("Account profile")}>
             <select className={input} value={cfg.active_profile}
