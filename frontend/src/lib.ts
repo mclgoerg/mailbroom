@@ -15,6 +15,27 @@ export const mailKey = (m: { folder: string; uid: number }): string =>
 export const olderThan = (m: { ts: number }, months: number): boolean =>
   m.ts > 0 && m.ts < Date.now() / 1000 - months * 30.44 * 86400;
 
+/* Proton Sieve snippet for a sender/domain, pasteable into
+ * Settings → Filters → Add sieve filter. Pure template, no server state. */
+export type SieveAction = "discard" | "fileinto" | "markread";
+
+const sieveQ = (s: string): string =>
+  s.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+
+export function sieveSnippet(kind: "sender" | "domain", value: string,
+  action: SieveAction, folder = "Archive"): string {
+  const requires = action === "fileinto" ? 'require ["fileinto"];\n'
+    : action === "markread" ? 'require ["imap4flags"];\n' : "";
+  const test = kind === "domain"
+    ? `address :domain "from" "${sieveQ(value)}"`
+    : `address :is "from" "${sieveQ(value)}"`;
+  const body = action === "discard" ? "    discard;\n    stop;"
+    : action === "fileinto" ? `    fileinto "${sieveQ(folder)}";`
+    : '    addflag "\\\\Seen";';
+  return `${requires}# proton-mail-cleaner: ${value}\n`
+    + `if ${test} {\n${body}\n}`;
+}
+
 /* --------------------------- combined filters ---------------------------
  * Query syntax, whitespace-separated and combinable:
  *   tag:shipping        group has this tag (prefix match)

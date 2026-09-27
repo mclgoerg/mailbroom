@@ -58,6 +58,9 @@ paid Proton plan), but it speaks plain IMAP, so other providers work too.
   them with `is:protected`.
 - **One-click unsubscribe** — RFC 8058 one-click POST or unsubscribe mail
   via Bridge SMTP, straight from a group's detail view.
+- **Sieve export** — generate a Proton Sieve filter for a sender or
+  domain (move to folder / delete on arrival / mark read) with a copy
+  button, so future mail never clutters the mailbox again.
 - **Undo** — restore the last deletions from Trash (matched by Message-ID).
 - **Bulk workflows** — background deletion queue with live progress and
   cancel, "select inactive since…" presets, global mail search, CSV export,

@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { api } from "../api";
 import { t } from "../i18n";
-import { fmtSize, fmtUsd, mailKey, olderThan } from "../lib";
+import { fmtSize, fmtUsd, mailKey, olderThan, sieveSnippet,
+  type SieveAction } from "../lib";
 import type { AppState, Group, Grouping, Mail } from "../types";
 import { MailRows, MessageView } from "./MailList";
 import { Button, ensureAiAck, Modal, ProtectButton, Spinner } from "./ui";
@@ -26,6 +27,9 @@ export function DetailPanel({ grouping, group, aiEnabled, protectedNow,
   const [sortBy, setSortBy] = useState<"date" | "size">("date");
   const [moveDest, setMoveDest] = useState("");
   const [vFilter, setVFilter] = useState("all");
+  const [sieveOpen, setSieveOpen] = useState(false);
+  const [sieveAction, setSieveAction] = useState<SieveAction>("fileinto");
+  const [sieveFolder, setSieveFolder] = useState("Archive");
   const cancelAi = useRef(false);
 
   useEffect(() => {
@@ -249,6 +253,11 @@ export function DetailPanel({ grouping, group, aiEnabled, protectedNow,
                 {t("Unsubscribe")}
               </Button>
             )}
+            {grouping !== "subject" && (
+              <Button variant="ghost" onClick={() => setSieveOpen(!sieveOpen)}>
+                {t("sieve.button")}
+              </Button>
+            )}
             {moveDest === "?" ? (
               <select className={sel9} value=""
                 onChange={(e) => { setMoveDest(""); act("move", e.target.value); }}>
@@ -271,6 +280,40 @@ export function DetailPanel({ grouping, group, aiEnabled, protectedNow,
             </Button>
             {note && (
               <div className="w-full text-xs text-muted">{note}</div>
+            )}
+            {sieveOpen && grouping !== "subject" && (
+              <div className="w-full rounded-md border border-line
+                bg-panel2 p-3">
+                <div className="mb-2 flex flex-wrap items-center gap-2">
+                  <span className="text-xs text-muted">{t("sieve.intro")}</span>
+                  <select className={sel9} value={sieveAction}
+                    onChange={(e) =>
+                      setSieveAction(e.target.value as SieveAction)}>
+                    <option value="fileinto">{t("sieve.fileinto")}</option>
+                    <option value="discard">{t("sieve.discard")}</option>
+                    <option value="markread">{t("sieve.markread")}</option>
+                  </select>
+                  {sieveAction === "fileinto" && (
+                    <input className={`${sel9} w-40`} value={sieveFolder}
+                      placeholder="Archive"
+                      onChange={(e) => setSieveFolder(e.target.value)} />
+                  )}
+                  <Button variant="ghost" onClick={() => {
+                    navigator.clipboard?.writeText(sieveSnippet(
+                      grouping, group.key, sieveAction, sieveFolder));
+                    setNote(t("sieve.copied"));
+                  }}>{t("Copy")}</Button>
+                  <a className="text-xs text-accent underline"
+                    href="https://account.proton.me/mail/filters"
+                    target="_blank" rel="noopener">
+                    {t("sieve.open_proton")}
+                  </a>
+                </div>
+                <pre className="overflow-x-auto rounded bg-surface p-2
+                  text-xs leading-relaxed">
+                  {sieveSnippet(grouping, group.key, sieveAction, sieveFolder)}
+                </pre>
+              </div>
             )}
           </div>
           <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-4">

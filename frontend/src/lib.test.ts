@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { fmtSize, fmtUsd, mailKey, matchGroup, olderThan, parseFilter } from "./lib";
+import { fmtSize, fmtUsd, mailKey, matchGroup, olderThan, parseFilter,
+  sieveSnippet } from "./lib";
 import type { Group } from "./types";
 
 const g = (over: Partial<Group> = {}): Group => ({
@@ -61,6 +62,28 @@ describe("parseFilter", () => {
     expect(parseFilter("att:>500k").attMin).toBe(500 * 1024);
     expect(parseFilter("att:5").attMin).toBe(5);
     expect(parseFilter("att:bogus").attMin).toBeNull();
+  });
+});
+
+describe("sieveSnippet", () => {
+  it("fileinto for a sender", () => {
+    const s = sieveSnippet("sender", "news@shop.example", "fileinto", "Ads");
+    expect(s).toContain('require ["fileinto"];');
+    expect(s).toContain('if address :is "from" "news@shop.example" {');
+    expect(s).toContain('fileinto "Ads";');
+  });
+  it("discard for a domain, no require", () => {
+    const s = sieveSnippet("domain", "shop.example", "discard");
+    expect(s).not.toContain("require");
+    expect(s).toContain('address :domain "from" "shop.example"');
+    expect(s).toContain("discard;");
+    expect(s).toContain("stop;");
+  });
+  it("markread requires imap4flags and escapes quotes", () => {
+    const s = sieveSnippet("sender", 'a"b@x.example', "markread");
+    expect(s).toContain('require ["imap4flags"];');
+    expect(s).toContain('addflag "\\\\Seen";');
+    expect(s).toContain('"a\\"b@x.example"');
   });
 });
 

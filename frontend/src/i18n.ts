@@ -143,6 +143,14 @@ const EN: Record<string, string> = {
     "{trash} trashed ({size}) · {archive} archived · {move} moved · "
     + "{read} marked read",
   "stats.scans": "Recent scans",
+  "sieve.button": "Sieve filter",
+  "sieve.intro": "Auto-handle future mail from this sender in Proton:",
+  "sieve.fileinto": "Move to folder",
+  "sieve.discard": "Delete on arrival",
+  "sieve.markread": "Mark as read",
+  "sieve.copied": "Sieve filter copied — paste it in Proton's filter settings.",
+  "sieve.open_proton": "Proton filter settings ↗",
+  "Copy": "Copy",
 };
 
 const DE: Record<string, string> = {
@@ -406,6 +414,16 @@ const DE: Record<string, string> = {
     "{trash} gelöscht ({size}) · {archive} archiviert · {move} verschoben "
     + "· {read} gelesen markiert",
   "stats.scans": "Letzte Scans",
+  "sieve.button": "Sieve-Filter",
+  "sieve.intro":
+    "Künftige Mails dieses Absenders automatisch in Proton behandeln:",
+  "sieve.fileinto": "In Ordner verschieben",
+  "sieve.discard": "Bei Empfang löschen",
+  "sieve.markread": "Als gelesen markieren",
+  "sieve.copied":
+    "Sieve-Filter kopiert — in Protons Filter-Einstellungen einfügen.",
+  "sieve.open_proton": "Proton-Filtereinstellungen ↗",
+  "Copy": "Kopieren",
 };
 
 let lang: Lang =
