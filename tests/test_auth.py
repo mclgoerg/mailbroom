@@ -1,0 +1,128 @@
+"""Native login: password mode, OIDC mode, sessions, and the default
+(mode none) staying completely open for reverse-proxy setups."""
+
+import time
+
+from fastapi.testclient import TestClient
+
+from backend import auth as authmod
+from backend import config as cfgmod
+from backend.main import app
+
+client = TestClient(app)
+
+
+def test_mode_none_is_open_by_default():
+    assert client.get("/api/state").status_code == 200
+    probe = client.get("/api/auth").json()
+    assert probe == {"mode": "none", "authed": True}
+
+
+def test_password_hashing_roundtrip():
+    h = authmod.hash_password("hunter2")
+    assert h.startswith("scrypt$") and "hunter2" not in h
+    assert authmod.verify_password("hunter2", h)
+    assert not authmod.verify_password("HUNTER2", h)
+    assert not authmod.verify_password("hunter2", "garbage")
+
+
+def test_sessions_expire_and_reject_tampering():
+    tok = authmod.make_session("me@x")
+    assert authmod.verify_session(tok) == "me@x"
+    assert authmod.verify_session(tok + "x") is None
+    old = authmod.make_session("me@x", now=time.time()
+                               - authmod.SESSION_MAX_AGE - 10)
+    assert authmod.verify_session(old) is None
+
+
+def test_password_mode_locks_the_api():
+    # enabling password mode without a password is refused
+    r = client.post("/api/config", json={"auth": {"mode": "password"}})
+    assert r.status_code == 400
+    r = client.post("/api/config", json={
+        "auth": {"mode": "password", "password": "s3cret"}})
+    assert r.status_code == 200
+    masked = r.json()["auth"]
+    assert masked["mode"] == "password" and masked["password_set"]
+    assert "password_hash" not in masked
+
+    c = TestClient(app)                       # fresh cookies
+    assert c.get("/api/state").status_code == 401
+    # login screen probes stay public
+    assert c.get("/api/auth").json() == {"mode": "password", "authed": False}
+    # SPA bundle stays public (it renders the login screen)
+    assert c.get("/").status_code == 200
+
+    assert c.post("/api/login", json={"password": "wrong"}).status_code == 401
+    r = c.post("/api/login", json={"password": "s3cret"})
+    assert r.status_code == 200 and "pmc_session" in r.cookies
+    assert c.get("/api/state").status_code == 200
+    assert c.get("/api/auth").json()["authed"] is True
+
+    c.post("/api/logout")
+    assert c.get("/api/state").status_code == 401
+
+
+def test_oidc_mode_flow(monkeypatch):
+    r = client.post("/api/config", json={"auth": {"mode": "oidc"}})
+    assert r.status_code == 400               # issuer/client missing
+    r = client.post("/api/config", json={"auth": {
+        "mode": "oidc",
+        "oidc": {"issuer": "https://idp.example", "client_id": "mailbroom",
+                 "client_secret": "sst", "allowed": ["Me@Corp.example"]}}})
+    assert r.status_code == 200
+    masked = r.json()["auth"]["oidc"]
+    assert masked["client_secret_set"] and "client_secret" not in masked
+    assert masked["allowed"] == ["me@corp.example"]
+
+    monkeypatch.setattr(authmod, "discovery", lambda issuer: {
+        "authorization_endpoint": "https://idp.example/authorize",
+        "token_endpoint": "https://idp.example/token",
+        "userinfo_endpoint": "https://idp.example/userinfo"})
+
+    c = TestClient(app)
+    assert c.get("/api/state").status_code == 401
+    r = c.get("/api/oidc/login", follow_redirects=False)
+    assert r.status_code == 307 or r.status_code == 302
+    loc = r.headers["location"]
+    assert loc.startswith("https://idp.example/authorize?")
+    assert "client_id=mailbroom" in loc and "state=" in loc
+    state = loc.split("state=")[1].split("&")[0]
+
+    # tampered/expired state is rejected
+    assert c.get("/api/oidc/callback?code=abc&state=bad").status_code == 400
+
+    # a user NOT on the allow-list is rejected
+    monkeypatch.setattr(authmod, "exchange_code",
+                        lambda cfg, redirect, code:
+                        {"email": "evil@other.example", "sub": "e1"})
+    import urllib.parse
+    q = urllib.parse.quote(state)
+    assert c.get(f"/api/oidc/callback?code=abc&state={q}").status_code == 403
+
+    # allowed user gets a session and lands on /
+    monkeypatch.setattr(authmod, "exchange_code",
+                        lambda cfg, redirect, code:
+                        {"email": "me@corp.example", "sub": "u1"})
+    r = c.get(f"/api/oidc/callback?code=abc&state={q}",
+              follow_redirects=False)
+    assert r.status_code in (302, 307) and r.headers["location"] == "/"
+    assert "pmc_session" in r.cookies
+    assert c.get("/api/state").status_code == 200
+
+
+def test_allowed_subject_rules():
+    assert authmod.allowed_subject({"email": "A@B.c"}, []) == "a@b.c"
+    assert authmod.allowed_subject({"sub": "u1"}, []) == "u1"
+    assert authmod.allowed_subject({}, []) is None
+    assert authmod.allowed_subject({"email": "a@b.c"}, ["x@y.z"]) is None
+    assert authmod.allowed_subject({"email": "a@b.c", "sub": "u1"},
+                                   ["u1"]) == "a@b.c"
+
+
+def test_auth_secrets_never_exported():
+    cfgmod.update_config({"auth": {"mode": "password", "password": "pw",
+                                   "oidc": {"client_secret": "sst"}}})
+    text = client.get("/api/export_config").text
+    assert "password_hash" not in text and "scrypt" not in text
+    assert "sst" not in text

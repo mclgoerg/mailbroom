@@ -1,6 +1,7 @@
 import type {
-  AiGroupResult, AppState, AttMail, Config, DupSet, FoldersResp, Grouping,
-  Mail, MessageDetail, Rule, RuleRun, StatsResp, TrashResp, UnsubResult,
+  AiGroupResult, AppState, AttMail, AuthProbe, Config, DupSet, FoldersResp,
+  Grouping, Mail, MessageDetail, Rule, RuleRun, StatsResp, TrashResp,
+  UnsubResult,
 } from "./types";
 
 /* Active account: every API call is scoped to exactly one account (strict
@@ -92,6 +93,10 @@ export const api = {
     req<{ restored: number }>("/api/trash/restore", { uids, dest, uv }),
   testConnection: () =>
     req<{ ok: boolean; folders: number }>("/api/test_connection", {}),
+  authProbe: () => req<AuthProbe>("/api/auth"),
+  login: (password: string) =>
+    req<{ ok: boolean }>("/api/login", { password }),
+  logout: () => req<{ ok: boolean }>("/api/logout", {}),
 };
 
 export { fmtSize, fmtUsd, mailKey } from "./lib";

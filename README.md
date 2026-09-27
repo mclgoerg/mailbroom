@@ -139,12 +139,17 @@ in the UI; they persist in `/data`. Env bootstrap for other providers:
 `IMAP_SECURITY=ssl|starttls`, `SMTP_HOST`, `SMTP_SECURITY=auto|ssl|starttls`
 (and leave `IMAP_CAFILE` empty unless you need a custom CA).
 
-> **The app has no authentication.** Anyone who can reach the port can read
-> your mail metadata and reconfigure the IMAP host / AI endpoint (i.e.
-> exfiltrate the stored credentials). Never publish the port beyond
-> localhost (`-p 127.0.0.1:8765:8765`, as above) and put it behind a
-> reverse proxy with an auth middleware (Traefik + tinyauth/Authelia, …)
-> for remote access. Remember that Docker published ports bypass ufw.
+> **Authentication is off by default.** Anyone who can reach the port can
+> read your mail metadata and reconfigure the IMAP host / AI endpoint
+> (i.e. exfiltrate the stored credentials). Either keep the port on
+> localhost behind a reverse proxy with an auth middleware (Traefik +
+> tinyauth/Authelia, …), or enable the built-in login in Settings →
+> Login: a **password** (scrypt-hashed, session cookie), or **SSO via
+> any OpenID Connect provider** (Pocket ID, Authentik, Keycloak, …—
+> register the app there with callback URL
+> `https://your-host/api/oidc/callback`, then enter issuer, client ID
+> and secret; an optional allow-list restricts which IdP accounts get
+> in). Remember that Docker published ports bypass ufw.
 
 ## Development
 
@@ -157,6 +162,17 @@ cd frontend && npm install && npm run dev
 # tests — no Bridge or network needed (fake in-memory IMAP server)
 python -m pytest tests/ -q
 ```
+
+## AI disclosure
+
+Mailbroom was built with heavy AI assistance (Anthropic's Claude via
+Claude Code): most of the code, tests and documentation were
+AI-generated, directed and reviewed by the maintainer, and every feature
+was verified against real mailboxes before release. Independent of how
+the code was written, the safety properties are enforced by tests:
+deletions are reversible moves, UIDVALIDITY is checked before every
+action, and the optional AI review only ever receives mail metadata —
+never message bodies.
 
 ## License
 

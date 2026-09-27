@@ -30,6 +30,30 @@ export const EN: Record<string, string> = {
     + "running; mails on the server are untouched.",
   "account.switch_tip": "Switch account — every view is per account",
   "scan.age": "scanned {ago} ago",
+  "login.section": "Login (optional)",
+  "login.help":
+    "Protects the API with a login. \"None\" trusts your network or a "
+    + "reverse-proxy auth layer (as before). Password = one shared "
+    + "password. SSO/OIDC = sign in via an OpenID Connect provider "
+    + "(Pocket ID, Authentik, Keycloak, …); register this app there "
+    + "with the callback URL <origin>/api/oidc/callback first.",
+  "login.mode": "Login method",
+  "login.mode_none": "None (reverse proxy / trusted network)",
+  "login.mode_password": "Password",
+  "login.mode_oidc": "SSO (OpenID Connect)",
+  "login.password_label": "Login password",
+  "login.oidc_issuer": "Issuer URL",
+  "login.oidc_client": "Client ID",
+  "login.oidc_secret": "Client secret",
+  "login.oidc_redirect": "Redirect base URL (optional)",
+  "login.oidc_redirect_ph": "auto: from the request headers",
+  "login.oidc_allowed": "Allowed users (one email or subject per line)",
+  "login.oidc_allowed_help":
+    "Empty list = every account your identity provider signs in may use "
+    + "the app. With entries, only those emails/subjects get in.",
+  "login.submit": "Sign in",
+  "login.sso": "Sign in with SSO",
+  "login.logout": "Logout",
   "account.rename": "Rename…",
   "account.rename_prompt": 'New name for account "{name}":',
   "account.renamed": 'Account renamed to "{name}".',

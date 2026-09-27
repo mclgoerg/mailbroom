@@ -57,6 +57,15 @@ DEFAULT_CONFIG = {
     # category replaces its keyword list (empty list disables it); other
     # names become new categories. Applied at scan time.
     "categories": {},
+    # Native login. "none" (default) trusts the network / reverse proxy;
+    # "password" = single shared password (scrypt hash); "oidc" = any
+    # OpenID Connect provider (empty "allowed" admits every IdP user).
+    "auth": {
+        "mode": "none",
+        "password_hash": "",
+        "oidc": {"issuer": "", "client_id": "", "client_secret": "",
+                 "redirect_base": "", "allowed": []},
+    },
     "ai": {
         # anthropic | foundry | openai | ollama (any OpenAI-compatible
         # endpoint works via "ollama" + base URL, e.g. LM Studio, vLLM).
@@ -196,6 +205,12 @@ def load_config() -> dict:
             cfg["protected"] = normalize_protected(saved["protected"])
         if isinstance(saved.get("categories"), dict):
             cfg["categories"] = saved["categories"]
+        auth_saved = saved.get("auth")
+        if isinstance(auth_saved, dict):
+            cfg["auth"].update({k: v for k, v in auth_saved.items()
+                                if k != "oidc"})
+            if isinstance(auth_saved.get("oidc"), dict):
+                cfg["auth"]["oidc"].update(auth_saved["oidc"])
     except (OSError, json.JSONDecodeError):
         pass
     return cfg
@@ -310,6 +325,34 @@ def update_config(body: dict) -> dict:
                                          for p in v if str(p).strip()]
                 for k, v in body["categories"].items()
                 if str(k).strip() and isinstance(v, list)}
+        auth_in = body.get("auth") or {}
+        if auth_in:
+            from . import auth as authmod
+            acfg = cfg["auth"]
+            if auth_in.get("password"):
+                acfg["password_hash"] = authmod.hash_password(
+                    str(auth_in["password"]))
+            oidc_in = auth_in.get("oidc") or {}
+            for key in ("issuer", "client_id", "redirect_base"):
+                if key in oidc_in:
+                    acfg["oidc"][key] = str(oidc_in[key]).strip().rstrip("/")
+            if oidc_in.get("client_secret"):
+                acfg["oidc"]["client_secret"] = str(oidc_in["client_secret"])
+            if isinstance(oidc_in.get("allowed"), list):
+                acfg["oidc"]["allowed"] = [
+                    str(a).strip().lower() for a in oidc_in["allowed"]
+                    if str(a).strip()]
+            mode = auth_in.get("mode")
+            if mode in authmod.AUTH_MODES:
+                if mode == "password" and not acfg["password_hash"]:
+                    raise ValueError("set a password before enabling "
+                                     "password login")
+                if mode == "oidc" and not (acfg["oidc"]["issuer"]
+                                           and acfg["oidc"]["client_id"]
+                                           and acfg["oidc"]["client_secret"]):
+                    raise ValueError("OIDC needs issuer, client ID and "
+                                     "client secret")
+                acfg["mode"] = mode
         ai_in = body.get("ai") or {}
         if ai_in.get("provider") in AI_PROVIDERS:
             cfg["ai"]["provider"] = ai_in["provider"]
@@ -336,6 +379,16 @@ def masked_config(cfg: dict) -> dict:
         "default_account": next(iter(cfg["accounts"])),
         "protected": normalize_protected(cfg.get("protected")),
         "categories": cfg.get("categories") or {},
+        "auth": {
+            "mode": cfg["auth"]["mode"],
+            "password_set": bool(cfg["auth"]["password_hash"]),
+            "oidc": {"issuer": cfg["auth"]["oidc"]["issuer"],
+                     "client_id": cfg["auth"]["oidc"]["client_id"],
+                     "client_secret_set":
+                         bool(cfg["auth"]["oidc"]["client_secret"]),
+                     "redirect_base": cfg["auth"]["oidc"]["redirect_base"],
+                     "allowed": cfg["auth"]["oidc"]["allowed"]},
+        },
         "ai": {"provider": cfg["ai"]["provider"],
                "model": cfg["ai"]["model"],
                "foundry_endpoint": cfg["ai"]["foundry_endpoint"],

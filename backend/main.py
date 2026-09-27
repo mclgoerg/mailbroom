@@ -20,6 +20,7 @@ from pydantic import BaseModel, Field
 
 from . import accounts as accountsmod
 from . import aihelper
+from . import auth as authmod
 from . import config as cfgmod
 from . import mailops
 from . import rules as rulesmod
@@ -55,25 +56,154 @@ STATIC_DIR = Path(__file__).resolve().parent.parent / "static"
 # cookie) or send `Authorization: Bearer <value>` on API calls.
 AUTH_TOKEN = os.environ.get("AUTH_TOKEN", "")
 _AUTH_COOKIE = "pmc_token"
+SESSION_COOKIE = "pmc_session"
+
+# Reachable without a session: the login endpoints themselves plus the
+# auth-mode probe the login screen needs.
+_PUBLIC_API = {"/api/auth", "/api/login", "/api/logout",
+               "/api/oidc/login", "/api/oidc/callback"}
+
+
+def _token_ok(request: Request) -> bool:
+    if not AUTH_TOKEN:
+        return False
+    header = request.headers.get("authorization", "")
+    bearer = header.removeprefix("Bearer ").strip()
+    supplied = request.cookies.get(_AUTH_COOKIE, "") or bearer
+    return bool(supplied and secrets.compare_digest(supplied, AUTH_TOKEN))
+
+
+def _session_ok(request: Request) -> bool:
+    return authmod.verify_session(
+        request.cookies.get(SESSION_COOKIE, "")) is not None
 
 
 @app.middleware("http")
 async def _auth(request: Request, call_next):
-    if not AUTH_TOKEN:
+    # Legacy shared token: valid token always passes; /?token= sets it.
+    if AUTH_TOKEN:
+        query_token = request.query_params.get("token", "")
+        if query_token and secrets.compare_digest(query_token, AUTH_TOKEN):
+            resp = RedirectResponse(request.url.path or "/")
+            resp.set_cookie(_AUTH_COOKIE, AUTH_TOKEN, httponly=True,
+                            samesite="strict", max_age=30 * 86400)
+            return resp
+        if _token_ok(request):
+            return await call_next(request)
+
+    mode = cfgmod.load_config()["auth"]["mode"]
+    if mode == "none":
+        if AUTH_TOKEN:      # token configured but absent/wrong: old behavior
+            return JSONResponse(
+                {"detail": "unauthorized — open /?token=<AUTH_TOKEN> "
+                 "or send a Bearer token"}, status_code=401)
         return await call_next(request)
-    query_token = request.query_params.get("token", "")
-    if query_token and secrets.compare_digest(query_token, AUTH_TOKEN):
-        resp = RedirectResponse(request.url.path or "/")
-        resp.set_cookie(_AUTH_COOKIE, AUTH_TOKEN, httponly=True,
-                        samesite="strict", max_age=30 * 86400)
-        return resp
-    header = request.headers.get("authorization", "")
-    bearer = header.removeprefix("Bearer ").strip()
-    supplied = request.cookies.get(_AUTH_COOKIE, "") or bearer
-    if supplied and secrets.compare_digest(supplied, AUTH_TOKEN):
+
+    # Native login active: the SPA bundle and login endpoints stay public,
+    # everything under /api/ needs a session.
+    path = request.url.path
+    if not path.startswith("/api/") or path in _PUBLIC_API:
         return await call_next(request)
-    return JSONResponse({"detail": "unauthorized — open /?token=<AUTH_TOKEN> "
-                         "or send a Bearer token"}, status_code=401)
+    if _session_ok(request):
+        return await call_next(request)
+    return JSONResponse({"detail": "login required"}, status_code=401)
+
+
+def _external_base(request: Request) -> str:
+    """Origin as the BROWSER sees it (honours the reverse proxy)."""
+    cfg_base = cfgmod.load_config()["auth"]["oidc"].get("redirect_base")
+    if cfg_base:
+        return cfg_base.rstrip("/")
+    proto = request.headers.get("x-forwarded-proto", request.url.scheme)
+    host = request.headers.get("x-forwarded-host",
+                               request.headers.get("host", ""))
+    return f"{proto}://{host}"
+
+
+def _set_session(resp, request: Request, sub: str):
+    secure = _external_base(request).startswith("https://")
+    resp.set_cookie(SESSION_COOKIE, authmod.make_session(sub),
+                    httponly=True, samesite="lax", secure=secure,
+                    max_age=authmod.SESSION_MAX_AGE)
+
+
+class LoginBody(BaseModel):
+    password: str
+
+
+@app.get("/api/auth")
+def get_auth(request: Request):
+    """Public probe for the login screen."""
+    cfg = cfgmod.load_config()
+    return {"mode": cfg["auth"]["mode"],
+            "authed": cfg["auth"]["mode"] == "none"
+            or _session_ok(request) or _token_ok(request)}
+
+
+@app.post("/api/login")
+async def post_login(body: LoginBody, request: Request):
+    cfg = cfgmod.load_config()
+    if cfg["auth"]["mode"] != "password":
+        raise HTTPException(400, "password login is not enabled")
+    if not authmod.verify_password(body.password,
+                                   cfg["auth"]["password_hash"]):
+        logging.getLogger("pmc.auth").warning(
+            "failed login from %s", request.client.host
+            if request.client else "?")
+        await asyncio.sleep(0.5)          # soften brute force
+        raise HTTPException(401, "wrong password")
+    resp = JSONResponse({"ok": True})
+    _set_session(resp, request, "password")
+    logging.getLogger("pmc.auth").info("password login ok")
+    return resp
+
+
+@app.post("/api/logout")
+def post_logout():
+    resp = JSONResponse({"ok": True})
+    resp.delete_cookie(SESSION_COOKIE)
+    return resp
+
+
+@app.get("/api/oidc/login")
+def get_oidc_login(request: Request):
+    cfg = cfgmod.load_config()
+    if cfg["auth"]["mode"] != "oidc":
+        raise HTTPException(400, "OIDC login is not enabled")
+    redirect = _external_base(request) + "/api/oidc/callback"
+    try:
+        url = authmod.auth_url(cfg["auth"]["oidc"], redirect,
+                               authmod.make_state())
+    except Exception as exc:
+        raise HTTPException(502, f"IdP discovery failed: {exc}")
+    return RedirectResponse(url)
+
+
+@app.get("/api/oidc/callback")
+def get_oidc_callback(request: Request, code: str = Query(""),
+                      state: str = Query("")):
+    cfg = cfgmod.load_config()
+    if cfg["auth"]["mode"] != "oidc":
+        raise HTTPException(400, "OIDC login is not enabled")
+    if not code or not authmod.verify_state(state):
+        raise HTTPException(400, "invalid or expired login state — "
+                            "try signing in again")
+    redirect = _external_base(request) + "/api/oidc/callback"
+    try:
+        claims = authmod.exchange_code(cfg["auth"]["oidc"], redirect, code)
+    except Exception as exc:
+        raise HTTPException(502, f"token exchange failed: {exc}")
+    sub = authmod.allowed_subject(claims,
+                                  cfg["auth"]["oidc"].get("allowed") or [])
+    if not sub:
+        logging.getLogger("pmc.auth").warning(
+            "OIDC login rejected for %r (not in allow-list)",
+            claims.get("email") or claims.get("sub"))
+        raise HTTPException(403, "this account is not allowed to sign in")
+    resp = RedirectResponse("/")
+    _set_session(resp, request, sub)
+    logging.getLogger("pmc.auth").info("OIDC login ok: %s", sub)
+    return resp
 
 
 class GroupingBody(BaseModel):

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api, setAccount as apiSetAccount, withAccount } from "./api";
 import { DetailPanel } from "./components/DetailPanel";
+import { Login } from "./components/Login";
 import { AttachmentsPanel } from "./components/AttachmentsPanel";
 import { DuplicatesPanel } from "./components/DuplicatesPanel";
 import { GroupTable, type SortKey } from "./components/GroupTable";
@@ -14,7 +15,8 @@ import { applyTheme, Button, currentTheme, ensureAiAck, Input, Select,
 import { t } from "./i18n";
 import { applyStatus, fmtAgo, fmtSize, fmtUsd, matchGroup, parseFilter }
   from "./lib";
-import type { AppState, Config, Group, Grouping, StatusMsg } from "./types";
+import type { AppState, AuthProbe, Config, Group, Grouping, StatusMsg }
+  from "./types";
 
 const GROUPING_LABEL: Record<Grouping, string> = {
   sender: "Sender", domain: "Domain", subject: "Subject",
@@ -40,6 +42,8 @@ const actionVerb = (a: string): string =>
 export default function App() {
   const [state, setState] = useState<AppState | null>(null);
   const [cfg, setCfg] = useState<Config | null>(null);
+  // null = probing; the app only talks to the API once authed.
+  const [auth, setAuth] = useState<AuthProbe | null>(null);
   // Active account: every view shows EXACTLY one account, never a mix.
   const [account, setAccountState] = useState(
     () => localStorage.getItem("pmc_account") || "");
@@ -112,6 +116,14 @@ export default function App() {
   };
 
   useEffect(() => {
+    api.authProbe()
+      .then(setAuth)
+      .catch(() => setAuth({ mode: "none", authed: true }));
+  }, []);
+  const authOk = !!auth && (auth.mode === "none" || auth.authed);
+
+  useEffect(() => {
+    if (!authOk) return;
     apiSetAccount(account);
     api.getConfig().then(setCfg).catch(() => {});
     // Prefer server-sent events; fall back to polling if they fail.
@@ -144,7 +156,8 @@ export default function App() {
       sse.current?.close();
       sse.current = null;
     };
-  }, [refresh, account]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [refresh, account, authOk]);
 
   /* Web notifications (opt-in via settings): fire when a background job
      finishes while the tab is hidden. */
@@ -402,6 +415,16 @@ export default function App() {
     return parts.join(" — ") || t("No scan yet — hit “Scan”.");
   };
 
+  if (!auth) {
+    return (
+      <div className="flex justify-center pt-24"><Spinner size="lg" /></div>
+    );
+  }
+  if (!authOk) {
+    return <Login mode={auth.mode}
+      onLogin={() => setAuth({ ...auth, authed: true })} />;
+  }
+
   return (
     <div className="mx-auto max-w-6xl p-3 sm:p-5">
       <header className="mb-4 flex items-center gap-3">
@@ -412,6 +435,16 @@ export default function App() {
           title={t("Theme")} onClick={toggleTheme}>
           {theme === "dark" ? "☀" : "🌙"}
         </button>
+        {auth.mode !== "none" && (
+          <button className="text-xs text-muted underline-offset-2
+            hover:underline"
+            onClick={async () => {
+              try { await api.logout(); } catch { /* session gone anyway */ }
+              window.location.reload();
+            }}>
+            {t("login.logout")}
+          </button>
+        )}
         {/* Account switcher — only when more than one account exists.
             Switching swaps the entire view; nothing mixes across accounts. */}
         {cfg && Object.keys(cfg.accounts).length > 1 && (

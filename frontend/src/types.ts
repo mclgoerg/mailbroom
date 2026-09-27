@@ -210,9 +210,29 @@ export interface ImapAccount {
   preset: Preset;
 }
 
+export type AuthMode = "none" | "password" | "oidc";
+
+export interface AuthProbe {
+  mode: AuthMode;
+  authed: boolean;
+}
+
+export interface AuthCfg {
+  mode: AuthMode;
+  password_set: boolean;
+  oidc: {
+    issuer: string;
+    client_id: string;
+    client_secret_set: boolean;
+    redirect_base: string;
+    allowed: string[];
+  };
+}
+
 export interface Config {
   accounts: Record<string, ImapAccount>;
   default_account: string;
+  auth: AuthCfg;
   protected: string[];
   categories: Record<string, string[]>;
   ai: {

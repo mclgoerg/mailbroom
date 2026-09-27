@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
 import { api, fmtUsd } from "../api";
 import { getLang, setLang, t, type Lang } from "../i18n";
-import type { Config, FoldersResp, Preset, Security, SmtpSecurity }
-  from "../types";
+import type { AuthMode, Config, FoldersResp, Preset, Security,
+  SmtpSecurity } from "../types";
 import { Button, Field, Input, Loading, Modal, PanelHeader,
   SectionLabel, Select, TextArea } from "./ui";
 
@@ -83,6 +83,13 @@ export function SettingsModal({ cfg, account, onClose, onSaved,
     priceIn: cfg.ai.price_in ? String(cfg.ai.price_in) : "",
     priceOut: cfg.ai.price_out ? String(cfg.ai.price_out) : "",
     budget: cfg.ai.budget_usd ? String(cfg.ai.budget_usd) : "",
+    authMode: cfg.auth.mode as AuthMode,
+    authPassword: "",
+    oidcIssuer: cfg.auth.oidc.issuer,
+    oidcClientId: cfg.auth.oidc.client_id,
+    oidcSecret: "",
+    oidcRedirect: cfg.auth.oidc.redirect_base,
+    oidcAllowed: (cfg.auth.oidc.allowed ?? []).join("\n"),
   });
   const [protectedText, setProtectedText] =
     useState((cfg.protected ?? []).join("\n"));
@@ -172,11 +179,19 @@ export function SettingsModal({ cfg, account, onClose, onSaved,
           price_in: +f.priceIn || 0, price_out: +f.priceOut || 0,
           budget_usd: +f.budget || 0,
           ...(f.apiKey ? { api_key: f.apiKey } : {}) },
+        auth: { mode: f.authMode,
+          ...(f.authPassword ? { password: f.authPassword } : {}),
+          oidc: { issuer: f.oidcIssuer, client_id: f.oidcClientId,
+            redirect_base: f.oidcRedirect,
+            allowed: f.oidcAllowed.split("\n")
+              .map((a) => a.trim()).filter(Boolean),
+            ...(f.oidcSecret ? { client_secret: f.oidcSecret } : {}) } },
         ...extra,
       };
       const next = await api.saveConfig(body);
       onSaved(next);
-      setF({ ...f, apiKey: "", ...imapFields(next, editAcct) });
+      setF({ ...f, apiKey: "", authPassword: "", oidcSecret: "",
+        authMode: next.auth.mode, ...imapFields(next, editAcct) });
       setProtectedText((next.protected ?? []).join("\n"));
       setCategoriesText(catText(next.categories));
       setMsg(t("Saved."));
@@ -467,6 +482,64 @@ export function SettingsModal({ cfg, account, onClose, onSaved,
           </Field>
           <p className="mt-1 text-xs text-muted">{t("categories.help")}</p>
         </div>
+
+        <SectionLabel className="sm:col-span-2 mt-2">
+          {t("login.section")}
+        </SectionLabel>
+        <p className="sm:col-span-2 -mt-2 text-xs text-muted">
+          {t("login.help")}
+        </p>
+        <Field label={t("login.mode")}>
+          <Select className="w-full" value={f.authMode}
+            onChange={set("authMode")}>
+            <option value="none">{t("login.mode_none")}</option>
+            <option value="password">{t("login.mode_password")}</option>
+            <option value="oidc">{t("login.mode_oidc")}</option>
+          </Select>
+        </Field>
+        {f.authMode === "password" && (
+          <Field label={t("login.password_label")}>
+            <Input className="w-full" type="password" value={f.authPassword}
+              placeholder={cfg.auth.password_set
+                ? t("(unchanged)") : t("required")}
+              onChange={set("authPassword")} />
+          </Field>
+        )}
+        {f.authMode === "oidc" && (
+          <>
+            <Field label={t("login.oidc_issuer")}>
+              <Input className="w-full" value={f.oidcIssuer}
+                placeholder="https://id.example.com"
+                onChange={set("oidcIssuer")} />
+            </Field>
+            <Field label={t("login.oidc_client")}>
+              <Input className="w-full" value={f.oidcClientId}
+                onChange={set("oidcClientId")} />
+            </Field>
+            <Field label={t("login.oidc_secret")}>
+              <Input className="w-full" type="password" value={f.oidcSecret}
+                placeholder={cfg.auth.oidc.client_secret_set
+                  ? t("(unchanged)") : t("required")}
+                onChange={set("oidcSecret")} />
+            </Field>
+            <Field label={t("login.oidc_redirect")}>
+              <Input className="w-full" value={f.oidcRedirect}
+                placeholder={t("login.oidc_redirect_ph")}
+                onChange={set("oidcRedirect")} />
+            </Field>
+            <div className="sm:col-span-2">
+              <Field label={t("login.oidc_allowed")}>
+                <TextArea className="!min-h-16" value={f.oidcAllowed}
+                  placeholder={"me@corp.example"}
+                  onChange={(e) =>
+                    setF({ ...f, oidcAllowed: e.target.value })} />
+              </Field>
+              <p className="mt-1 text-xs text-muted">
+                {t("login.oidc_allowed_help")}
+              </p>
+            </div>
+          </>
+        )}
 
         <SectionLabel className="sm:col-span-2 mt-2">
           {t("AI review (optional)")}

@@ -11,6 +11,7 @@ import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from backend import accounts as accountsmod   # noqa: E402
+from backend import auth as authmod            # noqa: E402
 from backend import config as cfgmod          # noqa: E402
 from backend import mailops                   # noqa: E402
 from backend import rules as rulesmod         # noqa: E402
@@ -29,6 +30,9 @@ def isolate(tmp_path, monkeypatch):
                         tmp_path / "verdicts.json")
     monkeypatch.setattr(mailops, "REPLIED_PATH", tmp_path / "replied.json")
     monkeypatch.setattr(mailops, "SNAPSHOT_DIR", tmp_path / "snapshots")
+    monkeypatch.setattr(authmod, "SESSION_SECRET_PATH",
+                        tmp_path / "session_secret")
+    monkeypatch.setattr(authmod, "_secret_cache", None)
     monkeypatch.setattr(rulesmod, "RULES_PATH", tmp_path / "rules.json")
     monkeypatch.setattr(statsmod, "HISTORY_PATH",
                         tmp_path / "stats_history.json")

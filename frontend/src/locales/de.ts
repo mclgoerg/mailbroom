@@ -373,6 +373,32 @@ export const DE: Record<string, string> = {
     + "laufen nicht mehr; Mails auf dem Server bleiben unangetastet.",
   "account.switch_tip": "Konto wechseln — jede Ansicht gilt pro Konto",
   "scan.age": "gescannt vor {ago}",
+  "login.section": "Anmeldung (optional)",
+  "login.help":
+    "Schützt die API mit einem Login. \"Keine\" vertraut dem Netzwerk "
+    + "bzw. einer Reverse-Proxy-Anmeldung (wie bisher). Passwort = ein "
+    + "gemeinsames Passwort. SSO/OIDC = Anmeldung über einen "
+    + "OpenID-Connect-Anbieter (Pocket ID, Authentik, Keycloak, …); die "
+    + "App dort vorher mit der Callback-URL <origin>/api/oidc/callback "
+    + "registrieren.",
+  "login.mode": "Anmeldemethode",
+  "login.mode_none": "Keine (Reverse Proxy / vertrautes Netz)",
+  "login.mode_password": "Passwort",
+  "login.mode_oidc": "SSO (OpenID Connect)",
+  "login.password_label": "Anmelde-Passwort",
+  "login.oidc_issuer": "Issuer-URL",
+  "login.oidc_client": "Client-ID",
+  "login.oidc_secret": "Client-Secret",
+  "login.oidc_redirect": "Redirect-Basis-URL (optional)",
+  "login.oidc_redirect_ph": "automatisch: aus den Request-Headern",
+  "login.oidc_allowed": "Erlaubte Nutzer (eine E-Mail/Subject pro Zeile)",
+  "login.oidc_allowed_help":
+    "Leere Liste = jedes Konto, das der Identity Provider anmeldet, darf "
+    + "die App nutzen. Mit Einträgen kommen nur diese E-Mails/Subjects "
+    + "hinein.",
+  "login.submit": "Anmelden",
+  "login.sso": "Mit SSO anmelden",
+  "login.logout": "Abmelden",
   "account.rename": "Umbenennen…",
   "account.rename_prompt": 'Neuer Name für Konto "{name}":',
   "account.renamed": 'Konto umbenannt in "{name}".',

@@ -38,6 +38,11 @@ const cfg: Config = {
       user: "me@icloud.example" },
   },
   default_account: "default",
+  auth: {
+    mode: "none", password_set: false,
+    oidc: { issuer: "", client_id: "", client_secret_set: false,
+      redirect_base: "", allowed: [] },
+  },
   protected: [],
   categories: {},
   ai: {
