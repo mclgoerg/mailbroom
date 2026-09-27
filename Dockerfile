@@ -19,6 +19,9 @@ COPY --from=web /web/dist ./static/
 RUN chmod -R a+rX /app
 USER app
 EXPOSE 8765
+# Probe the PUBLIC auth endpoint: /api/state needs a session since the
+# native login shipped — probing it would flap unhealthy (and trigger
+# autoheal restart loops) whenever a login mode is enabled.
 HEALTHCHECK --interval=60s --timeout=5s --start-period=10s CMD \
-  python3 -c "import urllib.request as u; u.urlopen('http://127.0.0.1:8765/api/state', timeout=4)" || exit 1
+  python3 -c "import urllib.request as u; u.urlopen('http://127.0.0.1:8765/api/auth', timeout=4)" || exit 1
 CMD ["uvicorn", "backend.main:app", "--host", "0.0.0.0", "--port", "8765"]
