@@ -10,7 +10,7 @@ const mk = (i: number): Group => ({
   count: i + 1, size: 1000 * (i + 1), unread: 0,
   first: "2024-01-01", last: "2025-01-01", tags: [], samples: [],
   bulk: false, unsub: false, ai: null, ratings: null, protected: false,
-  replied: false,
+  replied: false, att_size: 0,
 });
 
 const groups = Array.from({ length: 120 }, (_, i) => mk(i));

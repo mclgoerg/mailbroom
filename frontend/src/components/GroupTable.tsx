@@ -107,6 +107,11 @@ function DesktopTable({ slice, baseIdx, selected, focusedKey, onToggle,
                     <span title={t("replied.tip")}>↩ {t("replied")}</span>
                   </Tag>
                 )}
+                {g.att_size > 0 && (
+                  <Tag className="!bg-indigo-950 !text-indigo-300">
+                    📎 {fmtSize(g.att_size)}
+                  </Tag>
+                )}
                 {g.tags.map((t) => <Tag key={t}>{t}</Tag>)}
               </div>
             </td>
@@ -171,6 +176,11 @@ function MobileCards({ slice, baseIdx, selected, focusedKey, onToggle,
               {g.replied && (
                 <Tag className="!bg-sky-950 !text-sky-300">
                   <span title={t("replied.tip")}>↩ {t("replied")}</span>
+                </Tag>
+              )}
+              {g.att_size > 0 && (
+                <Tag className="!bg-indigo-950 !text-indigo-300">
+                  📎 {fmtSize(g.att_size)}
                 </Tag>
               )}
               {g.tags.map((t) => <Tag key={t}>{t}</Tag>)}

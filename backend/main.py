@@ -190,6 +190,21 @@ def post_unsubscribe(body: AiGroupBody):
         raise HTTPException(500, f"{type(exc).__name__}: {exc}")
 
 
+@app.post("/api/attachments")
+def post_attachments():
+    """Start the lazy attachment analysis (BODYSTRUCTURE pass)."""
+    try:
+        mailops.start_att_scan()
+    except RuntimeError as exc:
+        raise HTTPException(409, str(exc))
+    return {"ok": True}
+
+
+@app.get("/api/attachments")
+def get_attachments():
+    return mailops.attachments_list()
+
+
 class RuleBody(BaseModel):
     name: str = ""
     grouping: str = "sender"

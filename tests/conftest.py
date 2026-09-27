@@ -51,11 +51,13 @@ def isolate(tmp_path, monkeypatch):
 def make_msg(uid, frm='"Shop News" <news@shop.example>',
              subject="Big Sale 42", unsub=None, unsub_post=False,
              msgid=None, size=1000, seen=False,
-             date="26-Sep-2026 12:00:00 +0000", to=None, cc=None):
+             date="26-Sep-2026 12:00:00 +0000", to=None, cc=None,
+             atts=None):
     return {"uid": uid, "from": frm, "subject": subject, "unsub": unsub,
             "unsub_post": unsub_post,
             "msgid": msgid or f"<m{uid}@shop.example>",
-            "size": size, "seen": seen, "date": date, "to": to, "cc": cc}
+            "size": size, "seen": seen, "date": date, "to": to, "cc": cc,
+            "atts": atts or []}     # [(filename, size)] for BODYSTRUCTURE
 
 
 class FakeIMAP:
@@ -115,6 +117,18 @@ class FakeIMAP:
             lines.append("List-Unsubscribe-Post: List-Unsubscribe=One-Click")
         return ("\r\n".join(lines) + "\r\n\r\n").encode()
 
+    def _bodystructure(self, m) -> str:
+        text = '("text" "plain" ("charset" "utf-8") NIL NIL "7bit" 100 5)'
+        if not m.get("atts"):
+            return text
+        parts = [text]
+        for name, size in m["atts"]:
+            parts.append(
+                f'("application" "octet-stream" ("name" "{name}") NIL NIL '
+                f'"base64" {size} NIL '
+                f'("attachment" ("filename" "{name}")) NIL)')
+        return "(" + "".join(parts) + ' "mixed" ("boundary" "b1") NIL NIL)'
+
     def uid(self, cmd, *args):
         msgs = self.mailbox[self.selected]
         if cmd == "SEARCH":
@@ -129,6 +143,13 @@ class FakeIMAP:
 
         if cmd == "FETCH":
             wanted = {int(u) for u in args[0].split(",")}
+            if "BODYSTRUCTURE" in args[1]:
+                data = []
+                for i, m in enumerate(msgs):
+                    if m["uid"] in wanted:
+                        data.append(f"{i+1} (UID {m['uid']} BODYSTRUCTURE "
+                                    f"{self._bodystructure(m)})".encode())
+                return "OK", data
             if "BODY.PEEK[]" in args[1]:
                 for i, m in enumerate(msgs):
                     if m["uid"] in wanted:
@@ -196,7 +217,8 @@ def bridge(monkeypatch):
                      subject="SALE! 50% off everything",
                      unsub="<mailto:unsub@shop.example?subject=stop>, "
                            "<https://shop.example/u/1>",
-                     unsub_post=True, size=30000),
+                     unsub_post=True, size=30000,
+                     atts=[("catalog.pdf", 25000), ("promo.jpg", 3000)]),
         ],
         "Archive": [
             make_msg(10, frm='"DHL Paket" <noreply@dhl.example>',

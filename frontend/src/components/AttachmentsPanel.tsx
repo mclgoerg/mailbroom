@@ -1,0 +1,146 @@
+import { useEffect, useState } from "react";
+import { api, fmtSize, mailKey } from "../api";
+import { t } from "../i18n";
+import type { AppState, AttMail, Mail } from "../types";
+import { MessageView } from "./MailList";
+import { Button, Modal, Spinner, Tag } from "./ui";
+
+/** Attachment explorer: lazy BODYSTRUCTURE analysis, then the mailbox's
+ *  attachment-heaviest mails. Proton IMAP cannot strip attachments, so the
+ *  actions delete/move whole mails (reversible, as everywhere). */
+export function AttachmentsPanel({ state, onClose, onDeleted }: {
+  state: AppState;
+  onClose: () => void;
+  onDeleted: () => void;
+}) {
+  const [mails, setMails] = useState<AttMail[] | null>(null);
+  const [sel, setSel] = useState<Set<string>>(new Set());
+  const [view, setView] = useState<Mail | null>(null);
+  const [note, setNote] = useState("");
+
+  const atts = state.atts;
+  const running = atts?.status === "running";
+
+  // When the analysis finishes (SSE tick), load the result list.
+  useEffect(() => {
+    if (atts?.status === "done" && mails === null) {
+      api.attachments().then(setMails).catch((e) =>
+        setNote(`Error: ${e.message ?? e}`));
+    }
+  }, [atts?.status, mails]);
+
+  const analyze = async () => {
+    setNote("");
+    setMails(null);
+    try { await api.startAttachments(); }
+    catch (e: any) { setNote(`Error: ${e.message ?? e}`); }
+  };
+
+  const cancel = async () => {
+    try { await api.cancel("atts"); } catch { /* too late */ }
+  };
+
+  const act = async (action: string) => {
+    if (!mails || sel.size === 0) return;
+    if (!confirm(t("confirm.act_mails", {
+      verb: t("Move to Trash"), n: sel.size }))) return;
+    try {
+      const items = mails.filter((m) => sel.has(mailKey(m)))
+        .map((m) => [m.folder, m.uid] as [string, number]);
+      await api.deleteMessages(items, action);
+      setMails(mails.filter((m) => !sel.has(mailKey(m))));
+      setSel(new Set());
+      setNote(t("note.background", { verb: t("Move to Trash") }));
+      onDeleted();
+    } catch (e: any) {
+      setNote(`Error: ${e.message ?? e}`);
+    }
+  };
+
+  const toggle = (k: string) => {
+    const next = new Set(sel);
+    next.has(k) ? next.delete(k) : next.add(k);
+    setSel(next);
+  };
+
+  return (
+    <Modal onClose={onClose} full>
+      <div className="flex items-center gap-3 border-b border-line px-4 py-3">
+        <div className="min-w-0 flex-1">
+          <div className="font-semibold">📎 {t("Attachments")}</div>
+          <div className="text-xs text-muted">
+            {atts?.status === "done"
+              ? t("atts.summary", { n: atts.mails, size: fmtSize(atts.size) })
+              : t("atts.hint")}
+          </div>
+        </div>
+        {running ? (
+          <Button variant="ghost" onClick={cancel}>
+            <Spinner /> {atts.progress} — {t("cancel")}
+          </Button>
+        ) : (
+          <Button variant="ghost" onClick={analyze}
+            disabled={state.status !== "done"}>
+            {atts?.status === "done" ? t("atts.reanalyze") : t("atts.analyze")}
+          </Button>
+        )}
+        <Button variant="ghost" onClick={onClose}>✕</Button>
+      </div>
+
+      {view ? (
+        <MessageView mail={view} onBack={() => setView(null)} />
+      ) : (
+        <>
+          <div className="flex flex-wrap items-center gap-2 border-b
+            border-line px-4 py-2">
+            <Button variant="danger" disabled={sel.size === 0}
+              onClick={() => act("trash")}>
+              {t("Trash selected")}{sel.size > 0 && ` (${sel.size})`}
+            </Button>
+            {atts?.status === "error" && (
+              <span className="text-xs text-rose-400">{atts.error}</span>
+            )}
+            {note && <span className="text-xs text-muted">{note}</span>}
+          </div>
+          <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-4">
+            {!mails && !running && atts?.status !== "done" && (
+              <div className="p-4 text-sm text-muted">{t("atts.intro")}</div>
+            )}
+            {running && (
+              <div className="p-4 text-sm text-muted">
+                <Spinner /> {atts.progress}
+              </div>
+            )}
+            {mails && mails.length === 0 && (
+              <div className="p-4 text-sm text-muted">{t("atts.none")}</div>
+            )}
+            {mails?.map((m) => (
+              <div key={mailKey(m)}
+                className="flex flex-wrap items-baseline gap-2 border-b
+                  border-line/60 px-1 py-2">
+                <input type="checkbox" checked={sel.has(mailKey(m))}
+                  onChange={() => toggle(mailKey(m))} />
+                <span className="text-xs whitespace-nowrap text-muted">
+                  {(m.date || "").slice(0, 10)}
+                </span>
+                <button className="min-w-0 flex-1 basis-full cursor-pointer
+                    truncate text-left text-sm hover:underline sm:basis-0"
+                  title={m.addr}
+                  onClick={() => setView(m)}>
+                  {m.subject || t("(no subject)")}
+                  <span className="block truncate text-xs text-faint">
+                    {m.addr} · {m.atts.map((a) =>
+                      `${a.name} (${fmtSize(a.size)})`).join(", ")}
+                  </span>
+                </button>
+                <Tag className="!bg-indigo-950 !text-indigo-300">
+                  📎 {fmtSize(m.att_size)}
+                </Tag>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+    </Modal>
+  );
+}

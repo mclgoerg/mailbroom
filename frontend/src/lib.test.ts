@@ -7,7 +7,7 @@ const g = (over: Partial<Group> = {}): Group => ({
   count: 100, size: 5000, unread: 90, first: "2024-01-01",
   last: "2024-06-01", tags: ["shipping", "newsletter"], samples: [],
   bulk: true, unsub: true, ai: { verdict: "delete_safe", reason: "x" },
-  ratings: null, protected: false, replied: false,
+  ratings: null, protected: false, replied: false, att_size: 0,
   ...over,
 });
 
@@ -56,6 +56,12 @@ describe("parseFilter", () => {
     expect(parseFilter("is:noreply-ever").replied).toBe(false);
     expect(parseFilter("dhl").replied).toBeNull();
   });
+  it("parses attachment sizes", () => {
+    expect(parseFilter("att:>10m").attMin).toBe(10 * 1048576);
+    expect(parseFilter("att:>500k").attMin).toBe(500 * 1024);
+    expect(parseFilter("att:5").attMin).toBe(5);
+    expect(parseFilter("att:bogus").attMin).toBeNull();
+  });
 });
 
 describe("matchGroup", () => {
@@ -82,6 +88,11 @@ describe("matchGroup", () => {
     expect(matchGroup(g(), parseFilter("is:noreply-ever"), NOW)).toBe(true);
     expect(matchGroup(g({ replied: true }),
       parseFilter("is:noreply-ever"), NOW)).toBe(false);
+  });
+  it("att filter uses the analyzed aggregate", () => {
+    const f = parseFilter("att:>10k");
+    expect(matchGroup(g({ att_size: 28000 }), f, NOW)).toBe(true);
+    expect(matchGroup(g(), f, NOW)).toBe(false);
   });
   it("age filter uses last activity", () => {
     const f = parseFilter("age:>1y");

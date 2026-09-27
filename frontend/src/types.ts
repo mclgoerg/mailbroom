@@ -23,6 +23,7 @@ export interface Group {
   ratings: { delete_safe: number; review: number; keep: number } | null;
   protected: boolean;
   replied: boolean;
+  att_size: number;
 }
 
 export interface AiUsage {
@@ -45,6 +46,19 @@ export interface DeleteState {
   progress: string;
   error: string;
   moved: number;
+}
+
+export interface AttsState {
+  status: "idle" | "running" | "done" | "error";
+  progress: string;
+  error: string;
+  mails: number;
+  size: number;
+}
+
+export interface AttMail extends Mail {
+  att_size: number;
+  atts: { name: string; size: number }[];
 }
 
 export interface RuleRun {
@@ -81,6 +95,7 @@ export interface AppState {
   groups: Record<Grouping, Record<string, Group>>;
   ai: AiState;
   delete: DeleteState;
+  atts: AttsState;
   trash_count: number | null;
   notice: { key: string; params: Record<string, string | number> } | null;
   undo: { ts: number; label: string; count: number; action: string }[];

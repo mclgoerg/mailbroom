@@ -116,6 +116,18 @@ const EN: Record<string, string> = {
   "sched.weekly": "weekly",
   "mode.report": "report",
   "mode.execute": "execute",
+  "notice.atts_cancelled": "Attachment analysis cancelled.",
+  "atts.hint":
+    "Find the mails hogging your storage. Analysis reads only the mail "
+    + "structure (no content is downloaded).",
+  "atts.summary": "{n} mails with attachments · {size} total",
+  "atts.analyze": "Analyze attachments",
+  "atts.reanalyze": "Re-analyze",
+  "atts.intro":
+    "Run the analysis to list mails by attachment size. Afterwards the "
+    + "att:>10m filter also works on groups. Proton cannot strip single "
+    + "attachments over IMAP — deleting removes the whole mail (undoable).",
+  "atts.none": "No attachments found in the scanned folders.",
 };
 
 const DE: Record<string, string> = {
@@ -347,6 +359,20 @@ const DE: Record<string, string> = {
   "mode.execute": "Ausführen",
   "Edit": "Bearbeiten",
   "Delete": "Löschen",
+  "Attachments": "Anhänge",
+  "notice.atts_cancelled": "Anhang-Analyse abgebrochen.",
+  "atts.hint":
+    "Finden Sie die Mails, die Ihren Speicher belegen. Die Analyse liest "
+    + "nur die Mail-Struktur (keine Inhalte werden geladen).",
+  "atts.summary": "{n} Mails mit Anhängen · {size} gesamt",
+  "atts.analyze": "Anhänge analysieren",
+  "atts.reanalyze": "Neu analysieren",
+  "atts.intro":
+    "Analyse starten, um Mails nach Anhanggröße zu listen. Danach "
+    + "funktioniert auch der Filter att:>10m auf Gruppen. Proton kann per "
+    + "IMAP keine einzelnen Anhänge entfernen — Löschen entfernt die ganze "
+    + "Mail (rückgängig machbar).",
+  "atts.none": "Keine Anhänge in den gescannten Ordnern gefunden.",
 };
 
 let lang: Lang =

@@ -42,15 +42,17 @@ _RUN_LOCK = threading.Lock()      # one rule run at a time
 
 # ------------------------------------------------- filter DSL (port of lib.ts)
 
-_QUAL_RE = re.compile(r"^(tag|ai|age|unread|is):(.*)$")
+_QUAL_RE = re.compile(r"^(tag|ai|age|unread|is|att):(.*)$")
 _AGE_RE = re.compile(r"^>?(\d+)(m|y)$")
 _UNREAD_RE = re.compile(r"^>?(\d+)$")
+_ATT_RE = re.compile(r"^>?(\d+)(k|m|g)?$")
+_SIZE_UNIT = {"k": 1024, "m": 1048576, "g": 1073741824}
 
 
 def parse_filter(q: str) -> dict:
     out = {"text": [], "tags": [], "ai": None, "age_months": None,
            "unread_min": None, "unsub": False, "protected_only": False,
-           "replied": None}
+           "replied": None, "att_min": None}
     for tok in (q or "").strip().lower().split():
         m = _QUAL_RE.match(tok)
         if not m:
@@ -78,6 +80,11 @@ def parse_filter(q: str) -> dict:
             out["replied"] = True
         elif kind == "is" and val == "noreply-ever":
             out["replied"] = False
+        elif kind == "att":
+            a = _ATT_RE.match(val)
+            if a:
+                out["att_min"] = int(a.group(1)) * \
+                    _SIZE_UNIT.get(a.group(2) or "", 1)
         else:
             out["text"].append(tok)
     return out
@@ -100,6 +107,8 @@ def match_group(g: dict, f: dict, now: float | None = None) -> bool:
     if f["protected_only"] and not g.get("protected"):
         return False
     if f["replied"] is not None and bool(g.get("replied")) != f["replied"]:
+        return False
+    if f["att_min"] is not None and g.get("att_size", 0) < f["att_min"]:
         return False
     if f["unread_min"] is not None:
         pct = 100 * g["unread"] / g["count"] if g["count"] else 0

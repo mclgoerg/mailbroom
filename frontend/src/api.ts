@@ -1,5 +1,5 @@
 import type {
-  AiGroupResult, AppState, Config, FoldersResp, Grouping, Mail,
+  AiGroupResult, AppState, AttMail, Config, FoldersResp, Grouping, Mail,
   MessageDetail, Rule, RuleRun, UnsubResult,
 } from "./types";
 
@@ -48,7 +48,7 @@ export const api = {
   undo: (index = -1) =>
     req<{ restored: number; of: number }>("/api/undo", { index }),
   emptyTrash: () => req<{ deleted: number }>("/api/empty_trash", {}),
-  cancel: (target: "scan" | "ai" | "delete") =>
+  cancel: (target: "scan" | "ai" | "delete" | "atts") =>
     req<{ ok: boolean }>("/api/cancel", { target }),
   clearNotice: () => req<{ ok: boolean }>("/api/notice/clear", {}),
   search: (q: string) =>
@@ -64,6 +64,8 @@ export const api = {
     if (!res.ok) throw new Error(await res.text());
   },
   runRule: (id: string) => req<RuleRun>(`/api/rules/${id}/run`, {}),
+  startAttachments: () => req<{ ok: boolean }>("/api/attachments", {}),
+  attachments: () => req<AttMail[]>("/api/attachments"),
 };
 
 export { fmtSize, fmtUsd, mailKey } from "./lib";

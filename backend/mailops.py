@@ -68,6 +68,8 @@ STATE: dict = {
     "ai": {"status": "idle", "grouping": "", "progress": "", "error": "",
            "usage": None},
     "delete": {"status": "idle", "progress": "", "error": "", "moved": 0},
+    "atts": {"status": "idle", "progress": "", "error": "",
+             "mails": 0, "size": 0},   # attachment analysis (lazy)
     "trash_count": None,   # mails currently in Trash (None = unknown)
     "notice": None,        # one-shot info for the UI: {key, params} | None
     "undo": [],            # summaries of undoable move jobs (newest last)
@@ -117,7 +119,7 @@ class Cancelled(Exception):
     """Raised inside workers when the user cancelled the operation."""
 
 
-_CANCEL = {"scan": False, "ai": False, "delete": False}
+_CANCEL = {"scan": False, "ai": False, "delete": False, "atts": False}
 
 
 def request_cancel(target: str) -> None:
@@ -368,6 +370,7 @@ def _rec(groups: dict, grouping: str, key: str, label: str) -> dict:
         "key": key, "label": label, "sub": "", "count": 0, "size": 0,
         "unread": 0, "first": "", "last": "", "tags": [], "samples": [],
         "bulk": False, "unsub": False, "folders": {}, "ai": None,
+        "att_size": 0,
         "_senders": set(), "_names": {}, "_hay": "", "_min": 0, "_max": 0})
 
 
@@ -567,6 +570,9 @@ def start_scan() -> None:
                      notice=None, groups={g: {} for g in GROUPINGS})
         STATE["delete"] = {"status": "idle", "progress": "", "error": "",
                            "moved": 0}
+        # Attachment analysis is per-scan; a new scan invalidates it.
+        STATE["atts"] = {"status": "idle", "progress": "", "error": "",
+                         "mails": 0, "size": 0}
         INDEX.clear()
         FOLDER_UV.clear()
         _CANCEL["scan"] = False
@@ -588,7 +594,7 @@ def _apply_removal(moved_uids: dict[str, set[int]]) -> dict:
     for recs in STATE["groups"].values():
         for key in list(recs):
             rec = recs[key]
-            removed_n = removed_size = removed_unread = 0
+            removed_n = removed_size = removed_unread = removed_att = 0
             for folder, gone in moved_uids.items():
                 uids = rec["folders"].get(folder)
                 if not uids:
@@ -601,6 +607,7 @@ def _apply_removal(moved_uids: dict[str, set[int]]) -> dict:
                         if m:
                             removed_size += m["size"]
                             removed_unread += 0 if m["seen"] else 1
+                            removed_att += m.get("att_size", 0)
                     else:
                         kept.append(u)
                 if kept:
@@ -610,6 +617,7 @@ def _apply_removal(moved_uids: dict[str, set[int]]) -> dict:
             rec["count"] -= removed_n
             rec["size"] = max(0, rec["size"] - removed_size)
             rec["unread"] = max(0, rec["unread"] - removed_unread)
+            rec["att_size"] = max(0, rec.get("att_size", 0) - removed_att)
             if rec["count"] <= 0:
                 recs.pop(key)
     return meta
@@ -903,6 +911,231 @@ def delete_messages(items: list, action: str = "trash",
         n = sum(len(s) for s in by_folder.values())
         _start_delete(by_folder, f"{n} selected mails", action, dest)
     return {"ok": True, "queued": sum(len(s) for s in by_folder.values())}
+
+
+# ------------------------------------------------------------- attachments
+
+def _bs_tokenize(s: bytes):
+    """Tokens of an IMAP parenthesized list: '(', ')', str, int or None."""
+    i, n = 0, len(s)
+    while i < n:
+        c = s[i:i + 1]
+        if c in b" \r\n":
+            i += 1
+        elif c in b"()":
+            yield c.decode()
+            i += 1
+        elif c == b'"':
+            j, out = i + 1, bytearray()
+            while j < n and s[j:j + 1] != b'"':
+                if s[j:j + 1] == b"\\":
+                    j += 1
+                out += s[j:j + 1]
+                j += 1
+            yield bytes(out).decode("utf-8", "replace")
+            i = j + 1
+        else:
+            j = i
+            while j < n and s[j:j + 1] not in b' ()"\r\n':
+                j += 1
+            atom = s[i:j].decode("utf-8", "replace")
+            if atom.upper() == "NIL":
+                yield None
+            elif atom.isdigit():
+                yield int(atom)
+            else:
+                yield atom
+            i = j
+
+
+def _bs_parse(tokens) -> list:
+    out: list = []
+    for tok in tokens:
+        if tok == "(":
+            out.append(_bs_parse(tokens))
+        elif tok == ")":
+            return out
+        else:
+            out.append(tok)
+    return out
+
+
+def _bs_param(params, key: str) -> str:
+    """Value of `key` in a ("k1" "v1" "k2" "v2") parameter list."""
+    if isinstance(params, list):
+        for k, v in zip(params[::2], params[1::2]):
+            if isinstance(k, str) and k.lower() == key:
+                return v if isinstance(v, str) else ""
+    return ""
+
+
+def _bs_attachments(node, out: list) -> None:
+    """Collect {name, size} of attachment parts from a parsed BODYSTRUCTURE."""
+    if not isinstance(node, list) or not node:
+        return
+    if isinstance(node[0], list):                      # multipart container
+        for child in node:
+            _bs_attachments(child, out)
+        return
+    if len(node) < 7 or not isinstance(node[0], str):
+        return
+    size = node[6] if isinstance(node[6], int) else 0
+    name = _bs_param(node[2], "name")
+    dispo, dispo_name = "", ""
+    for ext in node[7:]:
+        if isinstance(ext, list) and ext and isinstance(ext[0], str) \
+                and ext[0].lower() in ("attachment", "inline"):
+            dispo = ext[0].lower()
+            if len(ext) > 1:
+                dispo_name = _bs_param(ext[1], "filename")
+    fname = dispo_name or name
+    # Attachment = explicitly disposed as one, or a named non-text part
+    # (many senders skip the disposition but do set a filename).
+    if size and (dispo == "attachment"
+                 or (fname and node[0].lower() != "text")):
+        out.append({"name": decode_mime(fname or "(unnamed)")[:120],
+                    "size": size})
+
+
+_BS_UID_RE = re.compile(rb"UID (\d+)")
+
+
+def _run_atts() -> None:
+    """Annotate INDEX with attachment lists via BODYSTRUCTURE (read-only)."""
+    cfg = cfgmod.load_config()
+    t0 = time.time()
+    try:
+        with STATE_LOCK:
+            folders = list(STATE["folders_raw"])
+            per_folder = {f: sorted(
+                m["uid"] for m in INDEX.values() if m["folder"] == f)
+                for f in folders}
+        conn = connect(cfg)
+        try:
+            for folder in folders:
+                uids = per_folder.get(folder) or []
+                if not uids:
+                    continue
+                status, _ = conn.select(quote_folder(folder), readonly=True)
+                if status != "OK":
+                    continue
+                uv = uidvalidity(conn)
+                if FOLDER_UV.get(folder) not in (None, 0) and uv \
+                        and uv != FOLDER_UV[folder]:
+                    log.warning("attachments: skipping %r (UIDVALIDITY "
+                                "changed since scan)", folder)
+                    continue
+                total = len(uids)
+                for start in range(0, total, FETCH_CHUNK):
+                    if cancel_requested("atts"):
+                        raise Cancelled()
+                    with STATE_LOCK:
+                        STATE["atts"]["progress"] = (
+                            f"{decode_mutf7(folder)}: "
+                            f"{min(start + FETCH_CHUNK, total)}/{total}")
+                    chunk = uids[start:start + FETCH_CHUNK]
+                    status, data = conn.uid(
+                        "FETCH", ",".join(str(u) for u in chunk),
+                        "(UID BODYSTRUCTURE)")
+                    if status != "OK":
+                        continue
+                    # Re-join literal fragments imaplib splits into tuples,
+                    # then parse one record per UID.
+                    buf = bytearray()
+                    for item in data or []:
+                        if isinstance(item, tuple):
+                            for part in item:
+                                buf += part if isinstance(part, bytes) else b""
+                        elif isinstance(item, bytes):
+                            buf += item
+                    for rec_m in re.finditer(
+                            rb"UID (\d+) BODYSTRUCTURE ", buf):
+                        uid = int(rec_m.group(1))
+                        depth, j = 0, rec_m.end()
+                        start_j = j
+                        while j < len(buf):
+                            if buf[j:j + 1] == b"(":
+                                depth += 1
+                            elif buf[j:j + 1] == b")":
+                                depth -= 1
+                                if depth == 0:
+                                    break
+                            elif buf[j:j + 1] == b'"':
+                                j += 1
+                                while j < len(buf) and buf[j:j+1] != b'"':
+                                    if buf[j:j + 1] == b"\\":
+                                        j += 1
+                                    j += 1
+                            j += 1
+                        blob = bytes(buf[start_j:j + 1])
+                        try:
+                            parsed = _bs_parse(_bs_tokenize(blob))
+                            atts: list = []
+                            if parsed:
+                                _bs_attachments(parsed[0], atts)
+                        except Exception:
+                            continue
+                        if not atts:
+                            continue
+                        with STATE_LOCK:
+                            m = INDEX.get(ikey(folder, uid))
+                            if m is not None:
+                                m["atts"] = atts
+                                m["att_size"] = sum(a["size"] for a in atts)
+        finally:
+            try:
+                conn.logout()
+            except Exception:
+                pass
+
+        with STATE_LOCK:
+            # Aggregate per group so the att:>… filter has data to work on.
+            for recs in STATE["groups"].values():
+                for rec in recs.values():
+                    rec["att_size"] = sum(
+                        (INDEX.get(ikey(f, u)) or {}).get("att_size", 0)
+                        for f, uids in rec["folders"].items() for u in uids)
+            n = sum(1 for m in INDEX.values() if m.get("att_size"))
+            size = sum(m.get("att_size", 0) for m in INDEX.values())
+            STATE["atts"] = {"status": "done", "progress": "", "error": "",
+                             "mails": n, "size": size}
+        log.info("attachment analysis done: %d mails with attachments, "
+                 "%s total, %.1fs", n, size, time.time() - t0)
+    except Cancelled:
+        with STATE_LOCK:
+            STATE["atts"].update(status="idle", progress="")
+            STATE["notice"] = {"key": "atts_cancelled", "params": {}}
+    except Exception as exc:
+        log.exception("attachment analysis failed")
+        with STATE_LOCK:
+            STATE["atts"].update(status="error", progress="",
+                                 error=f"{type(exc).__name__}: {exc}")
+
+
+def start_att_scan() -> None:
+    with STATE_LOCK:
+        if STATE["status"] != "done":
+            raise RuntimeError("scan first")
+        if STATE["status"] == "scanning" \
+                or STATE["atts"]["status"] == "running" \
+                or STATE["delete"]["status"] == "running":
+            raise RuntimeError("busy")
+        STATE["atts"] = {"status": "running", "progress": "starting…",
+                         "error": "", "mails": 0, "size": 0}
+        _CANCEL["atts"] = False
+    threading.Thread(target=_run_atts, daemon=True).start()
+
+
+def attachments_list(limit: int = 300) -> list[dict]:
+    """Mails with attachments, largest first."""
+    with STATE_LOCK:
+        out = [{"uid": m["uid"], "folder": m["folder"], "date": m["date"],
+                "ts": m["ts"], "subject": m["subject"], "addr": m["addr"],
+                "size": m["size"], "seen": m["seen"], "ai": None,
+                "att_size": m["att_size"], "atts": m["atts"]}
+               for m in INDEX.values() if m.get("att_size")]
+    out.sort(key=lambda m: -m["att_size"])
+    return out[:limit]
 
 
 # ----------------------------------------------------------- undo & trash

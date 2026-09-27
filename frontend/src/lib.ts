@@ -25,6 +25,7 @@ export const olderThan = (m: { ts: number }, months: number): boolean =>
  *   is:protected        group contains protected senders
  *   is:replied          the user has written to this sender before
  *   is:noreply-ever     the user has never written to any of its senders
+ *   att:>10m att:>500k  attachment size above N (needs attachment analysis)
  *   anything else       substring match on name / address / key
  */
 
@@ -37,14 +38,17 @@ export interface ParsedFilter {
   unsub: boolean;
   protectedOnly: boolean;
   replied: boolean | null;
+  attMin: number | null;
 }
+
+const SIZE_UNIT: Record<string, number> = { k: 1024, m: 1048576, g: 1073741824 };
 
 export function parseFilter(q: string): ParsedFilter {
   const out: ParsedFilter = { text: [], tags: [], ai: null,
     ageMonths: null, unreadMin: null, unsub: false, protectedOnly: false,
-    replied: null };
+    replied: null, attMin: null };
   for (const tok of q.trim().toLowerCase().split(/\s+/).filter(Boolean)) {
-    const m = tok.match(/^(tag|ai|age|unread|is):(.*)$/);
+    const m = tok.match(/^(tag|ai|age|unread|is|att):(.*)$/);
     if (!m) {
       out.text.push(tok);
       continue;
@@ -63,7 +67,10 @@ export function parseFilter(q: string): ParsedFilter {
     else if (kind === "is" && val === "protected") out.protectedOnly = true;
     else if (kind === "is" && val === "replied") out.replied = true;
     else if (kind === "is" && val === "noreply-ever") out.replied = false;
-    else out.text.push(tok);
+    else if (kind === "att") {
+      const a = val.match(/^>?(\d+)(k|m|g)?$/);
+      if (a) out.attMin = Number(a[1]) * (SIZE_UNIT[a[2]] ?? 1);
+    } else out.text.push(tok);
   }
   return out;
 }
@@ -80,6 +87,7 @@ export function matchGroup(g: Group, f: ParsedFilter, now = Date.now()): boolean
   if (f.unsub && !g.unsub) return false;
   if (f.protectedOnly && !g.protected) return false;
   if (f.replied !== null && g.replied !== f.replied) return false;
+  if (f.attMin !== null && g.att_size < f.attMin) return false;
   if (f.unreadMin !== null) {
     const pct = g.count ? (100 * g.unread) / g.count : 0;
     if (pct < f.unreadMin) return false;
