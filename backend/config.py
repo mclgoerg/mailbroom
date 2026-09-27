@@ -32,6 +32,10 @@ DEFAULT_CONFIG = {
     "profiles": {},
     "active_profile": "default",
     "excluded_folders": DEFAULT_EXCLUDED,
+    # Protected senders: addresses ("user@example.com") or domains
+    # ("@example.com" / "example.com"). Bulk deletes and selection presets
+    # skip them; the AI must never rate their mails delete_safe.
+    "protected": [],
     "ai": {
         # anthropic | foundry | openai | ollama (any OpenAI-compatible
         # endpoint works via "ollama" + base URL, e.g. LM Studio, vLLM).
@@ -45,6 +49,52 @@ DEFAULT_CONFIG = {
 }
 
 AI_PROVIDERS = ("anthropic", "foundry", "openai", "ollama")
+
+
+def normalize_protected(entries) -> list[str]:
+    """Lowercased, deduped protected entries; domains keep a leading '@'."""
+    out: list[str] = []
+    for e in entries or []:
+        e = str(e or "").strip().lower()
+        if not e:
+            continue
+        if "@" not in e:            # bare domain -> "@domain"
+            e = "@" + e
+        if e not in out:
+            out.append(e)
+    return out
+
+
+def is_protected(addr: str, protected: list[str]) -> bool:
+    """True if `addr` matches a protected entry (exact address, or the
+    address's domain for "@domain" entries). Expects a normalized list."""
+    addr = (addr or "").strip().lower()
+    if not addr or not protected:
+        return False
+    for e in protected:
+        if e.startswith("@"):
+            if addr.endswith(e):
+                return True
+        elif addr == e:
+            return True
+    return False
+
+
+def set_protected(entry: str, on: bool) -> list[str]:
+    """Add or remove one protected entry; returns the saved list."""
+    norm = normalize_protected([entry])
+    if not norm:
+        raise ValueError("empty protected entry")
+    with _LOCK:
+        cfg = load_config()
+        plist = normalize_protected(cfg.get("protected"))
+        if on and norm[0] not in plist:
+            plist.append(norm[0])
+        elif not on:
+            plist = [e for e in plist if e != norm[0]]
+        cfg["protected"] = plist
+        _write(CONFIG_PATH, cfg)
+        return plist
 
 
 def ai_available(ai_cfg: dict) -> bool:
@@ -84,6 +134,8 @@ def load_config() -> dict:
             cfg[section].update(saved.get(section) or {})
         if isinstance(saved.get("excluded_folders"), list):
             cfg["excluded_folders"] = saved["excluded_folders"]
+        if isinstance(saved.get("protected"), list):
+            cfg["protected"] = normalize_protected(saved["protected"])
         if isinstance(saved.get("profiles"), dict):
             cfg["profiles"] = saved["profiles"]
         if saved.get("active_profile"):
@@ -140,6 +192,8 @@ def update_config(body: dict) -> dict:
             cfg["imap"]["password"] = str(imap_in["password"])
         if isinstance(body.get("excluded_folders"), list):
             cfg["excluded_folders"] = [str(f) for f in body["excluded_folders"]]
+        if isinstance(body.get("protected"), list):
+            cfg["protected"] = normalize_protected(body["protected"])
         ai_in = body.get("ai") or {}
         if ai_in.get("provider") in AI_PROVIDERS:
             cfg["ai"]["provider"] = ai_in["provider"]
@@ -165,6 +219,7 @@ def masked_config(cfg: dict) -> dict:
         "profiles": sorted([cfg["active_profile"], *cfg["profiles"]]),
         "active_profile": cfg["active_profile"],
         "excluded_folders": cfg["excluded_folders"],
+        "protected": normalize_protected(cfg.get("protected")),
         "ai": {"provider": cfg["ai"]["provider"],
                "model": cfg["ai"]["model"],
                "foundry_endpoint": cfg["ai"]["foundry_endpoint"],

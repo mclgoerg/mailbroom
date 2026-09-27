@@ -55,6 +55,23 @@ export function RatingChips({ ratings }: {
 }
 
 
+/** Shield toggle: protected senders are skipped by bulk deletes and the AI
+ *  never rates them delete_safe. Grayscale = not protected. */
+export function ProtectButton({ on, onClick, className = "" }: {
+  on: boolean; onClick: () => void; className?: string;
+}) {
+  return (
+    <button
+      title={t(on ? "unprotect.tip" : "protect.tip")}
+      onClick={onClick}
+      className={`min-h-7 rounded px-1 text-sm transition-opacity
+        ${on ? "" : "opacity-30 grayscale hover:opacity-70"} ${className}`}>
+      🛡️
+    </button>
+  );
+}
+
+
 export function Spinner() {
   return (
     <span className="inline-block size-3.5 animate-spin rounded-full

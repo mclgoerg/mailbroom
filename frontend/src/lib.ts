@@ -22,6 +22,7 @@ export const olderThan = (m: { ts: number }, months: number): boolean =>
  *   age:>1y  age:>6m    last activity older than N years/months
  *   unread:>80          unread percentage above N
  *   is:unsub            group has a List-Unsubscribe header
+ *   is:protected        group contains protected senders
  *   anything else       substring match on name / address / key
  */
 
@@ -32,11 +33,12 @@ export interface ParsedFilter {
   ageMonths: number | null;
   unreadMin: number | null;
   unsub: boolean;
+  protectedOnly: boolean;
 }
 
 export function parseFilter(q: string): ParsedFilter {
   const out: ParsedFilter = { text: [], tags: [], ai: null,
-    ageMonths: null, unreadMin: null, unsub: false };
+    ageMonths: null, unreadMin: null, unsub: false, protectedOnly: false };
   for (const tok of q.trim().toLowerCase().split(/\s+/).filter(Boolean)) {
     const m = tok.match(/^(tag|ai|age|unread|is):(.*)$/);
     if (!m) {
@@ -54,6 +56,7 @@ export function parseFilter(q: string): ParsedFilter {
       const u = val.match(/^>?(\d+)$/);
       if (u) out.unreadMin = Number(u[1]);
     } else if (kind === "is" && val === "unsub") out.unsub = true;
+    else if (kind === "is" && val === "protected") out.protectedOnly = true;
     else out.text.push(tok);
   }
   return out;
@@ -69,6 +72,7 @@ export function matchGroup(g: Group, f: ParsedFilter, now = Date.now()): boolean
   }
   if (f.ai && (!g.ai || !g.ai.verdict.includes(f.ai))) return false;
   if (f.unsub && !g.unsub) return false;
+  if (f.protectedOnly && !g.protected) return false;
   if (f.unreadMin !== null) {
     const pct = g.count ? (100 * g.unread) / g.count : 0;
     if (pct < f.unreadMin) return false;

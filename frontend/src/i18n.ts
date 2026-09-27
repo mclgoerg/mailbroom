@@ -34,12 +34,26 @@ const EN: Record<string, string> = {
     "AI review sends mail METADATA to your configured AI provider "
     + "(e.g. Anthropic, OpenAI, Microsoft Foundry, or your local model): "
     + "sender names and addresses, "
-    + "mail counts, sizes, dates, read state, category tags and subject "
-    + "lines. Mail bodies and attachments are NEVER sent. Continue?",
+    + "mail counts, sizes, dates, read state, category tags, subject "
+    + "lines and protected-sender markers. Mail bodies and attachments "
+    + "are NEVER sent. Continue?",
   "ai.data_note":
     "Sent to the AI provider: sender names/addresses, counts, sizes, "
-    + "dates, read state, tags and subject lines — never mail bodies or "
-    + "attachments.",
+    + "dates, read state, tags, subject lines and protected-sender "
+    + "markers — never mail bodies or attachments.",
+  "confirm.trash_protected":
+    'The group "{label}" is protected. Move its mails to Trash anyway?',
+  "confirm.protected_skipped": "({n} protected group(s) skipped.)",
+  "toast.all_protected":
+    "All selected groups are protected — nothing was deleted.",
+  "protect.tip":
+    "Protect this sender — bulk deletes and AI suggestions will skip it",
+  "unprotect.tip": "Protected — click to remove protection",
+  "protected": "protected",
+  "protected.help":
+    "One entry per line: an address (user@example.com) or a domain "
+    + "(@example.com). Protected senders are skipped by bulk deletions and "
+    + "selection presets, and the AI never rates them safe to delete.",
   "ai.rate": "AI rate mails",
   "sel.ai_safe": "AI: safe to delete",
   "sel.ai_review": "AI: review",
@@ -90,13 +104,30 @@ const DE: Record<string, string> = {
     "Die KI-Prüfung sendet Mail-METADATEN an den konfigurierten "
     + "KI-Anbieter (z. B. Anthropic, OpenAI, Microsoft Foundry oder ein "
     + "lokales Modell): Absendernamen "
-    + "und -adressen, Anzahl, Größen, Daten, Lesestatus, Kategorien und "
-    + "Betreffzeilen. Mail-Inhalte und Anhänge werden NIE gesendet. "
-    + "Fortfahren?",
+    + "und -adressen, Anzahl, Größen, Daten, Lesestatus, Kategorien, "
+    + "Betreffzeilen und Schutz-Markierungen. Mail-Inhalte und Anhänge "
+    + "werden NIE gesendet. Fortfahren?",
   "ai.data_note":
     "An den KI-Anbieter gesendet: Absendernamen/-adressen, Anzahl, "
-    + "Größen, Daten, Lesestatus, Kategorien und Betreffzeilen — niemals "
-    + "Mail-Inhalte oder Anhänge.",
+    + "Größen, Daten, Lesestatus, Kategorien, Betreffzeilen und "
+    + "Schutz-Markierungen — niemals Mail-Inhalte oder Anhänge.",
+  "confirm.trash_protected":
+    "Die Gruppe „{label}“ ist geschützt. Mails trotzdem in den "
+    + "Papierkorb verschieben?",
+  "confirm.protected_skipped": "({n} geschützte Gruppe(n) übersprungen.)",
+  "toast.all_protected":
+    "Alle ausgewählten Gruppen sind geschützt — nichts wurde gelöscht.",
+  "protect.tip":
+    "Diesen Absender schützen — Massenlöschungen und KI-Vorschläge "
+    + "überspringen ihn",
+  "unprotect.tip": "Geschützt — klicken, um den Schutz aufzuheben",
+  "protected": "geschützt",
+  "Protected senders": "Geschützte Absender",
+  "protected.help":
+    "Ein Eintrag pro Zeile: eine Adresse (user@example.com) oder eine "
+    + "Domain (@example.com). Geschützte Absender werden von "
+    + "Massenlöschungen und Auswahl-Voreinstellungen übersprungen; die KI "
+    + "stuft sie nie als sicher löschbar ein.",
 
   "Scan": "Scannen",
   "Sender": "Absender",

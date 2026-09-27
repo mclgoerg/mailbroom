@@ -42,6 +42,17 @@ Be conservative: when unsure, prefer review over delete_safe. Broad groups
 (a whole domain, a vague subject) deserve extra caution. Give a reason of at
 most 12 words per group. Answer for every group in the input."""
 
+# Appended when the payload contains protected senders. The flag itself is
+# metadata; the backend additionally downgrades any delete_safe the model
+# returns for protected mail, so this is belt AND suspenders.
+AI_PROTECTED_NOTE = """
+Groups marked "protected": true contain senders the user explicitly
+protects. NEVER rate a protected group delete_safe — use review or keep."""
+
+AI_GROUP_PROTECTED_NOTE = """
+Mails marked "protected": true are from senders the user explicitly
+protects. NEVER rate a protected mail delete_safe — use review or keep."""
+
 AI_SCHEMA = {
     "type": "object",
     "properties": {
@@ -173,16 +184,24 @@ def _run_ai(grouping: str) -> None:
     try:
         model = cfg["ai"]["model"] or "claude-sonnet-5"
 
+        plist = cfg.get("protected") or []
         with STATE_LOCK:
+            paddrs = mailops._protected_addrs(plist)
+            prot_keys = {r["key"]
+                         for r in STATE["groups"][grouping].values()
+                         if mailops._group_protected(r, paddrs)}
             # Cached verdicts (applied at scan time) are not re-billed.
             batch_src = [
                 {"key": r["key"], "label": r["label"], "count": r["count"],
                  "total_size_kb": r["size"] // 1024,
                  "unread": r["unread"], "first": r["first"],
                  "last": r["last"], "tags": r["tags"],
-                 "samples": r["samples"]}
+                 "samples": r["samples"],
+                 **({"protected": True} if r["key"] in prot_keys else {})}
                 for r in STATE["groups"][grouping].values()
                 if r["ai"] is None]
+        system = AI_SYSTEM.format(grouping=grouping) + (
+            AI_PROTECTED_NOTE if prot_keys else "")
 
         if not batch_src:
             with STATE_LOCK:
@@ -202,8 +221,7 @@ def _run_ai(grouping: str) -> None:
                 batch = batch_src[start:start + AI_BATCH]
                 t0 = time.time()
                 data, tin, tout = _ai_call(
-                    cfg, model, AI_SYSTEM.format(grouping=grouping),
-                    {"groups": batch}, AI_SCHEMA)
+                    cfg, model, system, {"groups": batch}, AI_SCHEMA)
                 log.info("group review batch: %d groups, %d/%d tokens, %.1fs "
                          "(%s/%s)", len(batch), tin, tout, time.time() - t0,
                          cfg["ai"]["provider"], model)
@@ -215,7 +233,13 @@ def _run_ai(grouping: str) -> None:
                     for v in data["verdicts"]:
                         rec = recs.get(v["key"]) or recs.get(v["key"].lower())
                         if rec:
-                            rec["ai"] = {"verdict": v["verdict"],
+                            verdict = v["verdict"]
+                            if verdict == "delete_safe" \
+                                    and rec["key"] in prot_keys:
+                                log.info("downgraded delete_safe -> review "
+                                         "for protected group %r", rec["key"])
+                                verdict = "review"
+                            rec["ai"] = {"verdict": verdict,
                                          "reason": v["reason"][:160]}
                             applied[rec["key"]] = rec["ai"]
                     done += len(batch)
@@ -278,18 +302,22 @@ def ai_group(grouping: str, key: str, offset: int = 0,
                 "usage": {"input_tokens": 0, "output_tokens": 0, "cost": 0,
                           "total_cost": 0}}
 
+    plist = cfg.get("protected") or []
+    prot = {(m["folder"], m["uid"]) for m in mails
+            if cfgmod.is_protected(m["addr"], plist)}
     folders = sorted({m["folder"] for m in mails})
     fidx = {f: i for i, f in enumerate(folders)}
     payload = {"mails": [
         {"uid": m["uid"], "folder_i": fidx[m["folder"]], "date": m["date"],
          "subject": m["subject"], "unread": not m["seen"],
-         "size_kb": m["size"] // 1024}
+         "size_kb": m["size"] // 1024,
+         **({"protected": True} if (m["folder"], m["uid"]) in prot else {})}
         for m in mails]}
     model = cfg["ai"]["model"] or "claude-sonnet-5"
+    system = AI_GROUP_SYSTEM.format(grouping=grouping, label=label) + (
+        AI_GROUP_PROTECTED_NOTE if prot else "")
     t0 = time.time()
-    data, tin, tout = _ai_call(
-        cfg, model, AI_GROUP_SYSTEM.format(grouping=grouping, label=label),
-        payload, AI_GROUP_SCHEMA)
+    data, tin, tout = _ai_call(cfg, model, system, payload, AI_GROUP_SCHEMA)
     log.info("rated %d mails of %r: %d/%d tokens, %.1fs (%s/%s)",
              len(mails), key, tin, tout, time.time() - t0,
              cfg["ai"]["provider"], model)
@@ -305,8 +333,13 @@ def ai_group(grouping: str, key: str, offset: int = 0,
         pos = (folders[it["folder_i"]], it["uid"])
         if pos not in known:
             continue
-        verdicts_out.append([pos[0], pos[1], it["verdict"]])
-        to_store[known[pos]] = it["verdict"]
+        verdict = it["verdict"]
+        if verdict == "delete_safe" and pos in prot:
+            log.info("downgraded delete_safe -> review for protected mail "
+                     "uid %d in %r", pos[1], pos[0])
+            verdict = "review"
+        verdicts_out.append([pos[0], pos[1], verdict])
+        to_store[known[pos]] = verdict
     verdictstore.save_mails(to_store)
     spent = cfgmod.record_usage(cfg["ai"], tin, tout)
     return {"verdicts": verdicts_out, "note": data["note"][:400],

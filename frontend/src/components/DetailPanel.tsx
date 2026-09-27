@@ -4,13 +4,15 @@ import { t } from "../i18n";
 import { fmtSize, fmtUsd, mailKey, olderThan } from "../lib";
 import type { AppState, Group, Grouping, Mail } from "../types";
 import { MailRows, MessageView } from "./MailList";
-import { Button, ensureAiAck, Modal, Spinner } from "./ui";
+import { Button, ensureAiAck, Modal, ProtectButton, Spinner } from "./ui";
 
-export function DetailPanel({ grouping, group, aiEnabled, folders, onClose,
-  onDeleted }: {
+export function DetailPanel({ grouping, group, aiEnabled, protectedNow,
+  onProtect, folders, onClose, onDeleted }: {
   grouping: Grouping;
   group: Group;
   aiEnabled: boolean;
+  protectedNow: boolean;                 // live value; `group` is a snapshot
+  onProtect?: (g: Group) => void;        // absent in subject mode
   folders: AppState["folders_raw"];
   onClose: () => void;
   onDeleted: () => void;
@@ -97,8 +99,8 @@ export function DetailPanel({ grouping, group, aiEnabled, folders, onClose,
           r = await api.aiGroup(grouping, group.key, 0, 25);  // retry smaller
         }
         if (r.reviewed === 0) break;
-        const map = new Map(r.verdicts.map(
-          ([f, u, v]) => [`${f} ${u}`, v] as const));
+        const map = new Map<string, Mail["ai"]>(r.verdicts.map(
+          ([f, u, v]) => [`${f} ${u}`, v]));
         current = current.map((m) =>
           map.has(mailKey(m)) ? { ...m, ai: map.get(mailKey(m))! } : m);
         setMails(current);
@@ -185,8 +187,13 @@ export function DetailPanel({ grouping, group, aiEnabled, folders, onClose,
               ? `${shown.length} / ${mails.length}`
               : mails ? mails.length : group.count} {t("mails")} ·{" "}
             {fmtSize(group.size)}
+            {protectedNow && <> · 🛡️ {t("protected")}</>}
           </div>
         </div>
+        {onProtect && (
+          <ProtectButton on={protectedNow}
+            onClick={() => onProtect({ ...group, protected: protectedNow })} />
+        )}
         <Button variant="ghost" onClick={onClose}>✕</Button>
       </div>
 

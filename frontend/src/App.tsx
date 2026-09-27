@@ -151,34 +151,69 @@ export default function App() {
     catch (e: any) { setToast(`Error: ${e.message ?? e}`); }
   };
 
+  // Selection presets never pick up protected groups — protecting a sender
+  // means "keep it out of every bulk sweep".
   const selectPreset = (preset: string) => {
     const next = new Set(selected);
     if (preset === "none") next.clear();
     else if (preset === "aisafe") {
-      groups.filter((g) => g.ai?.verdict === "delete_safe")
+      groups.filter((g) => g.ai?.verdict === "delete_safe" && !g.protected)
         .forEach((g) => next.add(g.key));
     } else if (preset.startsWith("older")) {
       const months = Number(preset.slice(5));
       const cutoff = new Date(Date.now() - months * 30.44 * 86400e3)
         .toISOString().slice(0, 10);
-      groups.filter((g) => g.last && g.last < cutoff)
+      groups.filter((g) => g.last && g.last < cutoff && !g.protected)
         .forEach((g) => next.add(g.key));
     }
     setSelected(next);
   };
 
   const act = async (keys: string[], action: string, dest = "") => {
-    const n = keys.reduce((acc, k) => {
-      const g = state?.groups[mode][k];
-      return acc + (g ? g.count : 0);
-    }, 0);
+    const all = state?.groups[mode] ?? {};
+    let force = false;
+    let effective = keys;
+    if (action === "trash") {
+      const prot = keys.filter((k) => all[k]?.protected);
+      if (prot.length === 1 && keys.length === 1) {
+        // Explicitly trashing one protected group: allow, after its own
+        // warning (the backend requires force for this).
+        if (!confirm(t("confirm.trash_protected",
+          { label: all[keys[0]]?.label ?? keys[0] }))) return;
+        force = true;
+      } else if (prot.length) {
+        effective = keys.filter((k) => !all[k]?.protected);
+        if (!effective.length) {
+          setToast(t("toast.all_protected"));
+          return;
+        }
+      }
+    }
+    const n = effective.reduce((acc, k) => acc + (all[k]?.count ?? 0), 0);
     const verb = actionVerb(action) + (dest ? ` → ${dest}` : "");
-    if (!confirm(t("confirm.act", { verb, n, k: keys.length }))) return;
+    const skipNote = effective.length !== keys.length
+      ? " " + t("confirm.protected_skipped",
+          { n: keys.length - effective.length }) : "";
+    if (!force && !confirm(
+      t("confirm.act", { verb, n, k: effective.length }) + skipNote)) return;
     try {
-      await api.deleteGroups(mode, keys, action, dest);
+      await api.deleteGroups(mode, effective, action, dest, force);
       setToast("");
       setSelected(new Set());
       refresh();   // runs in the background; SSE/polling follows it
+    } catch (e: any) {
+      setToast(`Error: ${e.message ?? e}`);
+    }
+  };
+
+  // Sender mode protects the exact address, domain mode the whole domain.
+  // Subject groups have no stable sender, so they get no protect toggle.
+  const toggleProtect = mode === "subject" ? undefined : async (g: Group) => {
+    const entry = mode === "domain" ? `@${g.key}` : g.key;
+    try {
+      const r = await api.protect(entry, !g.protected);
+      setCfg((c) => (c ? { ...c, protected: r.protected } : c));
+      refresh();
     } catch (e: any) {
       setToast(`Error: ${e.message ?? e}`);
     }
@@ -442,6 +477,7 @@ export default function App() {
           }}
           onOpen={setDetail}
           onTrash={(g) => act([g.key], "trash")}
+          onProtect={toggleProtect}
           sortK={sortK}
           sortDir={sortDir}
           onSort={(k) => {
@@ -464,6 +500,9 @@ export default function App() {
           grouping={mode}
           group={detail}
           aiEnabled={aiEnabled}
+          protectedNow={state?.groups[mode][detail.key]?.protected
+            ?? detail.protected}
+          onProtect={toggleProtect}
           folders={state?.folders_raw ?? []}
           onClose={() => { setDetail(null); refresh(); }}
           onDeleted={refresh}

@@ -360,15 +360,41 @@ def _rating_counts(rec: dict, mail_verdicts: dict) -> dict | None:
     return counts if any(counts.values()) else None
 
 
+def _protected_addrs(plist: list[str]) -> set[str]:
+    """Scanned sender addresses matching the protected list (lock held)."""
+    if not plist:
+        return set()
+    addrs = {m["addr"] for m in INDEX.values()}
+    return {a for a in addrs if cfgmod.is_protected(a, plist)}
+
+
+def _group_protected(rec: dict, paddrs: set[str]) -> bool:
+    """True if any mail in this group comes from a protected sender
+    (lock held). Sender groups reduce to one key check; domain/subject
+    groups are protected as soon as they CONTAIN protected mail."""
+    if not paddrs:
+        return False
+    for folder, uids in rec["folders"].items():
+        for uid in uids:
+            m = INDEX.get(ikey(folder, uid))
+            if m and m["addr"] in paddrs:
+                return True
+    return False
+
+
 def public_state() -> dict:
     """STATE for the API: group records without the internal UID lists,
     plus the per-mail rating summary each group's mails have accumulated."""
     mail_verdicts = verdictstore.load_mails()
+    plist = cfgmod.normalize_protected(
+        cfgmod.load_config().get("protected"))
     with STATE_LOCK:
+        paddrs = _protected_addrs(plist)
         out = {k: v for k, v in STATE.items() if k != "groups"}
         out["groups"] = {
             g: {k: {**{kk: vv for kk, vv in rec.items() if kk != "folders"},
-                    "ratings": _rating_counts(rec, mail_verdicts)}
+                    "ratings": _rating_counts(rec, mail_verdicts),
+                    "protected": _group_protected(rec, paddrs)}
                 for k, rec in recs.items()}
             for g, recs in STATE["groups"].items()}
         return out
@@ -737,13 +763,31 @@ def _start_delete(by_folder: dict[str, set[int]], label: str,
 
 
 def delete_groups(grouping: str, keys: list[str],
-                  action: str = "trash", dest: str = "") -> dict:
+                  action: str = "trash", dest: str = "",
+                  force: bool = False) -> dict:
+    skipped = 0
     with STATE_LOCK:
         if STATE["status"] != "done":
             raise RuntimeError("No completed scan")
         # Server-side UID bookkeeping: client input only selects keys.
         recs = STATE["groups"][grouping]
         jobs = {k: recs[k] for k in keys if k in recs}
+        # Safety floor: trashing protected groups needs an explicit force
+        # (the UI sends it only after a dedicated per-group confirmation).
+        if jobs and action == "trash" and not force:
+            plist = cfgmod.normalize_protected(
+                cfgmod.load_config().get("protected"))
+            paddrs = _protected_addrs(plist)
+            prot = [k for k, rec in jobs.items()
+                    if _group_protected(rec, paddrs)]
+            for k in prot:
+                jobs.pop(k)
+            skipped = len(prot)
+            if skipped:
+                log.info("delete: skipped %d protected group(s): %s",
+                         skipped, ", ".join(prot[:5]))
+            if not jobs:
+                raise ValueError("all selected groups are protected")
         by_folder: dict[str, set[int]] = {}
         for rec in jobs.values():
             for folder, uids in rec["folders"].items():
@@ -753,7 +797,8 @@ def delete_groups(grouping: str, keys: list[str],
         labels = [jobs[k]["label"] for k in list(jobs)[:3]]
         label = ", ".join(labels) + ("…" if len(jobs) > 3 else "")
         _start_delete(by_folder, label, action, dest)
-    return {"ok": True, "queued": sum(len(s) for s in by_folder.values())}
+    return {"ok": True, "queued": sum(len(s) for s in by_folder.values()),
+            "skipped": skipped}
 
 
 def delete_messages(items: list, action: str = "trash",

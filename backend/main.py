@@ -69,6 +69,7 @@ class DeleteBody(BaseModel):
     keys: list[str] = Field(min_length=1)
     action: str = "trash"          # trash | archive | move | mark_read
     dest: str = ""                 # raw folder name, for action == "move"
+    force: bool = False            # trash protected groups anyway
 
 
 class DeleteMessagesBody(BaseModel):
@@ -126,7 +127,7 @@ def post_delete(body: DeleteBody):
     _check_grouping(body.grouping)
     try:
         return mailops.delete_groups(body.grouping, body.keys,
-                                     body.action, body.dest)
+                                     body.action, body.dest, body.force)
     except ValueError as exc:
         raise HTTPException(400, str(exc))
     except RuntimeError as exc:
@@ -177,6 +178,24 @@ def post_unsubscribe(body: AiGroupBody):
         return unsub.unsubscribe(body.grouping, body.key)
     except Exception as exc:
         raise HTTPException(500, f"{type(exc).__name__}: {exc}")
+
+
+class ProtectBody(BaseModel):
+    entry: str                     # "user@example.com" or "@example.com"
+    on: bool = True
+
+
+@app.post("/api/protect")
+def post_protect(body: ProtectBody):
+    try:
+        protected = cfgmod.set_protected(body.entry, body.on)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc))
+    logging.getLogger("pmc.mail").info(
+        "protected list %s %r (%d entries)",
+        "add" if body.on else "remove", body.entry.strip().lower(),
+        len(protected))
+    return {"protected": protected}
 
 
 @app.post("/api/undo")

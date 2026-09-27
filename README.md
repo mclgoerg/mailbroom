@@ -28,6 +28,11 @@ paid Proton plan), but it speaks plain IMAP, so other providers work too.
   Providers: Anthropic API, OpenAI, Claude on Microsoft Foundry, or any
   OpenAI-compatible local endpoint (Ollama, LM Studio, vLLM). Token usage
   and cost are tracked with a built-in price table.
+- **Protected senders** — mark addresses or whole domains (🛡️ in the group
+  row, or a list in settings) as never-bulk-delete: selection presets and
+  bulk trash skip them (trashing one explicitly asks first), and the AI is
+  told — and forced — to never rate their mails "safe to delete". Filter
+  them with `is:protected`.
 - **One-click unsubscribe** — RFC 8058 one-click POST or unsubscribe mail
   via Bridge SMTP, straight from a group's detail view.
 - **Undo** — restore the last deletions from Trash (matched by Message-ID).

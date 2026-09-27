@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { fmtSize } from "../api";
 import type { Group } from "../types";
 import { t } from "../i18n";
-import { AiTag, Button, RatingChips, Tag } from "./ui";
+import { AiTag, Button, ProtectButton, RatingChips, Tag } from "./ui";
 
 export type SortKey = "count" | "size" | "label" | "last" | "unreadPct";
 
@@ -17,6 +17,7 @@ interface Props {
   onToggleAll: (checked: boolean, keys: string[]) => void;
   onOpen: (g: Group) => void;
   onTrash: (g: Group) => void;
+  onProtect?: (g: Group) => void;   // absent in subject mode
   sortK: SortKey;
   sortDir: number;
   onSort: (k: SortKey) => void;
@@ -35,7 +36,7 @@ const unreadPct = (g: Group) =>
 /* Desktop: fixed-layout table so column widths never change when the
    grouping mode (and with it the content) changes. */
 function DesktopTable({ slice, baseIdx, selected, focusedKey, onToggle,
-  onToggleAll, onOpen, onTrash, sortK, sortDir, onSort, groupLabel
+  onToggleAll, onOpen, onTrash, onProtect, sortK, sortDir, onSort, groupLabel
 }: PageProps) {
   const arrow = (k: SortKey) =>
     sortK === k ? (sortDir < 0 ? " ↓" : " ↑") : "";
@@ -122,11 +123,17 @@ function DesktopTable({ slice, baseIdx, selected, focusedKey, onToggle,
               {g.last}
             </td>
             <td className="px-2 py-2 text-right align-top">
-              <Button variant="danger"
-                className="!min-h-7 !px-2 !py-0.5 !text-xs"
-                onClick={() => onTrash(g)}>
-                {t("Trash")}
-              </Button>
+              <div className="flex items-center justify-end gap-1">
+                {onProtect && (
+                  <ProtectButton on={g.protected}
+                    onClick={() => onProtect(g)} />
+                )}
+                <Button variant="danger"
+                  className="!min-h-7 !px-2 !py-0.5 !text-xs"
+                  onClick={() => onTrash(g)}>
+                  {t("Trash")}
+                </Button>
+              </div>
             </td>
           </tr>
         ))}
@@ -137,7 +144,7 @@ function DesktopTable({ slice, baseIdx, selected, focusedKey, onToggle,
 
 /* Mobile: a card list — no table semantics, no horizontal squeeze. */
 function MobileCards({ slice, baseIdx, selected, focusedKey, onToggle,
-  onOpen, onTrash }: PageProps) {
+  onOpen, onTrash, onProtect }: PageProps) {
   return (
     <div>
       {slice.map((g, i) => (
@@ -166,6 +173,9 @@ function MobileCards({ slice, baseIdx, selected, focusedKey, onToggle,
               onClick={() => onTrash(g)}>
               {t("Trash")}
             </Button>
+            {onProtect && (
+              <ProtectButton on={g.protected} onClick={() => onProtect(g)} />
+            )}
           </div>
         </div>
       ))}

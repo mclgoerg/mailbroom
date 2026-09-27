@@ -7,6 +7,7 @@ const g = (over: Partial<Group> = {}): Group => ({
   count: 100, size: 5000, unread: 90, first: "2024-01-01",
   last: "2024-06-01", tags: ["shipping", "newsletter"], samples: [],
   bulk: true, unsub: true, ai: { verdict: "delete_safe", reason: "x" },
+  ratings: null, protected: false,
   ...over,
 });
 
@@ -46,6 +47,10 @@ describe("parseFilter", () => {
     expect(parseFilter("age:>6m").ageMonths).toBe(6);
     expect(parseFilter("age:bogus").ageMonths).toBeNull();
   });
+  it("recognises is:protected", () => {
+    expect(parseFilter("is:protected").protectedOnly).toBe(true);
+    expect(parseFilter("dhl").protectedOnly).toBe(false);
+  });
 });
 
 describe("matchGroup", () => {
@@ -59,6 +64,11 @@ describe("matchGroup", () => {
     expect(matchGroup(g({ unsub: false }), f, NOW)).toBe(false);
     expect(matchGroup(g({ label: "UPS", key: "a@ups.example", sub: "" }),
       f, NOW)).toBe(false);
+  });
+  it("is:protected matches only protected groups", () => {
+    const f = parseFilter("is:protected");
+    expect(matchGroup(g({ protected: true }), f, NOW)).toBe(true);
+    expect(matchGroup(g(), f, NOW)).toBe(false);
   });
   it("age filter uses last activity", () => {
     const f = parseFilter("age:>1y");

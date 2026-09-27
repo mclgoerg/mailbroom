@@ -21,6 +21,7 @@ export interface Group {
   unsub: boolean;
   ai: GroupAi | null;
   ratings: { delete_safe: number; review: number; keep: number } | null;
+  protected: boolean;
 }
 
 export interface AiUsage {
@@ -118,8 +119,9 @@ export interface Config {
   profiles: string[];
   active_profile: string;
   excluded_folders: string[];
+  protected: string[];
   ai: {
-    provider: "anthropic" | "foundry";
+    provider: "anthropic" | "foundry" | "openai" | "ollama";
     model: string;
     foundry_endpoint: string;
     price_in: number;
