@@ -297,7 +297,10 @@ export function SettingsModal({ cfg, account, onClose, onSaved,
   ];
 
   return (
-    <Modal onClose={onClose}>
+    // full = fixed-height sheet: switching tabs must not resize or
+    // re-center the modal (only the content area scrolls; header, tab
+    // bar and the Save footer stay put).
+    <Modal full onClose={onClose}>
       <PanelHeader title={<>⚙ {t("Settings")}</>} onClose={onClose} />
       <div role="tablist" className="flex flex-wrap gap-1 border-b
         border-line px-5 pt-3">
@@ -311,7 +314,8 @@ export function SettingsModal({ cfg, account, onClose, onSaved,
           </button>
         ))}
       </div>
-      <div className="grid gap-4 p-5 sm:grid-cols-2">
+      <div className="grid flex-1 content-start gap-4 overflow-y-auto p-5
+        sm:grid-cols-2">
         {tab === "general" && (<>
         <Field label={t("Language")}>
           <Select className="w-full" value={getLang()}
