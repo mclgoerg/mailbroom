@@ -210,32 +210,52 @@ def post_logout():
     return resp
 
 
+_PKCE_COOKIE = "pmc_oidc_pkce"
+
+
 @app.get("/api/oidc/login")
 def get_oidc_login(request: Request):
     cfg = cfgmod.load_config()
     if cfg["auth"]["mode"] != "oidc":
         raise HTTPException(400, "OIDC login is not enabled")
     redirect = _external_base(request) + "/api/oidc/callback"
+    verifier = authmod.make_verifier()
     try:
         url = authmod.auth_url(cfg["auth"]["oidc"], redirect,
-                               authmod.make_state())
+                               authmod.make_state(), verifier)
     except Exception as exc:
         raise HTTPException(502, f"IdP discovery failed: {exc}")
-    return RedirectResponse(url)
+    resp = RedirectResponse(url)
+    # PKCE verifier for the callback leg. Lax still sends it on the IdP's
+    # top-level redirect back to us; it never appears in any URL.
+    resp.set_cookie(_PKCE_COOKIE, verifier, httponly=True, samesite="lax",
+                    secure=_external_base(request).startswith("https://"),
+                    max_age=authmod.STATE_MAX_AGE)
+    return resp
 
 
 @app.get("/api/oidc/callback")
 def get_oidc_callback(request: Request, code: str = Query(""),
-                      state: str = Query("")):
+                      state: str = Query(""), error: str = Query(""),
+                      error_description: str = Query("")):
     cfg = cfgmod.load_config()
     if cfg["auth"]["mode"] != "oidc":
         raise HTTPException(400, "OIDC login is not enabled")
+    if error:      # the IdP rejected the authorization request — say why
+        logging.getLogger("pmc.auth").warning(
+            "OIDC login rejected by the IdP: %s (%s)",
+            error, error_description)
+        raise HTTPException(
+            502, f"the identity provider rejected the login: "
+                 f"{error_description or error}")
     if not code or not authmod.verify_state(state):
         raise HTTPException(400, "invalid or expired login state — "
                             "try signing in again")
     redirect = _external_base(request) + "/api/oidc/callback"
+    verifier = request.cookies.get(_PKCE_COOKIE, "")
     try:
-        claims = authmod.exchange_code(cfg["auth"]["oidc"], redirect, code)
+        claims = authmod.exchange_code(cfg["auth"]["oidc"], redirect, code,
+                                       verifier)
     except Exception as exc:
         raise HTTPException(502, f"token exchange failed: {exc}")
     sub = authmod.allowed_subject(claims,
@@ -252,6 +272,7 @@ def get_oidc_callback(request: Request, code: str = Query(""),
             "OIDC admin claimed by %s — this identity now owns the "
             "existing workspace and the server settings", sub)
     resp = RedirectResponse("/")
+    resp.delete_cookie(_PKCE_COOKIE)          # one roundtrip, one verifier
     _set_session(resp, request, sub)
     logging.getLogger("pmc.auth").info("OIDC login ok: %s", sub)
     return resp

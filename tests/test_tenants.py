@@ -144,7 +144,7 @@ def test_first_oidc_login_claims_admin(monkeypatch):
         "token_endpoint": "https://idp.example/token",
         "userinfo_endpoint": "https://idp.example/userinfo"})
     monkeypatch.setattr(authmod, "exchange_code",
-                        lambda cfg, redirect, code:
+                        lambda cfg, redirect, code, verifier="":
                         {"email": "first@x.example", "sub": "u1"})
     c = TestClient(app)
     state = authmod.make_state()
@@ -156,7 +156,7 @@ def test_first_oidc_login_claims_admin(monkeypatch):
     assert c.get("/api/auth").json()["is_admin"] is True
     # The second identity does NOT become admin.
     monkeypatch.setattr(authmod, "exchange_code",
-                        lambda cfg, redirect, code:
+                        lambda cfg, redirect, code, verifier="":
                         {"email": "second@x.example", "sub": "u2"})
     c2 = TestClient(app)
     state = authmod.make_state()

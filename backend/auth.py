@@ -104,6 +104,19 @@ def make_state(now: float | None = None) -> str:
     return f"{body}.{_sign(('state:' + body).encode())}"
 
 
+# PKCE (RFC 7636, S256): providers like Pocket ID require it even for
+# confidential clients. The verifier crosses the roundtrip in an HttpOnly
+# Lax cookie (sent on the IdP's top-level redirect back), never in a URL.
+
+def make_verifier() -> str:
+    return secrets.token_urlsafe(48)              # 64 chars, in [43, 128]
+
+
+def code_challenge(verifier: str) -> str:
+    return base64.urlsafe_b64encode(
+        hashlib.sha256(verifier.encode()).digest()).rstrip(b"=").decode()
+
+
 def verify_state(state: str, now: float | None = None) -> bool:
     try:
         ts_s, nonce, sig = state.split(".")
@@ -135,30 +148,40 @@ def discovery(issuer: str) -> dict:
     return _discovery_cache[issuer]
 
 
-def auth_url(oidc_cfg: dict, redirect_uri: str, state: str) -> str:
+def auth_url(oidc_cfg: dict, redirect_uri: str, state: str,
+             verifier: str = "") -> str:
     disc = discovery(oidc_cfg["issuer"])
-    return disc["authorization_endpoint"] + "?" + urllib.parse.urlencode({
+    params = {
         "response_type": "code",
         "client_id": oidc_cfg["client_id"],
         "redirect_uri": redirect_uri,
         "scope": "openid email profile",
         "state": state,
-    })
+    }
+    if verifier:
+        params["code_challenge"] = code_challenge(verifier)
+        params["code_challenge_method"] = "S256"
+    return disc["authorization_endpoint"] + "?" + urllib.parse.urlencode(
+        params)
 
 
-def exchange_code(oidc_cfg: dict, redirect_uri: str, code: str) -> dict:
+def exchange_code(oidc_cfg: dict, redirect_uri: str, code: str,
+                  verifier: str = "") -> dict:
     """Code -> tokens -> userinfo claims (validated by the userinfo call
     itself: the IdP only answers for access tokens it just issued)."""
     disc = discovery(oidc_cfg["issuer"])
+    form = {
+        "grant_type": "authorization_code",
+        "code": code,
+        "redirect_uri": redirect_uri,
+        "client_id": oidc_cfg["client_id"],
+        "client_secret": oidc_cfg["client_secret"],
+    }
+    if verifier:
+        form["code_verifier"] = verifier
     tokens = _http_json(
         disc["token_endpoint"],
-        data=urllib.parse.urlencode({
-            "grant_type": "authorization_code",
-            "code": code,
-            "redirect_uri": redirect_uri,
-            "client_id": oidc_cfg["client_id"],
-            "client_secret": oidc_cfg["client_secret"],
-        }).encode(),
+        data=urllib.parse.urlencode(form).encode(),
         headers={"Content-Type": "application/x-www-form-urlencoded"})
     return _http_json(
         disc["userinfo_endpoint"],

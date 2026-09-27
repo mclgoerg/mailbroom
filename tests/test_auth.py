@@ -88,26 +88,43 @@ def test_oidc_mode_flow(monkeypatch):
     loc = r.headers["location"]
     assert loc.startswith("https://idp.example/authorize?")
     assert "client_id=mailbroom" in loc and "state=" in loc
+    # PKCE: challenge in the authorize URL, verifier in an HttpOnly cookie
+    # (providers like Pocket ID reject requests without code_challenge).
+    assert "code_challenge_method=S256" in loc
+    challenge = loc.split("code_challenge=")[1].split("&")[0]
+    verifier = r.cookies.get("pmc_oidc_pkce")
+    assert verifier and authmod.code_challenge(verifier) == challenge
     state = loc.split("state=")[1].split("&")[0]
 
     # tampered/expired state is rejected
     assert c.get("/api/oidc/callback?code=abc&state=bad").status_code == 400
 
+    # an IdP error redirect surfaces the IdP's reason, not "bad state"
+    r = c.get("/api/oidc/callback?error=invalid_request"
+              "&error_description=This+client+requires+PKCE&state=x")
+    assert r.status_code == 502 and "requires PKCE" in r.json()["detail"]
+
     # a user NOT on the allow-list is rejected
     monkeypatch.setattr(authmod, "exchange_code",
-                        lambda cfg, redirect, code:
+                        lambda cfg, redirect, code, verifier="":
                         {"email": "evil@other.example", "sub": "e1"})
     import urllib.parse
     q = urllib.parse.quote(state)
     assert c.get(f"/api/oidc/callback?code=abc&state={q}").status_code == 403
 
-    # allowed user gets a session and lands on /
-    monkeypatch.setattr(authmod, "exchange_code",
-                        lambda cfg, redirect, code:
-                        {"email": "me@corp.example", "sub": "u1"})
+    # allowed user gets a session and lands on /; the token exchange
+    # receives the SAME verifier the login leg set
+    seen = {}
+
+    def fake_exchange(cfg, redirect, code, verifier=""):
+        seen["verifier"] = verifier
+        return {"email": "me@corp.example", "sub": "u1"}
+
+    monkeypatch.setattr(authmod, "exchange_code", fake_exchange)
     r = c.get(f"/api/oidc/callback?code=abc&state={q}",
               follow_redirects=False)
     assert r.status_code in (302, 307) and r.headers["location"] == "/"
+    assert seen["verifier"] == verifier
     assert "pmc_session" in r.cookies
     assert c.get("/api/state").status_code == 200
 
