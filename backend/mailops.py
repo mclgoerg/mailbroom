@@ -1177,29 +1177,79 @@ def attachments_list(limit: int = 300) -> list[dict]:
 
 
 def index_stats() -> dict:
-    """Live numbers from the scanned index: per-year histogram and the
-    domains hogging the most space."""
+    """Live numbers from the scanned index: totals, unread/newsletter
+    share, per-year and per-month histograms, category breakdown, top
+    domains by size and senders by count, AI coverage, replied share."""
+    mail_verdicts = verdictstore.load_mails()
+    years: dict[str, dict] = {}
+    months: dict[str, dict] = {}
+    domains: dict[str, dict] = {}
+    categories: dict[str, dict] = {}
+    total_size = unread = bulk = oldest = 0
+    rated = {"delete_safe": 0, "review": 0, "keep": 0}
+    ai_groups = {"delete_safe": 0, "review": 0, "keep": 0, "unrated": 0}
+    replied_senders = 0
+    top_senders: list[dict] = []
+
     with STATE_LOCK:
         mails = list(INDEX.values())
-    years: dict[str, dict] = {}
-    domains: dict[str, dict] = {}
-    total_size = 0
-    for m in mails:
-        total_size += m["size"]
-        year = time.strftime("%Y", time.localtime(m["ts"])) if m["ts"] \
-            else "unknown"
-        y = years.setdefault(year, {"count": 0, "size": 0})
-        y["count"] += 1
-        y["size"] += m["size"]
-        dom = m["addr"].rsplit("@", 1)[-1]
-        d = domains.setdefault(dom, {"count": 0, "size": 0})
-        d["count"] += 1
-        d["size"] += m["size"]
+        for m in mails:
+            total_size += m["size"]
+            unread += 0 if m["seen"] else 1
+            bulk += 1 if m["bulk"] else 0
+            if m["ts"]:
+                oldest = m["ts"] if not oldest else min(oldest, m["ts"])
+            lt = time.localtime(m["ts"]) if m["ts"] else None
+            year = time.strftime("%Y", lt) if lt else "unknown"
+            y = years.setdefault(year, {"count": 0, "size": 0})
+            y["count"] += 1
+            y["size"] += m["size"]
+            if lt:
+                mo = months.setdefault(time.strftime("%Y-%m", lt),
+                                       {"count": 0, "size": 0})
+                mo["count"] += 1
+                mo["size"] += m["size"]
+            dom = m["addr"].rsplit("@", 1)[-1]
+            d = domains.setdefault(dom, {"count": 0, "size": 0})
+            d["count"] += 1
+            d["size"] += m["size"]
+            v = mail_verdicts.get(m["msgid"])
+            if v in rated:
+                rated[v] += 1
+
+        sender_groups = list(STATE["groups"]["sender"].values())
+        for g in sender_groups:
+            if g.get("replied"):
+                replied_senders += 1
+            verdict = g["ai"]["verdict"] if g.get("ai") else "unrated"
+            ai_groups[verdict] = ai_groups.get(verdict, 0) + 1
+            for tag in g["tags"]:
+                c = categories.setdefault(tag, {"count": 0, "size": 0})
+                c["count"] += g["count"]
+                c["size"] += g["size"]
+        top_senders = [
+            {"key": g["key"], "label": g["label"], "count": g["count"],
+             "size": g["size"]}
+            for g in sorted(sender_groups, key=lambda g: -g["count"])[:10]]
+
     top = sorted(domains.items(), key=lambda kv: -kv[1]["size"])[:10]
     return {
         "mails": len(mails), "size": total_size,
+        "unread": unread, "bulk": bulk,
+        "oldest": time.strftime("%Y-%m-%d", time.localtime(oldest))
+                  if oldest else "",
+        "senders": len(sender_groups),
+        "replied_senders": replied_senders,
+        "ai_groups": ai_groups,
+        "rated_mails": rated,
         "years": [{"year": y, **v} for y, v in sorted(years.items())],
+        "months": [{"month": k, **v}
+                   for k, v in sorted(months.items())][-12:],
+        "categories": sorted(
+            [{"tag": k, **v} for k, v in categories.items()],
+            key=lambda c: -c["count"]),
         "top_domains": [{"domain": k, **v} for k, v in top],
+        "top_senders": top_senders,
     }
 
 

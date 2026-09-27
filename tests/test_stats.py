@@ -51,6 +51,21 @@ def test_stats_endpoint_shape(bridge):
     assert len(st["scans"]) == 1
     assert isinstance(st["actions"], dict)
 
+    # extended numbers (fixture: uids 1+4 unread; 1+4 have List-Unsubscribe)
+    assert st["unread"] == 2
+    assert st["bulk"] == 2
+    assert st["senders"] == 3
+    assert st["replied_senders"] == 1            # alice (Sent To/Cc)
+    assert st["oldest"] == "2025-01-01"          # the Archive DHL mail
+    assert st["months"] and st["months"][-1]["month"] == "2026-09"
+    assert st["top_senders"][0]["key"] == "noreply@dhl.example"
+    assert st["top_senders"][0]["count"] == 3
+    cats = {c["tag"]: c for c in st["categories"]}
+    assert cats["shipping"]["count"] == 3        # the DHL group
+    assert cats["newsletter"]["count"] >= 1      # shop mail (List-Unsub)
+    assert st["ai_groups"]["unrated"] == 3       # nothing rated yet
+    assert st["rated_mails"] == {"delete_safe": 0, "review": 0, "keep": 0}
+
 
 def test_record_action_ignores_noise():
     statsmod.record_action("trash", 0, 100)      # zero count

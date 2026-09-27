@@ -76,8 +76,20 @@ export interface TrashResp {
 export interface StatsResp {
   mails: number;
   size: number;
+  unread: number;
+  bulk: number;
+  oldest: string;
+  senders: number;
+  replied_senders: number;
+  ai_groups: { delete_safe: number; review: number; keep: number;
+    unrated: number };
+  rated_mails: { delete_safe: number; review: number; keep: number };
   years: { year: string; count: number; size: number }[];
+  months: { month: string; count: number; size: number }[];
+  categories: { tag: string; count: number; size: number }[];
   top_domains: { domain: string; count: number; size: number }[];
+  top_senders: { key: string; label: string; count: number;
+    size: number }[];
   scans: { ts: number; mails: number; size: number; senders: number }[];
   actions: Record<string, { trash: number; archive: number; move: number;
     mark_read: number; freed: number }>;
