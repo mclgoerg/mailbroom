@@ -7,6 +7,7 @@ import { GroupTable, type SortKey } from "./components/GroupTable";
 import { RulesModal } from "./components/RulesModal";
 import { SearchPanel } from "./components/SearchPanel";
 import { SettingsModal } from "./components/SettingsModal";
+import { StatsPanel } from "./components/StatsPanel";
 import { applyTheme, Button, currentTheme, ensureAiAck, Spinner } from "./components/ui";
 import { t } from "./i18n";
 import { fmtSize, fmtUsd, matchGroup, parseFilter } from "./lib";
@@ -47,6 +48,7 @@ export default function App() {
   const [rulesOpen, setRulesOpen] = useState(false);
   const [attsOpen, setAttsOpen] = useState(false);
   const [dupsOpen, setDupsOpen] = useState(false);
+  const [statsOpen, setStatsOpen] = useState(false);
   const [undoOpen, setUndoOpen] = useState(false);
   const [moveDest, setMoveDest] = useState("");
   const [focusIdx, setFocusIdx] = useState(-1);
@@ -118,7 +120,7 @@ export default function App() {
   const deleting = state?.delete.status === "running";
   const aiEnabled = !!cfg?.ai.available;
   const anyModal = !!detail || searchOpen || settingsOpen || rulesOpen
-    || attsOpen || dupsOpen;
+    || attsOpen || dupsOpen || statsOpen;
 
   const startScan = async () => {
     setSelected(new Set());
@@ -379,6 +381,8 @@ export default function App() {
         <Button variant="ghost" title={t("Duplicates")}
           disabled={state?.status !== "done"}
           onClick={() => setDupsOpen(true)}>📑</Button>
+        <Button variant="ghost" title={t("Statistics")}
+          onClick={() => setStatsOpen(true)}>📊</Button>
         <Button variant="ghost" title={t("Settings")}
           onClick={() => setSettingsOpen(true)}>⚙</Button>
       </div>
@@ -528,6 +532,7 @@ export default function App() {
           onDeleted={refresh}
         />
       )}
+      {statsOpen && <StatsPanel onClose={() => setStatsOpen(false)} />}
       {dupsOpen && (
         <DuplicatesPanel
           onClose={() => { setDupsOpen(false); refresh(); }}

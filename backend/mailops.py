@@ -25,6 +25,7 @@ import imaplib
 imaplib._MAXLINE = 10_000_000  # bulk FETCH responses exceed the default 1MB
 
 from . import config as cfgmod
+from . import stats as statsmod
 from . import verdictstore
 
 FETCH_CHUNK = 500
@@ -527,6 +528,9 @@ def run_scan() -> None:
                      "%d replied-to addrs in %.1fs",
                      len(folders), len(messages), len(groups["sender"]),
                      len(replied), time.time() - t0)
+            statsmod.record_scan(len(messages),
+                                 sum(m["size"] for m in messages),
+                                 len(groups["sender"]))
         finally:
             try:
                 conn.logout()
@@ -794,15 +798,20 @@ def _delete_worker() -> None:
                 return
             meta = _apply_removal(moved_uids)
             _record_undo(label, meta, action, resolved[0])
-            STATE["delete"]["moved"] += sum(
-                len(s) for s in moved_uids.values())
+            n = sum(len(s) for s in moved_uids.values())
+            STATE["delete"]["moved"] += n
+            freed[0] += sum(m["size"] for by_uid in meta.values()
+                            for m in by_uid.values())
+            freed[1] += n
 
         resolved = [dest]
+        freed = [0, 0]                      # [bytes moved, mails moved]
         try:
             if action == "mark_read":
                 done = _mark_read(by_folder, progress_cb)
                 with STATE_LOCK:
                     STATE["delete"]["moved"] += done
+                statsmod.record_action("mark_read", done, 0)
             else:
                 moved, _, resolved[0] = _move_uids(
                     by_folder, action, dest, progress_cb, moved_uids)
@@ -824,6 +833,8 @@ def _delete_worker() -> None:
             with STATE_LOCK:
                 apply_partial()
                 STATE["delete"]["error"] = f"{type(exc).__name__}: {exc}"
+        if action != "mark_read" and freed[1]:
+            statsmod.record_action(action, freed[1], freed[0])
 
 
 def _start_delete(by_folder: dict[str, set[int]], label: str,
@@ -1136,6 +1147,33 @@ def attachments_list(limit: int = 300) -> list[dict]:
                for m in INDEX.values() if m.get("att_size")]
     out.sort(key=lambda m: -m["att_size"])
     return out[:limit]
+
+
+def index_stats() -> dict:
+    """Live numbers from the scanned index: per-year histogram and the
+    domains hogging the most space."""
+    with STATE_LOCK:
+        mails = list(INDEX.values())
+    years: dict[str, dict] = {}
+    domains: dict[str, dict] = {}
+    total_size = 0
+    for m in mails:
+        total_size += m["size"]
+        year = time.strftime("%Y", time.localtime(m["ts"])) if m["ts"] \
+            else "unknown"
+        y = years.setdefault(year, {"count": 0, "size": 0})
+        y["count"] += 1
+        y["size"] += m["size"]
+        dom = m["addr"].rsplit("@", 1)[-1]
+        d = domains.setdefault(dom, {"count": 0, "size": 0})
+        d["count"] += 1
+        d["size"] += m["size"]
+    top = sorted(domains.items(), key=lambda kv: -kv[1]["size"])[:10]
+    return {
+        "mails": len(mails), "size": total_size,
+        "years": [{"year": y, **v} for y, v in sorted(years.items())],
+        "top_domains": [{"domain": k, **v} for k, v in top],
+    }
 
 
 # -------------------------------------------------------------- duplicates

@@ -22,6 +22,7 @@ from . import aihelper
 from . import config as cfgmod
 from . import mailops
 from . import rules as rulesmod
+from . import stats as statsmod
 from . import unsub
 from . import verdictstore
 from .mailops import GROUPINGS
@@ -208,6 +209,14 @@ def get_attachments():
 @app.get("/api/duplicates")
 def get_duplicates():
     return mailops.duplicates_list()
+
+
+@app.get("/api/stats")
+def get_stats():
+    history = statsmod.load()
+    return {**mailops.index_stats(),
+            "scans": history["scans"][-30:],
+            "actions": history["actions"]}
 
 
 class RuleBody(BaseModel):

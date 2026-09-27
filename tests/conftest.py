@@ -13,6 +13,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from backend import config as cfgmod          # noqa: E402
 from backend import mailops                   # noqa: E402
 from backend import rules as rulesmod         # noqa: E402
+from backend import stats as statsmod         # noqa: E402
 from backend import verdictstore              # noqa: E402
 
 
@@ -26,6 +27,8 @@ def isolate(tmp_path, monkeypatch):
     monkeypatch.setattr(mailops, "REPLIED_PATH", tmp_path / "replied.json")
     monkeypatch.setattr(mailops, "_replied_loaded", False)
     monkeypatch.setattr(rulesmod, "RULES_PATH", tmp_path / "rules.json")
+    monkeypatch.setattr(statsmod, "HISTORY_PATH",
+                        tmp_path / "stats_history.json")
     mailops.REPLIED_TO.clear()
     verdictstore._mails_cache = None
     with mailops.STATE_LOCK:

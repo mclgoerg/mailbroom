@@ -66,6 +66,16 @@ export interface DupSet {
   mails: Mail[];    // newest first
 }
 
+export interface StatsResp {
+  mails: number;
+  size: number;
+  years: { year: string; count: number; size: number }[];
+  top_domains: { domain: string; count: number; size: number }[];
+  scans: { ts: number; mails: number; size: number; senders: number }[];
+  actions: Record<string, { trash: number; archive: number; move: number;
+    mark_read: number; freed: number }>;
+}
+
 export interface RuleRun {
   ts: number;
   mode: "report" | "execute";

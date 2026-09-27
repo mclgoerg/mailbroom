@@ -134,6 +134,15 @@ const EN: Record<string, string> = {
   "dups.wasted": "{size} reclaimable",
   "dups.newest": "newest",
   "dups.none": "No duplicates found — nice and tidy.",
+  "stats.current": "Currently scanned: {mails} mails · {size}",
+  "stats.this_month": "trashed this month: {n} mails · {size}",
+  "stats.per_year": "Mails per year",
+  "stats.top_domains": "Top domains by size",
+  "stats.cleanup": "Cleanup by month",
+  "stats.actions_line":
+    "{trash} trashed ({size}) · {archive} archived · {move} moved · "
+    + "{read} marked read",
+  "stats.scans": "Recent scans",
 };
 
 const DE: Record<string, string> = {
@@ -387,6 +396,16 @@ const DE: Record<string, string> = {
   "dups.wasted": "{size} freigebbar",
   "dups.newest": "neueste",
   "dups.none": "Keine Duplikate gefunden — schön aufgeräumt.",
+  "Statistics": "Statistik",
+  "stats.current": "Aktuell gescannt: {mails} Mails · {size}",
+  "stats.this_month": "diesen Monat gelöscht: {n} Mails · {size}",
+  "stats.per_year": "Mails pro Jahr",
+  "stats.top_domains": "Top-Domains nach Größe",
+  "stats.cleanup": "Aufräumen pro Monat",
+  "stats.actions_line":
+    "{trash} gelöscht ({size}) · {archive} archiviert · {move} verschoben "
+    + "· {read} gelesen markiert",
+  "stats.scans": "Letzte Scans",
 };
 
 let lang: Lang =
