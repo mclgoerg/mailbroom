@@ -47,18 +47,20 @@ def test_import_applies_and_stays_safe():
     old = rulesmod.create_rule({"name": "old", "query": "x"})
 
     body = {
-        "version": 1,
+        "version": 2,
         "config": {
-            "imap": {"user": "new@pm.example", "password": "evil-overwrite"},
+            "accounts": {"default": {"user": "new@pm.example",
+                                     "password": "evil-overwrite"}},
             "ai": {"model": "claude-haiku-4-5", "api_key": "evil-key"},
             "protected": ["@bank.example"],
             "categories": {"pets": ["dog"]},
         },
         "rules": [{"name": "imported", "query": "tag:shipping",
                    "mode": "execute", "report_runs": 99}],
-        "verdicts": {"sender": {"x@y.z": {"verdict": "review", "reason": ""}},
+        "verdicts": {"accounts": {"default": {"sender": {
+                         "x@y.z": {"verdict": "review", "reason": ""}}}},
                      "_mails": {"<a@b>": "keep", "<c@d>": "bogus"}},
-        "replied": ["pal@x.example", "not-an-addr"],
+        "replied": {"default": ["pal@x.example", "not-an-addr"]},
     }
     r = client.post("/api/import_config", json=body)
     assert r.json()["ok"] and r.json()["rules"] == 1
@@ -77,7 +79,7 @@ def test_import_applies_and_stays_safe():
     assert rules[0]["report_runs"] == 0
     assert not any(rl["id"] == old["id"] for rl in rules)
 
-    imported = verdictstore.load_account()      # v1 verdicts -> default acct
+    imported = verdictstore.load_account()
     assert imported["sender"]["x@y.z"]["verdict"] == "review"
     assert verdictstore.load_mails() == {"<a@b>": "keep"}
     assert "pal@x.example" in mailops.load_replied()

@@ -10,7 +10,6 @@ from pathlib import Path
 
 import logging
 import os
-import secrets
 
 from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.responses import (FileResponse, JSONResponse, RedirectResponse,
@@ -63,26 +62,12 @@ app = FastAPI(title="mailbroom", docs_url=None, redoc_url=None,
 STATIC_DIR = Path(os.environ.get(
     "STATIC_DIR", Path(__file__).resolve().parent.parent / "static"))
 
-# Optional shared-secret auth for deployments without a reverse-proxy auth
-# layer. Set AUTH_TOKEN, then open the app once as /?token=<value> (stores a
-# cookie) or send `Authorization: Bearer <value>` on API calls.
-AUTH_TOKEN = os.environ.get("AUTH_TOKEN", "")
-_AUTH_COOKIE = "pmc_token"
 SESSION_COOKIE = "pmc_session"
 
 # Reachable without a session: the login endpoints themselves plus the
 # auth-mode probe the login screen needs.
 _PUBLIC_API = {"/api/auth", "/api/login", "/api/logout",
                "/api/oidc/login", "/api/oidc/callback"}
-
-
-def _token_ok(request: Request) -> bool:
-    if not AUTH_TOKEN:
-        return False
-    header = request.headers.get("authorization", "")
-    bearer = header.removeprefix("Bearer ").strip()
-    supplied = request.cookies.get(_AUTH_COOKIE, "") or bearer
-    return bool(supplied and secrets.compare_digest(supplied, AUTH_TOKEN))
 
 
 def _session_sub(request: Request) -> str | None:
@@ -109,24 +94,9 @@ def _resolve_tenant(mode: str, auth_cfg: dict, sub: str) -> tenants.Tenant:
 async def _auth(request: Request, call_next):
     tenants.activate(tenants.DEFAULT, "")     # per-request baseline
 
-    # Legacy shared token: valid token always passes; /?token= sets it.
-    if AUTH_TOKEN:
-        query_token = request.query_params.get("token", "")
-        if query_token and secrets.compare_digest(query_token, AUTH_TOKEN):
-            resp = RedirectResponse(request.url.path or "/")
-            resp.set_cookie(_AUTH_COOKIE, AUTH_TOKEN, httponly=True,
-                            samesite="strict", max_age=30 * 86400)
-            return resp
-        if _token_ok(request):
-            return await call_next(request)
-
     auth_cfg = cfgmod.load_server()["auth"]
     mode = auth_cfg["mode"]
     if mode == "none":
-        if AUTH_TOKEN:      # token configured but absent/wrong: old behavior
-            return JSONResponse(
-                {"detail": "unauthorized — open /?token=<AUTH_TOKEN> "
-                 "or send a Bearer token"}, status_code=401)
         return await call_next(request)
 
     sub = _session_sub(request)
@@ -176,7 +146,7 @@ def get_auth(request: Request):
     sub = _session_sub(request)
     if mode == "oidc" and sub == "password":
         sub = None
-    authed = mode == "none" or sub is not None or _token_ok(request)
+    authed = mode == "none" or sub is not None
     out = {"mode": mode, "authed": authed}
     if authed:
         # The middleware already resolved the tenant for this request.
@@ -709,13 +679,11 @@ def get_export_config():
 
 @app.post("/api/import_config")
 def post_import_config(body: dict):
-    """Apply an exported backup. Secrets are never importable; imported
-    rules are forced back to report mode (safety floor)."""
+    """Apply an exported backup (v2 shape). Secrets are never importable;
+    imported rules are forced back to report mode (safety floor)."""
     c = body.get("config") or {}
-    update = {k: c[k] for k in ("accounts", "imap", "excluded_folders",
-                                "protected", "categories", "ai") if k in c}
-    if isinstance(update.get("imap"), dict):        # v1 backup: one account
-        update["imap"].pop("password", None)
+    update = {k: c[k] for k in ("accounts", "protected", "categories", "ai")
+              if k in c}
     if isinstance(update.get("accounts"), dict):
         for b in update["accounts"].values():
             if isinstance(b, dict):
@@ -759,13 +727,11 @@ def post_import_config(body: dict):
                      if v in ("delete_safe", "review", "keep")}
             verdictstore.save_mails(clean)
             nverdicts += len(clean)
-        if isinstance(verdicts.get("accounts"), dict):   # v2 backup
+        if isinstance(verdicts.get("accounts"), dict):
             known = set(accountsmod.names())
             for name, entries in verdicts["accounts"].items():
                 if name in known and isinstance(entries, dict):
                     nverdicts += _import_groupings(entries, name)
-        else:                                            # v1: default account
-            nverdicts += _import_groupings(verdicts, None)
 
     def _import_replied(acc, entries: list) -> int:
         mailops.load_replied(acc)
@@ -778,9 +744,7 @@ def post_import_config(body: dict):
 
     nreplied = 0
     replied = body.get("replied")
-    if isinstance(replied, list):                        # v1: default account
-        nreplied = _import_replied(accountsmod.get(), replied)
-    elif isinstance(replied, dict):                      # v2: per account
+    if isinstance(replied, dict):                        # per account
         known = set(accountsmod.names())
         for name, entries in replied.items():
             if name in known and isinstance(entries, list):

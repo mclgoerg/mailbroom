@@ -162,54 +162,6 @@ def test_api_account_validation(monkeypatch):
     assert client.get("/api/stats?account=nope").status_code == 400
 
 
-def test_migration_old_verdicts_file():
-    verdictstore.VERDICTS_PATH.write_text(json.dumps({
-        "sender": {"a@b.c": {"verdict": "keep", "reason": "r"}},
-        "_mails": {"<m1@x>": "delete_safe"}}))
-    acct = verdictstore.load_account()           # default account
-    assert acct["sender"]["a@b.c"]["verdict"] == "keep"
-    assert verdictstore.load_mails() == {"<m1@x>": "delete_safe"}
-    # saving keeps the migrated data and persists the new shape
-    verdictstore.save("sender", {"n@e.w": {"verdict": "review",
-                                           "reason": ""}})
-    raw = json.loads(verdictstore.VERDICTS_PATH.read_text())
-    assert set(raw["accounts"]["default"]["sender"]) == {"a@b.c", "n@e.w"}
-    assert raw["_mails"] == {"<m1@x>": "delete_safe"}
-
-
-def test_migration_old_stats_file():
-    statsmod.HISTORY_PATH.write_text(json.dumps({
-        "scans": [{"ts": 1, "mails": 5, "size": 100, "senders": 2}],
-        "actions": {"2026-01": {"trash": 3, "archive": 0, "move": 0,
-                                "mark_read": 0, "freed": 50}}}))
-    data = statsmod.load()                       # default account
-    assert data["scans"][0]["mails"] == 5
-    assert data["actions"]["2026-01"]["trash"] == 3
-    statsmod.record_action("trash", 1, 10)
-    raw = json.loads(statsmod.HISTORY_PATH.read_text())
-    assert "accounts" in raw and "default" in raw["accounts"]
-
-
-def test_migration_old_replied_file():
-    mailops.REPLIED_PATH.write_text(json.dumps(
-        {"ts": 123, "addrs": ["old@pal.example"]}))
-    assert "old@pal.example" in mailops.load_replied()
-    acc = accountsmod.get()
-    mailops.save_replied(acc)
-    raw = json.loads(mailops.REPLIED_PATH.read_text())
-    assert raw["accounts"]["default"]["addrs"] == ["old@pal.example"]
-
-
-def test_migration_old_rules_get_default_account(monkeypatch):
-    rulesmod.RULES_PATH.write_text(json.dumps({"rules": [{
-        "id": "abc123", "name": "legacy", "grouping": "sender",
-        "query": "", "action": "trash", "dest": "", "schedule": "manual",
-        "mode": "report", "report_runs": 0, "created": 1,
-        "last_run": None}]}))
-    rules = rulesmod.load_rules()
-    assert rules[0]["account"] == "default"
-
-
 def test_rename_account_migrates_everything(monkeypatch):
     fakes = _two_accounts(monkeypatch)
     one = accountsmod.get("one")
@@ -273,21 +225,3 @@ def test_excluded_folders_are_per_account(monkeypatch):
           client.get("/api/folders?account=two").json()["folders"]}
     assert f1["Receipts"]["excluded"] is True
     assert f2["Receipts"]["excluded"] is False
-
-
-def test_legacy_global_excluded_folders_migrate():
-    cfgmod.CONFIG_PATH.write_text(json.dumps({
-        "imap": {"user": "a@b.c"},
-        "profiles": {"second": {"host": "h2"}},
-        "excluded_folders": ["Trash", "Newsletters"]}))
-    cfg = cfgmod.load_config()
-    for name in ("default", "second"):
-        assert cfg["accounts"][name]["excluded_folders"] == [
-            "Trash", "Newsletters"]
-    # a per-account update no longer touches the other account
-    cfgmod.update_config({"account": "second",
-                          "excluded_folders": ["Trash"]})
-    cfg = cfgmod.load_config()
-    assert cfg["accounts"]["second"]["excluded_folders"] == ["Trash"]
-    assert cfg["accounts"]["default"]["excluded_folders"] == [
-        "Trash", "Newsletters"]

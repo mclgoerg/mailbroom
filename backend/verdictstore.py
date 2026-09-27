@@ -21,33 +21,23 @@ VERDICTS_PATH = Path(os.environ.get("VERDICTS_PATH", "/data/ai_verdicts.json"))
 
 _LOCK = threading.Lock()
 
-_GROUPINGS = ("sender", "domain", "subject")
-
 
 def _path() -> Path:
     return tenants.current().file("ai_verdicts.json", VERDICTS_PATH)
 
 
 def load() -> dict:
-    """Raw store: {"accounts": {name: {grouping: {...}}}, "_mails": {...}},
-    migrating old top-level groupings into the default account."""
+    """Raw store: {"accounts": {name: {grouping: {...}}}, "_mails": {...}}."""
     try:
         data = json.loads(_path().read_text())
     except (OSError, json.JSONDecodeError):
         return {"accounts": {}, "_mails": {}}
     if not isinstance(data, dict):
         return {"accounts": {}, "_mails": {}}
-    out = {"accounts": data.get("accounts")
-           if isinstance(data.get("accounts"), dict) else {},
-           "_mails": data.get("_mails")
-           if isinstance(data.get("_mails"), dict) else {}}
-    legacy = {g: v for g, v in data.items()
-              if g in _GROUPINGS and isinstance(v, dict)}
-    if legacy:                                   # pre-multi-account format
-        acct = out["accounts"].setdefault(accounts.default_name(), {})
-        for g, v in legacy.items():
-            acct.setdefault(g, {}).update(v)
-    return out
+    return {"accounts": data.get("accounts")
+            if isinstance(data.get("accounts"), dict) else {},
+            "_mails": data.get("_mails")
+            if isinstance(data.get("_mails"), dict) else {}}
 
 
 def rename_account(old: str, new: str) -> None:

@@ -100,18 +100,13 @@ def _replied_path(tenant=None) -> Path:
 
 
 def _read_replied_file(tenant=None) -> dict:
-    """Raw replied.json, migrating the old single-account shape
-    ({ts, addrs}) into {"accounts": {default: {...}}} in memory."""
+    """Raw replied.json: {"accounts": {name: {ts, addrs}}}."""
     try:
         data = json.loads(_replied_path(tenant).read_text())
     except (OSError, json.JSONDecodeError):
         return {"accounts": {}}
-    if not isinstance(data, dict):
-        return {"accounts": {}}
-    if isinstance(data.get("accounts"), dict):
+    if isinstance(data, dict) and isinstance(data.get("accounts"), dict):
         return data
-    if isinstance(data.get("addrs"), list):     # pre-multi-account format
-        return {"accounts": {accounts.default_name(): data}}
     return {"accounts": {}}
 
 

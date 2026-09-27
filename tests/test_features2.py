@@ -4,11 +4,9 @@ import json
 import types
 
 import pytest
-from fastapi.testclient import TestClient
 
 from backend import aihelper
 from backend import config as cfgmod
-from backend import main as mainmod
 from backend import mailops
 from backend import verdictstore
 
@@ -134,29 +132,3 @@ def test_undo_by_index(bridge):
     assert any(m["uid"] == 3 for m in bridge.mailbox["Trash"])
     assert len(mailops.STATE["undo"]) == 1
 
-
-# -------------------------------------------------------------------- auth
-
-def test_auth_token_middleware(monkeypatch):
-    monkeypatch.setattr(mainmod, "AUTH_TOKEN", "s3same")
-    client = TestClient(mainmod.app)
-
-    assert client.get("/api/state").status_code == 401
-    assert client.get("/").status_code == 401
-
-    ok = client.get("/api/state",
-                    headers={"Authorization": "Bearer s3same"})
-    assert ok.status_code == 200
-    assert client.get("/api/state",
-                      headers={"Authorization": "Bearer wrong"}
-                      ).status_code == 401
-
-    # Query token sets the cookie and redirects; cookie then works.
-    r = client.get("/?token=s3same", follow_redirects=False)
-    assert r.status_code in (302, 307)
-    assert "pmc_token" in r.headers.get("set-cookie", "")
-    client.cookies.set("pmc_token", "s3same")
-    assert client.get("/api/state").status_code == 200
-
-    monkeypatch.setattr(mainmod, "AUTH_TOKEN", "")
-    assert TestClient(mainmod.app).get("/api/state").status_code == 200

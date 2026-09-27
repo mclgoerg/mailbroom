@@ -290,37 +290,23 @@ _LOCK = threading.Lock()
 
 
 def _load_accounts(saved: dict, env_first: bool = True) -> dict[str, dict]:
-    """Accounts from a saved config, migrating the old single-account
-    format (imap + profiles + active_profile) transparently. The first
-    account merges over the env bootstrap values (classic Docker setups);
-    additional accounts merge over neutral defaults so env secrets never
-    leak into them. Non-default tenants get NO env values at all
-    (env_first=False) — the Bridge password belongs to the admin only.
-    Folder exclusions are PER ACCOUNT (providers name their folders
-    differently); a legacy top-level excluded_folders list fills every
-    account that doesn't have its own yet."""
+    """Accounts from a saved config. The first account merges over the
+    env bootstrap values (classic Docker setups); additional accounts
+    merge over neutral defaults so env secrets never leak into them.
+    Non-default tenants get NO env values at all (env_first=False) — the
+    Bridge password belongs to the admin only. Folder exclusions are
+    PER ACCOUNT (providers name their folders differently)."""
     if isinstance(saved.get("accounts"), dict) and saved["accounts"]:
         blocks = {str(n): (b if isinstance(b, dict) else {})
                   for n, b in saved["accounts"].items()}
-    elif "imap" in saved or "profiles" in saved:
-        active = str(saved.get("active_profile") or "default")
-        blocks = {active: saved.get("imap") or {}}
-        for n, p in (saved.get("profiles") or {}).items():
-            if isinstance(p, dict) and str(n) not in blocks:
-                blocks[str(n)] = p
     else:
         blocks = {"default": {}}
-    legacy_excluded = (saved.get("excluded_folders")
-                       if isinstance(saved.get("excluded_folders"), list)
-                       else None)
     out: dict[str, dict] = {}
     for i, (name, block) in enumerate(blocks.items()):
         base = ENV_IMAP if i == 0 and env_first else NEUTRAL_IMAP
         out[name] = {**base, **block}
         if not isinstance(out[name].get("excluded_folders"), list):
-            out[name]["excluded_folders"] = list(
-                legacy_excluded if legacy_excluded is not None
-                else DEFAULT_EXCLUDED)
+            out[name]["excluded_folders"] = list(DEFAULT_EXCLUDED)
     return out
 
 

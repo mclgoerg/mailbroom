@@ -106,20 +106,6 @@ def test_config_masking_and_accounts():
         pass
 
 
-def test_config_old_format_migrates():
-    import json
-    cfgmod.CONFIG_PATH.write_text(json.dumps({
-        "imap": {"user": "old@pm.example", "password": "pw"},
-        "profiles": {"second": {"host": "imap.x", "user": "b@x"}},
-        "active_profile": "main"}))
-    cfg = cfgmod.load_config()
-    assert list(cfg["accounts"]) == ["main", "second"]
-    assert cfg["accounts"]["main"]["user"] == "old@pm.example"
-    assert cfg["accounts"]["main"]["password"] == "pw"
-    assert cfg["accounts"]["second"]["user"] == "b@x"
-    assert cfg["accounts"]["second"]["password"] == ""   # neutral defaults
-
-
 def test_config_bad_port_ignored():
     before = cfgmod.load_config()["accounts"]["default"]["port"]
     cfgmod.update_config({"imap": {"port": "abc"}})

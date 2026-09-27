@@ -37,20 +37,13 @@ _EMPTY = {"scans": [], "actions": {}}
 
 
 def _load_all() -> dict:
-    """Raw file: {"accounts": {name: {scans, actions}}}, migrating the old
-    single-account top-level shape into the default account."""
+    """Raw file: {"accounts": {name: {scans, actions}}}."""
     try:
         data = json.loads(_path().read_text())
     except (OSError, json.JSONDecodeError):
         return {"accounts": {}}
-    if not isinstance(data, dict):
-        return {"accounts": {}}
-    if isinstance(data.get("accounts"), dict):
+    if isinstance(data, dict) and isinstance(data.get("accounts"), dict):
         return data
-    if "scans" in data or "actions" in data:    # pre-multi-account format
-        return {"accounts": {accounts.default_name(): {
-            "scans": data.get("scans", []),
-            "actions": data.get("actions", {})}}}
     return {"accounts": {}}
 
 

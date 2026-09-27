@@ -133,14 +133,9 @@ def match_group(g: dict, f: dict, now: float | None = None) -> bool:
 def load_rules() -> list[dict]:
     try:
         data = json.loads(_path().read_text())
-        rules = data.get("rules", []) if isinstance(data, dict) else []
+        return data.get("rules", []) if isinstance(data, dict) else []
     except (OSError, json.JSONDecodeError):
         return []
-    # Migration: pre-multi-account rules belong to the default account.
-    default = accounts.default_name()
-    for r in rules:
-        r.setdefault("account", default)
-    return rules
 
 
 def _save(rules: list[dict]) -> None:
