@@ -16,6 +16,8 @@ function Card({ value, label }: { value: ReactNode; label: string }) {
   );
 }
 
+/* Rows are label | track | value with FIXED side columns, so every bar
+   fills an identical track and the lengths stay truly proportional. */
 function Bars({ rows }: {
   rows: { label: string; count: number; size: number }[];
 }) {
@@ -24,12 +26,16 @@ function Bars({ rows }: {
     <>
       {rows.map((r) => (
         <div key={r.label} className="mb-1 flex items-center gap-2">
-          <span className="w-20 truncate text-xs tabular-nums text-muted">
+          <span className="w-24 shrink-0 truncate text-xs tabular-nums
+            text-muted" title={r.label}>
             {r.label}
           </span>
-          <div className="h-4 rounded bg-accent/70"
-            style={{ width: `${(100 * r.count) / max}%`, minWidth: 2 }} />
-          <span className="text-xs whitespace-nowrap text-faint">
+          <div className="h-4 min-w-0 flex-1">
+            <div className="h-4 rounded bg-accent/70"
+              style={{ width: `${(100 * r.count) / max}%`, minWidth: 2 }} />
+          </div>
+          <span className="w-28 shrink-0 text-right text-xs
+            whitespace-nowrap text-faint">
             {r.count} · {fmtSize(r.size)}
           </span>
         </div>
