@@ -90,12 +90,20 @@ def _send_mailto(cfg: dict, uri: str) -> None:
     msg = (f"From: {sender}\r\nTo: {to_addr}\r\nSubject: {subject}\r\n"
            f"\r\n{body}\r\n")
     ctx = ssl.create_default_context(cafile=im["cafile"] or None)
+    host = im.get("smtp_host") or im["host"]     # providers often split them
     port = int(im.get("smtp_port") or 1025)
-    try:
-        smtp = smtplib.SMTP_SSL(im["host"], port, timeout=30, context=ctx)
-    except (ssl.SSLError, OSError):
-        smtp = smtplib.SMTP(im["host"], port, timeout=30)
+    security = im.get("smtp_security") or "auto"
+    if security == "ssl":
+        smtp = smtplib.SMTP_SSL(host, port, timeout=30, context=ctx)
+    elif security == "starttls":
+        smtp = smtplib.SMTP(host, port, timeout=30)
         smtp.starttls(context=ctx)
+    else:                                        # auto: SSL, then STARTTLS
+        try:
+            smtp = smtplib.SMTP_SSL(host, port, timeout=30, context=ctx)
+        except (ssl.SSLError, OSError):
+            smtp = smtplib.SMTP(host, port, timeout=30)
+            smtp.starttls(context=ctx)
     try:
         smtp.login(im["user"], im["password"])
         smtp.sendmail(sender, [to_addr], msg.encode())

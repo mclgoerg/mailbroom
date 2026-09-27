@@ -360,7 +360,7 @@ def post_notice_clear():
 
 @app.post("/api/test_connection")
 def post_test_connection():
-    """Onboarding helper: can we reach and log into the Bridge?"""
+    """Onboarding helper: can we reach and log into the IMAP server?"""
     cfg = cfgmod.load_config()
     if not cfg["imap"]["password"]:
         raise HTTPException(400, "no password configured")
@@ -386,6 +386,7 @@ def get_folders():
         conn = mailops.connect(cfg)
         try:
             names = mailops.list_folders(conn)
+            roles = mailops.folder_roles(conn)
         finally:
             try:
                 conn.logout()
@@ -394,10 +395,13 @@ def get_folders():
     except Exception as exc:
         raise HTTPException(500, f"{type(exc).__name__}: {exc}")
     rules = cfg["excluded_folders"]
+    role_of = {name: role for role, name in roles.items()}
     return {
         "folders": [
             {"raw": f, "name": mailops.decode_mutf7(f),
-             "excluded": mailops.excluded(f, rules)
+             "role": role_of.get(f),
+             "excluded": role_of.get(f) in mailops.EXCLUDED_ROLES
+             or mailops.excluded(f, rules)
              or mailops.excluded(mailops.decode_mutf7(f), rules)}
             for f in names],
         "wildcards": [r for r in rules if r.strip().endswith("*")],

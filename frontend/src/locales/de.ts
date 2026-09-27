@@ -166,7 +166,7 @@ export const DE: Record<string, string> = {
   "Reset": "Zurücksetzen",
   "runs": "Läufe",
   "AI spend": "KI-Kosten",
-  "IMAP (Proton Mail Bridge)": "IMAP (Proton Mail Bridge)",
+  "Mail server (IMAP)": "Mailserver (IMAP)",
   "AI review (optional)": "KI-Prüfung (optional)",
   "AI is reviewing this group…": "Die KI prüft diese Gruppe…",
   "Unsubscribing…": "Bestelle ab…",
@@ -322,10 +322,12 @@ export const DE: Record<string, string> = {
   "no.matches": "Keine Gruppen passen zu diesem Filter.",
   "onboard.title": "Willkommen — in drei Schritten zum sauberen Postfach",
   "onboard.step_bridge":
-    "Proton Mail Bridge starten (der IMAP-Endpunkt muss von dieser App "
-    + "erreichbar sein — siehe README für das Docker-Setup).",
+    "Mail-Anbieter wählen (Gmail, iCloud, Fastmail, … — oder Proton über "
+    + "die Proton Mail Bridge; Hinweise pro Anbieter und das "
+    + "Bridge-Docker-Setup stehen im README).",
   "onboard.step_creds":
-    "Bridge-IMAP-Host, -Port, -Benutzer und -Passwort eintragen unter",
+    "Anbieter-Preset wählen und Host, Benutzer und Passwort eintragen "
+    + "(die meisten Anbieter brauchen ein App-Passwort) unter",
   "onboard.step_scan":
     "Auf Scannen klicken — gelöscht wird nur nach Bestätigung, und "
     + "Löschungen landen zuerst im Papierkorb.",
@@ -340,4 +342,24 @@ export const DE: Record<string, string> = {
   "notify.delete_done": "Fertig: {n} Mails verarbeitet.",
   "notify.ai_done": "KI-Prüfung abgeschlossen.",
   "notify.atts_done": "Anhang-Analyse abgeschlossen.",
+  "preset.label": "Anbieter-Preset (füllt die Felder unten vor)",
+  "preset.hint.proton":
+    "Proton braucht die Mail Bridge (Bezahltarife): IMAP-Modus auf SSL "
+    + "stellen, Zertifikat exportieren und als CA-Datei eintragen — "
+    + "siehe README.",
+  "preset.hint.apppw":
+    "App-spezifisches Passwort verwenden, nicht das normale "
+    + "Konto-Passwort — anlegen in den Sicherheitseinstellungen des "
+    + "Anbieters (Links im README).",
+  "preset.hint.imap_toggle":
+    "IMAP muss zuerst in den Mail-Einstellungen des Anbieters aktiviert "
+    + "werden; bei Zwei-Faktor-Authentifizierung App-Passwort verwenden.",
+  "imap.security": "IMAP-Verschlüsselung",
+  "smtp.host": "SMTP-Host (Abbestell-Mails)",
+  "smtp.host_placeholder": "leer = IMAP-Host",
+  "smtp.security": "SMTP-Verschlüsselung",
+  "sec.auto": "automatisch",
+  "cafile.label": "Eigene CA-Datei (optional, z.\u202fB. das Bridge-Zertifikat)",
+  "folder.role_excluded":
+    "Spezialordner (per Rolle erkannt) — wird nie mitgescannt",
 };

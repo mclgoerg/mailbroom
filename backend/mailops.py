@@ -1,7 +1,9 @@
 """IMAP scanning, grouping, drill-down, and move-to-Trash operations.
 
-Talks to Proton Mail Bridge over implicit TLS (the Bridge cert is the CA
-file). All state is in memory: STATE holds the group views, INDEX holds
+Speaks generic IMAP (implicit TLS or STARTTLS); special folders (Trash,
+Sent, …) are found via SPECIAL-USE flags (RFC 6154) with a name-table
+fallback, so Proton Bridge, Gmail, iCloud & co. all resolve correctly.
+All state is in memory: STATE holds the group views, INDEX holds
 per-message metadata keyed by (folder, uid).
 """
 
@@ -80,6 +82,7 @@ STATE: dict = {
 ACTIONS = ("trash", "archive", "move", "mark_read")
 INDEX: dict[str, dict] = {}   # "folder\x00uid" -> per-message metadata
 FOLDER_UV: dict[str, int] = {}  # folder -> UIDVALIDITY seen during the scan
+FOLDER_ROLES: dict[str, str] = {}  # role -> raw folder name (last LIST seen)
 UNDO_LOG: list[dict] = []       # {ts,label,count,items:[(folder,msgid)]}
 UNDO_MAX = 10
 
@@ -184,11 +187,22 @@ def categorize(hay: str, localpart: str = "", bulk: bool = False,
 
 # --------------------------------------------------------------------- imap
 
-def connect(cfg: dict) -> imaplib.IMAP4_SSL:
+def connect(cfg: dict) -> imaplib.IMAP4:
     im = cfg["imap"]
     ctx = ssl.create_default_context(cafile=im["cafile"] or None)
-    conn = imaplib.IMAP4_SSL(im["host"], int(im["port"]),
-                             ssl_context=ctx, timeout=120)
+    if (im.get("security") or "ssl") == "starttls":
+        conn = imaplib.IMAP4(im["host"], int(im["port"]), timeout=120)
+        try:
+            conn.starttls(ssl_context=ctx)
+        except BaseException:
+            try:
+                conn.shutdown()
+            except Exception:
+                pass
+            raise
+    else:
+        conn = imaplib.IMAP4_SSL(im["host"], int(im["port"]),
+                                 ssl_context=ctx, timeout=120)
     try:
         conn.login(im["user"], im["password"])
     except BaseException:
@@ -212,11 +226,12 @@ def uidvalidity(conn: imaplib.IMAP4_SSL) -> int:
 _LIST_RE = re.compile(rb'\((?P<flags>[^)]*)\) "(?P<delim>[^"]*)" (?P<name>.+)$')
 
 
-def list_folders(conn: imaplib.IMAP4_SSL) -> list[str]:
+def list_folders_ex(conn) -> list[tuple[str, set[str]]]:
+    """(name, lowercased-flags) per folder from LIST."""
     status, data = conn.list()
-    names = []
+    out: list[tuple[str, set[str]]] = []
     if status != "OK":
-        return names
+        return out
     for item in data or []:
         # Literal folder names arrive as tuples from imaplib; skip them
         # rather than crashing the whole scan on one exotic folder name.
@@ -228,8 +243,83 @@ def list_folders(conn: imaplib.IMAP4_SSL) -> list[str]:
         name = m.group("name").strip()
         if name.startswith(b'"') and name.endswith(b'"'):
             name = name[1:-1]
-        names.append(name.decode("utf-8", "replace"))
-    return names
+        flags = {f.lower() for f in
+                 m.group("flags").decode("utf-8", "replace").split()}
+        out.append((name.decode("utf-8", "replace"), flags))
+    return out
+
+
+def list_folders(conn) -> list[str]:
+    return [name for name, _ in list_folders_ex(conn)]
+
+
+# RFC 6154 SPECIAL-USE flags -> folder role.
+_ROLE_FLAGS = {"\\trash": "trash", "\\sent": "sent", "\\junk": "junk",
+               "\\drafts": "drafts", "\\archive": "archive", "\\all": "all"}
+
+# Fallback for servers without SPECIAL-USE: common provider/localized names
+# (compared against the decoded, lowercased folder name).
+_ROLE_NAMES: dict[str, set[str]] = {
+    "trash": {"trash", "bin", "deleted", "deleted messages", "deleted items",
+              "papierkorb", "gelöschte elemente", "gelöschte objekte",
+              "corbeille", "[gmail]/trash", "[gmail]/bin",
+              "[gmail]/papierkorb"},
+    "sent": {"sent", "sent mail", "sent items", "sent messages", "gesendet",
+             "gesendete elemente", "gesendete objekte", "[gmail]/sent mail",
+             "[gmail]/gesendet"},
+    "junk": {"spam", "junk", "junk mail", "junk e-mail", "bulk mail",
+             "[gmail]/spam"},
+    "drafts": {"drafts", "draft", "entwürfe", "[gmail]/drafts",
+               "[gmail]/entwürfe"},
+    "archive": {"archive", "archiv", "[gmail]/archive"},
+    "all": {"all mail", "[gmail]/all mail", "[gmail]/alle nachrichten",
+            "[gmail]/tous les messages"},
+}
+
+# Roles that never belong in cleanup scans: trash/junk hold deleted mail,
+# sent/drafts are the user's own, "all" would double-count everything.
+EXCLUDED_ROLES = ("trash", "junk", "sent", "drafts", "all")
+
+
+def folder_roles(conn) -> dict[str, str]:
+    """{role: raw folder name} via SPECIAL-USE flags, name fallback second.
+    Also refreshes the FOLDER_ROLES module cache (used by fetch_message)."""
+    roles: dict[str, str] = {}
+    pairs = list_folders_ex(conn)
+    for name, flags in pairs:
+        for flag, role in _ROLE_FLAGS.items():
+            if flag in flags and role not in roles:
+                roles[role] = name
+    for name, _ in pairs:
+        low = decode_mutf7(name).lower()
+        for role, names in _ROLE_NAMES.items():
+            if role not in roles and low in names:
+                roles[role] = name
+    FOLDER_ROLES.update(roles)
+    return roles
+
+
+def _supports_move(conn) -> bool:
+    caps = getattr(conn, "capabilities", ()) or ()
+    return any(str(c if isinstance(c, str) else c.decode()).upper() == "MOVE"
+               for c in caps)
+
+
+def _uid_move(conn, uidstr: str, dest: str) -> bool:
+    """UID MOVE `uidstr` into raw folder `dest`; falls back to
+    COPY + \\Deleted + EXPUNGE for servers without the MOVE capability."""
+    if _supports_move(conn):
+        status, _ = conn.uid("MOVE", uidstr, quote_folder(dest))
+        return status == "OK"
+    status, _ = conn.uid("COPY", uidstr, quote_folder(dest))
+    if status != "OK":
+        return False
+    conn.uid("STORE", uidstr, "+FLAGS", r"(\Deleted)")
+    try:
+        conn.uid("EXPUNGE", uidstr)          # UIDPLUS: only our UIDs
+    except Exception:
+        conn.expunge()   # last resort: purges every \Deleted in the folder
+    return True
 
 
 def decode_mutf7(name: str) -> str:
@@ -337,11 +427,11 @@ def scan_folder(conn, folder: str, messages: list, progress_cb) -> None:
             })
 
 
-def scan_sent_recipients(conn, progress_cb=None) -> set[str]:
+def scan_sent_recipients(conn, progress_cb=None,
+                         roles: dict[str, str] | None = None) -> set[str]:
     """Addresses in To/Cc of the Sent folder (headers only). Sent stays
     excluded from the cleanup views; this pass only feeds REPLIED_TO."""
-    target = next((f for f in list_folders(conn)
-                   if f.lower() == "sent"), None)
+    target = (roles if roles is not None else folder_roles(conn)).get("sent")
     if not target:
         return set()
     status, _ = conn.select(quote_folder(target), readonly=True)
@@ -519,17 +609,22 @@ def run_scan() -> None:
         conn = connect(cfg)
         try:
             rules = cfg["excluded_folders"]
+            roles = folder_roles(conn)
+            # Special folders are excluded by ROLE (works for any provider's
+            # names); the user's name/wildcard rules still apply on top.
+            role_excluded = {roles[r] for r in EXCLUDED_ROLES if r in roles}
             folders = [f for f in list_folders(conn)
-                       if not (excluded(f, rules)
-                               or excluded(decode_mutf7(f), rules))]
+                       if f not in role_excluded
+                       and not (excluded(f, rules)
+                                or excluded(decode_mutf7(f), rules))]
             with STATE_LOCK:
                 STATE["folders"] = [decode_mutf7(f) for f in folders]
             messages: list = []
             for folder in folders:
                 scan_folder(conn, folder, messages, progress_cb)
-            trash_count = folder_message_count(conn, "Trash")
+            trash_count = folder_message_count(conn, roles.get("trash"))
             replied = load_replied()
-            new_replied = scan_sent_recipients(conn, progress_cb)
+            new_replied = scan_sent_recipients(conn, progress_cb, roles)
             if new_replied - replied:
                 replied |= new_replied
                 save_replied()
@@ -574,11 +669,9 @@ def run_scan() -> None:
             STATE["error"] = f"{type(exc).__name__}: {exc}"
 
 
-def folder_message_count(conn, name: str) -> int | None:
-    """Message count of a folder via STATUS (folder stays unselected)."""
+def folder_message_count(conn, target: str | None) -> int | None:
+    """Message count of a raw folder via STATUS (folder stays unselected)."""
     try:
-        target = next((f for f in list_folders(conn)
-                       if f.lower() == name.lower()), None)
         if not target:
             return None
         status, data = conn.status(quote_folder(target), "(MESSAGES)")
@@ -606,6 +699,7 @@ def start_scan() -> None:
                          "mails": 0, "size": 0}
         INDEX.clear()
         FOLDER_UV.clear()
+        FOLDER_ROLES.clear()
         _CANCEL["scan"] = False
     threading.Thread(target=run_scan, daemon=True).start()
 
@@ -655,19 +749,14 @@ def _apply_removal(moved_uids: dict[str, set[int]]) -> dict:
 
 
 def _resolve_dest(conn, action: str, dest: str) -> str:
-    """Raw name of the folder an action moves mail into."""
-    folders = list_folders(conn)
-    if action == "trash":
-        name = next((f for f in folders if f.lower() == "trash"), None)
+    """Raw name of the folder an action moves mail into (via folder role)."""
+    if action in ("trash", "archive"):
+        name = folder_roles(conn).get(action)
         if not name:
-            raise RuntimeError("No Trash folder found on the server")
+            raise RuntimeError(
+                f"No {action.capitalize()} folder found on the server")
         return name
-    if action == "archive":
-        name = next((f for f in folders if f.lower() == "archive"), None)
-        if not name:
-            raise RuntimeError("No Archive folder found on the server")
-        return name
-    if dest not in folders:
+    if dest not in list_folders(conn):
         raise RuntimeError(f"unknown target folder {decode_mutf7(dest)!r}")
     return dest
 
@@ -706,10 +795,7 @@ def _move_uids(by_folder: dict[str, set[int]], action: str, dest: str,
                 if cancel_requested("delete"):
                     raise Cancelled()
                 chunk = uids[start:start + MOVE_CHUNK]
-                status, _ = conn.uid("MOVE",
-                                     ",".join(str(u) for u in chunk),
-                                     quote_folder(trash))
-                if status == "OK":
+                if _uid_move(conn, ",".join(str(u) for u in chunk), trash):
                     moved += len(chunk)
                     moved_uids.setdefault(folder, set()).update(chunk)
                 if progress_cb:
@@ -1308,8 +1394,7 @@ def undo_last(index: int = -1) -> dict:
     restored = 0
     conn = connect(cfg)
     try:
-        trash = entry.get("in") or next(
-            (f for f in list_folders(conn) if f.lower() == "trash"), None)
+        trash = entry.get("in") or folder_roles(conn).get("trash")
         if not trash:
             raise RuntimeError("No Trash folder found on the server")
         status, _ = conn.select(quote_folder(trash), readonly=False)
@@ -1328,9 +1413,7 @@ def undo_last(index: int = -1) -> dict:
         for folder, uids in by_target.items():
             for start in range(0, len(uids), MOVE_CHUNK):
                 chunk = uids[start:start + MOVE_CHUNK]
-                status, _ = conn.uid("MOVE", b",".join(chunk).decode(),
-                                     quote_folder(folder))
-                if status == "OK":
+                if _uid_move(conn, b",".join(chunk).decode(), folder):
                     restored += len(chunk)
     finally:
         try:
@@ -1355,8 +1438,7 @@ def trash_list(limit: int = 1000) -> dict:
     cfg = cfgmod.load_config()
     conn = connect(cfg)
     try:
-        trash = next((f for f in list_folders(conn)
-                      if f.lower() == "trash"), None)
+        trash = folder_roles(conn).get("trash")
         if not trash:
             raise RuntimeError("No Trash folder found on the server")
         messages: list = []
@@ -1388,7 +1470,7 @@ def trash_restore(uids: list[int], dest: str, uv: int = 0) -> dict:
     conn = connect(cfg)
     try:
         folders = list_folders(conn)
-        trash = next((f for f in folders if f.lower() == "trash"), None)
+        trash = folder_roles(conn).get("trash")
         if not trash:
             raise RuntimeError("No Trash folder found on the server")
         if dest not in folders:
@@ -1404,9 +1486,7 @@ def trash_restore(uids: list[int], dest: str, uv: int = 0) -> dict:
         clean = sorted({int(u) for u in uids})
         for start in range(0, len(clean), MOVE_CHUNK):
             chunk = clean[start:start + MOVE_CHUNK]
-            status, _ = conn.uid("MOVE", ",".join(str(u) for u in chunk),
-                                 quote_folder(dest))
-            if status == "OK":
+            if _uid_move(conn, ",".join(str(u) for u in chunk), dest):
                 restored += len(chunk)
     finally:
         try:
@@ -1433,8 +1513,7 @@ def empty_trash() -> dict:
     cfg = cfgmod.load_config()
     conn = connect(cfg)
     try:
-        trash = next((f for f in list_folders(conn)
-                      if f.lower() == "trash"), None)
+        trash = folder_roles(conn).get("trash")
         if not trash:
             raise RuntimeError("No Trash folder found on the server")
         status, data = conn.select(quote_folder(trash), readonly=False)
@@ -1539,8 +1618,11 @@ def extract_text(msg) -> str:
 
 def fetch_message(folder: str, uid: int) -> dict:
     # Trash mails are never in INDEX (excluded from scans) but the Trash
-    # browser still needs to open them.
-    if ikey(folder, uid) not in INDEX and folder.lower() != "trash":
+    # browser still needs to open them. Compare against the trash ROLE
+    # (trash_list populated FOLDER_ROLES); the literal stays as fallback.
+    if ikey(folder, uid) not in INDEX \
+            and folder != FOLDER_ROLES.get("trash") \
+            and folder.lower() != "trash":
         raise RuntimeError("unknown message")
     cfg = cfgmod.load_config()
     conn = connect(cfg)

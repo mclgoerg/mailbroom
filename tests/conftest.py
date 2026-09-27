@@ -44,6 +44,7 @@ def isolate(tmp_path, monkeypatch):
         mailops.STATE["rules"] = []
         mailops.INDEX.clear()
         mailops.FOLDER_UV.clear()
+        mailops.FOLDER_ROLES.clear()
         mailops.UNDO_LOG.clear()
         mailops._DELETE_PENDING.clear()
         for k in mailops._CANCEL:
@@ -64,10 +65,19 @@ def make_msg(uid, frm='"Shop News" <news@shop.example>',
 
 
 class FakeIMAP:
-    """In-memory IMAP double producing imaplib-shaped responses."""
+    """In-memory IMAP double producing imaplib-shaped responses.
 
-    def __init__(self, mailbox: dict[str, list[dict]]):
+    `flags` adds SPECIAL-USE flags per folder (e.g. {"Bin": "\\Trash"});
+    `move=False` simulates a server without the MOVE capability (deletes
+    must then go through COPY + \\Deleted + UID EXPUNGE)."""
+
+    def __init__(self, mailbox: dict[str, list[dict]],
+                 flags: dict[str, str] | None = None, move: bool = True):
         self.mailbox = mailbox            # folder -> list of make_msg dicts
+        self.flags = flags or {}
+        self.move = move
+        self.capabilities = ("IMAP4REV1", "UIDPLUS") \
+            + (("MOVE",) if move else ())
         self.uv = {f: 1 for f in mailbox}
         self.selected: str | None = None
         self.logged_out = False
@@ -85,8 +95,13 @@ class FakeIMAP:
 
     # -- mailbox metadata -----------------------------------------------
     def list(self):
-        return "OK", [f'(\\HasNoChildren) "/" "{f}"'.encode()
-                      for f in list(self.mailbox)]
+        out = []
+        for f in list(self.mailbox):
+            fl = "\\HasNoChildren"
+            if f in self.flags:
+                fl += f" {self.flags[f]}"
+            out.append(f'({fl}) "/" "{f}"'.encode())
+        return "OK", out
 
     def select(self, qname, readonly=False):
         name = qname.strip('"')
@@ -178,19 +193,36 @@ class FakeIMAP:
 
         if cmd == "STORE":
             wanted = {int(u) for u in args[0].split(",")}
-            if "Seen" in args[2]:
-                for m in msgs:
-                    if m["uid"] in wanted:
+            for m in msgs:
+                if m["uid"] in wanted:
+                    if "Seen" in args[2]:
                         m["seen"] = True
+                    if "Deleted" in args[2]:
+                        m["deleted"] = True
             return "OK", [b""]
 
         if cmd == "MOVE":
+            assert self.move, "server does not advertise MOVE"
             wanted = {int(u) for u in args[0].split(",")}
             dest = args[1].strip('"')
             moving = [m for m in msgs if m["uid"] in wanted]
             self.mailbox[self.selected] = [m for m in msgs
                                            if m["uid"] not in wanted]
             self.mailbox.setdefault(dest, []).extend(moving)
+            return "OK", [b""]
+
+        if cmd == "COPY":
+            wanted = {int(u) for u in args[0].split(",")}
+            dest = args[1].strip('"')
+            self.mailbox.setdefault(dest, []).extend(
+                dict(m) for m in msgs if m["uid"] in wanted)
+            return "OK", [b""]
+
+        if cmd == "EXPUNGE":     # UIDPLUS: expunge only the given UIDs
+            wanted = {int(u) for u in args[0].split(",")}
+            self.mailbox[self.selected] = [
+                m for m in msgs
+                if not (m["uid"] in wanted and m.get("deleted"))]
             return "OK", [b""]
 
         raise AssertionError(f"unexpected UID {cmd}")

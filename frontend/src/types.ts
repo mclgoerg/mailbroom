@@ -140,6 +140,7 @@ export interface AppState {
 export interface FolderInfo {
   raw: string;
   name: string;
+  role: string | null;    // trash | sent | junk | drafts | archive | all
   excluded: boolean;
 }
 
@@ -183,15 +184,24 @@ export interface UnsubResult {
   detail: string;
 }
 
+export type Security = "ssl" | "starttls";
+export type SmtpSecurity = "auto" | "ssl" | "starttls";
+export type Preset = "proton" | "gmail" | "icloud" | "fastmail" | "gmx"
+  | "mailbox" | "yahoo" | "custom";
+
 export interface Config {
   imap: {
     host: string;
     port: number;
+    security: Security;
+    smtp_host: string;
     smtp_port: number;
+    smtp_security: SmtpSecurity;
     user: string;
     password: string;
     password_set: boolean;
     cafile: string;
+    preset: Preset;
   };
   profiles: string[];
   active_profile: string;

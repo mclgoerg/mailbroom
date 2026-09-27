@@ -1,9 +1,47 @@
 import { useEffect, useState } from "react";
 import { api, fmtUsd } from "../api";
 import { getLang, setLang, t, type Lang } from "../i18n";
-import type { Config, FoldersResp } from "../types";
+import type { Config, FoldersResp, Preset, Security, SmtpSecurity }
+  from "../types";
 import { Button, Field, Input, Loading, Modal, PanelHeader,
   SectionLabel, Select, TextArea } from "./ui";
+
+/* Provider presets only PREFILL the connection fields — everything stays
+ * editable. "custom" prefills nothing. Hosts per provider docs; all of
+ * these use app passwords except Proton (Bridge password). */
+const PRESETS: Record<Exclude<Preset, "custom">, {
+  host: string; port: number; security: Security;
+  smtpHost: string; smtpPort: number; smtpSecurity: SmtpSecurity;
+  cafile: string; hint: string;
+}> = {
+  proton: { host: "127.0.0.1", port: 1143, security: "ssl",
+    smtpHost: "", smtpPort: 1025, smtpSecurity: "auto",
+    cafile: "/certs/bridge-cert.pem", hint: "preset.hint.proton" },
+  gmail: { host: "imap.gmail.com", port: 993, security: "ssl",
+    smtpHost: "smtp.gmail.com", smtpPort: 465, smtpSecurity: "ssl",
+    cafile: "", hint: "preset.hint.apppw" },
+  icloud: { host: "imap.mail.me.com", port: 993, security: "ssl",
+    smtpHost: "smtp.mail.me.com", smtpPort: 587, smtpSecurity: "starttls",
+    cafile: "", hint: "preset.hint.apppw" },
+  fastmail: { host: "imap.fastmail.com", port: 993, security: "ssl",
+    smtpHost: "smtp.fastmail.com", smtpPort: 465, smtpSecurity: "ssl",
+    cafile: "", hint: "preset.hint.apppw" },
+  gmx: { host: "imap.gmx.net", port: 993, security: "ssl",
+    smtpHost: "mail.gmx.net", smtpPort: 465, smtpSecurity: "ssl",
+    cafile: "", hint: "preset.hint.imap_toggle" },
+  mailbox: { host: "imap.mailbox.org", port: 993, security: "ssl",
+    smtpHost: "smtp.mailbox.org", smtpPort: 465, smtpSecurity: "ssl",
+    cafile: "", hint: "" },
+  yahoo: { host: "imap.mail.yahoo.com", port: 993, security: "ssl",
+    smtpHost: "smtp.mail.yahoo.com", smtpPort: 465, smtpSecurity: "ssl",
+    cafile: "", hint: "preset.hint.apppw" },
+};
+
+const PRESET_LABELS: Record<Preset, string> = {
+  proton: "Proton Mail Bridge", gmail: "Gmail", icloud: "iCloud Mail",
+  fastmail: "Fastmail", gmx: "GMX", mailbox: "mailbox.org",
+  yahoo: "Yahoo Mail", custom: "Custom (any IMAP server)",
+};
 
 export function SettingsModal({ cfg, onClose, onSaved }: {
   cfg: Config;
@@ -11,9 +49,14 @@ export function SettingsModal({ cfg, onClose, onSaved }: {
   onSaved: (c: Config) => void;
 }) {
   const [f, setF] = useState({
+    preset: (cfg.imap.preset ?? "proton") as Preset,
     host: cfg.imap.host,
     port: String(cfg.imap.port),
+    security: (cfg.imap.security ?? "ssl") as Security,
+    smtpHost: cfg.imap.smtp_host ?? "",
     smtpPort: String(cfg.imap.smtp_port ?? 1025),
+    smtpSecurity: (cfg.imap.smtp_security ?? "auto") as SmtpSecurity,
+    cafile: cfg.imap.cafile ?? "",
     user: cfg.imap.user,
     password: "",
     provider: cfg.ai.provider,
@@ -66,6 +109,19 @@ export function SettingsModal({ cfg, onClose, onSaved }: {
     (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
       setF({ ...f, [k]: e.target.value });
 
+  const applyPreset = (p: Preset) => {
+    if (p === "custom") {
+      setF({ ...f, preset: p });
+      return;
+    }
+    const pre = PRESETS[p];
+    setF({ ...f, preset: p, host: pre.host, port: String(pre.port),
+      security: pre.security, smtpHost: pre.smtpHost,
+      smtpPort: String(pre.smtpPort), smtpSecurity: pre.smtpSecurity,
+      cafile: pre.cafile });
+  };
+  const presetHint = f.preset !== "custom" ? PRESETS[f.preset].hint : "";
+
   const excludedList = (): string[] | undefined => {
     if (!folders) return undefined;   // picker never loaded: keep old config
     const explicit = folders.folders
@@ -79,7 +135,9 @@ export function SettingsModal({ cfg, onClose, onSaved }: {
       const excluded = excludedList();
       const body: Record<string, unknown> = {
         imap: { host: f.host, port: +f.port || 1143,
-          smtp_port: +f.smtpPort || 1025, user: f.user,
+          security: f.security, smtp_host: f.smtpHost,
+          smtp_port: +f.smtpPort || 1025, smtp_security: f.smtpSecurity,
+          cafile: f.cafile, preset: f.preset, user: f.user,
           ...(f.password ? { password: f.password } : {}) },
         ...(excluded ? { excluded_folders: excluded } : {}),
         protected: protectedText.split("\n")
@@ -95,8 +153,12 @@ export function SettingsModal({ cfg, onClose, onSaved }: {
       const next = await api.saveConfig(body);
       onSaved(next);
       setF({ ...f, password: "", apiKey: "",
-        host: next.imap.host, port: String(next.imap.port),
-        smtpPort: String(next.imap.smtp_port), user: next.imap.user });
+        preset: next.imap.preset, host: next.imap.host,
+        port: String(next.imap.port), security: next.imap.security,
+        smtpHost: next.imap.smtp_host,
+        smtpPort: String(next.imap.smtp_port),
+        smtpSecurity: next.imap.smtp_security,
+        cafile: next.imap.cafile, user: next.imap.user });
       setProtectedText((next.protected ?? []).join("\n"));
       setCategoriesText(catText(next.categories));
       setMsg(t("Saved."));
@@ -191,8 +253,21 @@ export function SettingsModal({ cfg, onClose, onSaved }: {
         </div>
 
         <SectionLabel className="sm:col-span-2">
-          {t("IMAP (Proton Mail Bridge)")}
+          {t("Mail server (IMAP)")}
         </SectionLabel>
+        <div className="sm:col-span-2">
+          <Field label={t("preset.label")}>
+            <Select className="w-full" value={f.preset}
+              onChange={(e) => applyPreset(e.target.value as Preset)}>
+              {(Object.keys(PRESET_LABELS) as Preset[]).map((p) => (
+                <option key={p} value={p}>{PRESET_LABELS[p]}</option>
+              ))}
+            </Select>
+          </Field>
+          {presetHint && (
+            <p className="mt-1 text-xs text-muted">{t(presetHint)}</p>
+          )}
+        </div>
         <Field label={t("Host")}>
           <Input className="w-full" value={f.host} onChange={set("host")} />
         </Field>
@@ -201,9 +276,12 @@ export function SettingsModal({ cfg, onClose, onSaved }: {
             <Input className="w-full" type="number" value={f.port}
               onChange={set("port")} />
           </Field>
-          <Field label={t("SMTP port (unsubscribe mails)")}>
-            <Input className="w-full" type="number" value={f.smtpPort}
-              onChange={set("smtpPort")} />
+          <Field label={t("imap.security")}>
+            <Select className="w-full" value={f.security}
+              onChange={set("security")}>
+              <option value="ssl">SSL/TLS</option>
+              <option value="starttls">STARTTLS</option>
+            </Select>
           </Field>
         </div>
         <Field label={t("User")}>
@@ -215,6 +293,32 @@ export function SettingsModal({ cfg, onClose, onSaved }: {
               ? t("(unchanged)") : t("required")}
             onChange={set("password")} />
         </Field>
+        <Field label={t("smtp.host")}>
+          <Input className="w-full" value={f.smtpHost}
+            placeholder={t("smtp.host_placeholder")}
+            onChange={set("smtpHost")} />
+        </Field>
+        <div className="grid grid-cols-2 gap-3">
+          <Field label={t("SMTP port (unsubscribe mails)")}>
+            <Input className="w-full" type="number" value={f.smtpPort}
+              onChange={set("smtpPort")} />
+          </Field>
+          <Field label={t("smtp.security")}>
+            <Select className="w-full" value={f.smtpSecurity}
+              onChange={set("smtpSecurity")}>
+              <option value="auto">{t("sec.auto")}</option>
+              <option value="ssl">SSL/TLS</option>
+              <option value="starttls">STARTTLS</option>
+            </Select>
+          </Field>
+        </div>
+        <div className="sm:col-span-2">
+          <Field label={t("cafile.label")}>
+            <Input className="w-full" value={f.cafile}
+              placeholder="/certs/bridge-cert.pem"
+              onChange={set("cafile")} />
+          </Field>
+        </div>
 
         <div className="sm:col-span-2">
           <span className="mb-1 block text-xs text-muted">
@@ -233,10 +337,17 @@ export function SettingsModal({ cfg, onClose, onSaved }: {
                       w.trim().toLowerCase().slice(0, -1))
                     || x.name.toLowerCase().startsWith(
                       w.trim().toLowerCase().slice(0, -1))))
-                  .map((x) => (
+                  .map((x) => {
+                  // trash/junk/sent/drafts/all are excluded by ROLE on the
+                  // backend — their checkboxes are informational only.
+                  const locked = !!x.role && x.role !== "archive";
+                  return (
                   <label key={x.raw}
-                    className="flex items-center gap-2 text-sm">
+                    className={`flex items-center gap-2 text-sm${
+                      locked ? " opacity-60" : ""}`}
+                    title={locked ? t("folder.role_excluded") : undefined}>
                     <input type="checkbox" checked={included.has(x.raw)}
+                      disabled={locked}
                       onChange={() => {
                         const next = new Set(included);
                         next.has(x.raw) ? next.delete(x.raw)
@@ -244,8 +355,13 @@ export function SettingsModal({ cfg, onClose, onSaved }: {
                         setIncluded(next);
                       }} />
                     <span className="truncate">{x.name}</span>
+                    {x.role && (
+                      <span className="rounded bg-chip px-1 text-[10px]
+                        text-chiptext">{x.role}</span>
+                    )}
                   </label>
-                ))}
+                  );
+                })}
               </div>
               {wildcards.length > 0 && (
                 <div className="mt-2 flex flex-wrap items-center gap-1.5

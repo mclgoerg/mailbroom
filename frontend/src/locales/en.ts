@@ -190,10 +190,12 @@ export const EN: Record<string, string> = {
   "no.matches": "No groups match this filter.",
   "onboard.title": "Welcome — three steps to a tidy mailbox",
   "onboard.step_bridge":
-    "Run Proton Mail Bridge (its IMAP endpoint must be reachable from "
-    + "this app — see the README for the Docker setup).",
+    "Pick your mail provider (Gmail, iCloud, Fastmail, … — or Proton "
+    + "via Proton Mail Bridge; see the README for provider notes and "
+    + "the Bridge Docker setup).",
   "onboard.step_creds":
-    "Enter the Bridge IMAP host, port, user and password in",
+    "Choose the provider preset and enter host, user and password "
+    + "(most providers need an app password) in",
   "onboard.step_scan":
     "Hit Scan — nothing is ever deleted without your confirmation, and "
     + "deletions go to Trash first.",
@@ -208,4 +210,24 @@ export const EN: Record<string, string> = {
   "notify.delete_done": "Done: {n} mails processed.",
   "notify.ai_done": "AI review finished.",
   "notify.atts_done": "Attachment analysis finished.",
+  "preset.label": "Provider preset (prefills the fields below)",
+  "preset.hint.proton":
+    "Proton needs the Mail Bridge (paid plans): switch its IMAP mode to "
+    + "SSL, export its certificate and point the CA file at it — see the "
+    + "README.",
+  "preset.hint.apppw":
+    "Use an app-specific password, not your normal account password — "
+    + "create one in the provider's security settings (links in the "
+    + "README).",
+  "preset.hint.imap_toggle":
+    "IMAP must be enabled first in the provider's mail settings; then "
+    + "use an app password if two-factor auth is on.",
+  "imap.security": "IMAP security",
+  "smtp.host": "SMTP host (unsubscribe mails)",
+  "smtp.host_placeholder": "empty = IMAP host",
+  "smtp.security": "SMTP security",
+  "sec.auto": "auto",
+  "cafile.label": "Custom CA file (optional, e.g. the Bridge certificate)",
+  "folder.role_excluded":
+    "Special folder (detected by role) — always excluded from scans",
 };

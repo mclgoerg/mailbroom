@@ -606,6 +606,7 @@ export default function App() {
             ?? detail.protected}
           onProtect={toggleProtect}
           folders={state?.folders_raw ?? []}
+          sieve={(cfg?.imap.preset ?? "proton") === "proton"}
           onClose={() => { setDetail(null); refresh(); }}
           onDeleted={refresh}
         />

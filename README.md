@@ -11,12 +11,28 @@ Foundry) that suggests what's safe to delete and tracks its own cost.
 
 ## Supported providers
 
-Mailbroom speaks plain IMAP. Proton Mail (via Bridge, requires a paid
-Proton plan) is the featured setup; a provider preset table with hosts
-and auth notes for Gmail, iCloud, Fastmail, GMX, mailbox.org, Yahoo and
-custom servers is coming with the generic-IMAP release.
-Outlook.com/Microsoft 365 is **not supported** (Microsoft requires
-OAuth for IMAP, which Mailbroom does not implement).
+Mailbroom speaks plain IMAP: special folders (Trash, Sent, Spam, …) are
+detected via SPECIAL-USE flags (RFC 6154) with a name fallback, Gmail's
+virtual "All Mail" is excluded automatically (no double counting), and
+servers without the `MOVE` capability get a COPY+EXPUNGE fallback. The
+settings dialog has a preset for each provider below that prefills
+host/port/security — you only add user + password:
+
+| Preset | IMAP host | SMTP host (unsubscribe) | Auth notes |
+|---|---|---|---|
+| **Proton Mail Bridge** | `127.0.0.1:1143` SSL | `127.0.0.1:1025` | Featured setup, see below. Paid Proton plan; use the Bridge-generated password and the exported Bridge certificate as CA file. |
+| **Gmail** | `imap.gmail.com:993` SSL | `smtp.gmail.com:465` SSL | [App password](https://myaccount.google.com/apppasswords) required (2-step verification must be on). |
+| **iCloud Mail** | `imap.mail.me.com:993` SSL | `smtp.mail.me.com:587` STARTTLS | [App-specific password](https://account.apple.com/account/manage) required. |
+| **Fastmail** | `imap.fastmail.com:993` SSL | `smtp.fastmail.com:465` SSL | [App password](https://www.fastmail.help/hc/en-us/articles/360058752854) with IMAP scope. |
+| **GMX** | `imap.gmx.net:993` SSL | `mail.gmx.net:465` SSL | Enable IMAP in GMX mail settings first; app password if 2FA is on. |
+| **mailbox.org** | `imap.mailbox.org:993` SSL | `smtp.mailbox.org:465` SSL | Normal password (or an app password). |
+| **Yahoo Mail** | `imap.mail.yahoo.com:993` SSL | `smtp.mail.yahoo.com:465` SSL | [App password](https://help.yahoo.com/kb/SLN15241.html) required. |
+| **Custom** | anything | anything | Any IMAP server with SSL or STARTTLS (Dovecot, Courier, …). |
+
+**Not supported: Outlook.com / Microsoft 365 / Hotmail.** Microsoft
+allows IMAP access only via OAuth2, which Mailbroom deliberately does
+not implement (no client secrets, no token flows). The Sieve filter
+export is Proton-only and hidden for other presets.
 
 ## Features
 
@@ -107,8 +123,11 @@ matches the SAN of Bridge's self-signed TLS certificate, switch Bridge's
 IMAP mode to SSL, export its certificate (`cert export` in the Bridge CLI)
 and mount it read-only at `IMAP_CAFILE`.
 
-All settings (IMAP credentials, folder exclusions, AI provider/model/key,
-token prices) can also be edited in the UI; they persist in `/data`.
+All settings (provider preset, IMAP/SMTP hosts and security, credentials,
+folder exclusions, AI provider/model/key, token prices) can also be edited
+in the UI; they persist in `/data`. Env bootstrap for other providers:
+`IMAP_SECURITY=ssl|starttls`, `SMTP_HOST`, `SMTP_SECURITY=auto|ssl|starttls`
+(and leave `IMAP_CAFILE` empty unless you need a custom CA).
 
 > **The app has no authentication.** Anyone who can reach the port can read
 > your mail metadata and reconfigure the IMAP host / AI endpoint (i.e.

@@ -22,10 +22,16 @@ DEFAULT_CONFIG = {
     "imap": {
         "host": os.environ.get("IMAP_HOST", "127.0.0.1"),
         "port": int(os.environ.get("IMAP_PORT", "1143")),
+        "security": os.environ.get("IMAP_SECURITY", "ssl"),  # ssl | starttls
+        "smtp_host": os.environ.get("SMTP_HOST", ""),   # "" = the IMAP host
         "smtp_port": int(os.environ.get("SMTP_PORT", "1025")),
+        "smtp_security": os.environ.get("SMTP_SECURITY", "auto"),
         "user": os.environ.get("IMAP_USER", ""),
         "password": os.environ.get("IMAP_PASSWORD", ""),
         "cafile": os.environ.get("IMAP_CAFILE", "/certs/bridge-cert.pem"),
+        # Which provider preset filled the fields (UI prefill + Proton-only
+        # features like Sieve export). Existing configs default to proton.
+        "preset": "proton",
     },
     # Multi-account: named copies of the "imap" block. "imap" is always the
     # ACTIVE account so the rest of the code never has to care.
@@ -54,6 +60,10 @@ DEFAULT_CONFIG = {
 }
 
 AI_PROVIDERS = ("anthropic", "foundry", "openai", "ollama")
+IMAP_SECURITY = ("ssl", "starttls")
+SMTP_SECURITY = ("auto", "ssl", "starttls")
+PRESETS = ("proton", "gmail", "icloud", "fastmail", "gmx", "mailbox",
+           "yahoo", "custom")
 
 
 def normalize_protected(entries) -> list[str]:
@@ -186,7 +196,7 @@ def update_config(body: dict) -> dict:
             cfg["profiles"].pop(str(body["delete_profile"]), None)
 
         imap_in = body.get("imap") or {}
-        for key in ("host", "user"):
+        for key in ("host", "user", "smtp_host", "cafile"):
             if key in imap_in:
                 cfg["imap"][key] = str(imap_in[key]).strip()
         for key in ("port", "smtp_port"):
@@ -196,6 +206,12 @@ def update_config(body: dict) -> dict:
                         imap_in[key] or (1143 if key == "port" else 1025))
                 except (TypeError, ValueError):
                     pass
+        if imap_in.get("security") in IMAP_SECURITY:
+            cfg["imap"]["security"] = imap_in["security"]
+        if imap_in.get("smtp_security") in SMTP_SECURITY:
+            cfg["imap"]["smtp_security"] = imap_in["smtp_security"]
+        if imap_in.get("preset") in PRESETS:
+            cfg["imap"]["preset"] = imap_in["preset"]
         if imap_in.get("password"):
             cfg["imap"]["password"] = str(imap_in["password"])
         if isinstance(body.get("excluded_folders"), list):

@@ -9,13 +9,14 @@ import { Button, ensureAiAck, Input, Loading, Modal, PanelHeader,
   ProtectButton, Select, Spinner, Toolbar } from "./ui";
 
 export function DetailPanel({ grouping, group, aiEnabled, protectedNow,
-  onProtect, folders, onClose, onDeleted }: {
+  onProtect, folders, sieve = true, onClose, onDeleted }: {
   grouping: Grouping;
   group: Group;
   aiEnabled: boolean;
   protectedNow: boolean;                 // live value; `group` is a snapshot
   onProtect?: (g: Group) => void;        // absent in subject mode
   folders: AppState["folders_raw"];
+  sieve?: boolean;                       // Sieve export is Proton-only
   onClose: () => void;
   onDeleted: () => void;
 }) {
@@ -248,7 +249,7 @@ export function DetailPanel({ grouping, group, aiEnabled, protectedNow,
                 {t("Unsubscribe")}
               </Button>
             )}
-            {grouping !== "subject" && (
+            {sieve && grouping !== "subject" && (
               <Button variant="ghost" onClick={() => setSieveOpen(!sieveOpen)}>
                 {t("sieve.button")}
               </Button>
@@ -276,7 +277,7 @@ export function DetailPanel({ grouping, group, aiEnabled, protectedNow,
             {note && (
               <div className="w-full text-xs text-muted">{note}</div>
             )}
-            {sieveOpen && grouping !== "subject" && (
+            {sieve && sieveOpen && grouping !== "subject" && (
               <div className="w-full rounded-md border border-line
                 bg-panel2 p-3">
                 <div className="mb-2 flex flex-wrap items-center gap-2">
