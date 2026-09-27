@@ -15,7 +15,8 @@ client = TestClient(app)
 def test_mode_none_is_open_by_default():
     assert client.get("/api/state").status_code == 200
     probe = client.get("/api/auth").json()
-    assert probe == {"mode": "none", "authed": True}
+    assert probe == {"mode": "none", "authed": True,
+                     "sub": "", "is_admin": True}
 
 
 def test_password_hashing_roundtrip():

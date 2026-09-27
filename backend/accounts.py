@@ -11,6 +11,7 @@ from __future__ import annotations
 import threading
 
 from . import config as cfgmod
+from . import tenants
 
 GROUPINGS = ("sender", "domain", "subject")
 
@@ -41,8 +42,12 @@ class AccountState:
     `index`, `undo_log` and `delete_pending` (same discipline the old
     module-level STATE_LOCK had)."""
 
-    def __init__(self, name: str):
+    def __init__(self, name: str, tenant: tenants.Tenant | None = None):
         self.name = name
+        # The workspace this account belongs to. Background workers use it
+        # to re-enter the right tenant context (threads don't inherit the
+        # spawning request's contextvars).
+        self.tenant = tenant or tenants.current()
         self.lock = threading.Lock()
         self.state = _initial_state()
         self.index: dict[str, dict] = {}     # "folder\x00uid" -> metadata
@@ -59,7 +64,9 @@ class AccountState:
         self.inflight: dict[str, set[int]] = {}
 
 
-_REGISTRY: dict[str, AccountState] = {}
+# Keyed (tenant id, account name) — two tenants may both call an account
+# "default" without ever sharing state.
+_REGISTRY: dict[tuple[str, str], AccountState] = {}
 _REG_LOCK = threading.Lock()
 
 
@@ -72,14 +79,18 @@ def default_name() -> str:
 
 
 def get(name: str | None = None) -> AccountState:
-    """The AccountState for `name` (default: the first configured account).
-    Raises KeyError for unknown names — API layers turn that into a 400."""
+    """The AccountState for `name` in the CURRENT TENANT (default: its
+    first configured account). Raises KeyError for unknown names — API
+    layers turn that into a 400, so one tenant probing another tenant's
+    account names learns nothing."""
     known = names()
     name = name or known[0]
     if name not in known:
         raise KeyError(f"unknown account {name!r}")
+    tenant = tenants.current()
     with _REG_LOCK:
-        return _REGISTRY.setdefault(name, AccountState(name))
+        return _REGISTRY.setdefault((tenant.id, name),
+                                    AccountState(name, tenant))
 
 
 def all_instantiated() -> list[AccountState]:
@@ -89,17 +100,18 @@ def all_instantiated() -> list[AccountState]:
 
 def rename(old: str, new: str) -> None:
     """Carry a renamed account's runtime state over to its new name."""
+    tid = tenants.current().id
     with _REG_LOCK:
-        acc = _REGISTRY.pop(old, None)
+        acc = _REGISTRY.pop((tid, old), None)
         if acc is not None:
             acc.name = new
-            _REGISTRY[new] = acc
+            _REGISTRY[(tid, new)] = acc
 
 
 def drop(name: str) -> None:
     """Forget the runtime state of a deleted account."""
     with _REG_LOCK:
-        _REGISTRY.pop(name, None)
+        _REGISTRY.pop((tenants.current().id, name), None)
 
 
 def reset() -> None:

@@ -15,6 +15,7 @@ import threading
 from pathlib import Path
 
 from . import accounts
+from . import tenants
 
 VERDICTS_PATH = Path(os.environ.get("VERDICTS_PATH", "/data/ai_verdicts.json"))
 
@@ -23,11 +24,15 @@ _LOCK = threading.Lock()
 _GROUPINGS = ("sender", "domain", "subject")
 
 
+def _path() -> Path:
+    return tenants.current().file("ai_verdicts.json", VERDICTS_PATH)
+
+
 def load() -> dict:
     """Raw store: {"accounts": {name: {grouping: {...}}}, "_mails": {...}},
     migrating old top-level groupings into the default account."""
     try:
-        data = json.loads(VERDICTS_PATH.read_text())
+        data = json.loads(_path().read_text())
     except (OSError, json.JSONDecodeError):
         return {"accounts": {}, "_mails": {}}
     if not isinstance(data, dict):
@@ -61,11 +66,12 @@ def load_account(account: str | None = None) -> dict:
 
 
 def _persist(data: dict) -> None:
-    VERDICTS_PATH.parent.mkdir(parents=True, exist_ok=True)
-    tmp = VERDICTS_PATH.with_suffix(".tmp")
+    path = _path()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_suffix(".tmp")
     tmp.write_text(json.dumps(data))
     tmp.chmod(0o600)
-    tmp.replace(VERDICTS_PATH)
+    tmp.replace(path)
 
 
 def save(grouping: str, verdicts: dict[str, dict],
@@ -79,35 +85,35 @@ def save(grouping: str, verdicts: dict[str, dict],
         _persist(data)
 
 
-_mails_cache: dict[str, str] | None = None   # avoids re-reading the file
-                                             # on every state snapshot
+# Per-tenant caches (keyed by tenant id) so the 1/s state snapshot never
+# re-reads the file — and never leaks one tenant's ratings into another.
+_mails_cache: dict[str, dict[str, str]] = {}
 
 
 def load_mails() -> dict[str, str]:
-    """Per-mail verdicts, keyed by Message-ID (global across accounts)."""
-    global _mails_cache
-    if _mails_cache is None:
-        _mails_cache = load().get("_mails") or {}
-    return _mails_cache
+    """Per-mail verdicts, keyed by Message-ID (global across the tenant's
+    accounts — Message-IDs are unique)."""
+    tid = tenants.current().id
+    if tid not in _mails_cache:
+        _mails_cache[tid] = load().get("_mails") or {}
+    return _mails_cache[tid]
 
 
 def save_mails(verdicts: dict[str, str]) -> None:
-    global _mails_cache
     with _LOCK:
         data = load()
         data.setdefault("_mails", {}).update(verdicts)
         _persist(data)
-        _mails_cache = data["_mails"]
+        _mails_cache[tenants.current().id] = data["_mails"]
 
 
 def clear() -> None:
-    global _mails_cache
     with _LOCK:
         try:
-            VERDICTS_PATH.unlink()
+            _path().unlink()
         except FileNotFoundError:
             pass
-        _mails_cache = None
+        _mails_cache.pop(tenants.current().id, None)
 
 
 def apply_to_groups(groups: dict, account: str | None = None) -> int:

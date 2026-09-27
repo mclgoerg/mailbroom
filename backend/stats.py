@@ -17,12 +17,17 @@ import time
 from pathlib import Path
 
 from . import accounts
+from . import tenants
 
 log = logging.getLogger("pmc.stats")
 
 HISTORY_PATH = Path(
     os.environ.get("STATS_HISTORY_PATH", "/data/stats_history.json"))
 MAX_SCANS = 200
+
+
+def _path() -> Path:
+    return tenants.current().file("stats_history.json", HISTORY_PATH)
 
 _LOCK = threading.Lock()
 
@@ -35,7 +40,7 @@ def _load_all() -> dict:
     """Raw file: {"accounts": {name: {scans, actions}}}, migrating the old
     single-account top-level shape into the default account."""
     try:
-        data = json.loads(HISTORY_PATH.read_text())
+        data = json.loads(_path().read_text())
     except (OSError, json.JSONDecodeError):
         return {"accounts": {}}
     if not isinstance(data, dict):
@@ -68,11 +73,12 @@ def load(account: str | None = None) -> dict:
 
 def _write(data: dict) -> None:
     try:
-        HISTORY_PATH.parent.mkdir(parents=True, exist_ok=True)
-        tmp = HISTORY_PATH.with_suffix(".tmp")
+        path = _path()
+        path.parent.mkdir(parents=True, exist_ok=True)
+        tmp = path.with_suffix(".tmp")
         tmp.write_text(json.dumps(data))
         tmp.chmod(0o600)
-        tmp.replace(HISTORY_PATH)
+        tmp.replace(path)
     except OSError:
         log.exception("could not persist stats history")
 

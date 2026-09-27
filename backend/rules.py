@@ -26,10 +26,15 @@ from pathlib import Path
 from . import accounts
 from . import config as cfgmod
 from . import mailops
+from . import tenants
 
 log = logging.getLogger("pmc.rules")
 
 RULES_PATH = Path(os.environ.get("RULES_PATH", "/data/rules.json"))
+
+
+def _path() -> Path:
+    return tenants.current().file("rules.json", RULES_PATH)
 RULE_CAP = int(os.environ.get("RULE_CAP", "500"))   # max mails per run
 CHECK_INTERVAL = int(os.environ.get("RULES_INTERVAL", "600"))  # seconds
 
@@ -127,7 +132,7 @@ def match_group(g: dict, f: dict, now: float | None = None) -> bool:
 
 def load_rules() -> list[dict]:
     try:
-        data = json.loads(RULES_PATH.read_text())
+        data = json.loads(_path().read_text())
         rules = data.get("rules", []) if isinstance(data, dict) else []
     except (OSError, json.JSONDecodeError):
         return []
@@ -139,11 +144,12 @@ def load_rules() -> list[dict]:
 
 
 def _save(rules: list[dict]) -> None:
-    RULES_PATH.parent.mkdir(parents=True, exist_ok=True)
-    tmp = RULES_PATH.with_suffix(".tmp")
+    path = _path()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_suffix(".tmp")
     tmp.write_text(json.dumps({"rules": rules}, indent=1))
     tmp.chmod(0o600)
-    tmp.replace(RULES_PATH)
+    tmp.replace(path)
     _publish(rules)
 
 
@@ -157,7 +163,10 @@ def _publish(rules: list[dict]) -> None:
 
 
 def publish() -> None:
-    _publish(load_rules())
+    """Startup: mirror every tenant's rules into their account states."""
+    for tenant in tenants.known():
+        with tenants.use(tenant):
+            _publish(load_rules())
 
 
 def _validate(body: dict, rule: dict) -> dict:
@@ -363,25 +372,29 @@ def due(rule: dict, now: float | None = None) -> bool:
 
 
 def _tick() -> None:
-    for rule in load_rules():
-        if due(rule):
-            try:
-                acc = accounts.get(rule.get("account"))
-            except KeyError:
-                continue                     # account was deleted
-            with acc.lock:
-                busy = (acc.state["status"] == "scanning"
-                        or acc.state["ai"]["status"] == "running"
-                        or acc.state["delete"]["status"] == "running"
-                        or acc.state["atts"]["status"] == "running")
-            if busy:
-                continue
-            log.info("scheduler: rule %s (%r) is due", rule["id"],
-                     rule["name"])
-            try:
-                run_rule(rule["id"], rescan=True)
-            except Exception:
-                pass          # recorded in last_run; try again next period
+    # Every tenant's due rules, each inside its own tenant context.
+    for tenant in tenants.known():
+        with tenants.use(tenant):
+            for rule in load_rules():
+                if not due(rule):
+                    continue
+                try:
+                    acc = accounts.get(rule.get("account"))
+                except KeyError:
+                    continue                 # account was deleted
+                with acc.lock:
+                    busy = (acc.state["status"] == "scanning"
+                            or acc.state["ai"]["status"] == "running"
+                            or acc.state["delete"]["status"] == "running"
+                            or acc.state["atts"]["status"] == "running")
+                if busy:
+                    continue
+                log.info("scheduler: rule %s (%r) is due", rule["id"],
+                         rule["name"])
+                try:
+                    run_rule(rule["id"], rescan=True)
+                except Exception:
+                    pass      # recorded in last_run; try again next period
 
 
 _scheduler_started = False

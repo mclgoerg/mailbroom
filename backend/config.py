@@ -1,6 +1,10 @@
 """Config and AI usage stats, persisted as JSON under /data.
 
 Env vars are the bootstrap defaults; the UI edits everything at runtime.
+Two layers since multi-tenancy: /data/server.json holds what is NOT
+per-tenant (auth incl. the admin identity, the shared AI key), while
+config.json + ai_usage.json exist once per tenant (the DEFAULT tenant
+keeps the legacy top-level paths).
 """
 
 from __future__ import annotations
@@ -10,8 +14,19 @@ import os
 import threading
 from pathlib import Path
 
+from . import tenants
+
 CONFIG_PATH = Path(os.environ.get("CONFIG_PATH", "/data/config.json"))
 STATS_PATH = Path(os.environ.get("STATS_PATH", "/data/ai_usage.json"))
+SERVER_PATH = Path(os.environ.get("SERVER_PATH", "/data/server.json"))
+
+
+def config_path() -> Path:
+    return tenants.current().file("config.json", CONFIG_PATH)
+
+
+def stats_path() -> Path:
+    return tenants.current().file("ai_usage.json", STATS_PATH)
 
 # Starred and Labels/* are Proton labels: their messages also live in a real
 # folder, so scanning them would double-count (and double-delete).
@@ -43,10 +58,17 @@ NEUTRAL_IMAP = {
     "user": "", "password": "", "cafile": "", "preset": "custom",
 }
 
+_ENV_AUTH_CACHE: dict | None = None
+
+
 def _env_auth() -> dict:
     """Auth defaults from env (AUTH_MODE, AUTH_PASSWORD, OIDC_*). The
-    password is hashed ONCE at import so verification is stable; a mode
-    whose prerequisites are missing falls back to "none"."""
+    password is hashed ONCE per process (scrypt is deliberately slow and
+    salted — re-hashing per request would cost ~50ms and change the hash);
+    a mode whose prerequisites are missing falls back to "none"."""
+    global _ENV_AUTH_CACHE
+    if _ENV_AUTH_CACHE is not None:
+        return json.loads(json.dumps(_ENV_AUTH_CACHE))
     from . import auth as authmod
     password = os.environ.get("AUTH_PASSWORD", "")
     oidc = {
@@ -62,11 +84,83 @@ def _env_auth() -> dict:
     if mode not in authmod.AUTH_MODES             or (mode == "password" and not password)             or (mode == "oidc" and not (oidc["issuer"] and oidc["client_id"]
                                         and oidc["client_secret"])):
         mode = "none"
-    return {"mode": mode,
-            "password_hash": authmod.hash_password(password)
-            if password else "",
-            "oidc": oidc}
+    _ENV_AUTH_CACHE = {
+        "mode": mode,
+        "password_hash": authmod.hash_password(password)
+        if password else "",
+        # In OIDC mode this identity owns the pre-tenancy workspace and
+        # the server-level settings. Empty = claimed by the first OIDC
+        # login.
+        "admin": os.environ.get("OIDC_ADMIN", "").strip().lower(),
+        "oidc": oidc}
+    return json.loads(json.dumps(_ENV_AUTH_CACHE))
 
+
+def _default_server() -> dict:
+    return {
+        "auth": _env_auth(),
+        # The admin MAY configure one server-side AI key and share it with
+        # every tenant; tenants without their own key then use it, capped
+        # by default_tenant_budget_usd per tenant and month (0 = no cap).
+        "shared_ai": {"enabled": False, "provider": "anthropic",
+                      "api_key": "", "model": "claude-sonnet-5",
+                      "foundry_endpoint": "", "price_in": 0.0,
+                      "price_out": 0.0, "default_tenant_budget_usd": 0.0},
+    }
+
+
+def load_server() -> dict:
+    """Server-level settings (auth + shared AI), same for every tenant.
+    Migration: a pre-tenancy config.json carried the auth section — seed
+    server.json from it the first time (persisted on the next save)."""
+    server = _default_server()
+    try:
+        saved = json.loads(SERVER_PATH.read_text())
+    except (OSError, json.JSONDecodeError):
+        saved = None
+    if saved is None:                      # legacy: auth lived in config.json
+        try:
+            legacy = json.loads(CONFIG_PATH.read_text()).get("auth")
+        except (OSError, json.JSONDecodeError):
+            legacy = None
+        saved = {"auth": legacy} if isinstance(legacy, dict) else {}
+    auth_saved = saved.get("auth")
+    if isinstance(auth_saved, dict):
+        server["auth"].update({k: v for k, v in auth_saved.items()
+                               if k != "oidc"})
+        if isinstance(auth_saved.get("oidc"), dict):
+            server["auth"]["oidc"].update(auth_saved["oidc"])
+    if isinstance(saved.get("shared_ai"), dict):
+        server["shared_ai"].update(saved["shared_ai"])
+    return server
+
+
+def save_server(server: dict) -> None:
+    with _LOCK:
+        _write(SERVER_PATH, server)
+
+
+def is_admin() -> bool:
+    """Whether the current request may edit server-level settings. The
+    DEFAULT tenant is the server owner: everyone in modes none/password,
+    only the admin identity in OIDC mode."""
+    return tenants.current().is_default
+
+
+def claim_admin(subject: str) -> bool:
+    """First-OIDC-login claim: when no admin is configured yet, the first
+    identity to sign in becomes it (and thereby owns the pre-tenancy
+    workspace). Returns True when the claim happened."""
+    subject = (subject or "").strip().lower()
+    if not subject:
+        return False
+    with _LOCK:
+        server = load_server()
+        if server["auth"].get("admin"):
+            return False
+        server["auth"]["admin"] = subject
+        _write(SERVER_PATH, server)
+        return True
 
 
 DEFAULT_CONFIG = {
@@ -83,11 +177,6 @@ DEFAULT_CONFIG = {
     # category replaces its keyword list (empty list disables it); other
     # names become new categories. Applied at scan time.
     "categories": {},
-    # Native login. "none" (default) trusts the network / reverse proxy;
-    # "password" = single shared password (scrypt hash); "oidc" = any
-    # OpenID Connect provider (empty "allowed" admits every IdP user).
-    # Env bootstrap like everything else; the settings UI overrides.
-    "auth": _env_auth(),
     "ai": {
         # anthropic | foundry | openai | ollama (any OpenAI-compatible
         # endpoint works via "ollama" + base URL, e.g. LM Studio, vLLM).
@@ -150,7 +239,7 @@ def set_protected(entry: str, on: bool) -> list[str]:
         elif not on:
             plist = [e for e in plist if e != norm[0]]
         cfg["protected"] = plist
-        _write(CONFIG_PATH, cfg)
+        _write_tenant_config(cfg)
         return plist
 
 
@@ -184,14 +273,16 @@ EMPTY_STATS = {"input_tokens": 0, "output_tokens": 0, "cost": 0.0,
 _LOCK = threading.Lock()
 
 
-def _load_accounts(saved: dict) -> dict[str, dict]:
+def _load_accounts(saved: dict, env_first: bool = True) -> dict[str, dict]:
     """Accounts from a saved config, migrating the old single-account
     format (imap + profiles + active_profile) transparently. The first
     account merges over the env bootstrap values (classic Docker setups);
     additional accounts merge over neutral defaults so env secrets never
-    leak into them. Folder exclusions are PER ACCOUNT (providers name
-    their folders differently); a legacy top-level excluded_folders list
-    fills every account that doesn't have its own yet."""
+    leak into them. Non-default tenants get NO env values at all
+    (env_first=False) — the Bridge password belongs to the admin only.
+    Folder exclusions are PER ACCOUNT (providers name their folders
+    differently); a legacy top-level excluded_folders list fills every
+    account that doesn't have its own yet."""
     if isinstance(saved.get("accounts"), dict) and saved["accounts"]:
         blocks = {str(n): (b if isinstance(b, dict) else {})
                   for n, b in saved["accounts"].items()}
@@ -208,7 +299,7 @@ def _load_accounts(saved: dict) -> dict[str, dict]:
                        else None)
     out: dict[str, dict] = {}
     for i, (name, block) in enumerate(blocks.items()):
-        base = ENV_IMAP if i == 0 else NEUTRAL_IMAP
+        base = ENV_IMAP if i == 0 and env_first else NEUTRAL_IMAP
         out[name] = {**base, **block}
         if not isinstance(out[name].get("excluded_folders"), list):
             out[name]["excluded_folders"] = list(
@@ -218,23 +309,28 @@ def _load_accounts(saved: dict) -> dict[str, dict]:
 
 
 def load_config() -> dict:
+    """The CURRENT TENANT's config (plus the server-level auth section,
+    merged in for the middleware and login endpoints). Env bootstrap
+    values only ever apply to the DEFAULT tenant — a fresh tenant starts
+    with one neutral, unconfigured account and no AI key."""
+    default_tenant = tenants.current().is_default
     cfg = json.loads(json.dumps(DEFAULT_CONFIG))  # deep copy
+    if not default_tenant:
+        cfg["accounts"] = {"default": {**NEUTRAL_IMAP,
+                                       "excluded_folders":
+                                       list(DEFAULT_EXCLUDED)}}
+        cfg["ai"]["api_key"] = ""
     try:
-        saved = json.loads(CONFIG_PATH.read_text())
-        cfg["accounts"] = _load_accounts(saved)
+        saved = json.loads(config_path().read_text())
+        cfg["accounts"] = _load_accounts(saved, env_first=default_tenant)
         cfg["ai"].update(saved.get("ai") or {})
         if isinstance(saved.get("protected"), list):
             cfg["protected"] = normalize_protected(saved["protected"])
         if isinstance(saved.get("categories"), dict):
             cfg["categories"] = saved["categories"]
-        auth_saved = saved.get("auth")
-        if isinstance(auth_saved, dict):
-            cfg["auth"].update({k: v for k, v in auth_saved.items()
-                                if k != "oidc"})
-            if isinstance(auth_saved.get("oidc"), dict):
-                cfg["auth"]["oidc"].update(auth_saved["oidc"])
     except (OSError, json.JSONDecodeError):
         pass
+    cfg["auth"] = load_server()["auth"]
     return cfg
 
 
@@ -252,6 +348,12 @@ def _write(path: Path, obj) -> None:
     tmp.write_text(json.dumps(obj, indent=1))
     tmp.chmod(0o600)
     tmp.replace(path)
+
+
+def _write_tenant_config(cfg: dict) -> None:
+    """Persist the tenant's config file — WITHOUT the merged-in
+    server-level auth section (that lives in server.json)."""
+    _write(config_path(), {k: v for k, v in cfg.items() if k != "auth"})
 
 
 def _apply_imap(block: dict, imap_in: dict) -> None:
@@ -348,12 +450,19 @@ def update_config(body: dict) -> dict:
                 for k, v in body["categories"].items()
                 if str(k).strip() and isinstance(v, list)}
         auth_in = body.get("auth") or {}
+        shared_in = body.get("shared_ai") or {}
+        if (auth_in or shared_in) and not is_admin():
+            raise PermissionError(
+                "only the admin can change server settings")
+        server = load_server() if (auth_in or shared_in) else None
         if auth_in:
             from . import auth as authmod
-            acfg = cfg["auth"]
+            acfg = server["auth"]
             if auth_in.get("password"):
                 acfg["password_hash"] = authmod.hash_password(
                     str(auth_in["password"]))
+            if "admin" in auth_in:
+                acfg["admin"] = str(auth_in["admin"]).strip().lower()
             oidc_in = auth_in.get("oidc") or {}
             for key in ("issuer", "client_id", "redirect_base"):
                 if key in oidc_in:
@@ -375,6 +484,26 @@ def update_config(body: dict) -> dict:
                     raise ValueError("OIDC needs issuer, client ID and "
                                      "client secret")
                 acfg["mode"] = mode
+        if shared_in:
+            scfg = server["shared_ai"]
+            if "enabled" in shared_in:
+                scfg["enabled"] = bool(shared_in["enabled"])
+            if shared_in.get("provider") in AI_PROVIDERS:
+                scfg["provider"] = shared_in["provider"]
+            for key in ("model", "foundry_endpoint"):
+                if key in shared_in:
+                    scfg[key] = str(shared_in[key]).strip()
+            for key in ("price_in", "price_out", "default_tenant_budget_usd"):
+                if key in shared_in:
+                    try:
+                        scfg[key] = max(0.0, float(shared_in[key] or 0))
+                    except (TypeError, ValueError):
+                        pass
+            if shared_in.get("api_key"):
+                scfg["api_key"] = str(shared_in["api_key"])
+        if server is not None:
+            _write(SERVER_PATH, server)
+            cfg["auth"] = server["auth"]
         ai_in = body.get("ai") or {}
         if ai_in.get("provider") in AI_PROVIDERS:
             cfg["ai"]["provider"] = ai_in["provider"]
@@ -389,28 +518,49 @@ def update_config(body: dict) -> dict:
                     pass
         if ai_in.get("api_key"):
             cfg["ai"]["api_key"] = str(ai_in["api_key"])
-        _write(CONFIG_PATH, cfg)
+        _write_tenant_config(cfg)
         return cfg
 
 
+def effective_ai(cfg: dict) -> tuple[dict, str | None]:
+    """The AI block this tenant actually runs on: their own key when set,
+    else the admin's shared server key when enabled, else nothing.
+    Returns (ai-shaped dict, "own" | "shared" | None). On the shared key
+    the tenant's monthly budget is the admin's per-tenant default; the
+    tenant may set a LOWER own cap but never a higher one."""
+    own = cfg["ai"]
+    if ai_available(own):
+        return own, "own"
+    shared = load_server()["shared_ai"]
+    if shared.get("enabled") and ai_available(shared):
+        default = float(shared.get("default_tenant_budget_usd") or 0)
+        mine = float(own.get("budget_usd") or 0)
+        budget = mine if mine > 0 and (default <= 0 or mine <= default) \
+            else default
+        return ({"provider": shared["provider"],
+                 "api_key": shared["api_key"],
+                 "model": shared["model"] or own.get("model") or "",
+                 "foundry_endpoint": shared["foundry_endpoint"],
+                 "price_in": shared.get("price_in") or 0,
+                 "price_out": shared.get("price_out") or 0,
+                 "budget_usd": budget}, "shared")
+    return own, None
+
+
 def masked_config(cfg: dict) -> dict:
-    return {
+    admin = is_admin()
+    ai_eff, ai_source = effective_ai(cfg)
+    out = {
         "accounts": {
             n: {**b, "password": "", "password_set": bool(b["password"])}
             for n, b in cfg["accounts"].items()},
         "default_account": next(iter(cfg["accounts"])),
         "protected": normalize_protected(cfg.get("protected")),
         "categories": cfg.get("categories") or {},
-        "auth": {
-            "mode": cfg["auth"]["mode"],
-            "password_set": bool(cfg["auth"]["password_hash"]),
-            "oidc": {"issuer": cfg["auth"]["oidc"]["issuer"],
-                     "client_id": cfg["auth"]["oidc"]["client_id"],
-                     "client_secret_set":
-                         bool(cfg["auth"]["oidc"]["client_secret"]),
-                     "redirect_base": cfg["auth"]["oidc"]["redirect_base"],
-                     "allowed": cfg["auth"]["oidc"]["allowed"]},
-        },
+        # Non-admins get the mode (their UI needs it) but none of the
+        # server-side login details — the allow-list alone would leak
+        # every other tenant's address.
+        "auth": {"mode": cfg["auth"]["mode"], "is_admin": admin},
         "ai": {"provider": cfg["ai"]["provider"],
                "model": cfg["ai"]["model"],
                "foundry_endpoint": cfg["ai"]["foundry_endpoint"],
@@ -418,11 +568,38 @@ def masked_config(cfg: dict) -> dict:
                "price_out": cfg["ai"].get("price_out") or 0,
                "budget_usd": cfg["ai"].get("budget_usd") or 0,
                "month_cost": month_cost(),
-               "prices_effective": effective_prices(cfg["ai"]),
+               "prices_effective": effective_prices(ai_eff),
                "api_key": "", "api_key_set": bool(cfg["ai"]["api_key"]),
-               "available": ai_available(cfg["ai"])},
+               "available": ai_source is not None,
+               "source": ai_source,
+               "shared_budget_usd": ai_eff.get("budget_usd") or 0
+               if ai_source == "shared" else 0},
         "ai_stats": load_stats(),
     }
+    if admin:
+        server = load_server()
+        out["auth"].update({
+            "password_set": bool(cfg["auth"]["password_hash"]),
+            "admin": cfg["auth"].get("admin") or "",
+            "oidc": {"issuer": cfg["auth"]["oidc"]["issuer"],
+                     "client_id": cfg["auth"]["oidc"]["client_id"],
+                     "client_secret_set":
+                         bool(cfg["auth"]["oidc"]["client_secret"]),
+                     "redirect_base": cfg["auth"]["oidc"]["redirect_base"],
+                     "allowed": cfg["auth"]["oidc"]["allowed"]},
+        })
+        shared = server["shared_ai"]
+        out["shared_ai"] = {
+            "enabled": bool(shared["enabled"]),
+            "provider": shared["provider"], "model": shared["model"],
+            "foundry_endpoint": shared["foundry_endpoint"],
+            "price_in": shared.get("price_in") or 0,
+            "price_out": shared.get("price_out") or 0,
+            "default_tenant_budget_usd":
+                shared.get("default_tenant_budget_usd") or 0,
+            "api_key": "", "api_key_set": bool(shared["api_key"]),
+        }
+    return out
 
 
 def effective_prices(ai_cfg: dict) -> tuple[float, float]:
@@ -440,7 +617,7 @@ def effective_prices(ai_cfg: dict) -> tuple[float, float]:
 
 def load_stats() -> dict:
     try:
-        saved = json.loads(STATS_PATH.read_text())
+        saved = json.loads(stats_path().read_text())
     except (OSError, json.JSONDecodeError):
         saved = {}
     stats = {**EMPTY_STATS, **saved}
@@ -451,7 +628,7 @@ def load_stats() -> dict:
 
 def reset_stats() -> None:
     with _LOCK:
-        _write(STATS_PATH, EMPTY_STATS)
+        _write(stats_path(), EMPTY_STATS)
 
 
 def record_usage(ai_cfg: dict, tokens_in: int, tokens_out: int) -> dict:
@@ -468,7 +645,7 @@ def record_usage(ai_cfg: dict, tokens_in: int, tokens_out: int) -> dict:
         stats["runs"] += 1
         months = stats.setdefault("months", {})
         months[month] = round(months.get(month, 0) + cost, 6)
-        _write(STATS_PATH, stats)
+        _write(stats_path(), stats)
     return {"cost": round(cost, 6), "total": stats}
 
 

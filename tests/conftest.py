@@ -16,6 +16,7 @@ from backend import config as cfgmod          # noqa: E402
 from backend import mailops                   # noqa: E402
 from backend import rules as rulesmod         # noqa: E402
 from backend import stats as statsmod         # noqa: E402
+from backend import tenants as tenantsmod     # noqa: E402
 from backend import verdictstore              # noqa: E402
 
 
@@ -26,6 +27,8 @@ def isolate(tmp_path, monkeypatch):
     resolve to a brand-new AccountState)."""
     monkeypatch.setattr(cfgmod, "CONFIG_PATH", tmp_path / "config.json")
     monkeypatch.setattr(cfgmod, "STATS_PATH", tmp_path / "stats.json")
+    monkeypatch.setattr(cfgmod, "SERVER_PATH", tmp_path / "server.json")
+    monkeypatch.setattr(tenantsmod, "TENANTS_DIR", tmp_path / "tenants")
     monkeypatch.setattr(verdictstore, "VERDICTS_PATH",
                         tmp_path / "verdicts.json")
     monkeypatch.setattr(mailops, "REPLIED_PATH", tmp_path / "replied.json")
@@ -36,9 +39,10 @@ def isolate(tmp_path, monkeypatch):
     monkeypatch.setattr(rulesmod, "RULES_PATH", tmp_path / "rules.json")
     monkeypatch.setattr(statsmod, "HISTORY_PATH",
                         tmp_path / "stats_history.json")
-    verdictstore._mails_cache = None
+    verdictstore._mails_cache.clear()
     accountsmod.reset()
     yield
+    verdictstore._mails_cache.clear()
     accountsmod.reset()
 
 

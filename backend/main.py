@@ -25,6 +25,7 @@ from . import config as cfgmod
 from . import mailops
 from . import rules as rulesmod
 from . import stats as statsmod
+from . import tenants
 from . import unsub
 from . import verdictstore
 from .mailops import GROUPINGS
@@ -39,10 +40,13 @@ from contextlib import asynccontextmanager
 
 @asynccontextmanager
 async def _lifespan(app: FastAPI):
-    # Show the last scan of every account right away instead of an empty
-    # view (safe: moves re-check UIDVALIDITY; undo works by Message-ID).
-    for name in accountsmod.names():
-        mailops.load_snapshot(accountsmod.get(name))
+    # Show the last scan of every tenant's accounts right away instead of
+    # an empty view (safe: moves re-check UIDVALIDITY; undo works by
+    # Message-ID).
+    for tenant in tenants.known():
+        with tenants.use(tenant):
+            for name in accountsmod.names():
+                mailops.load_snapshot(accountsmod.get(name))
     rulesmod.start_scheduler()
     yield
 
@@ -74,13 +78,30 @@ def _token_ok(request: Request) -> bool:
     return bool(supplied and secrets.compare_digest(supplied, AUTH_TOKEN))
 
 
+def _session_sub(request: Request) -> str | None:
+    return authmod.verify_session(request.cookies.get(SESSION_COOKIE, ""))
+
+
 def _session_ok(request: Request) -> bool:
-    return authmod.verify_session(
-        request.cookies.get(SESSION_COOKIE, "")) is not None
+    return _session_sub(request) is not None
+
+
+def _resolve_tenant(mode: str, auth_cfg: dict, sub: str) -> tenants.Tenant:
+    """The workspace of a verified session subject. Only OIDC mode is
+    multi-tenant; the admin identity claims the pre-tenancy DEFAULT
+    workspace, everyone else gets their own directory."""
+    if mode != "oidc":
+        return tenants.DEFAULT
+    admin = (auth_cfg.get("admin") or "").strip().lower()
+    if sub.strip().lower() == admin:
+        return tenants.DEFAULT
+    return tenants.for_subject(sub)
 
 
 @app.middleware("http")
 async def _auth(request: Request, call_next):
+    tenants.activate(tenants.DEFAULT, "")     # per-request baseline
+
     # Legacy shared token: valid token always passes; /?token= sets it.
     if AUTH_TOKEN:
         query_token = request.query_params.get("token", "")
@@ -92,7 +113,8 @@ async def _auth(request: Request, call_next):
         if _token_ok(request):
             return await call_next(request)
 
-    mode = cfgmod.load_config()["auth"]["mode"]
+    auth_cfg = cfgmod.load_server()["auth"]
+    mode = auth_cfg["mode"]
     if mode == "none":
         if AUTH_TOKEN:      # token configured but absent/wrong: old behavior
             return JSONResponse(
@@ -100,12 +122,20 @@ async def _auth(request: Request, call_next):
                  "or send a Bearer token"}, status_code=401)
         return await call_next(request)
 
+    sub = _session_sub(request)
+    # A password-mode session ("password" subject) does not carry over
+    # into OIDC mode — it has no identity to map to a tenant.
+    if mode == "oidc" and sub == "password":
+        sub = None
+    if sub:
+        tenants.activate(_resolve_tenant(mode, auth_cfg, sub), sub)
+
     # Native login active: the SPA bundle and login endpoints stay public,
     # everything under /api/ needs a session.
     path = request.url.path
     if not path.startswith("/api/") or path in _PUBLIC_API:
         return await call_next(request)
-    if _session_ok(request):
+    if sub:
         return await call_next(request)
     return JSONResponse({"detail": "login required"}, status_code=401)
 
@@ -134,11 +164,18 @@ class LoginBody(BaseModel):
 
 @app.get("/api/auth")
 def get_auth(request: Request):
-    """Public probe for the login screen."""
-    cfg = cfgmod.load_config()
-    return {"mode": cfg["auth"]["mode"],
-            "authed": cfg["auth"]["mode"] == "none"
-            or _session_ok(request) or _token_ok(request)}
+    """Public probe for the login screen; identity for the header."""
+    mode = cfgmod.load_server()["auth"]["mode"]
+    sub = _session_sub(request)
+    if mode == "oidc" and sub == "password":
+        sub = None
+    authed = mode == "none" or sub is not None or _token_ok(request)
+    out = {"mode": mode, "authed": authed}
+    if authed:
+        # The middleware already resolved the tenant for this request.
+        out["sub"] = sub if mode == "oidc" else ""
+        out["is_admin"] = tenants.current().is_default
+    return out
 
 
 @app.post("/api/login")
@@ -201,6 +238,12 @@ def get_oidc_callback(request: Request, code: str = Query(""),
             "OIDC login rejected for %r (not in allow-list)",
             claims.get("email") or claims.get("sub"))
         raise HTTPException(403, "this account is not allowed to sign in")
+    # No admin configured yet: the first allowed identity to sign in
+    # claims the pre-tenancy workspace (set OIDC_ADMIN to pin it upfront).
+    if cfgmod.claim_admin(sub):
+        logging.getLogger("pmc.auth").warning(
+            "OIDC admin claimed by %s — this identity now owns the "
+            "existing workspace and the server settings", sub)
     resp = RedirectResponse("/")
     _set_session(resp, request, sub)
     logging.getLogger("pmc.auth").info("OIDC login ok: %s", sub)
@@ -743,6 +786,8 @@ def post_config(body: dict):
         mailops.clear_ai_marks()
     try:
         cfg = cfgmod.update_config(body)
+    except PermissionError as exc:
+        raise HTTPException(403, str(exc))
     except ValueError as exc:
         raise HTTPException(400, str(exc))
     if body.get("delete_account"):

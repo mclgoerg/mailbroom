@@ -29,6 +29,7 @@ imaplib._MAXLINE = 10_000_000  # bulk FETCH responses exceed the default 1MB
 from . import accounts
 from . import config as cfgmod
 from . import stats as statsmod
+from . import tenants
 from . import verdictstore
 
 FETCH_CHUNK = 500
@@ -94,11 +95,15 @@ def __getattr__(name: str):
 REPLIED_PATH = Path(os.environ.get("REPLIED_PATH", "/data/replied.json"))
 
 
-def _read_replied_file() -> dict:
+def _replied_path(tenant=None) -> Path:
+    return (tenant or tenants.current()).file("replied.json", REPLIED_PATH)
+
+
+def _read_replied_file(tenant=None) -> dict:
     """Raw replied.json, migrating the old single-account shape
     ({ts, addrs}) into {"accounts": {default: {...}}} in memory."""
     try:
-        data = json.loads(REPLIED_PATH.read_text())
+        data = json.loads(_replied_path(tenant).read_text())
     except (OSError, json.JSONDecodeError):
         return {"accounts": {}}
     if not isinstance(data, dict):
@@ -110,17 +115,22 @@ def _read_replied_file() -> dict:
     return {"accounts": {}}
 
 
+def _write_replied_file(data: dict, tenant=None) -> None:
+    path = _replied_path(tenant)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_suffix(".tmp")
+    tmp.write_text(json.dumps(data))
+    tmp.chmod(0o600)
+    tmp.replace(path)
+
+
 def rename_replied_account(old: str, new: str) -> None:
     """Move one account's replied cache to a new account name."""
     try:
         data = _read_replied_file()
         if old in data["accounts"]:
             data["accounts"][new] = data["accounts"].pop(old)
-            REPLIED_PATH.parent.mkdir(parents=True, exist_ok=True)
-            tmp = REPLIED_PATH.with_suffix(".tmp")
-            tmp.write_text(json.dumps(data))
-            tmp.chmod(0o600)
-            tmp.replace(REPLIED_PATH)
+            _write_replied_file(data)
     except OSError:
         log.exception("could not rename replied account")
 
@@ -128,7 +138,7 @@ def rename_replied_account(old: str, new: str) -> None:
 def load_replied(acc=None) -> set[str]:
     acc = acc or accounts.get()
     if not acc.replied_loaded:
-        entry = _read_replied_file()["accounts"].get(acc.name) or {}
+        entry = _read_replied_file(acc.tenant)["accounts"].get(acc.name) or {}
         acc.replied.update(a for a in entry.get("addrs", [])
                            if isinstance(a, str))
         acc.replied_loaded = True
@@ -138,14 +148,10 @@ def load_replied(acc=None) -> set[str]:
 def save_replied(acc=None) -> None:
     acc = acc or accounts.get()
     try:
-        data = _read_replied_file()
+        data = _read_replied_file(acc.tenant)
         data["accounts"][acc.name] = {
             "ts": int(time.time()), "addrs": sorted(acc.replied)}
-        REPLIED_PATH.parent.mkdir(parents=True, exist_ok=True)
-        tmp = REPLIED_PATH.with_suffix(".tmp")
-        tmp.write_text(json.dumps(data))
-        tmp.chmod(0o600)
-        tmp.replace(REPLIED_PATH)
+        _write_replied_file(data, acc.tenant)
     except OSError:
         log.exception("could not persist replied.json")
 
@@ -161,10 +167,11 @@ SNAPSHOT_DIR = Path(os.environ.get("SNAPSHOT_DIR", "/data"))
 _SNAP_VERSION = 1
 
 
-def _snap_path(name: str) -> Path:
+def _snap_path(name: str, tenant=None) -> Path:
     slug = re.sub(r"[^A-Za-z0-9._-]", "_", name)[:40]
     h = __import__("hashlib").sha1(name.encode()).hexdigest()[:8]
-    return SNAPSHOT_DIR / f"scan_{slug}_{h}.json"
+    snap_dir = (tenant or tenants.current()).dir(SNAPSHOT_DIR)
+    return snap_dir / f"scan_{slug}_{h}.json"
 
 
 def save_snapshot(acc) -> None:
@@ -185,8 +192,8 @@ def save_snapshot(acc) -> None:
         }
         blob = json.dumps(data)
     try:
-        SNAPSHOT_DIR.mkdir(parents=True, exist_ok=True)
-        path = _snap_path(acc.name)
+        path = _snap_path(acc.name, acc.tenant)
+        path.parent.mkdir(parents=True, exist_ok=True)
         tmp = path.with_suffix(".tmp")
         tmp.write_text(blob)
         tmp.chmod(0o600)
@@ -199,7 +206,7 @@ def load_snapshot(acc) -> bool:
     """Restore the last scan from disk into an idle, empty account.
     Cached AI verdicts are re-applied like after a real scan."""
     try:
-        data = json.loads(_snap_path(acc.name).read_text())
+        data = json.loads(_snap_path(acc.name, acc.tenant).read_text())
     except (OSError, json.JSONDecodeError):
         return False
     if not isinstance(data, dict) or data.get("version") != _SNAP_VERSION:
@@ -901,7 +908,8 @@ def start_scan(acc=None) -> None:
         acc.folder_uv.clear()
         acc.folder_roles.clear()
         acc.cancel["scan"] = False
-    threading.Thread(target=run_scan, args=(acc,), daemon=True).start()
+    threading.Thread(target=tenants.call_in, args=(acc.tenant, run_scan, acc),
+                     daemon=True).start()
 
 
 # ------------------------------------------------------------------ deletes
@@ -1186,7 +1194,8 @@ def _start_delete(by_folder: dict[str, set[int]], label: str, acc,
         acc.state["delete"] = {"status": "running", "progress": "queued…",
                            "error": "", "moved": 0}
         acc.cancel["delete"] = False
-        threading.Thread(target=_delete_worker, args=(acc,),
+        threading.Thread(target=tenants.call_in,
+                         args=(acc.tenant, _delete_worker, acc),
                          daemon=True).start()
 
 
@@ -1464,7 +1473,9 @@ def start_att_scan(acc=None) -> None:
         acc.state["atts"] = {"status": "running", "progress": "starting…",
                          "error": "", "mails": 0, "size": 0}
         acc.cancel["atts"] = False
-    threading.Thread(target=_run_atts, args=(acc,), daemon=True).start()
+    threading.Thread(target=tenants.call_in,
+                     args=(acc.tenant, _run_atts, acc),
+                     daemon=True).start()
 
 
 def attachments_list(limit: int = 300, acc=None) -> list[dict]:

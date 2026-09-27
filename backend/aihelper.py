@@ -16,6 +16,7 @@ import time
 from . import accounts
 from . import config as cfgmod
 from . import mailops
+from . import tenants
 from . import verdictstore
 
 log = logging.getLogger("pmc.ai")
@@ -190,6 +191,10 @@ def _ai_call(cfg: dict, model: str, system: str, payload: dict, schema: dict):
 def _run_ai(grouping: str, acc=None) -> None:
     acc = acc or accounts.get()
     cfg = cfgmod.load_config()
+    # Tenants without their own key run on the admin's shared server key
+    # (with the per-tenant budget resolved in effective_ai).
+    ai_eff, ai_source = cfgmod.effective_ai(cfg)
+    cfg = {**cfg, "ai": ai_eff}
     STATE, STATE_LOCK = acc.state, acc.lock
     try:
         model = cfg["ai"]["model"] or "claude-sonnet-5"
@@ -296,9 +301,10 @@ def _run_ai(grouping: str, acc=None) -> None:
 def start_group_review(grouping: str, acc=None) -> None:
     acc = acc or accounts.get()
     cfg = cfgmod.load_config()
-    if not cfgmod.ai_available(cfg["ai"]):
+    ai_eff, ai_source = cfgmod.effective_ai(cfg)
+    if ai_source is None:
         raise ValueError("no API key configured")
-    cfgmod.check_budget(cfg["ai"])
+    cfgmod.check_budget(ai_eff)
     with acc.lock:
         if acc.state["status"] != "done":
             raise RuntimeError("scan first")
@@ -308,7 +314,8 @@ def start_group_review(grouping: str, acc=None) -> None:
                            "progress": "starting…", "error": "",
                            "usage": None}
         acc.cancel["ai"] = False
-    threading.Thread(target=_run_ai, args=(grouping, acc),
+    threading.Thread(target=tenants.call_in,
+                     args=(acc.tenant, _run_ai, grouping, acc),
                      daemon=True).start()
 
 
@@ -318,8 +325,10 @@ def ai_group(grouping: str, key: str, offset: int = 0,
     The client calls repeatedly until `remaining` is 0, showing progress."""
     acc = acc or accounts.get()
     cfg = cfgmod.load_config()
-    if not cfgmod.ai_available(cfg["ai"]):
+    ai_eff, ai_source = cfgmod.effective_ai(cfg)
+    if ai_source is None:
         raise RuntimeError("no API key configured")
+    cfg = {**cfg, "ai": ai_eff}
     cfgmod.check_budget(cfg["ai"])
     all_mails = mailops.group_mails(grouping, key, with_msgid=True, acc=acc)
     if not all_mails:
