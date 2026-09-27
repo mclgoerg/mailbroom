@@ -112,3 +112,24 @@ def test_search_mails(bridge):
     assert len(hits) == 3
     assert mailops.search_mails("alice")[0]["addr"] == "alice@friends.example"
     assert mailops.search_mails("x") == []         # too short
+
+
+def test_one_unparseable_mail_never_kills_the_scan(bridge, monkeypatch):
+    """Real mailboxes contain arbitrarily broken messages; the scan must
+    skip them (logged) instead of aborting with status=error."""
+    real = mailops.decode_mime
+
+    def poisoned(raw):
+        if "POISON" in str(raw):
+            raise ValueError("boom")
+        return real(raw)
+
+    monkeypatch.setattr(mailops, "decode_mime", poisoned)
+    from conftest import make_msg
+    bridge.mailbox["INBOX"].append(
+        make_msg(99, frm="evil <evil@x.example>", subject="POISON header"))
+    mailops.run_scan()
+    assert mailops.STATE["status"] == "done"          # not "error"
+    groups = mailops.STATE["groups"]["sender"]
+    assert "evil@x.example" not in groups             # skipped, not partial
+    assert groups["noreply@dhl.example"]["count"] == 3   # rest intact

@@ -522,17 +522,22 @@ _FLAGS_RE = re.compile(rb"FLAGS \(([^)]*)\)")
 
 
 def scan_folder(conn, folder: str, messages: list, progress_cb,
-                acc=None) -> None:
+                acc=None) -> int:
+    """Scan one folder into `messages`; returns how many messages had to
+    be SKIPPED because their metadata could not be parsed (real-world
+    mail contains arbitrarily broken headers — one bad message must
+    never abort a scan)."""
     acc = acc or accounts.get()
+    skipped = 0
     status, _ = conn.select(quote_folder(folder), readonly=True)
     if status != "OK":
-        return
+        return skipped
     # Cached UIDs are only meaningful for this UIDVALIDITY generation;
     # deletes re-check it (servers reset it on resync/re-login).
     acc.folder_uv[folder] = uidvalidity(conn)
     status, data = conn.uid("SEARCH", None, "ALL")
     if status != "OK" or not data or not data[0]:
-        return
+        return skipped
     uids = data[0].split()
     total = len(uids)
     for start in range(0, total, FETCH_CHUNK):
@@ -554,30 +559,38 @@ def scan_folder(conn, folder: str, messages: list, progress_cb,
             m = _UID_RE.search(meta)
             if not m:
                 continue
-            sm = _SIZE_RE.search(meta)
-            fm = _FLAGS_RE.search(meta)
-            ts = 0
-            tt = imaplib.Internaldate2tuple(meta)
-            if tt:
-                ts = int(time.mktime(tt))
-            msg = email.message_from_bytes(item[1])
-            name, addr = parseaddr(msg.get("From", ""))
-            addr = addr.strip().lower() or "(unparseable sender)"
-            messages.append({
-                "uid": int(m.group(1)), "folder": folder, "addr": addr,
-                "name": decode_mime(name) if name else "",
-                "subject": decode_mime(msg.get("Subject", ""))[:150],
-                "bulk": bool(msg.get("List-Unsubscribe")),
-                "unsub": (msg.get("List-Unsubscribe") or "")[:1000],
-                "unsub_post": "one-click" in
-                              (msg.get("List-Unsubscribe-Post") or "").lower(),
-                "msgid": (msg.get("Message-ID") or "").strip()[:300],
-                "size": int(sm.group(1)) if sm else 0,
-                "seen": bool(fm and b"\\Seen" in fm.group(1)),
-                "ts": ts,
-                "date": time.strftime("%Y-%m-%d %H:%M",
-                                      time.localtime(ts)) if ts else "",
-            })
+            try:
+                sm = _SIZE_RE.search(meta)
+                fm = _FLAGS_RE.search(meta)
+                ts = 0
+                tt = imaplib.Internaldate2tuple(meta)
+                if tt:
+                    ts = int(time.mktime(tt))
+                msg = email.message_from_bytes(item[1])
+                name, addr = parseaddr(msg.get("From", ""))
+                addr = addr.strip().lower() or "(unparseable sender)"
+                messages.append({
+                    "uid": int(m.group(1)), "folder": folder, "addr": addr,
+                    "name": decode_mime(name) if name else "",
+                    "subject": decode_mime(msg.get("Subject", ""))[:150],
+                    "bulk": bool(msg.get("List-Unsubscribe")),
+                    "unsub": (msg.get("List-Unsubscribe") or "")[:1000],
+                    "unsub_post": "one-click" in
+                                  (msg.get("List-Unsubscribe-Post")
+                                   or "").lower(),
+                    "msgid": (msg.get("Message-ID") or "").strip()[:300],
+                    "size": int(sm.group(1)) if sm else 0,
+                    "seen": bool(fm and b"\\Seen" in fm.group(1)),
+                    "ts": ts,
+                    "date": time.strftime("%Y-%m-%d %H:%M",
+                                          time.localtime(ts)) if ts else "",
+                })
+            except Exception:
+                skipped += 1
+                log.warning("[%s] skipping unparseable message uid %s in %r",
+                            acc.name, m.group(1).decode(), folder,
+                            exc_info=True)
+    return skipped
 
 
 def scan_sent_recipients(conn, progress_cb=None,
@@ -613,12 +626,16 @@ def scan_sent_recipients(conn, progress_cb=None,
         for item in data or []:
             if not isinstance(item, tuple) or len(item) < 2:
                 continue
-            msg = email.message_from_bytes(item[1])
-            for _, addr in getaddresses(
-                    msg.get_all("To", []) + msg.get_all("Cc", [])):
-                addr = addr.strip().lower()
-                if addr and "@" in addr:
-                    out.add(addr)
+            try:
+                msg = email.message_from_bytes(item[1])
+                for _, addr in getaddresses(
+                        msg.get_all("To", []) + msg.get_all("Cc", [])):
+                    addr = addr.strip().lower()
+                    if addr and "@" in addr:
+                        out.add(addr)
+            except Exception:
+                log.warning("skipping unparseable Sent message",
+                            exc_info=True)
     return out
 
 
@@ -793,8 +810,10 @@ def run_scan(acc=None) -> None:
             with acc.lock:
                 acc.state["folders"] = [decode_mutf7(f) for f in folders]
             messages: list = []
+            skipped = 0
             for folder in folders:
-                scan_folder(conn, folder, messages, progress_cb, acc)
+                skipped += scan_folder(conn, folder, messages,
+                                       progress_cb, acc)
             trash_count = folder_message_count(conn, roles.get("trash"))
             replied = load_replied(acc)
             new_replied = scan_sent_recipients(conn, progress_cb, roles, acc)
@@ -821,9 +840,11 @@ def run_scan(acc=None) -> None:
                 acc.state["scanned_ts"] = int(time.time())
                 acc.state["groups_rev"] += 1
             log.info("[%s] scan done: %d folders, %d mails, %d senders, "
-                     "%d replied-to addrs in %.1fs",
+                     "%d replied-to addrs%s in %.1fs",
                      acc.name, len(folders), len(messages),
-                     len(groups["sender"]), len(replied), time.time() - t0)
+                     len(groups["sender"]), len(replied),
+                     f", {skipped} unparseable SKIPPED" if skipped else "",
+                     time.time() - t0)
             statsmod.record_scan(len(messages),
                                  sum(m["size"] for m in messages),
                                  len(groups["sender"]), acc.name)
