@@ -484,6 +484,44 @@ export default function App() {
         )}
       </div>
 
+      {/* First-run onboarding: no credentials or no scan yet. */}
+      {cfg && state?.status === "idle" && groups.length === 0
+        && !scanning && (
+        <div className="mx-auto my-10 max-w-md rounded-xl border border-line
+          bg-panel p-6 text-sm">
+          <div className="mb-3 text-base font-semibold">
+            {t("onboard.title")}
+          </div>
+          <ol className="list-decimal space-y-2 pl-5 text-muted">
+            <li>{t("onboard.step_bridge")}</li>
+            <li>
+              {t("onboard.step_creds")}{" "}
+              <button className="text-accent underline"
+                onClick={() => setSettingsOpen(true)}>
+                {t("Settings")}
+              </button>
+            </li>
+            <li>{t("onboard.step_scan")}</li>
+          </ol>
+          <div className="mt-4 flex items-center gap-3">
+            {cfg.imap.password_set && (
+              <Button variant="ghost" onClick={async () => {
+                setToast(t("onboard.testing"));
+                try {
+                  const r = await api.testConnection();
+                  setToast(t("onboard.test_ok", { n: r.folders }));
+                } catch (e: any) {
+                  setToast(`${t("onboard.test_fail")}: ${e.message ?? e}`);
+                }
+              }}>{t("onboard.test")}</Button>
+            )}
+            <Button onClick={startScan} disabled={!cfg.imap.password_set}>
+              {t("Scan")}
+            </Button>
+          </div>
+        </div>
+      )}
+
       {groups.length > 0 ? (
         <GroupTable
           groups={groups}
@@ -512,9 +550,9 @@ export default function App() {
           resetSignal={`${mode}\u0000${filter}`}
         />
       ) : (
-        !scanning && (
+        !scanning && state?.status === "done" && (
           <div className="py-16 text-center text-sm text-muted">
-            {t("No scan yet — hit “Scan”.")}
+            {filter ? t("no.matches") : t("No scan yet — hit “Scan”.")}
           </div>
         )
       )}

@@ -71,6 +71,8 @@ export const api = {
   trash: () => req<TrashResp>("/api/trash"),
   trashRestore: (uids: number[], dest: string, uv: number) =>
     req<{ restored: number }>("/api/trash/restore", { uids, dest, uv }),
+  testConnection: () =>
+    req<{ ok: boolean; folders: number }>("/api/test_connection", {}),
 };
 
 export { fmtSize, fmtUsd, mailKey } from "./lib";

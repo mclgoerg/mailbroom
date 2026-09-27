@@ -358,6 +358,26 @@ def post_notice_clear():
     return {"ok": True}
 
 
+@app.post("/api/test_connection")
+def post_test_connection():
+    """Onboarding helper: can we reach and log into the Bridge?"""
+    cfg = cfgmod.load_config()
+    if not cfg["imap"]["password"]:
+        raise HTTPException(400, "no password configured")
+    try:
+        conn = mailops.connect(cfg)
+        try:
+            n = len(mailops.list_folders(conn))
+        finally:
+            try:
+                conn.logout()
+            except Exception:
+                pass
+    except Exception as exc:
+        raise HTTPException(502, f"{type(exc).__name__}: {exc}")
+    return {"ok": True, "folders": n}
+
+
 @app.get("/api/folders")
 def get_folders():
     """Live folder list with exclusion flags, for the settings picker."""

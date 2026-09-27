@@ -77,3 +77,23 @@ def test_import_applies_and_stays_safe():
     assert verdictstore.load_mails() == {"<a@b>": "keep"}
     assert "pal@x.example" in mailops.load_replied()
     assert "not-an-addr" not in mailops.load_replied()
+
+
+def test_test_connection(bridge):
+    # no password configured -> 400
+    r = TestClient(app).post("/api/test_connection", json={})
+    assert r.status_code == 400
+
+    cfgmod.update_config({"imap": {"password": "bridge-pass"}})
+    r = client.post("/api/test_connection", json={})
+    assert r.json()["ok"] and r.json()["folders"] >= 4
+
+
+def test_test_connection_failure(monkeypatch):
+    cfgmod.update_config({"imap": {"password": "bridge-pass"}})
+
+    def boom(cfg):
+        raise ConnectionRefusedError("nobody home")
+    monkeypatch.setattr(mailops, "connect", boom)
+    r = client.post("/api/test_connection", json={})
+    assert r.status_code == 502 and "nobody home" in r.json()["detail"]

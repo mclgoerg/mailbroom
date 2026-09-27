@@ -177,6 +177,20 @@ const EN: Record<string, string> = {
     + "(back in report mode), verdicts and replied data are merged. "
     + "Passwords/API keys are never imported.",
   "import.done": "Imported: {rules} rules, {verdicts} verdicts.",
+  "no.matches": "No groups match this filter.",
+  "onboard.title": "Welcome — three steps to a tidy mailbox",
+  "onboard.step_bridge":
+    "Run Proton Mail Bridge (its IMAP endpoint must be reachable from "
+    + "this app — see the README for the Docker setup).",
+  "onboard.step_creds":
+    "Enter the Bridge IMAP host, port, user and password in",
+  "onboard.step_scan":
+    "Hit Scan — nothing is ever deleted without your confirmation, and "
+    + "deletions go to Trash first.",
+  "onboard.test": "Test connection",
+  "onboard.testing": "Testing connection…",
+  "onboard.test_ok": "Connected — {n} folders visible. Ready to scan!",
+  "onboard.test_fail": "Connection failed",
 };
 
 const DE: Record<string, string> = {
@@ -483,6 +497,20 @@ const DE: Record<string, string> = {
     + "Antwortdaten zusammengeführt. Passwörter/API-Schlüssel werden nie "
     + "importiert.",
   "import.done": "Importiert: {rules} Regeln, {verdicts} Bewertungen.",
+  "no.matches": "Keine Gruppen passen zu diesem Filter.",
+  "onboard.title": "Willkommen — in drei Schritten zum sauberen Postfach",
+  "onboard.step_bridge":
+    "Proton Mail Bridge starten (der IMAP-Endpunkt muss von dieser App "
+    + "erreichbar sein — siehe README für das Docker-Setup).",
+  "onboard.step_creds":
+    "Bridge-IMAP-Host, -Port, -Benutzer und -Passwort eintragen unter",
+  "onboard.step_scan":
+    "Auf Scannen klicken — gelöscht wird nur nach Bestätigung, und "
+    + "Löschungen landen zuerst im Papierkorb.",
+  "onboard.test": "Verbindung testen",
+  "onboard.testing": "Teste Verbindung…",
+  "onboard.test_ok": "Verbunden — {n} Ordner sichtbar. Bereit zum Scannen!",
+  "onboard.test_fail": "Verbindung fehlgeschlagen",
 };
 
 let lang: Lang =
