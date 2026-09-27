@@ -434,6 +434,8 @@ export const DE: Record<string, string> = {
   "usage.last_scan": "Letzter Scan",
   "usage.disk": "Speicher",
   "usage.shared": "geteilter Schlüssel",
+  "sort.desc_tip": "Absteigend sortiert — Klick für aufsteigend",
+  "sort.asc_tip": "Aufsteigend sortiert — Klick für absteigend",
   "qb.tip": "Filter zusammenklicken statt Syntax merken",
   "qb.title": "Filter-Baukasten",
   "qb.hint": "jede hinzugefügte Bedingung muss AUCH zutreffen (UND)",

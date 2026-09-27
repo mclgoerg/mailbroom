@@ -50,8 +50,19 @@ export default function App() {
     () => localStorage.getItem("pmc_account") || "");
   const [mode, setMode] = useState<Grouping>("sender");
   const [filter, setFilter] = useState("");
-  const [sortK, setSortK] = useState<SortKey>("count");
-  const [sortDir, setSortDir] = useState(-1);
+  // Sort field + direction survive reloads; every field has a natural
+  // default direction (name A→Z, everything else biggest/newest first)
+  // and the toolbar toggle / a second header click flips it.
+  const [sortK, setSortK] = useState<SortKey>(() => {
+    const k = localStorage.getItem("pmc_sort_k") as SortKey | null;
+    return k && SORT_OPTIONS.some((o) => o.k === k) ? k : "count";
+  });
+  const [sortDir, setSortDir] = useState(
+    () => Number(localStorage.getItem("pmc_sort_dir")) || -1);
+  useEffect(() => {
+    localStorage.setItem("pmc_sort_k", sortK);
+    localStorage.setItem("pmc_sort_dir", String(sortDir));
+  }, [sortK, sortDir]);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [detail, setDetail] = useState<Group | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -559,16 +570,33 @@ export default function App() {
           <option value="older24">{t("Inactive > 2 years")}</option>
           <option value="none">{t("Clear selection")}</option>
         </Select>
-        <Select className="flex-1 sm:flex-none" value={sortK}
-          onChange={(e) => {
-            const k = e.target.value as SortKey;
-            setSortK(k);
-            setSortDir(k === "label" ? 1 : -1);
-          }}>
-          {SORT_OPTIONS.map((o) => (
-            <option key={o.k} value={o.k}>{t(o.label)}</option>
-          ))}
-        </Select>
+        {/* Sort: field select + direction toggle as one segmented
+            control; the arrow rotates instead of swapping glyphs. */}
+        <div className="flex flex-1 items-stretch overflow-hidden rounded-md
+          border border-line sm:flex-none">
+          <Select className="min-w-0 flex-1 !rounded-none !border-0"
+            value={sortK}
+            onChange={(e) => {
+              const k = e.target.value as SortKey;
+              setSortK(k);
+              setSortDir(k === "label" ? 1 : -1);
+            }}>
+            {SORT_OPTIONS.map((o) => (
+              <option key={o.k} value={o.k}>{t(o.label)}</option>
+            ))}
+          </Select>
+          <button
+            className="flex w-9 shrink-0 items-center justify-center
+              border-l border-line bg-panel2 text-accent hover:bg-chip"
+            title={t(sortDir < 0 ? "sort.desc_tip" : "sort.asc_tip")}
+            aria-label={t(sortDir < 0 ? "sort.desc_tip" : "sort.asc_tip")}
+            onClick={() => setSortDir(-sortDir)}>
+            <span aria-hidden className={`inline-block transition-transform
+              duration-200 ${sortDir > 0 ? "rotate-180" : ""}`}>
+              ↓
+            </span>
+          </button>
+        </div>
         {aiEnabled && (
           <Button variant="ghost" onClick={startAi}
             disabled={scanning || aiRunning || state?.status !== "done"}>

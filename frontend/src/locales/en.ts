@@ -87,6 +87,8 @@ export const EN: Record<string, string> = {
   "usage.last_scan": "Last scan",
   "usage.disk": "Disk",
   "usage.shared": "shared key",
+  "sort.desc_tip": "Sorted descending — click for ascending",
+  "sort.asc_tip": "Sorted ascending — click for descending",
   "qb.tip": "Build a filter — click conditions together",
   "qb.title": "Filter builder",
   "qb.hint": "every condition you add must ALSO match (AND)",

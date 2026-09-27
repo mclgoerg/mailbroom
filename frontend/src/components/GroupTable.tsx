@@ -38,11 +38,26 @@ const unreadPct = (g: Group) =>
 function DesktopTable({ slice, baseIdx, selected, focusedKey, onToggle,
   onToggleAll, onOpen, onTrash, onProtect, sortK, sortDir, onSort, groupLabel
 }: PageProps) {
-  const arrow = (k: SortKey) =>
-    sortK === k ? (sortDir < 0 ? " ↓" : " ↑") : "";
+  // Sort indicator: the active column shows an accent arrow that ROTATES
+  // between directions; inactive sortable columns reserve the space
+  // (no layout shift) and reveal a faint hint on hover.
+  const arrow = (k: SortKey) => (
+    <span aria-hidden
+      className={`ml-0.5 inline-block transition-all duration-200 ${
+        sortK === k
+          ? `text-accent ${sortDir > 0 ? "rotate-180" : ""}`
+          : "opacity-0 group-hover/th:opacity-50"}`}>
+      ↓
+    </span>
+  );
+  const ariaSort = (k: SortKey) =>
+    sortK === k ? (sortDir < 0 ? "descending" as const
+      : "ascending" as const) : undefined;
   const allChecked =
     slice.length > 0 && slice.every((g) => selected.has(g.key));
   const th = "px-2 py-2 font-semibold";
+  const sortableTh = `${th} group/th cursor-pointer select-none
+    hover:text-body`;
   // table-fixed: column widths come from the header cells, so they are
   // content-independent and identical in every grouping mode.
   return (
@@ -54,22 +69,24 @@ function DesktopTable({ slice, baseIdx, selected, focusedKey, onToggle,
               onChange={(e) => onToggleAll(e.target.checked,
                 slice.map((g) => g.key))} />
           </th>
-          <th className={`${th} cursor-pointer select-none`}
+          <th className={sortableTh} aria-sort={ariaSort("label")}
             onClick={() => onSort("label")}>
             {groupLabel}{arrow("label")}
           </th>
           <th className={`${th} hidden w-44 lg:table-cell`}>{t("Type")}</th>
           <th className={`${th} w-24`}>{t("AI")}</th>
-          <th className={`${th} w-16 cursor-pointer select-none text-right`}
+          <th className={`${sortableTh} w-16 text-right`}
+            aria-sort={ariaSort("count")}
             onClick={() => onSort("count")}>
             {t("Mails")}{arrow("count")}
           </th>
-          <th className={`${th} w-20 cursor-pointer select-none text-right`}
+          <th className={`${sortableTh} w-20 text-right`}
+            aria-sort={ariaSort("size")}
             onClick={() => onSort("size")}>
             {t("Size")}{arrow("size")}
           </th>
-          <th className={`${th} hidden w-24 cursor-pointer select-none
-            text-right md:table-cell`}
+          <th className={`${sortableTh} hidden w-24 text-right md:table-cell`}
+            aria-sort={ariaSort("last")}
             onClick={() => onSort("last")}>
             {t("Last")}{arrow("last")}
           </th>
