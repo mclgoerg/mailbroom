@@ -400,6 +400,10 @@ export const DE: Record<string, string> = {
   "login.sso": "Mit SSO anmelden",
   "login.logout": "Abmelden",
   "login.admin_tip": "Admin — verwaltet die Server-Einstellungen",
+  "menu.profile": "Profil & Einstellungen",
+  "menu.theme": "Zu {next}em Design wechseln",
+  "menu.light": "hell",
+  "menu.dark": "dunkl",
   "login.oidc_admin": "Admin-Identität (E-Mail oder Subject)",
   "login.oidc_admin_ph": "leer: erste Anmeldung übernimmt sie",
   "login.tenancy_note":

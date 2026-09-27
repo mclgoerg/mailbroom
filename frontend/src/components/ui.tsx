@@ -1,4 +1,5 @@
-import { useEffect, type ComponentProps, type ReactNode } from "react";
+import { useEffect, useRef, useState,
+  type ComponentProps, type ReactNode } from "react";
 import { t } from "../i18n";
 import type { GroupAi } from "../types";
 
@@ -212,6 +213,74 @@ export function SectionLabel({ children, className = "" }: {
 }
 
 /** Standard "nothing here" message for empty lists/results. */
+/** Dropdown menu: a trigger button plus a right-aligned popover. Closes
+ * on outside click, Escape, or after any click inside (items just run
+ * their onClick). Sits BELOW modals (they are z-20). */
+export function Menu({ trigger, label, children }: {
+  trigger: ReactNode;
+  label?: string;                 // accessible name / tooltip
+  children: ReactNode;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const onDoc = (e: MouseEvent) => {
+      if (!ref.current?.contains(e.target as Node)) setOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setOpen(false);
+    };
+    document.addEventListener("mousedown", onDoc);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDoc);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
+  return (
+    <div className="relative" ref={ref}>
+      <button className="flex min-h-8 items-center rounded-md border
+        border-line bg-panel2 px-2 text-sm hover:bg-chip"
+        title={label} aria-label={label} aria-expanded={open}
+        onClick={() => setOpen(!open)}>
+        {trigger}
+      </button>
+      {open && (
+        <div className="absolute right-0 top-full z-10 mt-1 min-w-52
+          rounded-lg border border-line bg-panel p-1 shadow-lg"
+          onClick={() => setOpen(false)}>
+          {children}
+        </div>
+      )}
+    </div>
+  );
+}
+
+export function MenuItem({ children, onClick, disabled }: {
+  children: ReactNode;
+  onClick?: () => void;
+  disabled?: boolean;
+}) {
+  return (
+    <button className="block w-full rounded-md px-3 py-2 text-left text-sm
+      text-body hover:bg-chip disabled:opacity-50"
+      onClick={onClick} disabled={disabled}>
+      {children}
+    </button>
+  );
+}
+
+/** Non-interactive heading line inside a Menu (e.g. the identity). */
+export function MenuHeading({ children }: { children: ReactNode }) {
+  return (
+    <div className="max-w-64 truncate border-b border-line px-3 pb-2 pt-1
+      text-xs text-muted">
+      {children}
+    </div>
+  );
+}
+
 export function EmptyState({ children }: { children: ReactNode }) {
   return (
     <div className="p-6 text-center text-sm text-muted">{children}</div>

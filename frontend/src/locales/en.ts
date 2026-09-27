@@ -55,6 +55,10 @@ export const EN: Record<string, string> = {
   "login.sso": "Sign in with SSO",
   "login.logout": "Logout",
   "login.admin_tip": "admin — owns the server settings",
+  "menu.profile": "Profile & settings",
+  "menu.theme": "Switch to {next} theme",
+  "menu.light": "light",
+  "menu.dark": "dark",
   "login.oidc_admin": "Admin identity (email or subject)",
   "login.oidc_admin_ph": "empty: first login claims it",
   "login.tenancy_note":

@@ -10,8 +10,8 @@ import { SearchPanel } from "./components/SearchPanel";
 import { SettingsModal } from "./components/SettingsModal";
 import { StatsPanel } from "./components/StatsPanel";
 import { TrashPanel } from "./components/TrashPanel";
-import { applyTheme, Button, currentTheme, ensureAiAck, Input, Select,
-  Spinner } from "./components/ui";
+import { applyTheme, Button, currentTheme, ensureAiAck, Input, Menu,
+  MenuHeading, MenuItem, Select, Spinner } from "./components/ui";
 import { t } from "./i18n";
 import { applyStatus, fmtAgo, fmtSize, fmtUsd, matchGroup, parseFilter }
   from "./lib";
@@ -431,27 +431,6 @@ export default function App() {
         <h1 className="text-lg font-bold tracking-tight">
           Mailbroom
         </h1>
-        <button className="text-sm text-muted hover:text-body"
-          title={t("Theme")} onClick={toggleTheme}>
-          {theme === "dark" ? "☀" : "🌙"}
-        </button>
-        {auth.mode === "oidc" && !!auth.sub && (
-          <span className="max-w-40 truncate text-xs text-muted"
-            title={auth.is_admin
-              ? `${auth.sub} — ${t("login.admin_tip")}` : auth.sub}>
-            {auth.sub}{auth.is_admin ? " ★" : ""}
-          </span>
-        )}
-        {auth.mode !== "none" && (
-          <button className="text-xs text-muted underline-offset-2
-            hover:underline"
-            onClick={async () => {
-              try { await api.logout(); } catch { /* session gone anyway */ }
-              window.location.reload();
-            }}>
-            {t("login.logout")}
-          </button>
-        )}
         {/* Account switcher — only when more than one account exists.
             Switching swaps the entire view; nothing mixes across accounts. */}
         {cfg && Object.keys(cfg.accounts).length > 1 && (
@@ -469,17 +448,49 @@ export default function App() {
             ))}
           </div>
         )}
-        {state?.trash_count != null && state.trash_count > 0 && (
-          <span className="ml-auto flex items-center gap-2 text-xs text-muted">
-            <button className="underline-offset-2 hover:underline"
+        <span className="ml-auto flex items-center gap-2">
+          {state?.trash_count != null && state.trash_count > 0 && (
+            <button className="text-xs text-muted underline-offset-2
+              hover:underline"
               title={t("trash.browse")}
               onClick={() => setTrashOpen(true)}>
               {t("Trash")}: {state.trash_count}
             </button>
-            <Button variant="ghost" className="!min-h-7 !px-2 !py-0.5 !text-xs"
-              onClick={emptyTrash}>{t("Empty Trash")}</Button>
-          </span>
-        )}
+          )}
+          {/* Profile menu: identity, theme, settings, trash, logout —
+              keeps the header to three compact elements on phones. */}
+          <Menu label={t("menu.profile")}
+            trigger={<>👤{auth.is_admin && auth.mode === "oidc"
+              ? <span className="ml-0.5 text-xs">★</span> : null}</>}>
+            {auth.mode === "oidc" && !!auth.sub && (
+              <MenuHeading>
+                {auth.sub}
+                {auth.is_admin ? ` ★ ${t("login.admin_tip")}` : ""}
+              </MenuHeading>
+            )}
+            <MenuItem onClick={toggleTheme}>
+              {theme === "dark" ? "☀ " : "🌙 "}
+              {t("menu.theme", {
+                next: theme === "dark" ? t("menu.light") : t("menu.dark") })}
+            </MenuItem>
+            <MenuItem onClick={() => setSettingsOpen(true)}>
+              ⚙ {t("Settings")}
+            </MenuItem>
+            {state?.trash_count != null && state.trash_count > 0 && (
+              <MenuItem onClick={emptyTrash}>
+                🗑 {t("Empty Trash")} ({state.trash_count})
+              </MenuItem>
+            )}
+            {auth.mode !== "none" && (
+              <MenuItem onClick={async () => {
+                try { await api.logout(); } catch { /* session gone */ }
+                window.location.reload();
+              }}>
+                ⏻ {t("login.logout")}
+              </MenuItem>
+            )}
+          </Menu>
+        </span>
       </header>
 
       {/* Row 1: primary actions — identical in every grouping mode. */}
