@@ -47,6 +47,32 @@ export interface DeleteState {
   moved: number;
 }
 
+export interface RuleRun {
+  ts: number;
+  mode: "report" | "execute";
+  groups: number;
+  mails: number;
+  acted: number;
+  capped: number;
+  skipped_protected: number;
+  preview: { key: string; label: string; count: number }[];
+  error: string;
+}
+
+export interface Rule {
+  id: string;
+  name: string;
+  grouping: Grouping;
+  query: string;
+  action: string;
+  dest: string;
+  schedule: "manual" | "daily" | "weekly";
+  mode: "report" | "execute";
+  report_runs: number;
+  created: number;
+  last_run: RuleRun | null;
+}
+
 export interface AppState {
   status: "idle" | "scanning" | "done" | "error";
   progress: string;
@@ -59,6 +85,7 @@ export interface AppState {
   notice: { key: string; params: Record<string, string | number> } | null;
   undo: { ts: number; label: string; count: number; action: string }[];
   folders_raw: string[];
+  rules: Rule[];
 }
 
 export interface FolderInfo {

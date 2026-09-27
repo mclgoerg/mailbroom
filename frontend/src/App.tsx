@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api } from "./api";
 import { DetailPanel } from "./components/DetailPanel";
 import { GroupTable, type SortKey } from "./components/GroupTable";
+import { RulesModal } from "./components/RulesModal";
 import { SearchPanel } from "./components/SearchPanel";
 import { SettingsModal } from "./components/SettingsModal";
 import { applyTheme, Button, currentTheme, ensureAiAck, Spinner } from "./components/ui";
@@ -41,6 +42,7 @@ export default function App() {
   const [detail, setDetail] = useState<Group | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
+  const [rulesOpen, setRulesOpen] = useState(false);
   const [undoOpen, setUndoOpen] = useState(false);
   const [moveDest, setMoveDest] = useState("");
   const [focusIdx, setFocusIdx] = useState(-1);
@@ -111,7 +113,7 @@ export default function App() {
   const aiRunning = state?.ai.status === "running";
   const deleting = state?.delete.status === "running";
   const aiEnabled = !!cfg?.ai.available;
-  const anyModal = !!detail || searchOpen || settingsOpen;
+  const anyModal = !!detail || searchOpen || settingsOpen || rulesOpen;
 
   const startScan = async () => {
     setSelected(new Set());
@@ -365,6 +367,8 @@ export default function App() {
         />
         <Button variant="ghost" title={t("Search all mails")}
           onClick={() => setSearchOpen(true)}>🔍</Button>
+        <Button variant="ghost" title={t("Rules")}
+          onClick={() => setRulesOpen(true)}>📋</Button>
         <Button variant="ghost" title={t("Settings")}
           onClick={() => setSettingsOpen(true)}>⚙</Button>
       </div>
@@ -512,6 +516,13 @@ export default function App() {
         <SearchPanel
           onClose={() => { setSearchOpen(false); refresh(); }}
           onDeleted={refresh}
+        />
+      )}
+      {rulesOpen && state && (
+        <RulesModal
+          state={state}
+          onClose={() => setRulesOpen(false)}
+          onChanged={refresh}
         />
       )}
       {settingsOpen && cfg && (

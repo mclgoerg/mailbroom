@@ -72,6 +72,7 @@ STATE: dict = {
     "notice": None,        # one-shot info for the UI: {key, params} | None
     "undo": [],            # summaries of undoable move jobs (newest last)
     "folders_raw": [],     # raw IMAP folder names (targets for move-to)
+    "rules": [],           # saved cleanup rules (mirrored by backend.rules)
 }
 ACTIONS = ("trash", "archive", "move", "mark_read")
 INDEX: dict[str, dict] = {}   # "folder\x00uid" -> per-message metadata

@@ -74,6 +74,48 @@ const EN: Record<string, string> = {
   "page.of": "Page {p} / {n}",
   "per page": "per page",
   "All": "All",
+  "notice.rule_report":
+    'Rule "{name}" (report): {groups} groups · {mails} mails would be '
+    + "affected.",
+  "notice.rule_executed":
+    'Rule "{name}" executed: {acted} mails queued ({groups} groups).',
+  "rules.help":
+    "A rule saves a group filter (same syntax as the filter box) plus an "
+    + "action. New rules only REPORT what they would do; switch to execute "
+    + "after checking a report. Runs are capped at 500 mails, protected "
+    + "senders are skipped, and everything lands in Trash/undo as usual.",
+  "rules.empty": "No rules yet — create one below.",
+  "rule.never_ran": "never ran",
+  "rule.run_report": "report: {groups} groups · {mails} mails would be affected",
+  "rule.run_executed": "executed: {acted} mails queued ({groups} groups, {mails} matched)",
+  "rule.capped": "{n} mails beyond the per-run cap",
+  "rule.protected_skipped": "{n} protected skipped",
+  "rule.run_now": "Run now",
+  "rule.enable_execute": "Enable execute",
+  "rule.back_to_report": "Back to report mode",
+  "rule.need_report": "Run at least one report first",
+  "rule.confirm_execute": 'Run rule "{name}" in EXECUTE mode now?',
+  "rule.confirm_enable":
+    'Switch rule "{name}" to EXECUTE? Scheduled runs will then act on '
+    + "matching mails (cap 500 per run, protected senders skipped, "
+    + "undo available).",
+  "rule.confirm_delete": 'Delete rule "{name}"?',
+  "rule.edit_title": "Edit rule",
+  "rule.new_title": "New rule",
+  "rule.name": "Rule name",
+  "rule.create": "Create (report mode)",
+  "rule.match_count":
+    "currently matches {groups} groups · {mails} mails (protected excluded)",
+  "rule.match_unknown": "run a scan to see live match counts",
+  "action.trash": "Move to Trash",
+  "action.archive": "Archive",
+  "action.move": "Move to folder",
+  "action.mark_read": "Mark as read",
+  "sched.manual": "manual",
+  "sched.daily": "daily",
+  "sched.weekly": "weekly",
+  "mode.report": "report",
+  "mode.execute": "execute",
 };
 
 const DE: Record<string, string> = {
@@ -257,6 +299,54 @@ const DE: Record<string, string> = {
   "Export current grouping as CSV":
     "Aktuelle Gruppierung als CSV exportieren",
   "total": "gesamt",
+  "Rules": "Regeln",
+  "notice.rule_report":
+    "Regel „{name}“ (Bericht): {groups} Gruppen · {mails} Mails wären "
+    + "betroffen.",
+  "notice.rule_executed":
+    "Regel „{name}“ ausgeführt: {acted} Mails eingereiht ({groups} Gruppen).",
+  "rules.help":
+    "Eine Regel speichert einen Gruppenfilter (gleiche Syntax wie das "
+    + "Filterfeld) plus eine Aktion. Neue Regeln BERICHTEN nur, was sie tun "
+    + "würden; nach Prüfung eines Berichts kann auf Ausführen umgeschaltet "
+    + "werden. Läufe sind auf 500 Mails begrenzt, geschützte Absender "
+    + "werden übersprungen, alles landet wie üblich im Papierkorb/Undo.",
+  "rules.empty": "Noch keine Regeln — unten eine anlegen.",
+  "rule.never_ran": "noch nie gelaufen",
+  "rule.run_report":
+    "Bericht: {groups} Gruppen · {mails} Mails wären betroffen",
+  "rule.run_executed":
+    "ausgeführt: {acted} Mails eingereiht ({groups} Gruppen, {mails} Treffer)",
+  "rule.capped": "{n} Mails über dem Limit pro Lauf",
+  "rule.protected_skipped": "{n} geschützte übersprungen",
+  "rule.run_now": "Jetzt ausführen",
+  "rule.enable_execute": "Ausführen aktivieren",
+  "rule.back_to_report": "Zurück zu Bericht",
+  "rule.need_report": "Zuerst mindestens einen Bericht ausführen",
+  "rule.confirm_execute": "Regel „{name}“ jetzt im AUSFÜHREN-Modus starten?",
+  "rule.confirm_enable":
+    "Regel „{name}“ auf AUSFÜHREN umschalten? Geplante Läufe verarbeiten "
+    + "dann passende Mails (max. 500 pro Lauf, geschützte Absender "
+    + "übersprungen, Undo verfügbar).",
+  "rule.confirm_delete": "Regel „{name}“ löschen?",
+  "rule.edit_title": "Regel bearbeiten",
+  "rule.new_title": "Neue Regel",
+  "rule.name": "Regelname",
+  "rule.create": "Anlegen (Bericht-Modus)",
+  "rule.match_count":
+    "trifft aktuell {groups} Gruppen · {mails} Mails (ohne geschützte)",
+  "rule.match_unknown": "Für Live-Trefferzahlen zuerst scannen",
+  "action.trash": "In den Papierkorb",
+  "action.archive": "Archivieren",
+  "action.move": "In Ordner verschieben",
+  "action.mark_read": "Als gelesen markieren",
+  "sched.manual": "manuell",
+  "sched.daily": "täglich",
+  "sched.weekly": "wöchentlich",
+  "mode.report": "Bericht",
+  "mode.execute": "Ausführen",
+  "Edit": "Bearbeiten",
+  "Delete": "Löschen",
 };
 
 let lang: Lang =

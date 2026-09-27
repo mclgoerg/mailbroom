@@ -1,6 +1,6 @@
 import type {
   AiGroupResult, AppState, Config, FoldersResp, Grouping, Mail,
-  MessageDetail, UnsubResult,
+  MessageDetail, Rule, RuleRun, UnsubResult,
 } from "./types";
 
 async function req<T>(path: string, body?: unknown): Promise<T> {
@@ -55,6 +55,15 @@ export const api = {
     req<Mail[]>(`/api/search?q=${encodeURIComponent(q)}`),
   folders: () => req<FoldersResp>("/api/folders"),
   exportUrl: (grouping: Grouping) => `/api/export?grouping=${grouping}`,
+  rules: () => req<{ rules: Rule[] }>("/api/rules"),
+  createRule: (body: Partial<Rule>) => req<Rule>("/api/rules", body),
+  updateRule: (id: string, body: Partial<Rule>) =>
+    req<Rule>(`/api/rules/${id}`, body),
+  deleteRule: async (id: string): Promise<void> => {
+    const res = await fetch(`/api/rules/${id}`, { method: "DELETE" });
+    if (!res.ok) throw new Error(await res.text());
+  },
+  runRule: (id: string) => req<RuleRun>(`/api/rules/${id}/run`, {}),
 };
 
 export { fmtSize, fmtUsd, mailKey } from "./lib";

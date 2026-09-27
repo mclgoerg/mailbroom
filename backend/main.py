@@ -21,6 +21,7 @@ from pydantic import BaseModel, Field
 from . import aihelper
 from . import config as cfgmod
 from . import mailops
+from . import rules as rulesmod
 from . import unsub
 from . import verdictstore
 from .mailops import GROUPINGS
@@ -30,7 +31,16 @@ logging.basicConfig(
     format="%(asctime)s %(levelname)-7s %(name)s: %(message)s",
     datefmt="%Y-%m-%d %H:%M:%S")
 
-app = FastAPI(title="proton-mail-cleaner", docs_url=None, redoc_url=None)
+from contextlib import asynccontextmanager
+
+
+@asynccontextmanager
+async def _lifespan(app: FastAPI):
+    rulesmod.start_scheduler()
+    yield
+
+app = FastAPI(title="proton-mail-cleaner", docs_url=None, redoc_url=None,
+              lifespan=_lifespan)
 
 STATIC_DIR = Path(__file__).resolve().parent.parent / "static"
 
@@ -178,6 +188,59 @@ def post_unsubscribe(body: AiGroupBody):
         return unsub.unsubscribe(body.grouping, body.key)
     except Exception as exc:
         raise HTTPException(500, f"{type(exc).__name__}: {exc}")
+
+
+class RuleBody(BaseModel):
+    name: str = ""
+    grouping: str = "sender"
+    query: str = ""
+    action: str = "trash"
+    dest: str = ""
+    schedule: str = "manual"
+    mode: str | None = None        # only honoured on update
+
+
+@app.get("/api/rules")
+def get_rules():
+    return {"rules": rulesmod.load_rules()}
+
+
+@app.post("/api/rules")
+def post_rules(body: RuleBody):
+    try:
+        return rulesmod.create_rule(body.model_dump(exclude_none=True))
+    except ValueError as exc:
+        raise HTTPException(400, str(exc))
+
+
+@app.post("/api/rules/{rule_id}")
+def post_rule_update(rule_id: str, body: dict):
+    try:
+        return rulesmod.update_rule(rule_id, body)
+    except KeyError:
+        raise HTTPException(404, "unknown rule")
+    except ValueError as exc:
+        raise HTTPException(400, str(exc))
+
+
+@app.delete("/api/rules/{rule_id}")
+def delete_rule(rule_id: str):
+    try:
+        rulesmod.delete_rule(rule_id)
+    except KeyError:
+        raise HTTPException(404, "unknown rule")
+    return {"ok": True}
+
+
+@app.post("/api/rules/{rule_id}/run")
+def post_rule_run(rule_id: str):
+    """Manual trigger; reuses the current scan when one is loaded."""
+    try:
+        return rulesmod.run_rule(rule_id, rescan=False)
+    except KeyError:
+        raise HTTPException(404, "unknown rule")
+    except RuntimeError as exc:
+        raise HTTPException(409, str(exc))
 
 
 class ProtectBody(BaseModel):

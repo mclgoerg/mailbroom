@@ -28,6 +28,13 @@ paid Proton plan), but it speaks plain IMAP, so other providers work too.
   Providers: Anthropic API, OpenAI, Claude on Microsoft Foundry, or any
   OpenAI-compatible local endpoint (Ollama, LM Studio, vLLM). Token usage
   and cost are tracked with a built-in price table.
+- **Rules + scheduler** — save a filter query (same syntax as the filter
+  box) plus an action as a rule, run it manually or daily/weekly. Rules
+  always start in **report mode** (they only tell you what they would do);
+  execute mode can be enabled after at least one report run. Every run is
+  capped at 500 mails, skips protected senders, and uses the normal
+  Trash/undo pipeline — the scheduler is a background loop inside the
+  container, no cron needed.
 - **"Never replied" signal** — each scan also reads the To/Cc headers of
   your Sent folder (headers only, cached across scans): groups you have
   written to get a ↩ replied tag, filter with `is:replied` /
