@@ -162,6 +162,18 @@ def xoauth2_string(user: str, access_token: str) -> bytes:
     return f"user={user}\x01auth=Bearer {access_token}\x01\x01".encode()
 
 
+def smtp_auth_callback(user: str, access_token: str):
+    """smtplib.SMTP.auth() authobject for XOAUTH2: the initial response
+    is the whole auth string (as ASCII text, not bytes - smtplib base64
+    encodes it itself); on error the server sends a 334 continuation
+    that the client must answer with an empty response."""
+    def cb(challenge: bytes | None = None) -> str:
+        if challenge:
+            return ""
+        return xoauth2_string(user, access_token).decode()
+    return cb
+
+
 # ------------------------------------------------------------ device code
 
 def device_start() -> dict:

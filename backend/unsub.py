@@ -80,7 +80,7 @@ def _post_one_click(url: str) -> None:
             raise RuntimeError(f"unsubscribe endpoint returned {res.status}")
 
 
-def _send_mailto(im: dict, uri: str) -> None:
+def _send_mailto(im: dict, uri: str, account_name: str | None = None) -> None:
     parsed = urllib.parse.urlparse(uri)
     to_addr = urllib.parse.unquote(parsed.path)
     params = dict(urllib.parse.parse_qsl(parsed.query))
@@ -105,7 +105,16 @@ def _send_mailto(im: dict, uri: str) -> None:
             smtp = smtplib.SMTP(host, port, timeout=30)
             smtp.starttls(context=ctx)
     try:
-        smtp.login(im["user"], im["password"])
+        oauth = im.get("oauth")
+        if oauth and oauth.get("refresh_token"):
+            from . import oauthflow
+            fresh = oauthflow.ensure_fresh(oauth)
+            if fresh is not oauth and account_name:
+                cfgmod.save_oauth(account_name, fresh)
+            cb = oauthflow.smtp_auth_callback(sender, fresh["access_token"])
+            smtp.auth("XOAUTH2", cb, initial_response_ok=True)
+        else:
+            smtp.login(im["user"], im["password"])
         smtp.sendmail(sender, [to_addr], msg.encode())
     finally:
         try:
@@ -140,7 +149,7 @@ def unsubscribe(grouping: str, key: str, acc=None) -> dict:
         return {"action": "done", "method": "one-click POST",
                 "detail": parts["http"]}
     if parts["mailto"]:
-        _send_mailto(cfgmod.account_imap(acc.name), parts["mailto"])
+        _send_mailto(cfgmod.account_imap(acc.name), parts["mailto"], acc.name)
         return {"action": "done", "method": "unsubscribe mail sent",
                 "detail": parts["mailto"]}
     if parts["http"]:
