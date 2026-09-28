@@ -354,6 +354,9 @@ export const DE: Record<string, string> = {
   "preset.hint.imap_toggle":
     "IMAP muss zuerst in den Mail-Einstellungen des Anbieters aktiviert "
     + "werden; bei Zwei-Faktor-Authentifizierung App-Passwort verwenden.",
+  "preset.hint.oauth_gmail":
+    "Gmail verbindet hier nur per OAuth (unten) - eigenen, kostenlosen "
+    + "Google-OAuth-Client registrieren, siehe Installationsanleitung.",
   "preset.hint.oauth_only":
     "Microsoft bietet für IMAP kein App-Passwort - unten per OAuth "
     + "verbinden (experimentell).",
@@ -364,9 +367,6 @@ export const DE: Record<string, string> = {
   "sec.auto": "automatisch",
   "cafile.label": "Eigene CA-Datei (optional, z.\u202fB. das Bridge-Zertifikat)",
   "oauth.title": "{provider}-Konto per OAuth verbinden",
-  "oauth.password_unused": "Nicht n\u00f6tig - dieses Konto nutzt OAuth",
-  "oauth.password_optional":
-    "Optional - oder unten per OAuth verbinden",
   "oauth.client_id": "Client-ID",
   "oauth.client_secret": "Client-Secret",
   "oauth.google_help":

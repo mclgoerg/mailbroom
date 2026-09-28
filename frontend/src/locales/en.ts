@@ -326,6 +326,9 @@ export const EN: Record<string, string> = {
   "preset.hint.imap_toggle":
     "IMAP must be enabled first in the provider's mail settings; then "
     + "use an app password if two-factor auth is on.",
+  "preset.hint.oauth_gmail":
+    "Gmail connects via OAuth only here (below) - register your own "
+    + "free Google OAuth client, see the install guide.",
   "preset.hint.oauth_only":
     "Microsoft has no app-password option for IMAP - connect via OAuth "
     + "below (experimental).",
@@ -336,8 +339,6 @@ export const EN: Record<string, string> = {
   "sec.auto": "auto",
   "cafile.label": "Custom CA file (optional, e.g. the Bridge certificate)",
   "oauth.title": "Connect your {provider} account via OAuth",
-  "oauth.password_unused": "Not needed - this account uses OAuth",
-  "oauth.password_optional": "Optional - or connect via OAuth below",
   "oauth.client_id": "Client ID",
   "oauth.client_secret": "Client secret",
   "oauth.google_help":
