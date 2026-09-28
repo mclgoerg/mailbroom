@@ -25,6 +25,8 @@ def _initial_state() -> dict:
         "delete": {"status": "idle", "progress": "", "error": "", "moved": 0},
         "atts": {"status": "idle", "progress": "", "error": "",
                  "mails": 0, "size": 0},   # attachment analysis (lazy)
+        "unsub": {"status": "idle", "progress": "", "error": "", "total": 0,
+                  "done": 0, "links": 0, "failed": 0, "skipped": 0},
         "trash_count": None,   # mails currently in Trash (None = unknown)
         "notice": None,        # one-shot info for the UI: {key, params}|None
         "scanned_ts": None,    # when the current groups were scanned
@@ -57,7 +59,7 @@ class AccountState:
         self.replied: set[str] = set()
         self.replied_loaded = False
         self.cancel = {"scan": False, "ai": False, "delete": False,
-                       "atts": False}
+                       "atts": False, "unsub": False}
         self.delete_pending: list[dict] = []
         # UIDs of the delete job currently being processed (guarded by
         # `lock`) - new jobs dedup against these too, not just the queue.

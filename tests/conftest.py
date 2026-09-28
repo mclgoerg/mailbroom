@@ -17,6 +17,7 @@ from backend import mailops                   # noqa: E402
 from backend import rules as rulesmod         # noqa: E402
 from backend import stats as statsmod         # noqa: E402
 from backend import tenants as tenantsmod     # noqa: E402
+from backend import unsubstore                # noqa: E402
 from backend import verdictstore              # noqa: E402
 
 
@@ -31,6 +32,8 @@ def isolate(tmp_path, monkeypatch):
     monkeypatch.setattr(tenantsmod, "TENANTS_DIR", tmp_path / "tenants")
     monkeypatch.setattr(verdictstore, "VERDICTS_PATH",
                         tmp_path / "verdicts.json")
+    monkeypatch.setattr(unsubstore, "UNSUB_STATE_PATH",
+                        tmp_path / "unsub_state.json")
     monkeypatch.setattr(mailops, "REPLIED_PATH", tmp_path / "replied.json")
     monkeypatch.setattr(mailops, "SNAPSHOT_DIR", tmp_path / "snapshots")
     monkeypatch.setattr(authmod, "SESSION_SECRET_PATH",
@@ -40,9 +43,11 @@ def isolate(tmp_path, monkeypatch):
     monkeypatch.setattr(statsmod, "HISTORY_PATH",
                         tmp_path / "stats_history.json")
     verdictstore._mails_cache.clear()
+    unsubstore._cache.clear()
     accountsmod.reset()
     yield
     verdictstore._mails_cache.clear()
+    unsubstore._cache.clear()
     accountsmod.reset()
 
 
@@ -276,11 +281,20 @@ def bridge(monkeypatch):
 
 def wait_delete_done(timeout=5.0):
     """Delete jobs run in a worker thread; wait for the queue to drain."""
+    return _wait_job("delete", timeout)
+
+
+def wait_unsub_done(timeout=5.0):
+    """Bulk unsubscribe runs in a worker thread; wait for it to finish."""
+    return _wait_job("unsub", timeout)
+
+
+def _wait_job(key: str, timeout: float):
     import time
     end = time.time() + timeout
     while time.time() < end:
         with mailops.STATE_LOCK:
-            if mailops.STATE["delete"]["status"] != "running":
-                return mailops.STATE["delete"]
+            if mailops.STATE[key]["status"] != "running":
+                return mailops.STATE[key]
         time.sleep(0.02)
-    raise TimeoutError("delete worker did not finish")
+    raise TimeoutError(f"{key} worker did not finish")

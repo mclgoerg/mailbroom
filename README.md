@@ -121,7 +121,13 @@ presets.
   told - and forced - to never rate their mails "safe to delete". Filter
   them with `is:protected`.
 - **One-click unsubscribe** - RFC 8058 one-click POST or unsubscribe mail
-  via Bridge SMTP, straight from a group's detail view.
+  via Bridge SMTP, straight from a group's detail view - or in bulk:
+  select any number of groups and unsubscribe from every one of their
+  senders in the background, with live progress and cancel. Every
+  outcome (done / needs a confirmation page / failed) is remembered per
+  sender and survives rescans and restarts, shown as a badge on the
+  group and filterable with `is:unsubscribed` / `is:not-unsubscribed`.
+  Protected senders are always skipped.
 - **Sieve export** - generate a Proton Sieve filter for a sender or
   domain (move to folder / delete on arrival / mark read) with a copy
   button, so future mail never clutters the mailbox again.

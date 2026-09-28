@@ -1,7 +1,7 @@
 import type {
   AdminTenantStats, AiGroupResult, AppState, AttMail, AuthProbe, Config,
   DupSet, FoldersResp, Grouping, Mail, MessageDetail, Rule, RuleRun,
-  StatsResp, TrashResp, UnsubResult,
+  StatsResp, TrashResp, UnsubBulkResult, UnsubResult,
 } from "./types";
 
 /* Active account: every API call is scoped to exactly one account (strict
@@ -61,10 +61,15 @@ export const api = {
   saveConfig: (body: unknown) => req<Config>("/api/config", body),
   unsubscribe: (grouping: Grouping, key: string) =>
     req<UnsubResult>("/api/unsubscribe", { grouping, key }),
+  unsubscribeBulk: (grouping: Grouping, keys: string[]) =>
+    req<UnsubBulkResult>("/api/unsubscribe_bulk", { grouping, keys }),
+  unsubscribeAck: (addr: string, done = true) =>
+    req<{ status?: string; ok?: boolean }>("/api/unsubscribe/ack",
+      { addr, done }),
   undo: (index = -1) =>
     req<{ restored: number; of: number }>("/api/undo", { index }),
   emptyTrash: () => req<{ deleted: number }>("/api/empty_trash", {}),
-  cancel: (target: "scan" | "ai" | "delete" | "atts") =>
+  cancel: (target: "scan" | "ai" | "delete" | "atts" | "unsub") =>
     req<{ ok: boolean }>("/api/cancel", { target }),
   clearNotice: () => req<{ ok: boolean }>("/api/notice/clear", {}),
   search: (q: string) =>

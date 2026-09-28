@@ -9,6 +9,7 @@ const g = (over: Partial<Group> = {}): Group => ({
   last: "2024-06-01", tags: ["shipping", "newsletter"], samples: [],
   bulk: true, unsub: true, ai: { verdict: "delete_safe", reason: "x" },
   ratings: null, protected: false, replied: false, att_size: 0,
+  unsubscribed: null,
   ...over,
 });
 
@@ -56,6 +57,11 @@ describe("parseFilter", () => {
     expect(parseFilter("is:replied").replied).toBe(true);
     expect(parseFilter("is:noreply-ever").replied).toBe(false);
     expect(parseFilter("dhl").replied).toBeNull();
+  });
+  it("recognises is:unsubscribed / is:not-unsubscribed", () => {
+    expect(parseFilter("is:unsubscribed").unsubscribed).toBe(true);
+    expect(parseFilter("is:not-unsubscribed").unsubscribed).toBe(false);
+    expect(parseFilter("dhl").unsubscribed).toBeNull();
   });
   it("parses attachment sizes", () => {
     expect(parseFilter("att:>10m").attMin).toBe(10 * 1048576);
@@ -111,6 +117,23 @@ describe("matchGroup", () => {
     expect(matchGroup(g(), parseFilter("is:noreply-ever"), NOW)).toBe(true);
     expect(matchGroup(g({ replied: true }),
       parseFilter("is:noreply-ever"), NOW)).toBe(false);
+  });
+  it("is:unsubscribed requires EVERY sender done, not just one", () => {
+    const done = { n: 1, of: 1, status: "done" as const, link: "", addr: "" };
+    const pending = { n: 0, of: 1, status: "pending" as const, link: "",
+      addr: "" };
+    expect(matchGroup(g({ unsubscribed: done }),
+      parseFilter("is:unsubscribed"), NOW)).toBe(true);
+    expect(matchGroup(g({ unsubscribed: pending }),
+      parseFilter("is:unsubscribed"), NOW)).toBe(false);
+    expect(matchGroup(g({ unsubscribed: null }),
+      parseFilter("is:unsubscribed"), NOW)).toBe(false);
+    expect(matchGroup(g({ unsubscribed: pending }),
+      parseFilter("is:not-unsubscribed"), NOW)).toBe(true);
+    expect(matchGroup(g({ unsubscribed: null }),
+      parseFilter("is:not-unsubscribed"), NOW)).toBe(true);
+    expect(matchGroup(g({ unsubscribed: done }),
+      parseFilter("is:not-unsubscribed"), NOW)).toBe(false);
   });
   it("att filter uses the analyzed aggregate", () => {
     const f = parseFilter("att:>10k");

@@ -24,7 +24,8 @@ def g(**over):
             "unread": 90, "first": "2024-01-01", "last": "2024-06-01",
             "tags": ["shipping", "newsletter"], "samples": [], "bulk": True,
             "unsub": True, "ai": {"verdict": "delete_safe", "reason": "x"},
-            "ratings": None, "protected": False, "replied": False}
+            "ratings": None, "protected": False, "replied": False,
+            "unsubscribed": None}
     base.update(over)
     return base
 
@@ -48,6 +49,10 @@ def test_parse_filter_splits_qualifiers_and_text():
     assert rulesmod.parse_filter("is:replied")["replied"] is True
     assert rulesmod.parse_filter("is:noreply-ever")["replied"] is False
     assert rulesmod.parse_filter("dhl")["replied"] is None
+    assert rulesmod.parse_filter("is:unsubscribed")["unsubscribed"] is True
+    assert rulesmod.parse_filter(
+        "is:not-unsubscribed")["unsubscribed"] is False
+    assert rulesmod.parse_filter("dhl")["unsubscribed"] is None
 
 
 def test_match_group_combines_criteria_and():
@@ -77,6 +82,25 @@ def test_match_group_age_and_flags():
         g(), rulesmod.parse_filter("is:noreply-ever"), NOW)
     assert not rulesmod.match_group(
         g(replied=True), rulesmod.parse_filter("is:noreply-ever"), NOW)
+
+    done = {"n": 1, "of": 1, "status": "done", "link": "", "addr": ""}
+    pending = {"n": 0, "of": 1, "status": "pending", "link": "", "addr": ""}
+    assert rulesmod.match_group(
+        g(unsubscribed=done), rulesmod.parse_filter("is:unsubscribed"), NOW)
+    assert not rulesmod.match_group(
+        g(unsubscribed=pending), rulesmod.parse_filter("is:unsubscribed"),
+        NOW)
+    assert not rulesmod.match_group(
+        g(unsubscribed=None), rulesmod.parse_filter("is:unsubscribed"), NOW)
+    assert rulesmod.match_group(
+        g(unsubscribed=pending),
+        rulesmod.parse_filter("is:not-unsubscribed"), NOW)
+    assert rulesmod.match_group(
+        g(unsubscribed=None),
+        rulesmod.parse_filter("is:not-unsubscribed"), NOW)
+    assert not rulesmod.match_group(
+        g(unsubscribed=done),
+        rulesmod.parse_filter("is:not-unsubscribed"), NOW)
 
 
 # ------------------------------------------------------------ CRUD + guards

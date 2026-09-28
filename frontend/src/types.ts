@@ -6,6 +6,20 @@ export interface GroupAi {
   reason: string;
 }
 
+/** Unsubscribe state of one group's senders (null = none ever attempted).
+ *  `status` is "done" only once EVERY sender with a List-Unsubscribe
+ *  header is recorded done; "pending" covers a partially-handled
+ *  domain/subject group (n < of, nothing failed); "link"/"failed" is the
+ *  worst outstanding case and wins over "pending". `addr`/`link` are only
+ *  set for "link" (the sender needing manual confirmation). */
+export interface GroupUnsub {
+  n: number;
+  of: number;
+  status: "done" | "pending" | "link" | "failed";
+  link: string;
+  addr: string;
+}
+
 export interface Group {
   key: string;
   label: string;
@@ -24,6 +38,7 @@ export interface Group {
   protected: boolean;
   replied: boolean;
   att_size: number;
+  unsubscribed: GroupUnsub | null;
 }
 
 export interface AiUsage {
@@ -54,6 +69,17 @@ export interface AttsState {
   error: string;
   mails: number;
   size: number;
+}
+
+export interface UnsubState {
+  status: "idle" | "running" | "done" | "error";
+  progress: string;
+  error: string;
+  total: number;
+  done: number;
+  links: number;
+  failed: number;
+  skipped: number;
 }
 
 export interface AttMail extends Mail {
@@ -136,6 +162,7 @@ export interface AppState {
   ai: AiState;
   delete: DeleteState;
   atts: AttsState;
+  unsub: UnsubState;
   trash_count: number | null;
   notice: { key: string; params: Record<string, string | number> } | null;
   undo: { ts: number; label: string; count: number; action: string }[];
@@ -188,6 +215,14 @@ export interface UnsubResult {
   action: "done" | "link";
   method: string;
   detail: string;
+  addr: string;
+}
+
+export interface UnsubBulkResult {
+  queued: number;
+  skipped_protected: number;
+  skipped_done: number;
+  capped: number;
 }
 
 export type Security = "ssl" | "starttls";

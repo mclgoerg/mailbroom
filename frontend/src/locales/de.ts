@@ -15,6 +15,8 @@ export const DE: Record<string, string> = {
   "notice.ai_cancelled": "KI-Prüfung nach {done}/{total} Gruppen abgebrochen.",
   "confirm.act": "{verb}: {n} Mails aus {k} Gruppe(n)?",
   "confirm.act_mails": "{verb}: {n} ausgewählte Mails?",
+  "confirm.unsubscribe":
+    "Von den Absendern in {k} ausgewählten Gruppe(n) abbestellen?",
   "confirm.restore": "{count} Mails wiederherstellen ({label})?",
   "confirm.empty_trash":
     "Alle {n} Mails im Papierkorb ENDGÜLTIG löschen? Das kann nicht rückgängig gemacht werden.",
@@ -173,6 +175,7 @@ export const DE: Record<string, string> = {
   "Opened the sender's unsubscribe page - confirm it there.":
     "Abbestellseite des Absenders geöffnet - dort bestätigen.",
   "Unsubscribed": "Abbestellt",
+  "Marked as unsubscribed.": "Als abbestellt markiert.",
   "search all scanned mails (subject / sender)…":
     "alle gescannten Mails durchsuchen (Betreff / Absender)…",
   "Search every scanned mail by subject or sender.":
@@ -232,6 +235,7 @@ export const DE: Record<string, string> = {
   "Delete": "Löschen",
   "Attachments": "Anhänge",
   "notice.atts_cancelled": "Anhang-Analyse abgebrochen.",
+  "notice.unsub_cancelled": "Abbestellen abgebrochen.",
   "atts.hint":
     "Finden Sie die Mails, die Ihren Speicher belegen. Die Analyse liest "
     + "nur die Mail-Struktur (keine Inhalte werden geladen).",
@@ -245,6 +249,22 @@ export const DE: Record<string, string> = {
     + "Mail (rückgängig machbar).",
   "atts.none": "Keine Anhänge in den gescannten Ordnern gefunden.",
   "atts.running": "Analysiere Anhänge…",
+  "unsub.running": "Bestelle ab…",
+  "unsub.done":
+    "Abbestellen fertig: {done} erledigt, {links} brauchen Bestätigung, "
+    + "{failed} fehlgeschlagen.",
+  "unsub.open_link": "Abbestellseite öffnen",
+  "unsub.badge_link": "Bestätigen ↗",
+  "unsub.mark_done": "Als erledigt markieren",
+  "unsub.retry": "Erneut versuchen",
+  "unsub.badge_pending": "{n}/{of} abbestellt",
+  "unsub.badge_failed": "Abbestellen fehlgeschlagen",
+  "toast.unsub_started": "Bestelle bei {n} Absender(n) ab…",
+  "toast.unsub_skipped":
+    "({n} bereits erledigt, geschützt oder über dem Limit pro Lauf.)",
+  "toast.unsub_nothing":
+    "Nichts abzubestellen - alle Absender sind bereits erledigt oder "
+    + "geschützt.",
   "Starting…": "Starte…",
   "Duplicates": "Duplikate",
   "dups.hint":
@@ -342,6 +362,7 @@ export const DE: Record<string, string> = {
   "notify.delete_done": "Fertig: {n} Mails verarbeitet.",
   "notify.ai_done": "KI-Prüfung abgeschlossen.",
   "notify.atts_done": "Anhang-Analyse abgeschlossen.",
+  "notify.unsub_done": "Massenabbestellen abgeschlossen.",
   "preset.label": "Anbieter-Preset (füllt die Felder unten vor)",
   "preset.hint.proton":
     "Proton braucht die Mail Bridge (Bezahltarife): IMAP-Modus auf SSL "
@@ -491,6 +512,7 @@ export const DE: Record<string, string> = {
   "qb.att": "Anhänge ≥",
   "qb.flags": "Nur Gruppen…",
   "qb.is_unsub": "mit Abmeldelink",
+  "qb.is_not_unsubscribed": "noch nicht abbestellt",
   "qb.is_noreply": "nie geantwortet",
   "qb.is_replied": "geantwortet",
   "qb.is_protected": "geschützt",

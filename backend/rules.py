@@ -57,7 +57,7 @@ _SIZE_UNIT = {"k": 1024, "m": 1048576, "g": 1073741824}
 def parse_filter(q: str) -> dict:
     out = {"text": [], "tags": [], "ai": None, "age_months": None,
            "unread_min": None, "unsub": False, "protected_only": False,
-           "replied": None, "att_min": None}
+           "replied": None, "att_min": None, "unsubscribed": None}
     for tok in (q or "").strip().lower().split():
         m = _QUAL_RE.match(tok)
         if not m:
@@ -85,6 +85,10 @@ def parse_filter(q: str) -> dict:
             out["replied"] = True
         elif kind == "is" and val == "noreply-ever":
             out["replied"] = False
+        elif kind == "is" and val == "unsubscribed":
+            out["unsubscribed"] = True
+        elif kind == "is" and val == "not-unsubscribed":
+            out["unsubscribed"] = False
         elif kind == "att":
             a = _ATT_RE.match(val)
             if a:
@@ -113,6 +117,10 @@ def match_group(g: dict, f: dict, now: float | None = None) -> bool:
         return False
     if f["replied"] is not None and bool(g.get("replied")) != f["replied"]:
         return False
+    if f.get("unsubscribed") is not None:
+        u = g.get("unsubscribed")
+        if (bool(u) and u.get("status") == "done") != f["unsubscribed"]:
+            return False
     if f["att_min"] is not None and g.get("att_size", 0) < f["att_min"]:
         return False
     if f["unread_min"] is not None:

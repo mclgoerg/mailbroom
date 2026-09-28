@@ -121,6 +121,7 @@ export function QueryBuilder({ value, onChange, className = "" }: {
               <span className="w-24 shrink-0 text-xs text-muted">
                 {t("qb.flags")}</span>
               {flag("is:unsub", t("qb.is_unsub"))}
+              {flag("is:not-unsubscribed", t("qb.is_not_unsubscribed"))}
               {flag("is:noreply-ever", t("qb.is_noreply"))}
               {flag("is:replied", t("qb.is_replied"))}
               {flag("is:protected", t("qb.is_protected"))}
