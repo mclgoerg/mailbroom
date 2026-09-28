@@ -169,7 +169,7 @@ function DesktopTable({ slice, baseIdx, selected, focusedKey, onToggle,
   );
 }
 
-/* Mobile: a card list — no table semantics, no horizontal squeeze. */
+/* Mobile: a card list - no table semantics, no horizontal squeeze. */
 function MobileCards({ slice, baseIdx, selected, focusedKey, onToggle,
   onOpen, onTrash, onProtect }: PageProps) {
   return (

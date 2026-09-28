@@ -35,7 +35,7 @@ def _client_as(sub: str) -> TestClient:
 
 def test_admin_claims_the_existing_workspace():
     """The pre-tenancy config (legacy /data paths) belongs to the admin
-    identity after OIDC activates — no files move, nothing is lost."""
+    identity after OIDC activates - no files move, nothing is lost."""
     cfgmod.update_config({"account": "default", "imap": {"host": "bridge"}})
     cfgmod.update_config({"rename_account": {"from": "default",
                                              "to": "proton"}})
@@ -76,7 +76,7 @@ def test_tenants_are_fully_isolated():
                                        "account": "personal"})
     assert r.status_code == 200
 
-    # Bob sees none of it — and probing Alice's account name yields the
+    # Bob sees none of it - and probing Alice's account name yields the
     # same 400 an unknown name gives (no existence oracle).
     bcfg = bob.get("/api/config").json()
     assert list(bcfg["accounts"]) == ["default"]
@@ -259,7 +259,7 @@ def test_verdicts_and_stats_isolated_per_tenant():
 
 def test_wrong_tenant_gets_400_on_every_account_endpoint():
     """Authenticated-but-wrong-tenant hardening: every ?account= endpoint
-    answers 400 for another tenant's account name — same as an unknown
+    answers 400 for another tenant's account name - same as an unknown
     one, so nothing about other tenants can be probed."""
     _enable_oidc()
     admin = _client_as(ADMIN)

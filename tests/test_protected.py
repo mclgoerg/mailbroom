@@ -26,7 +26,7 @@ def test_normalize_and_is_protected():
     assert cfgmod.is_protected("BOSS@work.example", plist)
     assert cfgmod.is_protected("anyone@bank.example", plist)
     assert cfgmod.is_protected("noreply@dhl.example", plist)
-    # domain match is exact — no subdomains, no substring surprises
+    # domain match is exact - no subdomains, no substring surprises
     assert not cfgmod.is_protected("a@mail.bank.example", plist)
     assert not cfgmod.is_protected("a@notbank.example", plist)
     assert not cfgmod.is_protected("other@work.example", plist)
@@ -85,7 +85,7 @@ def test_trash_skips_protected_unless_forced(bridge):
 
 
 def test_non_trash_actions_ignore_protection(bridge):
-    """Archive/move/mark_read are reversible — protection only guards trash."""
+    """Archive/move/mark_read are reversible - protection only guards trash."""
     cfgmod.update_config({"protected": ["noreply@dhl.example"]})
     mailops.run_scan()
     r = mailops.delete_groups("sender", ["noreply@dhl.example"], "mark_read")

@@ -63,7 +63,7 @@ await page.screenshot({ path: `${OUT}/detail.png` });
 console.log("detail.png");
 await page.close();
 
-// 3) Statistics panel (own page — cleaner than closing the modal).
+// 3) Statistics panel (own page - cleaner than closing the modal).
 page = await fresh();
 await clickHeaderButton(page, "📊");
 await page.waitForFunction(

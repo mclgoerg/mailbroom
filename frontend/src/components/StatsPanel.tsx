@@ -79,7 +79,7 @@ export function StatsPanel({ onClose }: { onClose: () => void }) {
               <Card value={stats.senders.toLocaleString()}
                 label={t("stats.senders")} />
               <Card value={stats.mails
-                  ? fmtSize(Math.round(stats.size / stats.mails)) : "—"}
+                  ? fmtSize(Math.round(stats.size / stats.mails)) : "-"}
                 label={t("stats.avg_size")} />
               <Card value={`${pct(stats.unread, stats.mails)}%`}
                 label={`${t("stats.unread")} (${stats.unread.toLocaleString()})`} />
@@ -88,7 +88,7 @@ export function StatsPanel({ onClose }: { onClose: () => void }) {
               <Card value={stats.replied_senders}
                 label={t("stats.replied_senders",
                   { total: stats.senders })} />
-              <Card value={stats.oldest || "—"} label={t("stats.oldest")} />
+              <Card value={stats.oldest || "-"} label={t("stats.oldest")} />
             </div>
             {thisMonth && (
               <div className="text-xs text-muted">

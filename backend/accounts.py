@@ -2,7 +2,7 @@
 
 Every connected account gets its own AccountState: scan state, message
 index, folder UIDVALIDITYs/roles, replied cache, cancel flags and delete
-queue — nothing is ever shared or aggregated across accounts. Instances
+queue - nothing is ever shared or aggregated across accounts. Instances
 are created lazily from the configured account names.
 """
 
@@ -28,7 +28,7 @@ def _initial_state() -> dict:
         "trash_count": None,   # mails currently in Trash (None = unknown)
         "notice": None,        # one-shot info for the UI: {key, params}|None
         "scanned_ts": None,    # when the current groups were scanned
-        "groups_rev": 1,       # bumped whenever groups/index change — SSE
+        "groups_rev": 1,       # bumped whenever groups/index change - SSE
                                # clients refetch the (big) group list only
                                # when this moves
         "undo": [],            # summaries of undoable move jobs (newest last)
@@ -60,11 +60,11 @@ class AccountState:
                        "atts": False}
         self.delete_pending: list[dict] = []
         # UIDs of the delete job currently being processed (guarded by
-        # `lock`) — new jobs dedup against these too, not just the queue.
+        # `lock`) - new jobs dedup against these too, not just the queue.
         self.inflight: dict[str, set[int]] = {}
 
 
-# Keyed (tenant id, account name) — two tenants may both call an account
+# Keyed (tenant id, account name) - two tenants may both call an account
 # "default" without ever sharing state.
 _REGISTRY: dict[tuple[str, str], AccountState] = {}
 _REG_LOCK = threading.Lock()
@@ -80,7 +80,7 @@ def default_name() -> str:
 
 def get(name: str | None = None) -> AccountState:
     """The AccountState for `name` in the CURRENT TENANT (default: its
-    first configured account). Raises KeyError for unknown names — API
+    first configured account). Raises KeyError for unknown names - API
     layers turn that into a 400, so one tenant probing another tenant's
     account names learns nothing."""
     known = names()

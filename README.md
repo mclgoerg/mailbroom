@@ -2,24 +2,24 @@
 
 **Tired of cleaning up your mailbox? Grab the broom.** 🧹
 
-Mailbroom sweeps any IMAP mailbox — built with love for
+Mailbroom sweeps any IMAP mailbox - built with love for
 [Proton Mail Bridge](https://proton.me/mail/bridge).
 
 Declutter a mailbox: scan everything over IMAP, group mails **by
 sender, domain, or subject** with counts, sizes, and unread ratios, drill
 into any group down to the full mail text, and move whole groups or single
-mails to Trash — with optional AI assistance (Anthropic API or Microsoft
+mails to Trash - with optional AI assistance (Anthropic API or Microsoft
 Foundry) that suggests what's safe to delete and tracks its own cost.
 
 ![Mailbroom group view](docs/screenshots/groups-dark.png)
 
-**In action** — click a filter together, select everything the AI rated
+**In action** - click a filter together, select everything the AI rated
 safe, drill into a group:
 
 ![Filter, select, drill down](docs/screenshots/demo.gif)
 
 <details>
-<summary>More screenshots — drill-down, statistics, light theme</summary>
+<summary>More screenshots - drill-down, statistics, light theme</summary>
 
 ![Group drill-down](docs/screenshots/detail.png)
 ![Statistics](docs/screenshots/stats.png)
@@ -27,7 +27,7 @@ safe, drill into a group:
 
 </details>
 
-All screenshots show generated demo data (`scripts/demo.py` — run it
+All screenshots show generated demo data (`scripts/demo.py` - run it
 yourself for a zero-setup playground on fake mailboxes; the GIF rig is
 `scripts/demo-gif.mjs`).
 
@@ -38,7 +38,7 @@ detected via SPECIAL-USE flags (RFC 6154) with a name fallback, Gmail's
 virtual "All Mail" is excluded automatically (no double counting), and
 servers without the `MOVE` capability get a COPY+EXPUNGE fallback. The
 settings dialog has a preset for each provider below that prefills
-host/port/security — you only add user + password:
+host/port/security - you only add user + password:
 
 | Preset | IMAP host | SMTP host (unsubscribe) | Auth notes |
 |---|---|---|---|
@@ -58,87 +58,89 @@ export is Proton-only and hidden for other presets.
 
 ## Features
 
-- **Three group views** — by sender, by domain (catches `noreply@`,
+- **Three group views** - by sender, by domain (catches `noreply@`,
   `news@`, … of the same company), by normalized subject (merges
   `Order 123` / `Order 456`, strips Re:/Fwd:).
-- **Cleanup signals** — mail count, total size (find attachment hogs),
+- **Cleanup signals** - mail count, total size (find attachment hogs),
   unread percentage, first→last date range, category tags (shipping,
   finance, shopping, social, travel, newsletters, automated…).
-- **Drill-down** — every mail of a group with date/size/unread, full-text
-  reader (HTML mails rendered as plain text — no remote content, no
+- **Drill-down** - every mail of a group with date/size/unread, full-text
+  reader (HTML mails rendered as plain text - no remote content, no
   tracking pixels), per-mail selection and deletion.
-- **AI review (optional)** — coarse verdicts per group
+- **AI review (optional)** - coarse verdicts per group
   (delete-safe/review/keep) and a fine-grained mode that rates every mail
   *inside* a group, with selection by rating. Verdicts are cached (by group
   key and Message-ID), so rescans and reopened groups cost nothing. Sends
-  only metadata (addresses, counts, subject lines) — never mail bodies.
+  only metadata (addresses, counts, subject lines) - never mail bodies.
   Providers: Anthropic API, OpenAI, Claude on Microsoft Foundry, or any
   OpenAI-compatible local endpoint (Ollama, LM Studio, vLLM). Token usage
   and cost are tracked with a built-in price table.
-- **Attachment explorer** — an on-demand BODYSTRUCTURE pass (structure
+- **Attachment explorer** - an on-demand BODYSTRUCTURE pass (structure
   only, no content downloaded) lists mails by attachment size with file
   names, adds a 📎 aggregate to groups, and enables the `att:>10m` filter.
   Proton IMAP can't strip single attachments, so cleanup means deleting
   the whole mail (reversible as always).
-- **Statistics** — mails-per-year histogram, top domains by size, scan
+- **Statistics** - mails-per-year histogram, top domains by size, scan
   history and per-month cleanup tallies ("freed this month"), persisted
   across restarts.
-- **Duplicate finder** — mails with the same Message-ID (e.g. copies
+- **Duplicate finder** - mails with the same Message-ID (e.g. copies
   across folders) or identical sender + subject + size, grouped into sets
   with one click to select everything but the newest copy.
-- **Rules + scheduler** — save a filter query (same syntax as the filter
+- **Rules + scheduler** - save a filter query (same syntax as the filter
   box) plus an action as a rule, run it manually or daily/weekly. Rules
   always start in **report mode** (they only tell you what they would do);
   execute mode can be enabled after at least one report run. Every run is
   capped at 500 mails, skips protected senders, and uses the normal
-  Trash/undo pipeline — the scheduler is a background loop inside the
+  Trash/undo pipeline - the scheduler is a background loop inside the
   container, no cron needed.
-- **"Never replied" signal** — each scan also reads the To/Cc headers of
+- **"Never replied" signal** - each scan also reads the To/Cc headers of
   your Sent folder (headers only, cached across scans): groups you have
   written to get a ↩ replied tag, filter with `is:replied` /
   `is:noreply-ever`, and the AI leans towards keeping senders you actually
   correspond with.
-- **Protected senders** — mark addresses or whole domains (🛡️ in the group
+- **Protected senders** - mark addresses or whole domains (🛡️ in the group
   row, or a list in settings) as never-bulk-delete: selection presets and
   bulk trash skip them (trashing one explicitly asks first), and the AI is
-  told — and forced — to never rate their mails "safe to delete". Filter
+  told - and forced - to never rate their mails "safe to delete". Filter
   them with `is:protected`.
-- **One-click unsubscribe** — RFC 8058 one-click POST or unsubscribe mail
+- **One-click unsubscribe** - RFC 8058 one-click POST or unsubscribe mail
   via Bridge SMTP, straight from a group's detail view.
-- **Sieve export** — generate a Proton Sieve filter for a sender or
+- **Sieve export** - generate a Proton Sieve filter for a sender or
   domain (move to folder / delete on arrival / mark read) with a copy
   button, so future mail never clutters the mailbox again.
-- **Undo** — restore the last deletions from Trash (matched by Message-ID).
-- **Trash browser** — inspect the live Trash (also mail deleted outside
+- **Undo** - restore the last deletions from Trash (matched by Message-ID).
+- **Trash browser** - inspect the live Trash (also mail deleted outside
   the app), search it, and restore selected mails to any folder.
-- **Bulk workflows** — background deletion queue with live progress and
+- **Bulk workflows** - background deletion queue with live progress and
   cancel, "select inactive since…" presets, global mail search, CSV export,
   Empty-Trash button, cancellable scans and AI runs.
-- **Multiple accounts** — connect several providers at once (e.g. Proton
+- **Multiple accounts** - connect several providers at once (e.g. Proton
   Bridge + Gmail). Every account is strictly separate: its own scans,
   groups, rules, statistics, folder exclusions and replied/verdict
-  caches — nothing is ever mixed or aggregated. A header toggle switches
+  caches - nothing is ever mixed or aggregated. A header toggle switches
   the whole view between accounts; accounts can be added, renamed
   (all their data follows) and removed in settings, and each has its
   own folder-discovery picker.
-- **Fast to open** — each account's last scan is cached on disk and shown
+- **Fast to open** - each account's last scan is cached on disk and shown
   instantly after a restart or account switch (with its age); a rescan
-  refreshes it. Live updates stream only small status deltas — the full
+  refreshes it. Live updates stream only small status deltas - the full
   group list is re-fetched just when it actually changed.
-- **Safe by design** — deletions are IMAP `MOVE` to Trash (reversible),
+- **Safe by design** - deletions are IMAP `MOVE` to Trash (reversible),
   UIDVALIDITY checked before every move, read-only scans, UID bookkeeping
   stays server-side, non-root container.
-- **Polish** — installable as a PWA (manifest + icon), optional desktop
+- **Polish** - installable as a PWA (manifest + icon), optional desktop
   notifications when background jobs finish, monthly AI budget cap,
   onboarding wizard on first run, config/verdict backup export+import.
-- **Languages** — English and German. Translations live in
+- **Languages** - English and German. Translations live in
   `frontend/src/locales/`; to contribute one, copy `de.ts`, translate the
   values and register the locale in `frontend/src/i18n.ts`.
-- **Stack** — FastAPI backend (SSE live updates), React + TypeScript +
+- **Stack** - FastAPI backend (SSE live updates), React + TypeScript +
   Tailwind frontend, single container, no external assets at runtime.
 
 ## Running
 
+Platform guides (Synology, Unraid, TrueNAS SCALE, Portainer, plain
+Docker, Raspberry Pi) live in **[docs/install.md](docs/install.md)**.
 The quickest start is the starter kit in [`deploy/`](deploy/):
 
 ```bash
@@ -150,7 +152,7 @@ docker compose -f docker-compose.proton.yml up -d
 ```
 
 Then open http://localhost:8765. Everything in `.env` is just the
-bootstrap — the settings UI can change all of it at runtime.
+bootstrap - the settings UI can change all of it at runtime.
 
 Plain `docker run`, if you prefer:
 
@@ -182,23 +184,23 @@ in the UI; they persist in `/data`. Env bootstrap for other providers:
 > localhost behind a reverse proxy with an auth middleware (Traefik +
 > tinyauth/Authelia, …), or enable the built-in login in Settings →
 > Login: a **password** (scrypt-hashed, session cookie), or **SSO via
-> any OpenID Connect provider** (Pocket ID, Authentik, Keycloak, …—
+> any OpenID Connect provider** (Pocket ID, Authentik, Keycloak, …-
 > register the app there with callback URL
 > `https://your-host/api/oidc/callback`, then enter issuer, client ID
 > and secret; an optional allow-list restricts which IdP accounts get
 > in). Both can also be bootstrapped via env (`AUTH_MODE`,
-> `AUTH_PASSWORD`, `OIDC_*` — see `deploy/.env.example`).
+> `AUTH_PASSWORD`, `OIDC_*` - see `deploy/.env.example`).
 > Remember that Docker published ports bypass ufw.
 
 ### Multi-user (SSO mode)
 
 With SSO enabled, **every signed-in identity gets its own isolated
 workspace**: their own mail accounts, scans, AI verdicts, rules,
-statistics and settings — nothing is shared or visible across users.
+statistics and settings - nothing is shared or visible across users.
 One identity is the **admin** (set `OIDC_ADMIN`, enter it in settings,
 or let the first login claim it): the admin owns the workspace that
 existed before SSO was enabled, plus the server-level settings (login
-config and the optional **shared AI key** — users without their own AI
+config and the optional **shared AI key** - users without their own AI
 key can use the admin's, capped by a per-user monthly budget; everyone
 else brings their own key). Password mode and mode "none" stay
 single-workspace.
@@ -206,7 +208,7 @@ single-workspace.
 ### Secrets encryption at rest
 
 Set `MAILBROOM_SECRET_KEY` (e.g. `openssl rand -base64 32`) and every
-stored secret — IMAP passwords, AI API keys, the OIDC client secret —
+stored secret - IMAP passwords, AI API keys, the OIDC client secret -
 is encrypted on disk (Fernet/AES). That protects **volume backups**:
 without the key, a copied `/data` contains no usable credentials. Keep
 the key in the environment only, never in the backups; if it is lost,
@@ -221,7 +223,7 @@ pip install -r backend/requirements-dev.txt
 uvicorn backend.main:app --port 8765 --reload
 # frontend (proxies /api to :8765)
 cd frontend && npm install && npm run dev
-# tests — no Bridge or network needed (fake in-memory IMAP server)
+# tests - no Bridge or network needed (fake in-memory IMAP server)
 python -m pytest tests/ -q
 ```
 
@@ -233,7 +235,7 @@ AI-generated, directed and reviewed by the maintainer, and every feature
 was verified against real mailboxes before release. Independent of how
 the code was written, the safety properties are enforced by tests:
 deletions are reversible moves, UIDVALIDITY is checked before every
-action, and the optional AI review only ever receives mail metadata —
+action, and the optional AI review only ever receives mail metadata -
 never message bodies.
 
 ## License

@@ -39,7 +39,7 @@ def test_snapshot_restore_reapplies_verdicts_and_allows_actions(bridge):
     g = mailops.public_state(acc)["groups"]["sender"]["noreply@dhl.example"]
     assert g["ai"] and g["ai"]["verdict"] == "delete_safe"
 
-    # deleting from restored (unscanned) state works — UIDVALIDITY matches
+    # deleting from restored (unscanned) state works - UIDVALIDITY matches
     mailops.delete_groups("sender", ["noreply@dhl.example"], acc=acc)
     wait_delete_done()
     assert len(bridge.mailbox["Trash"]) == 3

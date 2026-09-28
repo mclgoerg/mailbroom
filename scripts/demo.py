@@ -25,7 +25,7 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / "tests"))
 
-# Isolated storage — set BEFORE importing the backend (paths bind at import).
+# Isolated storage - set BEFORE importing the backend (paths bind at import).
 DATA = Path(tempfile.mkdtemp(prefix="mailbroom-demo-"))
 os.environ.update(
     CONFIG_PATH=str(DATA / "config.json"),
@@ -95,7 +95,7 @@ def mails(frm: str, subjects: list[str], n: int, *, newest_days=1.0,
 
 PROTON_INBOX = (
     mails('"ACME Store" <news@acme-store.example>',
-          ["Weekend SALE — up to 70% off ✨", "Your points expire soon",
+          ["Weekend SALE - up to 70% off ✨", "Your points expire soon",
            "New arrivals for autumn", "Last chance: free shipping"],
           214, unsub=True)
     + mails('"PaketFix" <noreply@paketfix.example>',
@@ -133,7 +133,7 @@ PROTON_INBOX = (
              "Re: Geschenk für Papa"], 12, unread=0.05,
             size=(4000, 30000))
     + mails('"Photo Club" <hello@photoclub.example>',
-            ["March meetup — RAW files inside", "Contest results 🎉"],
+            ["March meetup - RAW files inside", "Contest results 🎉"],
             9, unread=0.1, size=(2000000, 6000000),
             atts=[("IMG_2041.jpg", 4200000), ("IMG_2044.jpg", 3800000)])
     + mails('"Dr. Meier Praxis" <praxis@dr-meier.example>',

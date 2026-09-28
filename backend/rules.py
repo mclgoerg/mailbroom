@@ -4,7 +4,7 @@ A rule is a saved group filter (the SAME query DSL the UI filter box uses;
 match_group here is a line-for-line port of frontend/src/lib.ts) plus an
 action. Rules always start in REPORT mode: a run only records what WOULD
 happen. Only after at least one report run may a rule be switched to
-EXECUTE, and every run is capped (RULE_CAP mails) — executed actions go
+EXECUTE, and every run is capped (RULE_CAP mails) - executed actions go
 through the normal delete queue, so they stay reversible via undo.
 
 The scheduler is a plain daemon thread (no cron/APScheduler): every
@@ -307,7 +307,7 @@ def run_rule(rule_id: str, rescan: bool = True) -> dict:
         snapshot = mailops.public_state(acc)["groups"][rule["grouping"]]
         matched = [g for g in snapshot.values() if match_group(g, f)]
         # Protected groups never take part in rule actions, not even in
-        # report numbers for trash-like actions — they are counted apart.
+        # report numbers for trash-like actions - they are counted apart.
         acted_on = [g for g in matched if not g["protected"]]
         result["skipped_protected"] = len(matched) - len(acted_on)
         result["groups"] = len(acted_on)

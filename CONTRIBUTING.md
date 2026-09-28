@@ -6,13 +6,15 @@ for changes is: **safe by default, tested, and translated.**
 ## Workflow
 
 1. Fork (or branch, if you have access) from `main`.
-2. One topic per pull request; keep diffs reviewable.
-3. CI must be green — it runs the backend tests, the frontend tests
+2. One topic per pull request; keep diffs reviewable. **Everything**
+   lands through a PR - `main` takes no direct pushes, and the
+   maintainer holds themselves to the same rule.
+3. CI must be green - it runs the backend tests, the frontend tests
    **including the TypeScript check**, and a full multi-arch Docker
    build. `main` only takes squash merges, so your PR title becomes the
    commit message: write it like a changelog line.
-4. A maintainer review is required; @mclgoerg is auto-requested via
-   CODEOWNERS.
+4. External PRs get a maintainer review; @mclgoerg is auto-requested
+   via CODEOWNERS.
 
 ## Running everything locally
 
@@ -32,7 +34,7 @@ docker run --rm -v "$PWD/frontend":/app -w /app node:26-alpine \
   sh -c "npm ci --no-audit --no-fund && npm test"
 ```
 
-No IMAP server or network is needed — the backend suite runs against an
+No IMAP server or network is needed - the backend suite runs against an
 in-memory fake IMAP server (`tests/conftest.py`).
 
 ## Ground rules for changes
@@ -41,7 +43,7 @@ in-memory fake IMAP server (`tests/conftest.py`).
   reversible IMAP moves to the trash role, UIDVALIDITY must be checked
   before acting on cached UIDs, UID bookkeeping stays server-side, and
   accounts stay strictly separated (never aggregate across accounts).
-  The optional AI review may only ever receive mail *metadata* — if you
+  The optional AI review may only ever receive mail *metadata* - if you
   add a field to an AI payload, update the consent texts
   (`ai.disclaimer` / `ai.data_note`) in the same PR.
 - **Tests come with the feature.** New backend behavior gets pytest
@@ -51,7 +53,7 @@ in-memory fake IMAP server (`tests/conftest.py`).
 - **Every user-visible string** goes through `t()` with entries in BOTH
   `frontend/src/locales/en.ts` and `de.ts`.
 - **UI composes the design system** (`frontend/src/components/ui.tsx`)
-  and the theme tokens (`frontend/src/index.css`) — no hand-rolled
+  and the theme tokens (`frontend/src/index.css`) - no hand-rolled
   controls, no raw colors, one shared loading animation.
 - **No new runtime dependencies** without discussing it in an issue
   first; the stdlib has taken us far.
@@ -60,11 +62,11 @@ in-memory fake IMAP server (`tests/conftest.py`).
 
 ## AI-assisted contributions
 
-AI-generated code is welcome (most of this codebase started that way —
+AI-generated code is welcome (most of this codebase started that way -
 see the README's AI disclosure), with the same expectations as any other
 code: you understood it, you tested it, and you can discuss it in
 review.
 
 ## Security issues
 
-Please do NOT open a public issue — see [SECURITY.md](SECURITY.md).
+Please do NOT open a public issue - see [SECURITY.md](SECURITY.md).

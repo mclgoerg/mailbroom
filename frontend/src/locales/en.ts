@@ -7,10 +7,10 @@ export const EN: Record<string, string> = {
   "notice.cached_verdicts":
     "{n} cached AI verdicts applied (AI review only evaluates new groups).",
   "notice.restored":
-    "Restored {restored} of {of} mails ({label}) — rescan to see them again.",
+    "Restored {restored} of {of} mails ({label}) - rescan to see them again.",
   "notice.emptied_trash": "Emptied Trash ({count} mails permanently deleted).",
   "notice.ai_all_cached":
-    "All groups already have cached AI verdicts — nothing to review.",
+    "All groups already have cached AI verdicts - nothing to review.",
   "notice.ai_cancelled": "AI review cancelled after {done}/{total} groups.",
   "confirm.act": "{verb}: {n} mails from {k} group(s)?",
   "confirm.act_mails": "{verb}: {n} selected mails?",
@@ -22,13 +22,13 @@ export const EN: Record<string, string> = {
   "account.label": "Account to edit",
   "account.add": "Add account",
   "account.hint":
-    "Each account is scanned and cleaned separately — views never mix. "
+    "Each account is scanned and cleaned separately - views never mix. "
     + "Switch accounts in the header once more than one is set up.",
   "account.new_prompt": "Name for the new account (e.g. \"gmail\"):",
   "account.confirm_delete":
     'Remove account "{name}"? Its rules keep their account name and stop '
     + "running; mails on the server are untouched.",
-  "account.switch_tip": "Switch account — every view is per account",
+  "account.switch_tip": "Switch account - every view is per account",
   "scan.age": "scanned {ago} ago",
   "login.section": "Login (optional)",
   "login.help":
@@ -54,7 +54,7 @@ export const EN: Record<string, string> = {
   "login.submit": "Sign in",
   "login.sso": "Sign in with SSO",
   "login.logout": "Logout",
-  "login.admin_tip": "admin — owns the server settings",
+  "login.admin_tip": "admin - owns the server settings",
   "menu.profile": "Profile & settings",
   "tab.account": "Mail account",
   "tab.general": "General",
@@ -78,7 +78,7 @@ export const EN: Record<string, string> = {
   "ai.shared_key_ph": "using the shared server key",
   "usage.section": "User statistics",
   "usage.help":
-    "Usage per workspace — counts, AI spend and disk only. Mailbroom "
+    "Usage per workspace - counts, AI spend and disk only. Mailbroom "
     + "never shows you other users' mail data, account names or senders.",
   "usage.user": "User / workspace",
   "usage.mails": "Mails (last scan)",
@@ -87,9 +87,9 @@ export const EN: Record<string, string> = {
   "usage.last_scan": "Last scan",
   "usage.disk": "Disk",
   "usage.shared": "shared key",
-  "sort.desc_tip": "Sorted descending — click for ascending",
-  "sort.asc_tip": "Sorted ascending — click for descending",
-  "qb.tip": "Build a filter — click conditions together",
+  "sort.desc_tip": "Sorted descending - click for ascending",
+  "sort.asc_tip": "Sorted ascending - click for descending",
+  "qb.tip": "Build a filter - click conditions together",
   "qb.title": "Filter builder",
   "qb.hint": "every condition you add must ALSO match (AND)",
   "qb.add": "Add",
@@ -111,22 +111,22 @@ export const EN: Record<string, string> = {
   "qb.is_replied": "replied to",
   "qb.is_protected": "protected",
   "ai.shared_note":
-    "No own key — AI runs on the server's shared key "
+    "No own key - AI runs on the server's shared key "
     + "(your monthly cap: {cap}).",
   "account.rename": "Rename…",
   "account.rename_prompt": 'New name for account "{name}":',
   "account.renamed": 'Account renamed to "{name}".',
-  "folders.title": "Folders to scan — account \u201c{name}\u201d",
+  "folders.title": "Folders to scan - account \u201c{name}\u201d",
   "folders.discover": "Discover",
   "folders.discover_tip":
     "Reload this account's folder list from the server (uses the SAVED "
-    + "credentials — save new ones first)",
+    + "credentials - save new ones first)",
   "folders.err_hint":
-    "— folder discovery needs saved, working credentials for this "
+    "- folder discovery needs saved, working credentials for this "
     + "account; save them, then hit Discover.",
-  "note.ai_selected": "{note} — selected {n}/{of}",
+  "note.ai_selected": "{note} - selected {n}/{of}",
   "note.ai_truncated": " (first {n} mails only)",
-  "note.background": "{verb} — running in the background…",
+  "note.background": "{verb} - running in the background…",
   "show_more": "Show {n} more ({hidden} hidden)",
   "ai_done": "AI done ({in} in / {out} out{cost}) · total {total}",
   "done_moved": "Done: {n} mails processed.",
@@ -141,16 +141,16 @@ export const EN: Record<string, string> = {
   "ai.data_note":
     "Sent to the AI provider: sender names/addresses, counts, sizes, "
     + "dates, read state, tags, subject lines, protected-sender markers "
-    + "and whether you ever replied to a sender — never mail bodies or "
+    + "and whether you ever replied to a sender - never mail bodies or "
     + "attachments.",
   "confirm.trash_protected":
     'The group "{label}" is protected. Move its mails to Trash anyway?',
   "confirm.protected_skipped": "({n} protected group(s) skipped.)",
   "toast.all_protected":
-    "All selected groups are protected — nothing was deleted.",
+    "All selected groups are protected - nothing was deleted.",
   "protect.tip":
-    "Protect this sender — bulk deletes and AI suggestions will skip it",
-  "unprotect.tip": "Protected — click to remove protection",
+    "Protect this sender - bulk deletes and AI suggestions will skip it",
+  "unprotect.tip": "Protected - click to remove protection",
   "protected": "protected",
   "replied": "replied",
   "replied.tip":
@@ -185,7 +185,7 @@ export const EN: Record<string, string> = {
     + "action. New rules only REPORT what they would do; switch to execute "
     + "after checking a report. Runs are capped at 500 mails, protected "
     + "senders are skipped, and everything lands in Trash/undo as usual.",
-  "rules.empty": "No rules yet — create one below.",
+  "rules.empty": "No rules yet - create one below.",
   "rule.never_ran": "never ran",
   "rule.run_report": "report: {groups} groups · {mails} mails would be affected",
   "rule.run_executed": "executed: {acted} mails queued ({groups} groups, {mails} matched)",
@@ -227,7 +227,7 @@ export const EN: Record<string, string> = {
   "atts.intro":
     "Run the analysis to list mails by attachment size. Afterwards the "
     + "att:>10m filter also works on groups. Proton cannot strip single "
-    + "attachments over IMAP — deleting removes the whole mail (undoable).",
+    + "attachments over IMAP - deleting removes the whole mail (undoable).",
   "atts.none": "No attachments found in the scanned folders.",
   "atts.running": "Analyzing attachments…",
   "dups.hint": "Same Message-ID, or identical sender + subject + size.",
@@ -235,7 +235,7 @@ export const EN: Record<string, string> = {
   "dups.keep_newest": "Select all but newest",
   "dups.wasted": "{size} reclaimable",
   "dups.newest": "newest",
-  "dups.none": "No duplicates found — nice and tidy.",
+  "dups.none": "No duplicates found - nice and tidy.",
   "stats.this_month": "trashed this month: {n} mails · {size}",
   "stats.per_year": "Mails per year",
   "stats.per_month": "Mails per month (last 12)",
@@ -262,18 +262,18 @@ export const EN: Record<string, string> = {
   "sieve.fileinto": "Move to folder",
   "sieve.discard": "Delete on arrival",
   "sieve.markread": "Mark as read",
-  "sieve.copied": "Sieve filter copied — paste it in Proton's filter settings.",
+  "sieve.copied": "Sieve filter copied - paste it in Proton's filter settings.",
   "sieve.open_proton": "Proton filter settings ↗",
   "Copy": "Copy",
   "notice.trash_restored": "Restored {n} mails from Trash to {dest}.",
   "trash.browse": "Browse Trash",
   "trash.search": "search subject / sender…",
   "trash.restore_to": "Restore to…",
-  "trash.restored": "Restored {n} mails — rescan to see them in the views.",
+  "trash.restored": "Restored {n} mails - rescan to see them in the views.",
   "trash.newest_shown": "newest {n} shown",
   "trash.empty": "Trash is empty.",
   "notice.ai_budget":
-    "AI review stopped after {done}/{total} groups — monthly budget "
+    "AI review stopped after {done}/{total} groups - monthly budget "
     + "reached (raise it in settings).",
   "budget.label": "Monthly AI budget ($, 0 = unlimited)",
   "budget.none": "no cap",
@@ -292,20 +292,20 @@ export const EN: Record<string, string> = {
     + "Passwords/API keys are never imported.",
   "import.done": "Imported: {rules} rules, {verdicts} verdicts.",
   "no.matches": "No groups match this filter.",
-  "onboard.title": "Welcome — three steps to a tidy mailbox",
+  "onboard.title": "Welcome - three steps to a tidy mailbox",
   "onboard.step_bridge":
-    "Pick your mail provider (Gmail, iCloud, Fastmail, … — or Proton "
+    "Pick your mail provider (Gmail, iCloud, Fastmail, … - or Proton "
     + "via Proton Mail Bridge; see the README for provider notes and "
     + "the Bridge Docker setup).",
   "onboard.step_creds":
     "Choose the provider preset and enter host, user and password "
     + "(most providers need an app password) in",
   "onboard.step_scan":
-    "Hit Scan — nothing is ever deleted without your confirmation, and "
+    "Hit Scan - nothing is ever deleted without your confirmation, and "
     + "deletions go to Trash first.",
   "onboard.test": "Test connection",
   "onboard.testing": "Testing connection…",
-  "onboard.test_ok": "Connected — {n} folders visible. Ready to scan!",
+  "onboard.test_ok": "Connected - {n} folders visible. Ready to scan!",
   "onboard.test_fail": "Connection failed",
   "notify.toggle":
     "Desktop notifications when background jobs finish (only while the "
@@ -317,10 +317,10 @@ export const EN: Record<string, string> = {
   "preset.label": "Provider preset (prefills the fields below)",
   "preset.hint.proton":
     "Proton needs the Mail Bridge (paid plans): switch its IMAP mode to "
-    + "SSL, export its certificate and point the CA file at it — see the "
+    + "SSL, export its certificate and point the CA file at it - see the "
     + "README.",
   "preset.hint.apppw":
-    "Use an app-specific password, not your normal account password — "
+    "Use an app-specific password, not your normal account password - "
     + "create one in the provider's security settings (links in the "
     + "README).",
   "preset.hint.imap_toggle":
@@ -333,5 +333,5 @@ export const EN: Record<string, string> = {
   "sec.auto": "auto",
   "cafile.label": "Custom CA file (optional, e.g. the Bridge certificate)",
   "folder.role_excluded":
-    "Special folder (detected by role) — always excluded from scans",
+    "Special folder (detected by role) - always excluded from scans",
 };

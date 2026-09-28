@@ -18,7 +18,7 @@ function RunSummary({ rule }: { rule: Rule }) {
   if (r.error) return <span className="text-rose-400">{r.error}</span>;
   return (
     <>
-      {new Date(r.ts * 1000).toLocaleString()} —{" "}
+      {new Date(r.ts * 1000).toLocaleString()} -{" "}
       {t(r.mode === "execute" ? "rule.run_executed" : "rule.run_report", {
         groups: r.groups, mails: r.mails, acted: r.acted })}
       {r.capped > 0 && <> · {t("rule.capped", { n: r.capped })}</>}

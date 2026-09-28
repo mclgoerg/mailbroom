@@ -3,7 +3,7 @@
 A tenant owns a full set of the app's JSON files (config, verdicts,
 replied cache, stats, rules, scan snapshots). Auth modes "none" and
 "password" always use the single DEFAULT tenant, which maps to the
-legacy top-level /data paths — existing single-user deployments keep
+legacy top-level /data paths - existing single-user deployments keep
 working unchanged. In OIDC mode the ADMIN identity also maps to the
 DEFAULT tenant (it "claims" the pre-tenancy workspace without any file
 moves, so the switch is idempotent and reversible), while every other
@@ -92,7 +92,7 @@ def use(tenant: Tenant, subject: str = ""):
 
 
 def call_in(tenant: Tenant, fn, *args, **kwargs):
-    """Run `fn` inside `tenant` — thread targets don't inherit the
+    """Run `fn` inside `tenant` - thread targets don't inherit the
     spawning request's contextvars, so workers re-enter explicitly."""
     with use(tenant):
         return fn(*args, **kwargs)
@@ -112,7 +112,7 @@ def for_subject(subject: str) -> Tenant:
 
 def known() -> list[Tenant]:
     """Every tenant with data on disk: DEFAULT plus one per directory.
-    Directory names don't recover the subject — not needed for the
+    Directory names don't recover the subject - not needed for the
     scheduler / lifespan walks this feeds."""
     out = [DEFAULT]
     try:

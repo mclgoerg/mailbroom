@@ -10,7 +10,7 @@
       `locales/de.ts`
 - [ ] UI changes compose `ui.tsx` components / theme tokens only
 - [ ] Safety invariants untouched (reversible deletes, UIDVALIDITY
-      checks, strict account separation, AI gets metadata only — consent
+      checks, strict account separation, AI gets metadata only - consent
       texts updated if AI payload fields changed)
 - [ ] Persisted-format change? Read-side migration + migration test
       included

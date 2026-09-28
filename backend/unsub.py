@@ -144,7 +144,7 @@ def unsubscribe(grouping: str, key: str, acc=None) -> dict:
         return {"action": "done", "method": "unsubscribe mail sent",
                 "detail": parts["mailto"]}
     if parts["http"]:
-        # Confirmation pages can't be automated reliably — open in browser.
+        # Confirmation pages can't be automated reliably - open in browser.
         return {"action": "link", "method": "open link",
                 "detail": parts["http"]}
     raise RuntimeError("could not parse the List-Unsubscribe header")

@@ -2,7 +2,7 @@
 
 /* Sandy/beige palette (2026-09-28): warm coffee-and-sand dark theme,
    cream/beige light theme, caramel accent. Components must only use these
-   tokens — never raw colors (see workspace DESIGN.md). */
+   tokens - never raw colors (see workspace DESIGN.md). */
 @theme {
   --color-surface: #171310;
   --color-panel: #1f1913;

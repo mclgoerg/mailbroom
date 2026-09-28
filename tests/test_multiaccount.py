@@ -65,7 +65,7 @@ def test_scan_isolation_groups_never_mix(monkeypatch):
     g2 = mailops.public_state(two)["groups"]["sender"]
     assert set(g1) == {"shop@a.example", "both@x.example"}
     assert set(g2) == {"news@b.example", "both@x.example"}
-    # the shared sender is counted separately per account — no aggregation
+    # the shared sender is counted separately per account - no aggregation
     assert g1["both@x.example"]["count"] == 1
     assert g2["both@x.example"]["count"] == 1
     assert mailops.public_state(one)["account"] == "one"
@@ -76,7 +76,7 @@ def test_parallel_scans_do_not_interfere(monkeypatch):
     _two_accounts(monkeypatch)
     one, two = accountsmod.get("one"), accountsmod.get("two")
     mailops.start_scan(one)
-    mailops.start_scan(two)      # must NOT raise "busy" — separate accounts
+    mailops.start_scan(two)      # must NOT raise "busy" - separate accounts
     assert _wait_done(one) == "done"
     assert _wait_done(two) == "done"
     assert len(mailops.public_state(one)["groups"]["sender"]) == 2

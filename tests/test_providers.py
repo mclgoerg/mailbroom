@@ -14,7 +14,7 @@ client = TestClient(app)
 
 def _gmail(monkeypatch, extra_trash=0) -> FakeIMAP:
     """Gmail-shaped account: SPECIAL-USE flags + [Gmail]/ names. Every
-    INBOX mail also lives in All Mail — scanning both would double-count."""
+    INBOX mail also lives in All Mail - scanning both would double-count."""
     inbox = [
         make_msg(1, frm="a@x.example", subject="hello 1"),
         make_msg(2, frm="a@x.example", subject="hello 2"),

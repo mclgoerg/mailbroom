@@ -11,7 +11,7 @@ from backend import config as cfgmod
 from backend import secretbox
 
 KEY = "0Yl6dY0zXhP0aXkQ0T5S5vC9m3o0J8m1kU4dY2wG9pA="   # gitleaks:allow
-# ^ made-up fixture (any string works as a key) — NOT a real secret
+# ^ made-up fixture (any string works as a key) - NOT a real secret
 
 
 def test_seal_unseal_roundtrip(monkeypatch):
