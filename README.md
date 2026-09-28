@@ -3,6 +3,7 @@
 [![CI](https://github.com/mclgoerg/mailbroom/actions/workflows/ci.yml/badge.svg)](https://github.com/mclgoerg/mailbroom/actions/workflows/ci.yml)
 [![Latest release](https://img.shields.io/github/v/release/mclgoerg/mailbroom)](https://github.com/mclgoerg/mailbroom/releases)
 [![OpenSSF Scorecard](https://api.securityscorecards.dev/projects/github.com/mclgoerg/mailbroom/badge)](https://scorecard.dev/viewer/?uri=github.com/mclgoerg/mailbroom)
+[![OpenSSF Best Practices](https://www.bestpractices.dev/projects/14997/badge)](https://www.bestpractices.dev/projects/14997)
 [![License: MIT](https://img.shields.io/github/license/mclgoerg/mailbroom)](LICENSE)
 
 **Tired of cleaning up your mailbox? Grab the broom.** 🧹
