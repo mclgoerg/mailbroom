@@ -360,6 +360,40 @@ export const DE: Record<string, string> = {
   "smtp.security": "SMTP-Verschlüsselung",
   "sec.auto": "automatisch",
   "cafile.label": "Eigene CA-Datei (optional, z.\u202fB. das Bridge-Zertifikat)",
+  "oauth.title": "Per OAuth verbinden (optional)",
+  "oauth.help":
+    "Anmelden statt ein Passwort zu verwenden. F\u00fcr Outlook empfohlen; "
+    + "bei Gmail ist ein App-Passwort (oben) einfacher, au\u00dfer OAuth wird "
+    + "gezielt gew\u00fcnscht.",
+  "oauth.provider": "OAuth-Anbieter",
+  "oauth.provider_off": "Aus (Passwort oben verwenden)",
+  "oauth.client_id": "Client-ID",
+  "oauth.client_secret": "Client-Secret",
+  "oauth.google_help":
+    "Der eingeschr\u00e4nkte Mail-Scope von Gmail ben\u00f6tigt f\u00fcr jeden "
+    + "gemeinsam genutzten Client eine Google-Verifizierung - es gibt "
+    + "daher keinen universellen \"Mit Google anmelden\"-Button. Jeder "
+    + "Selbsthoster registriert einen eigenen OAuth-Client (siehe "
+    + "Installationsanleitung). Ein Client im Testmodus stellt ein "
+    + "Refresh-Token aus, das nach 7 Tagen abl\u00e4uft.",
+  "oauth.ms_device_help":
+    "Keine App-Registrierung n\u00f6tig: unten klicken, dann den "
+    + "angezeigten Code auf microsoft.com/devicelogin auf einem "
+    + "beliebigen Ger\u00e4t eingeben.",
+  "oauth.ms_byo_help":
+    "Dieser Server hat keine gemeinsame Microsoft-App konfiguriert - "
+    + "eigenen OAuth-Client in Entra ID registrieren (siehe "
+    + "Installationsanleitung).",
+  "oauth.connect": "Konto verbinden",
+  "oauth.connect_device": "Mit Ger\u00e4tecode verbinden",
+  "oauth.connected": "Verbunden",
+  "oauth.disconnect": "Trennen",
+  "oauth.confirm_disconnect":
+    "Dieses Konto von OAuth trennen? Eine erneute Verbindung ist "
+    + "jederzeit m\u00f6glich.",
+  "oauth.device_instructions":
+    "Den folgenden Link auf einem beliebigen Ger\u00e4t \u00f6ffnen und diesen "
+    + "Code eingeben:",
   "folder.role_excluded":
     "Spezialordner (per Rolle erkannt) - wird nie mitgescannt",
   "account.label": "Zu bearbeitendes Konto",

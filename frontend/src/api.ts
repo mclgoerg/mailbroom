@@ -99,6 +99,18 @@ export const api = {
   logout: () => req<{ ok: boolean }>("/api/logout", {}),
   adminStats: () =>
     req<{ tenants: AdminTenantStats[] }>("/api/admin/stats"),
+  oauthDeviceStart: (account: string) =>
+    req<{ device_code: string; user_code: string; verification_uri: string;
+      expires_in: number; interval: number }>(
+      `/api/oauth/imap/device/start?account=${encodeURIComponent(account)}`,
+      {}),
+  oauthDevicePoll: (account: string, deviceCode: string) =>
+    req<{ status: "pending" | "complete" | "error"; error?: string }>(
+      `/api/oauth/imap/device/poll?account=${encodeURIComponent(account)}` +
+      `&device_code=${encodeURIComponent(deviceCode)}`, {}),
+  oauthDisconnect: (account: string) =>
+    req<{ ok: boolean }>(
+      `/api/oauth/imap/disconnect?account=${encodeURIComponent(account)}`, {}),
 };
 
 export { fmtSize, fmtUsd, mailKey } from "./lib";

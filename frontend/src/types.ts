@@ -208,6 +208,18 @@ export interface ImapAccount {
   password_set: boolean;
   cafile: string;
   preset: Preset;
+  oauth: ImapOauth | null;
+}
+
+export type OauthProvider = "google" | "microsoft";
+
+// Never carries a token - just enough to render connect status and let
+// the user re-enter their own client credentials.
+export interface ImapOauth {
+  provider: OauthProvider;
+  client_id: string;
+  client_secret_set: boolean;
+  connected: boolean;
 }
 
 export type AuthMode = "none" | "password" | "oidc";
@@ -273,6 +285,8 @@ export interface SharedAiCfg {
 export interface Config {
   accounts: Record<string, ImapAccount>;
   default_account: string;
+  oauth_providers: OauthProvider[];
+  oauth_ms_device_available: boolean;
   auth: AuthCfg;
   protected: string[];
   categories: Record<string, string[]>;

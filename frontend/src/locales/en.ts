@@ -332,6 +332,35 @@ export const EN: Record<string, string> = {
   "smtp.security": "SMTP security",
   "sec.auto": "auto",
   "cafile.label": "Custom CA file (optional, e.g. the Bridge certificate)",
+  "oauth.title": "Connect via OAuth (optional)",
+  "oauth.help":
+    "Sign in instead of using a password. Recommended for Outlook; for "
+    + "Gmail an app password (above) is simpler unless you specifically "
+    + "want OAuth.",
+  "oauth.provider": "OAuth provider",
+  "oauth.provider_off": "Off (use the password above)",
+  "oauth.client_id": "Client ID",
+  "oauth.client_secret": "Client secret",
+  "oauth.google_help":
+    "Gmail's restricted mail scope needs Google's own verification for "
+    + "any shared client, so there is no universal \"Sign in with "
+    + "Google\" button - every self-hoster registers their own OAuth "
+    + "client (see the install guide). A client in \"testing\" mode "
+    + "issues a refresh token that expires after 7 days.",
+  "oauth.ms_device_help":
+    "No app registration needed: click below, then enter the code shown "
+    + "at microsoft.com/devicelogin on any device.",
+  "oauth.ms_byo_help":
+    "This server has no shared Microsoft app configured - register your "
+    + "own OAuth client in Entra ID (see the install guide).",
+  "oauth.connect": "Connect account",
+  "oauth.connect_device": "Connect with a device code",
+  "oauth.connected": "Connected",
+  "oauth.disconnect": "Disconnect",
+  "oauth.confirm_disconnect":
+    "Disconnect this account from OAuth? You can reconnect anytime.",
+  "oauth.device_instructions":
+    "Open the link below on any device and enter this code:",
   "folder.role_excluded":
     "Special folder (detected by role) - always excluded from scans",
 };

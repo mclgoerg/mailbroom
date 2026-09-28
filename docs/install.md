@@ -105,6 +105,40 @@ names as `.env.example`), deploy.
 Nothing special to do - the image is multi-arch (amd64 + arm64). A
 64-bit OS is required (Raspberry Pi OS 64-bit, Pi 4/5).
 
+## Gmail OAuth setup
+
+Only needed if you want OAuth instead of an app password for a Gmail
+account (app passwords remain simpler for most people). Google requires
+every OAuth client to be registered by whoever uses it - there is no
+shared "Sign in with Google" option, because the restricted mail scope
+needs per-app Google verification.
+
+1. Go to [Google Cloud console](https://console.cloud.google.com/) and
+   create a project (or reuse one).
+2. **APIs & Services -> OAuth consent screen**: User type "External",
+   fill the required fields, add your own Google account under
+   "Test users" (this keeps the client in "testing" mode - no Google
+   review needed, but refresh tokens then expire after 7 days; request
+   verification later if you need them to last).
+3. **APIs & Services -> Credentials -> Create credentials -> OAuth
+   client ID**, application type "Web application". Add this authorized
+   redirect URI (replace with your instance's URL):
+   `https://your-mailbroom-domain/api/oauth/imap/callback`
+4. Copy the client ID and client secret into Mailbroom's account
+   settings (OAuth provider: Gmail), then click **Connect account** and
+   sign in with the Google account you added as a test user.
+
+## Microsoft device-code setup
+
+If the maintainer's shared app is configured (`MAILBROOM_MS_CLIENT_ID`
+set on the server), no registration is needed - pick "Outlook /
+Microsoft 365", click **Connect with a device code**, then enter the
+shown code at microsoft.com/devicelogin. Otherwise, register your own
+public client in [Entra ID](https://entra.microsoft.com/) (App
+registrations -> New registration, no redirect URI needed, enable
+"Allow public client flows" under Authentication) and enter its client
+ID in the account settings instead.
+
 ## After the first start
 
 1. Open the web UI -> the onboarding asks for IMAP credentials if env
