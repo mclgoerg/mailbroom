@@ -1,0 +1,58 @@
+name: Security scan
+
+# On-demand (Actions tab -> Security scan -> Run workflow) and every
+# Monday morning. Three independent angles:
+#   secrets      - gitleaks over the FULL git history
+#   dependencies - pip-audit (resolved Python deps) + npm audit
+#   image        - Trivy CVE scan of the published container image
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "17 5 * * 1"
+
+permissions:
+  contents: read
+
+jobs:
+  secrets:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0            # gitleaks walks every commit
+      - name: gitleaks (full history)
+        run: |
+          docker run --rm -v "$PWD:/repo" zricethezav/gitleaks:latest \
+            git /repo --no-banner --redact
+
+  dependencies:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.13"
+      - name: pip-audit (what a fresh install would get)
+        run: |
+          pip install -q pip-audit
+          pip-audit -r backend/requirements.txt \
+                    -r backend/requirements-dev.txt
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 26
+      - name: npm audit (fail on high+)
+        working-directory: frontend
+        run: |
+          npm ci --no-audit --no-fund
+          npm audit --audit-level=high
+
+  image:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trivy scan of the published image
+        uses: aquasecurity/trivy-action@0.33.1
+        with:
+          image-ref: ghcr.io/${{ github.repository }}:latest
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true      # only CVEs a rebuild could fix
+          exit-code: "1"
