@@ -354,19 +354,17 @@ export const DE: Record<string, string> = {
   "preset.hint.imap_toggle":
     "IMAP muss zuerst in den Mail-Einstellungen des Anbieters aktiviert "
     + "werden; bei Zwei-Faktor-Authentifizierung App-Passwort verwenden.",
+  "preset.hint.oauth_only":
+    "Microsoft bietet für IMAP kein App-Passwort - unten per OAuth "
+    + "verbinden (experimentell).",
   "imap.security": "IMAP-Verschlüsselung",
   "smtp.host": "SMTP-Host (Abbestell-Mails)",
   "smtp.host_placeholder": "leer = IMAP-Host",
   "smtp.security": "SMTP-Verschlüsselung",
   "sec.auto": "automatisch",
   "cafile.label": "Eigene CA-Datei (optional, z.\u202fB. das Bridge-Zertifikat)",
-  "oauth.title": "Per OAuth verbinden (optional)",
-  "oauth.help":
-    "Anmelden statt ein Passwort zu verwenden. F\u00fcr Outlook empfohlen; "
-    + "bei Gmail ist ein App-Passwort (oben) einfacher, au\u00dfer OAuth wird "
-    + "gezielt gew\u00fcnscht.",
-  "oauth.provider": "OAuth-Anbieter",
-  "oauth.provider_off": "Aus (Passwort oben verwenden)",
+  "oauth.title": "{provider}-Konto per OAuth verbinden",
+  "oauth.password_unused": "Nicht n\u00f6tig - dieses Konto nutzt OAuth",
   "oauth.client_id": "Client-ID",
   "oauth.client_secret": "Client-Secret",
   "oauth.google_help":

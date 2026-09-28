@@ -192,8 +192,8 @@ export interface UnsubResult {
 
 export type Security = "ssl" | "starttls";
 export type SmtpSecurity = "auto" | "ssl" | "starttls";
-export type Preset = "proton" | "gmail" | "icloud" | "fastmail" | "gmx"
-  | "mailbox" | "yahoo" | "custom";
+export type Preset = "proton" | "gmail" | "outlook" | "icloud" | "fastmail"
+  | "gmx" | "mailbox" | "yahoo" | "custom";
 
 export interface ImapAccount {
   excluded_folders: string[];

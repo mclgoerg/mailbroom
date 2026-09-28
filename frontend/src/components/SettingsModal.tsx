@@ -21,6 +21,9 @@ const PRESETS: Record<Exclude<Preset, "custom">, {
   gmail: { host: "imap.gmail.com", port: 993, security: "ssl",
     smtpHost: "smtp.gmail.com", smtpPort: 465, smtpSecurity: "ssl",
     cafile: "", hint: "preset.hint.apppw" },
+  outlook: { host: "outlook.office365.com", port: 993, security: "ssl",
+    smtpHost: "smtp.office365.com", smtpPort: 587, smtpSecurity: "starttls",
+    cafile: "", hint: "preset.hint.oauth_only" },
   icloud: { host: "imap.mail.me.com", port: 993, security: "ssl",
     smtpHost: "smtp.mail.me.com", smtpPort: 587, smtpSecurity: "starttls",
     cafile: "", hint: "preset.hint.apppw" },
@@ -39,7 +42,8 @@ const PRESETS: Record<Exclude<Preset, "custom">, {
 };
 
 const PRESET_LABELS: Record<Preset, string> = {
-  proton: "Proton Mail Bridge", gmail: "Gmail", icloud: "iCloud Mail",
+  proton: "Proton Mail Bridge", gmail: "Gmail",
+  outlook: "Outlook / Microsoft 365", icloud: "iCloud Mail",
   fastmail: "Fastmail", gmx: "GMX", mailbox: "mailbox.org",
   yahoo: "Yahoo Mail", custom: "Custom (any IMAP server)",
 };
@@ -160,18 +164,28 @@ export function SettingsModal({ cfg, account, onClose, onSaved,
     (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
       setF({ ...f, [k]: e.target.value });
 
+  const PRESET_OAUTH: Partial<Record<Preset, OauthProvider>> =
+    { gmail: "google", outlook: "microsoft" };
   const applyPreset = (p: Preset) => {
     if (p === "custom") {
-      setF({ ...f, preset: p });
+      setF({ ...f, preset: p, oauthProvider: "" });
       return;
     }
     const pre = PRESETS[p];
     setF({ ...f, preset: p, host: pre.host, port: String(pre.port),
       security: pre.security, smtpHost: pre.smtpHost,
       smtpPort: String(pre.smtpPort), smtpSecurity: pre.smtpSecurity,
-      cafile: pre.cafile });
+      cafile: pre.cafile, oauthProvider: PRESET_OAUTH[p] ?? "" });
   };
   const presetHint = f.preset !== "custom" ? PRESETS[f.preset].hint : "";
+  // The provider preset already says which mail service this is, so it
+  // also decides the OAuth provider - no need to ask again. Only a
+  // preset outside gmail/outlook falls back to whatever the account's
+  // saved oauth block already has (a leftover from a custom setup).
+  const oauthProvider: "" | OauthProvider =
+    f.preset === "gmail" ? "google"
+    : f.preset === "outlook" ? "microsoft"
+    : f.oauthProvider;
 
   const excludedList = (): string[] | undefined => {
     if (!folders) return undefined;   // picker never loaded: keep old config
@@ -191,7 +205,7 @@ export function SettingsModal({ cfg, account, onClose, onSaved,
           smtp_port: +f.smtpPort || 1025, smtp_security: f.smtpSecurity,
           cafile: f.cafile, preset: f.preset, user: f.user,
           ...(f.password ? { password: f.password } : {}),
-          ...(f.oauthProvider ? { oauth: { provider: f.oauthProvider,
+          ...(oauthProvider ? { oauth: { provider: oauthProvider,
             client_id: f.oauthClientId,
             ...(f.oauthClientSecret
               ? { client_secret: f.oauthClientSecret } : {}) } } : {}) },
@@ -296,7 +310,7 @@ export function SettingsModal({ cfg, account, onClose, onSaved,
     const next = await save();
     if (!next) return;
     window.location.href = `/api/oauth/imap/login?account=` +
-      `${encodeURIComponent(editAcct)}&provider=${f.oauthProvider}`;
+      `${encodeURIComponent(editAcct)}&provider=${oauthProvider}`;
   };
 
   const disconnectOauth = async () => {
@@ -487,8 +501,10 @@ export function SettingsModal({ cfg, account, onClose, onSaved,
         </Field>
         <Field label={t("Password")}>
           <Input className="w-full" type="password" value={f.password}
-            placeholder={imapOf(cfg, editAcct).password_set
-              ? t("(unchanged)") : t("required")}
+            disabled={f.oauthConnected}
+            placeholder={f.oauthConnected ? t("oauth.password_unused")
+              : imapOf(cfg, editAcct).password_set
+                ? t("(unchanged)") : t("required")}
             onChange={set("password")} />
         </Field>
         <Field label={t("smtp.host")}>
@@ -518,31 +534,25 @@ export function SettingsModal({ cfg, account, onClose, onSaved,
           </Field>
         </div>
 
+        {oauthProvider && (
         <div className="sm:col-span-2 rounded-md border border-line
           bg-panel2 p-3">
-          <SectionLabel>{t("oauth.title")}</SectionLabel>
-          <p className="mb-2 text-xs text-muted">{t("oauth.help")}</p>
-          <Field label={t("oauth.provider")}>
-            <Select className="w-full" value={f.oauthProvider}
-              onChange={(e) => setF({ ...f,
-                oauthProvider: e.target.value as "" | OauthProvider })}>
-              <option value="">{t("oauth.provider_off")}</option>
-              <option value="google">Gmail (Google)</option>
-              <option value="microsoft">Outlook / Microsoft 365</option>
-            </Select>
-          </Field>
+          <SectionLabel>
+            {t("oauth.title", { provider: oauthProvider === "google"
+              ? "Gmail" : "Outlook" })}
+          </SectionLabel>
 
-          {f.oauthProvider === "google" && (
+          {oauthProvider === "google" && (
             <p className="my-2 text-xs text-muted">{t("oauth.google_help")}</p>
           )}
-          {f.oauthProvider === "microsoft" && cfg.oauth_ms_device_available && (
+          {oauthProvider === "microsoft" && cfg.oauth_ms_device_available && (
             <p className="my-2 text-xs text-muted">{t("oauth.ms_device_help")}</p>
           )}
-          {f.oauthProvider === "microsoft" && !cfg.oauth_ms_device_available && (
+          {oauthProvider === "microsoft" && !cfg.oauth_ms_device_available && (
             <p className="my-2 text-xs text-muted">{t("oauth.ms_byo_help")}</p>
           )}
 
-          {f.oauthProvider && !(f.oauthProvider === "microsoft"
+          {!(oauthProvider === "microsoft"
             && cfg.oauth_ms_device_available) && (
             <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
               <Field label={t("oauth.client_id")}>
@@ -559,27 +569,25 @@ export function SettingsModal({ cfg, account, onClose, onSaved,
             </div>
           )}
 
-          {f.oauthProvider && (
-            <div className="mt-3 flex flex-wrap items-center gap-2">
-              {f.oauthConnected ? (<>
-                <span className="text-sm text-emerald-400">
-                  ✓ {t("oauth.connected")}
-                </span>
-                <Button variant="ghost" onClick={disconnectOauth}>
-                  {t("oauth.disconnect")}
-                </Button>
-              </>) : f.oauthProvider === "microsoft"
-                && cfg.oauth_ms_device_available ? (
-                <Button onClick={startDeviceConnect}>
-                  {t("oauth.connect_device")}
-                </Button>
-              ) : (
-                <Button onClick={connectOauth} disabled={!f.oauthClientId}>
-                  {t("oauth.connect")}
-                </Button>
-              )}
-            </div>
-          )}
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            {f.oauthConnected ? (<>
+              <span className="text-sm text-emerald-400">
+                ✓ {t("oauth.connected")}
+              </span>
+              <Button variant="ghost" onClick={disconnectOauth}>
+                {t("oauth.disconnect")}
+              </Button>
+            </>) : oauthProvider === "microsoft"
+              && cfg.oauth_ms_device_available ? (
+              <Button onClick={startDeviceConnect}>
+                {t("oauth.connect_device")}
+              </Button>
+            ) : (
+              <Button onClick={connectOauth} disabled={!f.oauthClientId}>
+                {t("oauth.connect")}
+              </Button>
+            )}
+          </div>
 
           {deviceInfo && (
             <div className="mt-2 rounded-md border border-line bg-panel p-3
@@ -600,6 +608,7 @@ export function SettingsModal({ cfg, account, onClose, onSaved,
             <p className="mt-2 text-xs text-muted">{oauthMsg}</p>
           )}
         </div>
+        )}
 
         <div className="sm:col-span-2">
           <div className="mb-1 flex items-center gap-2">
