@@ -269,6 +269,49 @@ def test_oauth_device_start_and_poll(monkeypatch):
     assert saved["provider"] == "microsoft" and saved["refresh_token"] == "rt"
 
 
+def test_unsub_smtp_uses_xoauth2(monkeypatch):
+    from backend import unsub
+    import time
+
+    seen = {}
+
+    class FakeSMTP:
+        def __init__(self, host, port, timeout=None, context=None):
+            pass
+
+        def login(self, user, password):
+            raise AssertionError("should not use plain login for oauth")
+
+        def auth(self, mechanism, authobject, initial_response_ok=True):
+            seen["mechanism"] = mechanism
+            seen["response"] = authobject()
+
+        def sendmail(self, frm, to, msg):
+            seen["to"] = to
+
+        def quit(self):
+            pass
+
+    monkeypatch.setattr(unsub.smtplib, "SMTP_SSL", FakeSMTP)
+    unsub._send_mailto(
+        {"host": "smtp.gmail.example", "smtp_security": "ssl",
+         "user": "me@gmail.com", "password": "", "cafile": "",
+         "oauth": {"provider": "google", "client_id": "cid",
+                   "client_secret": "sec", "refresh_token": "rt",
+                   "access_token": "at", "expires_at": time.time() + 3600}},
+        "mailto:unsub@list.example")
+    assert seen["mechanism"] == "XOAUTH2"
+    assert seen["response"] == "user=me@gmail.com\x01auth=Bearer at\x01\x01"
+    assert seen["to"] == ["unsub@list.example"]
+
+
+def test_unsub_smtp_xoauth2_error_continuation_returns_empty():
+    from backend import oauthflow
+    cb = oauthflow.smtp_auth_callback("me@gmail.com", "at")
+    assert cb() == "user=me@gmail.com\x01auth=Bearer at\x01\x01"
+    assert cb(b"{\"status\":\"400\"}") == ""
+
+
 def test_masked_config_hides_oauth_tokens():
     _setup_gmail_account()
     cfgmod.save_oauth("gmail", {"provider": "google", "client_id": "cid",
