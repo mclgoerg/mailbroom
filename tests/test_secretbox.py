@@ -110,3 +110,38 @@ def test_fuzz_seal_roundtrip(value):
             os.environ.pop(secretbox.ENV_VAR, None)
         else:
             os.environ[secretbox.ENV_VAR] = old
+
+
+def test_session_secret_sealed_at_rest(monkeypatch):
+    from backend import auth as authmod
+    monkeypatch.setenv(secretbox.ENV_VAR, KEY)
+    monkeypatch.setattr(authmod, "_secret_cache", None)
+    s1 = authmod._secret()
+    raw = authmod.SESSION_SECRET_PATH.read_bytes()
+    assert raw.startswith(b"enc:v1:") and s1 not in raw
+    # survives a restart (cache reset) with the same key
+    monkeypatch.setattr(authmod, "_secret_cache", None)
+    assert authmod._secret() == s1
+
+
+def test_legacy_plaintext_session_secret_is_resealed(monkeypatch):
+    from backend import auth as authmod
+    monkeypatch.delenv(secretbox.ENV_VAR, raising=False)
+    monkeypatch.setattr(authmod, "_secret_cache", None)
+    s1 = authmod._secret()                     # plaintext (no key)
+    assert authmod.SESSION_SECRET_PATH.read_bytes() == s1
+    monkeypatch.setenv(secretbox.ENV_VAR, KEY)   # key introduced later
+    monkeypatch.setattr(authmod, "_secret_cache", None)
+    assert authmod._secret() == s1             # same secret, sessions live
+    assert authmod.SESSION_SECRET_PATH.read_bytes().startswith(b"enc:v1:")
+
+
+def test_lost_key_regenerates_session_secret(monkeypatch):
+    from backend import auth as authmod
+    monkeypatch.setenv(secretbox.ENV_VAR, KEY)
+    monkeypatch.setattr(authmod, "_secret_cache", None)
+    s1 = authmod._secret()
+    monkeypatch.setenv(secretbox.ENV_VAR, "another-key")
+    monkeypatch.setattr(authmod, "_secret_cache", None)
+    s2 = authmod._secret()                     # clean recovery, new secret
+    assert s2 != s1 and len(s2) == 32

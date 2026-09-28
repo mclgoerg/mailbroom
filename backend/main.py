@@ -817,12 +817,17 @@ if STATIC_DIR.is_dir():
     app.mount("/assets", StaticFiles(directory=STATIC_DIR / "assets"),
               name="assets")
 
+    # Resolve the base ONCE: comparing a resolved child against an
+    # unresolved (possibly relative or symlinked) base would break the
+    # containment check below.
+    _STATIC_ROOT = STATIC_DIR.resolve()
+
     @app.get("/{path:path}", include_in_schema=False)
     def spa(path: str):
         # Containment check: `path` is percent-decoded and may contain ../ or
         # be absolute (pathlib discards the left side then) - never serve
         # anything that resolves outside the static dir.
-        file = (STATIC_DIR / path).resolve()
-        if path and file.is_relative_to(STATIC_DIR) and file.is_file():
+        file = (_STATIC_ROOT / path).resolve()
+        if path and file.is_relative_to(_STATIC_ROOT) and file.is_file():
             return FileResponse(file)
-        return FileResponse(STATIC_DIR / "index.html")
+        return FileResponse(_STATIC_ROOT / "index.html")

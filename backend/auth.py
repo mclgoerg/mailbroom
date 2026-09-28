@@ -34,19 +34,46 @@ _secret_cache: bytes | None = None
 
 def _secret() -> bytes:
     global _secret_cache
-    if _secret_cache is None:
-        try:
-            _secret_cache = SESSION_SECRET_PATH.read_bytes()
-        except OSError:
-            _secret_cache = secrets.token_bytes(32)
-            try:
-                SESSION_SECRET_PATH.parent.mkdir(parents=True, exist_ok=True)
-                SESSION_SECRET_PATH.write_bytes(_secret_cache)
-                SESSION_SECRET_PATH.chmod(0o600)
-            except OSError:
-                log.exception("could not persist session secret - sessions "
-                              "will not survive restarts")
+    if _secret_cache is not None:
+        return _secret_cache
+    from . import secretbox
+    try:
+        raw = SESSION_SECRET_PATH.read_bytes()
+    except OSError:
+        raw = None
+    if raw is not None:
+        if raw.startswith(secretbox.PREFIX.encode()):
+            # Sealed with MAILBROOM_SECRET_KEY. A missing/changed key
+            # yields "" -> fall through and generate a fresh secret
+            # (all sessions drop; users just sign in again).
+            opened = secretbox.unseal(raw.decode())
+            if opened:
+                _secret_cache = base64.b64decode(opened)
+                return _secret_cache
+        else:
+            _secret_cache = raw
+            if secretbox.enabled():      # legacy plaintext: seal it now
+                _persist_secret(_secret_cache)
+            return _secret_cache
+    _secret_cache = secrets.token_bytes(32)
+    _persist_secret(_secret_cache)
     return _secret_cache
+
+
+def _persist_secret(secret: bytes) -> None:
+    """Store the session signing secret, sealed when MAILBROOM_SECRET_KEY
+    is set - a volume backup must not allow forging session cookies."""
+    from . import secretbox
+    data = secretbox.seal(
+        base64.b64encode(secret).decode()).encode() \
+        if secretbox.enabled() else secret
+    try:
+        SESSION_SECRET_PATH.parent.mkdir(parents=True, exist_ok=True)
+        SESSION_SECRET_PATH.write_bytes(data)
+        SESSION_SECRET_PATH.chmod(0o600)
+    except OSError:
+        log.exception("could not persist session secret - sessions "
+                      "will not survive restarts")
 
 
 # ------------------------------------------------------------ passwords
