@@ -365,6 +365,8 @@ export const DE: Record<string, string> = {
   "cafile.label": "Eigene CA-Datei (optional, z.\u202fB. das Bridge-Zertifikat)",
   "oauth.title": "{provider}-Konto per OAuth verbinden",
   "oauth.password_unused": "Nicht n\u00f6tig - dieses Konto nutzt OAuth",
+  "oauth.password_optional":
+    "Optional - oder unten per OAuth verbinden",
   "oauth.client_id": "Client-ID",
   "oauth.client_secret": "Client-Secret",
   "oauth.google_help":
