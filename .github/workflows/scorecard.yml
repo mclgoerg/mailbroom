@@ -31,4 +31,8 @@ jobs:
 
       - uses: ossf/scorecard-action@v2.4.4
         with:
+          # The action requires a local results file even when only
+          # publishing - it is never uploaded or persisted anywhere.
+          results_file: results.sarif
+          results_format: sarif
           publish_results: true
