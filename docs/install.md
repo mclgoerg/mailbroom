@@ -107,11 +107,10 @@ Nothing special to do - the image is multi-arch (amd64 + arm64). A
 
 ## Gmail OAuth setup
 
-Only needed if you want OAuth instead of an app password for a Gmail
-account (app passwords remain simpler for most people). Google requires
-every OAuth client to be registered by whoever uses it - there is no
-shared "Sign in with Google" option, because the restricted mail scope
-needs per-app Google verification.
+Mailbroom connects to Gmail via OAuth only (no app-password option in
+the settings UI). Google requires every OAuth client to be registered
+by whoever uses it - there is no shared "Sign in with Google" option,
+because the restricted mail scope needs per-app Google verification.
 
 1. Go to [Google Cloud console](https://console.cloud.google.com/) and
    create a project (or reuse one).
@@ -124,20 +123,26 @@ needs per-app Google verification.
    client ID**, application type "Web application". Add this authorized
    redirect URI (replace with your instance's URL):
    `https://your-mailbroom-domain/api/oauth/imap/callback`
-4. Copy the client ID and client secret into Mailbroom's account
-   settings (OAuth provider: Gmail), then click **Connect account** and
-   sign in with the Google account you added as a test user.
+4. In Mailbroom, add or edit an account, select the **Gmail** preset,
+   paste the client ID and client secret under "Connect via OAuth",
+   then click **Connect** and sign in with the Google account you added
+   as a test user.
 
-## Microsoft device-code setup
+## Microsoft OAuth setup
 
-If the maintainer's shared app is configured (`MAILBROOM_MS_CLIENT_ID`
-set on the server), no registration is needed - pick "Outlook /
-Microsoft 365", click **Connect with a device code**, then enter the
-shown code at microsoft.com/devicelogin. Otherwise, register your own
-public client in [Entra ID](https://entra.microsoft.com/) (App
-registrations -> New registration, no redirect URI needed, enable
-"Allow public client flows" under Authentication) and enter its client
-ID in the account settings instead.
+Mailbroom connects to Outlook/Microsoft 365 via OAuth only (Microsoft
+has no app-password option for IMAP). Select the **Outlook / Microsoft
+365** preset for the account, then:
+
+- If the maintainer's shared app is configured
+  (`MAILBROOM_MS_CLIENT_ID` set on the server), no registration is
+  needed - click **Connect with a device code**, then enter the shown
+  code at microsoft.com/devicelogin.
+- Otherwise, register your own public client in
+  [Entra ID](https://entra.microsoft.com/) (App registrations -> New
+  registration, no redirect URI needed, enable "Allow public client
+  flows" under Authentication), paste its client ID under "Connect via
+  OAuth", then click **Connect**.
 
 ## After the first start
 

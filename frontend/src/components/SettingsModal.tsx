@@ -23,7 +23,9 @@ const PRESETS: Record<Exclude<Preset, "custom">, {
     cafile: "", hint: "preset.hint.oauth_gmail" },
   outlook: { host: "outlook.office365.com", port: 993, security: "ssl",
     smtpHost: "smtp.office365.com", smtpPort: 587, smtpSecurity: "starttls",
-    cafile: "", hint: "preset.hint.oauth_only" },
+    // Unused: presetHint below computes this dynamically (depends on
+    // whether the server has a shared Microsoft app configured).
+    cafile: "", hint: "" },
   icloud: { host: "imap.mail.me.com", port: 993, security: "ssl",
     smtpHost: "smtp.mail.me.com", smtpPort: 587, smtpSecurity: "starttls",
     cafile: "", hint: "preset.hint.apppw" },
@@ -177,7 +179,13 @@ export function SettingsModal({ cfg, account, onClose, onSaved,
       smtpPort: String(pre.smtpPort), smtpSecurity: pre.smtpSecurity,
       cafile: pre.cafile, oauthProvider: PRESET_OAUTH[p] ?? "" });
   };
-  const presetHint = f.preset !== "custom" ? PRESETS[f.preset].hint : "";
+  const presetHint = f.preset === "custom" ? ""
+    // Outlook's hint depends on whether this server has a shared
+    // Microsoft app (device code, no setup) or not (bring your own).
+    : f.preset === "outlook"
+      ? (cfg.oauth_ms_device_available ? "preset.hint.oauth_outlook_device"
+        : "preset.hint.oauth_outlook_byo")
+      : PRESETS[f.preset].hint;
   // The provider preset already says which mail service this is, so it
   // also decides the OAuth provider - no need to ask again. Only a
   // preset outside gmail/outlook falls back to whatever the account's
