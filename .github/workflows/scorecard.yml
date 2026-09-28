@@ -1,8 +1,12 @@
 name: Scorecard analysis
 
 # Public supply-chain risk score (branch protection, pinned deps, CI
-# hardening, ...). Informational only - no PR gate; results show up in
-# the Security tab and on the public Scorecard dashboard/badge.
+# hardening, ...). Informational only - no PR gate. Published to the
+# public Scorecard dashboard/badge only; deliberately NOT uploaded to
+# this repo's code-scanning alerts (several checks - Code-Review,
+# Maintained, Fuzzing, CII-Best-Practices, Contributors - can never
+# clear for a solo-maintained project and would sit there permanently,
+# drowning out actual CodeQL findings).
 on:
   branch_protection_rule:
   schedule:
@@ -10,16 +14,16 @@ on:
   push:
     branches: [main]
 
-permissions: read-all
+permissions:
+  contents: read
 
 jobs:
   analysis:
     runs-on: ubuntu-latest
     permissions:
-      security-events: write
-      id-token: write
+      id-token: write   # signs the published result for authenticity
       contents: read
-      actions: read
+      actions: read      # lets the CI-Tests check read workflow history
     steps:
       - uses: actions/checkout@v7
         with:
@@ -27,16 +31,4 @@ jobs:
 
       - uses: ossf/scorecard-action@v2.4.4
         with:
-          results_file: results.sarif
-          results_format: sarif
           publish_results: true
-
-      - uses: actions/upload-artifact@v7
-        with:
-          name: SARIF file
-          path: results.sarif
-          retention-days: 5
-
-      - uses: github/codeql-action/upload-sarif@v4
-        with:
-          sarif_file: results.sarif
