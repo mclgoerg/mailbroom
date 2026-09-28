@@ -327,7 +327,10 @@ def categorize(hay: str, localpart: str = "", bulk: bool = False,
 
 # --------------------------------------------------------------------- imap
 
-def connect(im: dict) -> imaplib.IMAP4:
+def connect(im: dict, account_name: str | None = None) -> imaplib.IMAP4:
+    """`account_name` lets an oauth account persist a refreshed access
+    token back to its config; omit it only for throwaway connections
+    (test_connection) where the refreshed token would otherwise be lost."""
     ctx = ssl.create_default_context(cafile=im["cafile"] or None)
     if (im.get("security") or "ssl") == "starttls":
         conn = imaplib.IMAP4(im["host"], int(im["port"]), timeout=120)
@@ -343,7 +346,18 @@ def connect(im: dict) -> imaplib.IMAP4:
         conn = imaplib.IMAP4_SSL(im["host"], int(im["port"]),
                                  ssl_context=ctx, timeout=120)
     try:
-        conn.login(im["user"], im["password"])
+        oauth = im.get("oauth")
+        if oauth and oauth.get("refresh_token"):
+            from . import oauthflow
+            fresh = oauthflow.ensure_fresh(oauth)
+            if fresh is not oauth and account_name:
+                cfgmod.save_oauth(account_name, fresh)
+            token = fresh["access_token"]
+            conn.authenticate(
+                "XOAUTH2",
+                lambda _: oauthflow.xoauth2_string(im["user"], token))
+        else:
+            conn.login(im["user"], im["password"])
     except BaseException:
         try:
             conn.shutdown()
@@ -808,7 +822,7 @@ def run_scan(acc=None) -> None:
     t0 = time.time()
     log.info("[%s] scan started (host %s)", acc.name, im["host"])
     try:
-        conn = connect(im)
+        conn = connect(im, acc.name)
         try:
             rules = im.get("excluded_folders") or []
             roles = folder_roles(conn, acc)
@@ -986,7 +1000,7 @@ def _move_uids(by_folder: dict[str, set[int]], action: str, dest: str,
     moved = 0
     if moved_uids is None:
         moved_uids = {}
-    conn = connect(cfgmod.account_imap(acc.name))
+    conn = connect(cfgmod.account_imap(acc.name), acc.name)
     try:
         trash = _resolve_dest(conn, action, dest)
         for folder, uidset in by_folder.items():
@@ -1026,7 +1040,7 @@ def _mark_read(by_folder: dict[str, set[int]], acc,
     """Set \\Seen on the given UIDs; returns how many were flagged."""
     total = sum(len(s) for s in by_folder.values())
     done = 0
-    conn = connect(cfgmod.account_imap(acc.name))
+    conn = connect(cfgmod.account_imap(acc.name), acc.name)
     try:
         for folder, uidset in by_folder.items():
             status, _ = conn.select(quote_folder(folder), readonly=False)
@@ -1362,7 +1376,7 @@ def _run_atts(acc) -> None:
             per_folder = {f: sorted(
                 m["uid"] for m in acc.index.values() if m["folder"] == f)
                 for f in folders}
-        conn = connect(cfgmod.account_imap(acc.name))
+        conn = connect(cfgmod.account_imap(acc.name), acc.name)
         try:
             for folder in folders:
                 uids = per_folder.get(folder) or []
@@ -1628,7 +1642,7 @@ def undo_last(index: int = -1, acc=None) -> dict:
         acc.state["undo"] = _undo_summaries(acc)
 
     restored = 0
-    conn = connect(cfgmod.account_imap(acc.name))
+    conn = connect(cfgmod.account_imap(acc.name), acc.name)
     try:
         trash = entry.get("in") or folder_roles(conn, acc).get("trash")
         if not trash:
@@ -1672,7 +1686,7 @@ def trash_list(limit: int = 1000, acc=None) -> dict:
     """Live Trash contents (Trash stays out of the cleanup index). The
     returned uv must be sent back on restore so we never MOVE stale UIDs."""
     acc = acc or accounts.get()
-    conn = connect(cfgmod.account_imap(acc.name))
+    conn = connect(cfgmod.account_imap(acc.name), acc.name)
     try:
         trash = folder_roles(conn, acc).get("trash")
         if not trash:
@@ -1704,7 +1718,7 @@ def trash_restore(uids: list[int], dest: str, uv: int = 0,
         if acc.state["delete"]["status"] == "running":
             raise RuntimeError("busy: a deletion is running")
     restored = 0
-    conn = connect(cfgmod.account_imap(acc.name))
+    conn = connect(cfgmod.account_imap(acc.name), acc.name)
     try:
         folders = list_folders(conn)
         trash = folder_roles(conn, acc).get("trash")
@@ -1748,7 +1762,7 @@ def empty_trash(acc=None) -> dict:
         acc.undo_log.clear()
         acc.state["undo"] = []
 
-    conn = connect(cfgmod.account_imap(acc.name))
+    conn = connect(cfgmod.account_imap(acc.name), acc.name)
     try:
         trash = folder_roles(conn, acc).get("trash")
         if not trash:
@@ -1865,7 +1879,7 @@ def fetch_message(folder: str, uid: int, acc=None) -> dict:
             and folder != acc.folder_roles.get("trash") \
             and folder.lower() != "trash":
         raise RuntimeError("unknown message")
-    conn = connect(cfgmod.account_imap(acc.name))
+    conn = connect(cfgmod.account_imap(acc.name), acc.name)
     try:
         status, _ = conn.select(quote_folder(folder), readonly=True)
         if status != "OK":

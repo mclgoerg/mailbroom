@@ -11,7 +11,7 @@ client = TestClient(app)
 
 def _scan(monkeypatch, mailbox):
     fake = FakeIMAP(mailbox)
-    monkeypatch.setattr(mailops, "connect", lambda cfg: fake)
+    monkeypatch.setattr(mailops, "connect", lambda cfg, name=None: fake)
     mailops.run_scan()
     assert mailops.STATE["status"] == "done"
     return fake

@@ -99,7 +99,7 @@ def test_test_connection(bridge):
 def test_test_connection_failure(monkeypatch):
     cfgmod.update_config({"imap": {"password": "bridge-pass"}})
 
-    def boom(cfg):
+    def boom(cfg, name=None):
         raise ConnectionRefusedError("nobody home")
     monkeypatch.setattr(mailops, "connect", boom)
     r = client.post("/api/test_connection", json={})
