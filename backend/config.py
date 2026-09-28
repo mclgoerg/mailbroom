@@ -34,7 +34,7 @@ def stats_path() -> Path:
 DEFAULT_EXCLUDED = ["Trash", "Spam", "Sent", "Drafts", "All Mail",
                     "Starred", "Labels", "Labels/*"]
 
-# Env-based bootstrap values — used for the FIRST account only (classic
+# Env-based bootstrap values - used for the FIRST account only (classic
 # single-account Docker setups pass Bridge creds via env).
 ENV_IMAP = {
     "host": os.environ.get("IMAP_HOST", "127.0.0.1"),
@@ -51,7 +51,7 @@ ENV_IMAP = {
     "preset": "proton",
 }
 
-# Blank slate for ADDITIONAL accounts — env values (e.g. the Bridge
+# Blank slate for ADDITIONAL accounts - env values (e.g. the Bridge
 # password) must never leak into them.
 NEUTRAL_IMAP = {
     "host": "", "port": 993, "security": "ssl",
@@ -65,7 +65,7 @@ _ENV_AUTH_CACHE: dict | None = None
 def _env_auth() -> dict:
     """Auth defaults from env (AUTH_MODE, AUTH_PASSWORD, OIDC_*). The
     password is hashed ONCE per process (scrypt is deliberately slow and
-    salted — re-hashing per request would cost ~50ms and change the hash);
+    salted - re-hashing per request would cost ~50ms and change the hash);
     a mode whose prerequisites are missing falls back to "none"."""
     global _ENV_AUTH_CACHE
     if _ENV_AUTH_CACHE is not None:
@@ -112,7 +112,7 @@ def _default_server() -> dict:
 
 def load_server() -> dict:
     """Server-level settings (auth + shared AI), same for every tenant.
-    Migration: a pre-tenancy config.json carried the auth section — seed
+    Migration: a pre-tenancy config.json carried the auth section - seed
     server.json from it the first time (persisted on the next save)."""
     server = _default_server()
     try:
@@ -293,7 +293,7 @@ def _load_accounts(saved: dict, env_first: bool = True) -> dict[str, dict]:
     """Accounts from a saved config. The first account merges over the
     env bootstrap values (classic Docker setups); additional accounts
     merge over neutral defaults so env secrets never leak into them.
-    Non-default tenants get NO env values at all (env_first=False) — the
+    Non-default tenants get NO env values at all (env_first=False) - the
     Bridge password belongs to the admin only. Folder exclusions are
     PER ACCOUNT (providers name their folders differently)."""
     if isinstance(saved.get("accounts"), dict) and saved["accounts"]:
@@ -313,7 +313,7 @@ def _load_accounts(saved: dict, env_first: bool = True) -> dict[str, dict]:
 def load_config() -> dict:
     """The CURRENT TENANT's config (plus the server-level auth section,
     merged in for the middleware and login endpoints). Env bootstrap
-    values only ever apply to the DEFAULT tenant — a fresh tenant starts
+    values only ever apply to the DEFAULT tenant - a fresh tenant starts
     with one neutral, unconfigured account and no AI key."""
     default_tenant = tenants.current().is_default
     cfg = json.loads(json.dumps(DEFAULT_CONFIG))  # deep copy
@@ -356,7 +356,7 @@ def _write(path: Path, obj) -> None:
 
 
 def _write_tenant_config(cfg: dict) -> None:
-    """Persist the tenant's config file — WITHOUT the merged-in
+    """Persist the tenant's config file - WITHOUT the merged-in
     server-level auth section (that lives in server.json), and with the
     secret fields sealed when MAILBROOM_SECRET_KEY is set."""
     out = json.loads(json.dumps(
@@ -432,7 +432,7 @@ def update_config(body: dict) -> dict:
             if target not in cfg["accounts"]:
                 raise ValueError(f"unknown account {target!r}")
             _apply_imap(cfg["accounts"][target], body["imap"])
-        # Bulk shape (config import): {"accounts": {name: {...}}} — creates
+        # Bulk shape (config import): {"accounts": {name: {...}}} - creates
         # missing accounts; passwords only change when explicitly provided.
         if isinstance(body.get("accounts"), dict):
             for name, imap_in in body["accounts"].items():
@@ -569,7 +569,7 @@ def masked_config(cfg: dict) -> dict:
         "protected": normalize_protected(cfg.get("protected")),
         "categories": cfg.get("categories") or {},
         # Non-admins get the mode (their UI needs it) but none of the
-        # server-side login details — the allow-list alone would leak
+        # server-side login details - the allow-list alone would leak
         # every other tenant's address.
         "auth": {"mode": cfg["auth"]["mode"], "is_admin": admin},
         "ai": {"provider": cfg["ai"]["provider"],
@@ -667,9 +667,9 @@ def month_cost() -> float:
 
 def check_budget(ai_cfg: dict) -> None:
     """Raise before an AI call when this month's spend has reached the cap.
-    Already-started runs still record their usage — bills don't un-happen."""
+    Already-started runs still record their usage - bills don't un-happen."""
     budget = float(ai_cfg.get("budget_usd") or 0)
     if budget and month_cost() >= budget:
         raise ValueError(
             f"monthly AI budget reached (${month_cost():.2f} of "
-            f"${budget:.2f}) — raise it in settings to continue")
+            f"${budget:.2f}) - raise it in settings to continue")

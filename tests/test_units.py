@@ -114,7 +114,7 @@ def test_config_bad_port_ignored():
 
 def test_decode_mime_survives_raw_8bit_headers():
     """Raw non-ASCII bytes in headers make email.get() return a Header
-    object with charset unknown-8bit — this used to crash whole scans."""
+    object with charset unknown-8bit - this used to crash whole scans."""
     import email as email_mod
     from backend.mailops import decode_mime
     msg = email_mod.message_from_bytes(

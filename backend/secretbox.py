@@ -2,7 +2,7 @@
 
 Only the fields that would let an attacker pivot are encrypted: IMAP
 passwords, AI API keys, the OIDC client secret. Everything else (mail
-metadata, verdicts, stats) stays plain JSON — the threat model here is
+metadata, verdicts, stats) stays plain JSON - the threat model here is
 a leaked VOLUME BACKUP, not a compromised host (root on the box can
 read process memory either way).
 
@@ -11,7 +11,7 @@ generate one with `openssl rand -base64 32`) and is stretched to a
 Fernet key via SHA-256. Values are stored as "enc:v1:<token>"; loading
 is transparent. Without a key everything stays plaintext (one startup
 warning); pre-existing plaintext values are encrypted on the next save.
-If the key is lost, the secrets cannot be recovered — re-enter them.
+If the key is lost, the secrets cannot be recovered - re-enter them.
 """
 
 from __future__ import annotations
@@ -52,21 +52,21 @@ def seal(value: str) -> str:
 
 def unseal(value: str) -> str:
     """Decrypt one persisted secret. Plaintext passes through unchanged.
-    A sealed value without the (right) key yields "" — the UI then shows
+    A sealed value without the (right) key yields "" - the UI then shows
     the secret as unset and it must be re-entered."""
     value = value or ""
     if not value.startswith(PREFIX):
         return value
     f = _fernet()
     if f is None:
-        log.error("found an encrypted secret but %s is not set — "
+        log.error("found an encrypted secret but %s is not set - "
                   "the secret is unusable until the key returns", ENV_VAR)
         return ""
     from cryptography.fernet import InvalidToken
     try:
         return f.decrypt(value[len(PREFIX):].encode()).decode()
     except (InvalidToken, ValueError):
-        log.error("could not decrypt a stored secret — %s does not match "
+        log.error("could not decrypt a stored secret - %s does not match "
                   "the key it was encrypted with; re-enter the secret",
                   ENV_VAR)
         return ""

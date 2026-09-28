@@ -219,7 +219,7 @@ export interface AuthProbe {
   is_admin?: boolean;  // may edit server-level settings (auth, shared AI)
 }
 
-// Non-admins only ever receive {mode, is_admin} — the server-side login
+// Non-admins only ever receive {mode, is_admin} - the server-side login
 // details (incl. the allow-list) are admin-only.
 export interface AuthCfg {
   mode: AuthMode;
@@ -236,7 +236,7 @@ export interface AuthCfg {
 }
 
 // Admin-only usage overview: one row per tenant workspace. Counts,
-// spend and disk only — the backend never includes account names,
+// spend and disk only - the backend never includes account names,
 // addresses or any mail-derived data here.
 export interface AdminTenantStats {
   id: string;

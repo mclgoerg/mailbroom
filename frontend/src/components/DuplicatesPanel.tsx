@@ -101,7 +101,7 @@ export function DuplicatesPanel({ onClose, onDeleted }: {
                 <div className="mb-1 flex items-baseline gap-2 px-1 text-xs
                   text-muted">
                   <span className="min-w-0 flex-1 truncate">
-                    {s.mails[0].subject || t("(no subject)")} —{" "}
+                    {s.mails[0].subject || t("(no subject)")} -{" "}
                     {s.mails[0].addr}
                   </span>
                   <span className="whitespace-nowrap">

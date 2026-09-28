@@ -39,7 +39,7 @@ For EACH group decide whether all its mails are safe to bulk-delete:
 - keep: personal correspondence, employers, government, doctors, lawyers,
   banks' document mails, anything that looks important or irreplaceable.
 
-"replied": true means the user has written to this sender before — lean
+"replied": true means the user has written to this sender before - lean
 towards keep. Groups the user NEVER replied to, with mostly unread mail,
 lean towards delete_safe (still stay careful with money/account mail).
 
@@ -52,11 +52,11 @@ most 12 words per group. Answer for every group in the input."""
 # returns for protected mail, so this is belt AND suspenders.
 AI_PROTECTED_NOTE = """
 Groups marked "protected": true contain senders the user explicitly
-protects. NEVER rate a protected group delete_safe — use review or keep."""
+protects. NEVER rate a protected group delete_safe - use review or keep."""
 
 AI_GROUP_PROTECTED_NOTE = """
 Mails marked "protected": true are from senders the user explicitly
-protects. NEVER rate a protected mail delete_safe — use review or keep."""
+protects. NEVER rate a protected mail delete_safe - use review or keep."""
 
 AI_SCHEMA = {
     "type": "object",
@@ -84,13 +84,13 @@ AI_GROUP_SYSTEM = """You help clean up one group of mails from a personal
 mailbox (all from the same {grouping}: {label!r}). You get every mail's uid,
 date, subject, read state and size. Rate EACH mail:
 
-- delete_safe: clearly disposable — marketing, promotions, shipping status,
+- delete_safe: clearly disposable - marketing, promotions, shipping status,
   social notifications, expired offers, outdated automated notices.
-- review: possibly worth keeping — receipts, order confirmations, tickets,
+- review: possibly worth keeping - receipts, order confirmations, tickets,
   bookings, account or security notices, anything unclear.
 - keep: personal messages, documents, contracts, anything important.
 
-"replied": true on a mail means the user has written to its sender before —
+"replied": true on a mail means the user has written to its sender before -
 lean towards keep for those; senders the user never replied to lean
 towards delete_safe.
 
@@ -274,7 +274,7 @@ def _run_ai(grouping: str, acc=None) -> None:
                 verdictstore.save(grouping, applied, acc.name)
         finally:
             # Tokens of completed batches are billed even if a later batch
-            # fails — always record them.
+            # fails - always record them.
             spent = (cfgmod.record_usage(cfg["ai"], usage_in, usage_out)
                      if usage_in or usage_out else None)
         with STATE_LOCK:

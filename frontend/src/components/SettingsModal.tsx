@@ -7,7 +7,7 @@ import type { AdminTenantStats, AuthMode, Config, FoldersResp, Preset,
 import { Button, Field, Input, Loading, Modal, PanelHeader,
   SectionLabel, Select, TextArea } from "./ui";
 
-/* Provider presets only PREFILL the connection fields — everything stays
+/* Provider presets only PREFILL the connection fields - everything stays
  * editable. "custom" prefills nothing. Hosts per provider docs; all of
  * these use app passwords except Proton (Bridge password). */
 const PRESETS: Record<Exclude<Preset, "custom">, {
@@ -195,7 +195,7 @@ export function SettingsModal({ cfg, account, onClose, onSaved,
           price_in: +f.priceIn || 0, price_out: +f.priceOut || 0,
           budget_usd: +f.budget || 0,
           ...(f.apiKey ? { api_key: f.apiKey } : {}) },
-        // Server-level settings ride along for the admin only — the
+        // Server-level settings ride along for the admin only - the
         // backend rejects them (403) from anyone else.
         ...(cfg.auth.is_admin ? {
           auth: { mode: f.authMode, admin: f.oidcAdmin.trim(),
@@ -477,7 +477,7 @@ export function SettingsModal({ cfg, account, onClose, onSaved,
                       w.trim().toLowerCase().slice(0, -1))))
                   .map((x) => {
                   // trash/junk/sent/drafts/all are excluded by ROLE on the
-                  // backend — their checkboxes are informational only.
+                  // backend - their checkboxes are informational only.
                   const locked = !!x.role && x.role !== "archive";
                   return (
                   <label key={x.raw}
@@ -702,7 +702,7 @@ export function SettingsModal({ cfg, account, onClose, onSaved,
                       <tr key={u.id} className="border-b border-line
                         last:border-0 align-top">
                         <td className="truncate px-2 py-1.5"
-                          title={`${u.id} — ${u.accounts} account(s), ${
+                          title={`${u.id} - ${u.accounts} account(s), ${
                             u.scans} scan(s), ${u.rules} rule(s), ${
                             u.verdicts} AI verdict(s)`}>
                           {u.is_admin_workspace ? "★ " : ""}
@@ -728,7 +728,7 @@ export function SettingsModal({ cfg, account, onClose, onSaved,
                           </span>
                         </td>
                         <td className="px-2 py-1.5">
-                          {fmtAgo(u.last_scan_ts) || "—"}
+                          {fmtAgo(u.last_scan_ts) || "-"}
                         </td>
                         <td className="px-2 py-1.5">
                           {fmtSize(u.disk_bytes)}
@@ -780,7 +780,7 @@ export function SettingsModal({ cfg, account, onClose, onSaved,
                   ? t("key.optional")
                   : cfg.ai.source === "shared"
                     ? t("ai.shared_key_ph")
-                    : t("(no key — AI features hidden)")}
+                    : t("(no key - AI features hidden)")}
               onChange={set("apiKey")} />
           </Field>
           {cfg.ai.source === "shared" && (
@@ -815,7 +815,7 @@ export function SettingsModal({ cfg, account, onClose, onSaved,
           rounded-lg bg-panel2 px-4 py-3 text-xs text-muted">
           <span>
             {t("AI spend")}: <b className="text-body">{fmtUsd(s.cost)}</b>
-            {" "}— {s.runs} {t("runs")}, {s.input_tokens.toLocaleString()} /{" "}
+            {" "}- {s.runs} {t("runs")}, {s.input_tokens.toLocaleString()} /{" "}
             {s.output_tokens.toLocaleString()}
           </span>
           <Button variant="ghost" className="!min-h-7 !px-2 !py-0.5 !text-xs"

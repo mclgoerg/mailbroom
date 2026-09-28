@@ -13,7 +13,7 @@ from backend import verdictstore
 
 
 class FakeClient:
-    """Stands in for anthropic.Anthropic — returns canned JSON verdicts."""
+    """Stands in for anthropic.Anthropic - returns canned JSON verdicts."""
 
     def __init__(self, make_payload):
         self._make = make_payload

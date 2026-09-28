@@ -1,7 +1,7 @@
 # Security policy
 
 Mailbroom holds IMAP credentials and (optionally) AI API keys, and acts
-on real mailboxes — security reports are taken seriously.
+on real mailboxes - security reports are taken seriously.
 
 ## Reporting a vulnerability
 

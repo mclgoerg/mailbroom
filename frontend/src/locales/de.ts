@@ -7,11 +7,11 @@ export const DE: Record<string, string> = {
   "notice.cached_verdicts":
     "{n} zwischengespeicherte KI-Bewertungen übernommen (die KI-Prüfung bewertet nur neue Gruppen).",
   "notice.restored":
-    "{restored} von {of} Mails wiederhergestellt ({label}) — zum Anzeigen neu scannen.",
+    "{restored} von {of} Mails wiederhergestellt ({label}) - zum Anzeigen neu scannen.",
   "notice.emptied_trash":
     "Papierkorb geleert ({count} Mails endgültig gelöscht).",
   "notice.ai_all_cached":
-    "Alle Gruppen haben bereits KI-Bewertungen — nichts zu prüfen.",
+    "Alle Gruppen haben bereits KI-Bewertungen - nichts zu prüfen.",
   "notice.ai_cancelled": "KI-Prüfung nach {done}/{total} Gruppen abgebrochen.",
   "confirm.act": "{verb}: {n} Mails aus {k} Gruppe(n)?",
   "confirm.act_mails": "{verb}: {n} ausgewählte Mails?",
@@ -22,9 +22,9 @@ export const DE: Record<string, string> = {
   "confirm.reset_spend": "KI-Kostenzähler zurücksetzen?",
   "confirm.switch_profile":
     "Zum Kontoprofil „{name}“ wechseln? Danach neu scannen.",
-  "note.ai_selected": "{note} — {n}/{of} ausgewählt",
+  "note.ai_selected": "{note} - {n}/{of} ausgewählt",
   "note.ai_truncated": " (nur die ersten {n} Mails)",
-  "note.background": "{verb} — läuft im Hintergrund…",
+  "note.background": "{verb} - läuft im Hintergrund…",
   "show_more": "{n} weitere anzeigen ({hidden} ausgeblendet)",
   "ai_done": "KI fertig ({in} rein / {out} raus{cost}) · gesamt {total}",
   "done_moved": "Fertig: {n} Mails verarbeitet.",
@@ -41,7 +41,7 @@ export const DE: Record<string, string> = {
     "An den KI-Anbieter gesendet: Absendernamen/-adressen, Anzahl, "
     + "Größen, Daten, Lesestatus, Kategorien, Betreffzeilen, "
     + "Schutz-Markierungen und ob Sie einem Absender je geantwortet "
-    + "haben — niemals Mail-Inhalte oder Anhänge.",
+    + "haben - niemals Mail-Inhalte oder Anhänge.",
   "replied": "geantwortet",
   "replied.tip":
     "Sie haben diesem Absender schon geschrieben (aus Ihrem "
@@ -51,11 +51,11 @@ export const DE: Record<string, string> = {
     + "Papierkorb verschieben?",
   "confirm.protected_skipped": "({n} geschützte Gruppe(n) übersprungen.)",
   "toast.all_protected":
-    "Alle ausgewählten Gruppen sind geschützt — nichts wurde gelöscht.",
+    "Alle ausgewählten Gruppen sind geschützt - nichts wurde gelöscht.",
   "protect.tip":
-    "Diesen Absender schützen — Massenlöschungen und KI-Vorschläge "
+    "Diesen Absender schützen - Massenlöschungen und KI-Vorschläge "
     + "überspringen ihn",
-  "unprotect.tip": "Geschützt — klicken, um den Schutz aufzuheben",
+  "unprotect.tip": "Geschützt - klicken, um den Schutz aufzuheben",
   "protected": "geschützt",
   "Protected senders": "Geschützte Absender",
   "protected.help":
@@ -114,7 +114,7 @@ export const DE: Record<string, string> = {
   "unread": "ungelesen",
   "(filtered)": "(gefiltert)",
   "(no subject)": "(kein Betreff)",
-  "No scan yet — hit “Scan”.": "Noch kein Scan — auf „Scannen“ klicken.",
+  "No scan yet - hit “Scan”.": "Noch kein Scan - auf „Scannen“ klicken.",
   "Scanning…": "Scanne…",
   "Moving…": "Verschiebe…",
   "Restoring…": "Stelle wieder her…",
@@ -162,7 +162,7 @@ export const DE: Record<string, string> = {
   "Provider": "Anbieter",
   "Model": "Modell",
   "API key": "API-Schlüssel",
-  "(no key — AI features hidden)": "(kein Schlüssel — KI ausgeblendet)",
+  "(no key - AI features hidden)": "(kein Schlüssel - KI ausgeblendet)",
   "Reset": "Zurücksetzen",
   "runs": "Läufe",
   "AI spend": "KI-Kosten",
@@ -170,8 +170,8 @@ export const DE: Record<string, string> = {
   "AI review (optional)": "KI-Prüfung (optional)",
   "AI is reviewing this group…": "Die KI prüft diese Gruppe…",
   "Unsubscribing…": "Bestelle ab…",
-  "Opened the sender's unsubscribe page — confirm it there.":
-    "Abbestellseite des Absenders geöffnet — dort bestätigen.",
+  "Opened the sender's unsubscribe page - confirm it there.":
+    "Abbestellseite des Absenders geöffnet - dort bestätigen.",
   "Unsubscribed": "Abbestellt",
   "search all scanned mails (subject / sender)…":
     "alle gescannten Mails durchsuchen (Betreff / Absender)…",
@@ -194,7 +194,7 @@ export const DE: Record<string, string> = {
     + "würden; nach Prüfung eines Berichts kann auf Ausführen umgeschaltet "
     + "werden. Läufe sind auf 500 Mails begrenzt, geschützte Absender "
     + "werden übersprungen, alles landet wie üblich im Papierkorb/Undo.",
-  "rules.empty": "Noch keine Regeln — unten eine anlegen.",
+  "rules.empty": "Noch keine Regeln - unten eine anlegen.",
   "rule.never_ran": "noch nie gelaufen",
   "rule.run_report":
     "Bericht: {groups} Gruppen · {mails} Mails wären betroffen",
@@ -241,7 +241,7 @@ export const DE: Record<string, string> = {
   "atts.intro":
     "Analyse starten, um Mails nach Anhanggröße zu listen. Danach "
     + "funktioniert auch der Filter att:>10m auf Gruppen. Proton kann per "
-    + "IMAP keine einzelnen Anhänge entfernen — Löschen entfernt die ganze "
+    + "IMAP keine einzelnen Anhänge entfernen - Löschen entfernt die ganze "
     + "Mail (rückgängig machbar).",
   "atts.none": "Keine Anhänge in den gescannten Ordnern gefunden.",
   "atts.running": "Analysiere Anhänge…",
@@ -253,7 +253,7 @@ export const DE: Record<string, string> = {
   "dups.keep_newest": "Alle außer der neuesten auswählen",
   "dups.wasted": "{size} freigebbar",
   "dups.newest": "neueste",
-  "dups.none": "Keine Duplikate gefunden — schön aufgeräumt.",
+  "dups.none": "Keine Duplikate gefunden - schön aufgeräumt.",
   "Statistics": "Statistik",
   "stats.this_month": "diesen Monat gelöscht: {n} Mails · {size}",
   "stats.per_year": "Mails pro Jahr",
@@ -283,7 +283,7 @@ export const DE: Record<string, string> = {
   "sieve.discard": "Bei Empfang löschen",
   "sieve.markread": "Als gelesen markieren",
   "sieve.copied":
-    "Sieve-Filter kopiert — in Protons Filter-Einstellungen einfügen.",
+    "Sieve-Filter kopiert - in Protons Filter-Einstellungen einfügen.",
   "sieve.open_proton": "Proton-Filtereinstellungen ↗",
   "Copy": "Kopieren",
   "notice.trash_restored":
@@ -292,11 +292,11 @@ export const DE: Record<string, string> = {
   "trash.search": "Betreff / Absender suchen…",
   "trash.restore_to": "Wiederherstellen nach…",
   "trash.restored":
-    "{n} Mails wiederhergestellt — zum Anzeigen neu scannen.",
+    "{n} Mails wiederhergestellt - zum Anzeigen neu scannen.",
   "trash.newest_shown": "neueste {n} angezeigt",
   "trash.empty": "Der Papierkorb ist leer.",
   "notice.ai_budget":
-    "KI-Prüfung nach {done}/{total} Gruppen gestoppt — Monatsbudget "
+    "KI-Prüfung nach {done}/{total} Gruppen gestoppt - Monatsbudget "
     + "erreicht (in den Einstellungen erhöhen).",
   "budget.label": "Monatliches KI-Budget ($, 0 = unbegrenzt)",
   "budget.none": "kein Limit",
@@ -320,20 +320,20 @@ export const DE: Record<string, string> = {
     + "importiert.",
   "import.done": "Importiert: {rules} Regeln, {verdicts} Bewertungen.",
   "no.matches": "Keine Gruppen passen zu diesem Filter.",
-  "onboard.title": "Willkommen — in drei Schritten zum sauberen Postfach",
+  "onboard.title": "Willkommen - in drei Schritten zum sauberen Postfach",
   "onboard.step_bridge":
-    "Mail-Anbieter wählen (Gmail, iCloud, Fastmail, … — oder Proton über "
+    "Mail-Anbieter wählen (Gmail, iCloud, Fastmail, … - oder Proton über "
     + "die Proton Mail Bridge; Hinweise pro Anbieter und das "
     + "Bridge-Docker-Setup stehen im README).",
   "onboard.step_creds":
     "Anbieter-Preset wählen und Host, Benutzer und Passwort eintragen "
     + "(die meisten Anbieter brauchen ein App-Passwort) unter",
   "onboard.step_scan":
-    "Auf Scannen klicken — gelöscht wird nur nach Bestätigung, und "
+    "Auf Scannen klicken - gelöscht wird nur nach Bestätigung, und "
     + "Löschungen landen zuerst im Papierkorb.",
   "onboard.test": "Verbindung testen",
   "onboard.testing": "Teste Verbindung…",
-  "onboard.test_ok": "Verbunden — {n} Ordner sichtbar. Bereit zum Scannen!",
+  "onboard.test_ok": "Verbunden - {n} Ordner sichtbar. Bereit zum Scannen!",
   "onboard.test_fail": "Verbindung fehlgeschlagen",
   "notify.toggle":
     "Desktop-Benachrichtigungen, wenn Hintergrundjobs fertig sind (nur "
@@ -345,11 +345,11 @@ export const DE: Record<string, string> = {
   "preset.label": "Anbieter-Preset (füllt die Felder unten vor)",
   "preset.hint.proton":
     "Proton braucht die Mail Bridge (Bezahltarife): IMAP-Modus auf SSL "
-    + "stellen, Zertifikat exportieren und als CA-Datei eintragen — "
+    + "stellen, Zertifikat exportieren und als CA-Datei eintragen - "
     + "siehe README.",
   "preset.hint.apppw":
     "App-spezifisches Passwort verwenden, nicht das normale "
-    + "Konto-Passwort — anlegen in den Sicherheitseinstellungen des "
+    + "Konto-Passwort - anlegen in den Sicherheitseinstellungen des "
     + "Anbieters (Links im README).",
   "preset.hint.imap_toggle":
     "IMAP muss zuerst in den Mail-Einstellungen des Anbieters aktiviert "
@@ -361,17 +361,17 @@ export const DE: Record<string, string> = {
   "sec.auto": "automatisch",
   "cafile.label": "Eigene CA-Datei (optional, z.\u202fB. das Bridge-Zertifikat)",
   "folder.role_excluded":
-    "Spezialordner (per Rolle erkannt) — wird nie mitgescannt",
+    "Spezialordner (per Rolle erkannt) - wird nie mitgescannt",
   "account.label": "Zu bearbeitendes Konto",
   "account.add": "Konto hinzufügen",
   "account.hint":
-    "Jedes Konto wird getrennt gescannt und aufgeräumt — Ansichten "
+    "Jedes Konto wird getrennt gescannt und aufgeräumt - Ansichten "
     + "vermischen sich nie. Bei mehreren Konten oben im Kopf umschalten.",
   "account.new_prompt": "Name für das neue Konto (z. B. \"gmail\"):",
   "account.confirm_delete":
     'Konto "{name}" entfernen? Seine Regeln behalten den Kontonamen und '
     + "laufen nicht mehr; Mails auf dem Server bleiben unangetastet.",
-  "account.switch_tip": "Konto wechseln — jede Ansicht gilt pro Konto",
+  "account.switch_tip": "Konto wechseln - jede Ansicht gilt pro Konto",
   "scan.age": "gescannt vor {ago}",
   "login.section": "Anmeldung (optional)",
   "login.help":
@@ -399,7 +399,7 @@ export const DE: Record<string, string> = {
   "login.submit": "Anmelden",
   "login.sso": "Mit SSO anmelden",
   "login.logout": "Abmelden",
-  "login.admin_tip": "Admin — verwaltet die Server-Einstellungen",
+  "login.admin_tip": "Admin - verwaltet die Server-Einstellungen",
   "menu.profile": "Profil & Einstellungen",
   "tab.account": "Mail-Konto",
   "tab.general": "Allgemein",
@@ -424,7 +424,7 @@ export const DE: Record<string, string> = {
   "ai.shared_key_ph": "nutzt den gemeinsamen Server-Schlüssel",
   "usage.section": "Nutzerstatistik",
   "usage.help":
-    "Nutzung pro Arbeitsbereich — nur Zahlen, AI-Kosten und "
+    "Nutzung pro Arbeitsbereich - nur Zahlen, AI-Kosten und "
     + "Speicherplatz. Mailbroom zeigt dir nie Maildaten, Kontonamen "
     + "oder Absender anderer Nutzer.",
   "usage.user": "Nutzer / Arbeitsbereich",
@@ -434,8 +434,8 @@ export const DE: Record<string, string> = {
   "usage.last_scan": "Letzter Scan",
   "usage.disk": "Speicher",
   "usage.shared": "geteilter Schlüssel",
-  "sort.desc_tip": "Absteigend sortiert — Klick für aufsteigend",
-  "sort.asc_tip": "Aufsteigend sortiert — Klick für absteigend",
+  "sort.desc_tip": "Absteigend sortiert - Klick für aufsteigend",
+  "sort.asc_tip": "Aufsteigend sortiert - Klick für absteigend",
   "qb.tip": "Filter zusammenklicken statt Syntax merken",
   "qb.title": "Filter-Baukasten",
   "qb.hint": "jede hinzugefügte Bedingung muss AUCH zutreffen (UND)",
@@ -458,17 +458,17 @@ export const DE: Record<string, string> = {
   "qb.is_replied": "geantwortet",
   "qb.is_protected": "geschützt",
   "ai.shared_note":
-    "Kein eigener Schlüssel — AI läuft über den gemeinsamen "
+    "Kein eigener Schlüssel - AI läuft über den gemeinsamen "
     + "Server-Schlüssel (dein Monatslimit: {cap}).",
   "account.rename": "Umbenennen…",
   "account.rename_prompt": 'Neuer Name für Konto "{name}":',
   "account.renamed": 'Konto umbenannt in "{name}".',
-  "folders.title": "Zu scannende Ordner — Konto \u201e{name}\u201c",
+  "folders.title": "Zu scannende Ordner - Konto \u201e{name}\u201c",
   "folders.discover": "Erkennen",
   "folders.discover_tip":
     "Ordnerliste dieses Kontos neu vom Server laden (nutzt die "
-    + "GESPEICHERTEN Zugangsdaten — neue erst speichern)",
+    + "GESPEICHERTEN Zugangsdaten - neue erst speichern)",
   "folders.err_hint":
-    "— die Ordner-Erkennung braucht gespeicherte, funktionierende "
+    "- die Ordner-Erkennung braucht gespeicherte, funktionierende "
     + "Zugangsdaten für dieses Konto; erst speichern, dann Erkennen.",
 };

@@ -72,7 +72,7 @@ UNDO_MAX = 10
 # All mutable mail state lives in per-account AccountState objects (see
 # backend/accounts.py); every function below takes `acc` (None = default
 # account). Legacy module attributes (acc.state, acc.index, …) resolve to the
-# DEFAULT account via __getattr__ — single-account callers and the test
+# DEFAULT account via __getattr__ - single-account callers and the test
 # suite keep working unchanged.
 _ACC_ALIASES = {
     "STATE": "state", "STATE_LOCK": "lock", "INDEX": "index",
@@ -90,7 +90,7 @@ def __getattr__(name: str):
 
 # "Never replied" signal: every address the user has ever written to
 # (To/Cc of the Sent folder), merged across scans and persisted PER
-# ACCOUNT — mail later deleted from Sent must not flip senders back to
+# ACCOUNT - mail later deleted from Sent must not flip senders back to
 # "never replied".
 REPLIED_PATH = Path(os.environ.get("REPLIED_PATH", "/data/replied.json"))
 
@@ -229,7 +229,7 @@ def load_snapshot(acc) -> bool:
                                time.localtime(data.get("ts") or 0)), cached)
         return True
     except (KeyError, TypeError, AttributeError):
-        log.exception("[%s] scan snapshot unusable — ignored", acc.name)
+        log.exception("[%s] scan snapshot unusable - ignored", acc.name)
         return False
 
 
@@ -498,7 +498,7 @@ def quote_folder(name: str) -> str:
 def decode_mime(raw) -> str:
     # msg.get() returns a Header OBJECT (not str) for malformed/raw-8bit
     # headers, and decode_header may report the bogus charset
-    # "unknown-8bit" — both crashed whole scans before. decode_header
+    # "unknown-8bit" - both crashed whole scans before. decode_header
     # must see the ORIGINAL object (str()-ing it first loses the bytes).
     if raw is None:
         return ""
@@ -527,7 +527,7 @@ def scan_folder(conn, folder: str, messages: list, progress_cb,
                 acc=None) -> int:
     """Scan one folder into `messages`; returns how many messages had to
     be SKIPPED because their metadata could not be parsed (real-world
-    mail contains arbitrarily broken headers — one bad message must
+    mail contains arbitrarily broken headers - one bad message must
     never abort a scan)."""
     acc = acc or accounts.get()
     skipped = 0
@@ -777,7 +777,7 @@ def public_state(acc=None) -> dict:
 def public_status(acc=None) -> dict:
     """Small live-update payload: everything EXCEPT the (big) group lists.
     SSE clients watch groups_rev and refetch the full state only when it
-    moves — that keeps the stream at a few KB/s instead of ~700 KB/s."""
+    moves - that keeps the stream at a few KB/s instead of ~700 KB/s."""
     acc = acc or accounts.get()
     with acc.lock:
         out = json.loads(json.dumps(
@@ -992,7 +992,7 @@ def _move_uids(by_folder: dict[str, set[int]], action: str, dest: str,
                     and uv != acc.folder_uv[folder]:
                 raise RuntimeError(
                     f"mailbox {decode_mutf7(folder)!r} changed on the server "
-                    "(UIDVALIDITY mismatch) — rescan before deleting")
+                    "(UIDVALIDITY mismatch) - rescan before deleting")
             uids = sorted(uidset)
             for start in range(0, len(uids), MOVE_CHUNK):
                 if cancel_requested("delete", acc):
@@ -1099,7 +1099,7 @@ def _delete_worker(acc) -> None:
                 job = acc.delete_pending.pop(0)
                 acc.inflight = job["by_folder"]
         if done_persist is not None:
-            if done_persist:         # groups/index changed — cache them
+            if done_persist:         # groups/index changed - cache them
                 save_snapshot(acc)
             return
         by_folder, label = job["by_folder"], job["label"]
@@ -1172,8 +1172,8 @@ def _start_delete(by_folder: dict[str, set[int]], label: str, acc,
         raise ValueError("move needs a target folder")
     if acc.state["status"] == "scanning":
         raise RuntimeError("busy: scan running")
-    # Drop UIDs already sitting in queued jobs — or in the job the worker is
-    # processing right now — so overlapping selections (e.g. a sender group,
+    # Drop UIDs already sitting in queued jobs - or in the job the worker is
+    # processing right now - so overlapping selections (e.g. a sender group,
     # then its whole domain) don't get moved twice.
     queued: dict[str, set[int]] = {}
     for job in [*acc.delete_pending, {"by_folder": acc.inflight}]:
@@ -1708,7 +1708,7 @@ def trash_restore(uids: list[int], dest: str, uv: int = 0,
         if status != "OK":
             raise RuntimeError("cannot open Trash")
         if uv and uidvalidity(conn) not in (0, uv):
-            raise RuntimeError("Trash changed on the server — reload it "
+            raise RuntimeError("Trash changed on the server - reload it "
                                "before restoring")
         clean = sorted({int(u) for u in uids})
         for start in range(0, len(clean), MOVE_CHUNK):

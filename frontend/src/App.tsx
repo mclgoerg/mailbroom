@@ -206,7 +206,7 @@ export default function App() {
     });
   }, [state, mode, filter, sortK, sortDir]);
 
-  // Count over ALL groups of the mode, not the filtered view — actions apply
+  // Count over ALL groups of the mode, not the filtered view - actions apply
   // to every selected key, including ones a filter is hiding.
   const selCount = useMemo(() => {
     const all = state?.groups?.[mode] ?? {};
@@ -262,7 +262,7 @@ export default function App() {
     catch (e: any) { setToast(`Error: ${e.message ?? e}`); }
   };
 
-  // Selection presets never pick up protected groups — protecting a sender
+  // Selection presets never pick up protected groups - protecting a sender
   // means "keep it out of every bulk sweep".
   const selectPreset = (preset: string) => {
     const next = new Set(selected);
@@ -424,7 +424,7 @@ export default function App() {
         total: fmtUsd(u.total_cost ?? 0) }));
     }
     if (toast) parts.push(toast);
-    return parts.join(" — ") || t("No scan yet — hit “Scan”.");
+    return parts.join(" - ") || t("No scan yet - hit “Scan”.");
   };
 
   if (!auth) {
@@ -443,7 +443,7 @@ export default function App() {
         <h1 className="text-lg font-bold tracking-tight">
           Mailbroom
         </h1>
-        {/* Account switcher — only when more than one account exists.
+        {/* Account switcher - only when more than one account exists.
             Switching swaps the entire view; nothing mixes across accounts. */}
         {cfg && Object.keys(cfg.accounts).length > 1 && (
           <div className="flex overflow-hidden rounded-md border border-line"
@@ -469,7 +469,7 @@ export default function App() {
               {t("Trash")}: {state.trash_count}
             </button>
           )}
-          {/* Profile menu: identity, theme, settings, trash, logout —
+          {/* Profile menu: identity, theme, settings, trash, logout -
               keeps the header to three compact elements on phones. */}
           <Menu label={t("menu.profile")}
             trigger={<>👤{auth.is_admin && auth.mode === "oidc"
@@ -505,7 +505,7 @@ export default function App() {
         </span>
       </header>
 
-      {/* Row 1: primary actions — identical in every grouping mode. */}
+      {/* Row 1: primary actions - identical in every grouping mode. */}
       <div className="mb-2 flex flex-wrap items-center gap-2">
         <Button onClick={startScan}
           disabled={scanning || aiRunning || deleting || attsRunning}>
@@ -669,7 +669,7 @@ export default function App() {
                       hover:bg-panel2"
                     onClick={() => undo(i)}>
                     {actionVerb(u.action)}: {u.count}{" "}
-                    {t("mails")} — <span className="text-muted">{u.label}</span>
+                    {t("mails")} - <span className="text-muted">{u.label}</span>
                   </button>
                 ))}
               </span>
@@ -746,7 +746,7 @@ export default function App() {
       ) : (
         !scanning && state?.status === "done" && (
           <div className="py-16 text-center text-sm text-muted">
-            {filter ? t("no.matches") : t("No scan yet — hit “Scan”.")}
+            {filter ? t("no.matches") : t("No scan yet - hit “Scan”.")}
           </div>
         )
       )}

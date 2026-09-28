@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-/* The filter builder must emit exactly the DSL that parseFilter reads —
+/* The filter builder must emit exactly the DSL that parseFilter reads -
  * clicking conditions together yields a query users could have typed. */
 
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";

@@ -5,7 +5,7 @@ import type {
 } from "./types";
 
 /* Active account: every API call is scoped to exactly one account (strict
- * separation — the backend never mixes them). Set once by App on startup
+ * separation - the backend never mixes them). Set once by App on startup
  * and whenever the user switches. */
 let ACCOUNT = "";
 

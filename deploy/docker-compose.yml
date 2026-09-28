@@ -1,4 +1,4 @@
-# Mailbroom starter — any IMAP provider (Gmail, iCloud, Fastmail, …).
+# Mailbroom starter - any IMAP provider (Gmail, iCloud, Fastmail, …).
 #
 #   cp .env.example .env    # edit it
 #   docker compose up -d    # open http://localhost:8765

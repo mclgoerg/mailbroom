@@ -1,9 +1,9 @@
 """Cleanup history: per-scan snapshots and per-month action tallies.
 
 Persisted to /data/stats_history.json, namespaced PER ACCOUNT (strict
-separation — nothing is aggregated across accounts). The old
+separation - nothing is aggregated across accounts). The old
 single-account file shape ({scans, actions}) is migrated on read.
-Pure bookkeeping — no IMAP access here; live-index numbers (histogram,
+Pure bookkeeping - no IMAP access here; live-index numbers (histogram,
 top domains) come from mailops.index_stats().
 """
 
@@ -92,7 +92,7 @@ def record_scan(mails: int, size: int, senders: int,
 
 def admin_overview() -> list[dict]:
     """Per-tenant USAGE numbers for the admin: counts, spend, timestamps
-    and disk footprint only — deliberately NO account names, addresses,
+    and disk footprint only - deliberately NO account names, addresses,
     folder names or any other mail-derived content. The only identifier
     is the tenant's storage id."""
     # Lazy imports: mailops imports this module at load time.
@@ -136,7 +136,7 @@ def admin_overview() -> list[dict]:
             out.append({
                 "id": tenant.id,
                 # "default" is just the storage id of the pre-tenancy
-                # workspace — display the admin identity instead. Other
+                # workspace - display the admin identity instead. Other
                 # tenants keep their directory id (their subject is not
                 # recoverable from the slug, by design).
                 "label": (cfgmod.load_server()["auth"].get("admin") or "")

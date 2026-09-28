@@ -1,7 +1,7 @@
 """Native login: password (scrypt, stdlib) and OIDC (authorization code).
 
 Sessions are stateless HMAC-signed cookies; the signing secret lives in
-/data (created on first use). No new dependencies — hashing is
+/data (created on first use). No new dependencies - hashing is
 hashlib.scrypt, OIDC talks plain HTTPS via urllib. This module is pure
 mechanics: which mode is active and the stored hash/secrets live in the
 config ("auth" section); enforcement happens in main.py's middleware.
@@ -44,7 +44,7 @@ def _secret() -> bytes:
                 SESSION_SECRET_PATH.write_bytes(_secret_cache)
                 SESSION_SECRET_PATH.chmod(0o600)
             except OSError:
-                log.exception("could not persist session secret — sessions "
+                log.exception("could not persist session secret - sessions "
                               "will not survive restarts")
     return _secret_cache
 

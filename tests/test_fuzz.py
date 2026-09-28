@@ -1,6 +1,6 @@
 """Property-based fuzzing of every parser that sees UNTRUSTED input
 (mail headers, IMAP responses, user filter queries). The property is
-always the same: any input yields the right TYPE and never an exception —
+always the same: any input yields the right TYPE and never an exception -
 one hostile mail must never take down a scan (the raw-8-bit-header crash
 taught us that the hard way)."""
 

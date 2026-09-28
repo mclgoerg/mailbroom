@@ -1,7 +1,7 @@
 """Persistent cache of AI verdicts, so rescans don't re-bill the LLM.
 
 Group verdicts (keyed by grouping + group key) are namespaced PER ACCOUNT
-— the same sender key can mean different things in different mailboxes.
+- the same sender key can mean different things in different mailboxes.
 Per-mail verdicts ("_mails", keyed by Message-ID) stay GLOBAL: Message-IDs
 are unique and a mail's rating doesn't depend on which account holds it.
 The old file shape (groupings at the top level) is migrated on read.
@@ -76,13 +76,13 @@ def save(grouping: str, verdicts: dict[str, dict],
 
 
 # Per-tenant caches (keyed by tenant id) so the 1/s state snapshot never
-# re-reads the file — and never leaks one tenant's ratings into another.
+# re-reads the file - and never leaks one tenant's ratings into another.
 _mails_cache: dict[str, dict[str, str]] = {}
 
 
 def load_mails() -> dict[str, str]:
     """Per-mail verdicts, keyed by Message-ID (global across the tenant's
-    accounts — Message-IDs are unique)."""
+    accounts - Message-IDs are unique)."""
     tid = tenants.current().id
     if tid not in _mails_cache:
         _mails_cache[tid] = load().get("_mails") or {}

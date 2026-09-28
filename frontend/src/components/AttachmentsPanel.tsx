@@ -83,7 +83,7 @@ export function AttachmentsPanel({ state, onClose, onDeleted }: {
         actions={running ? (
           <Button variant="ghost" onClick={cancel}>
             <Spinner /> {starting ? t("Starting…") : atts.progress}{" "}
-            — {t("cancel")}
+            - {t("cancel")}
           </Button>
         ) : (
           <Button variant="ghost" onClick={analyze}

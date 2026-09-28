@@ -3,7 +3,7 @@ import { t } from "../i18n";
 import { Button, Input, Select } from "./ui";
 
 /* Interactive helper for the filter/rule query DSL: instead of
- * remembering the syntax, users click conditions together — each one
+ * remembering the syntax, users click conditions together - each one
  * appends its token to the query (tokens AND together). Renders as a
  * 🧰 toggle plus a panel: a dropdown anchored to the (relative!) parent
  * on >=sm, but IN-FLOW full-width on phones, where an absolute panel

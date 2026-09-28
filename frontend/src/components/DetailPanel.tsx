@@ -122,7 +122,7 @@ export function DetailPanel({ grouping, group, aiEnabled, protectedNow,
           { note: lastNote, n: safe.length, of: done })
         + (cost ? ` · ${fmtUsd(cost)}` : ""));
     } catch (e: any) {
-      setNote(`AI error: ${e.message ?? e} — ${t("note.ai_resume")}`);
+      setNote(`AI error: ${e.message ?? e} - ${t("note.ai_resume")}`);
     }
     setBusy(false);
   };
@@ -134,7 +134,7 @@ export function DetailPanel({ grouping, group, aiEnabled, protectedNow,
       const r = await api.unsubscribe(grouping, group.key);
       if (r.action === "link") {
         window.open(r.detail, "_blank", "noopener");
-        setNote(t("Opened the sender's unsubscribe page — confirm it there."));
+        setNote(t("Opened the sender's unsubscribe page - confirm it there."));
       } else {
         setNote(`${t("Unsubscribed")} (${r.method}).`);
       }
@@ -156,7 +156,7 @@ export function DetailPanel({ grouping, group, aiEnabled, protectedNow,
         .map((m) => [m.folder, m.uid] as [string, number]);
       await api.deleteMessages(items, action, dest);  // background job
       if (wholeGroup) {
-        // The group will be empty — go straight back to the overview.
+        // The group will be empty - go straight back to the overview.
         onDeleted();
         onClose();
         return;

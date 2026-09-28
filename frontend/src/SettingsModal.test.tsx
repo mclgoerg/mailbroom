@@ -183,7 +183,7 @@ test("tab switches keep unsaved edits and Save persists every tab", () => {
     onSaved={() => {}} onAccountsChanged={() => {}} />);
   // edit on the account tab …
   fireEvent.change(hostInput(), { target: { value: "imap.new.example" } });
-  // … wander off and back — the edit must survive
+  // … wander off and back - the edit must survive
   fireEvent.click(screen.getByRole("tab", { name: "AI" }));
   fireEvent.change(screen.getByLabelText(/Model/),
     { target: { value: "claude-opus-5" } });

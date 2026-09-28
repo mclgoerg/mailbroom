@@ -1,4 +1,4 @@
-/* Pure helpers — kept dependency-free so they are unit-testable. */
+/* Pure helpers - kept dependency-free so they are unit-testable. */
 
 import type { Group } from "./types";
 

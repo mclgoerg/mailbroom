@@ -42,7 +42,7 @@ async def _lifespan(app: FastAPI):
     from . import secretbox
     if not secretbox.enabled():
         logging.getLogger("pmc.secrets").warning(
-            "MAILBROOM_SECRET_KEY is not set — IMAP passwords and API keys "
+            "MAILBROOM_SECRET_KEY is not set - IMAP passwords and API keys "
             "are stored in plaintext in /data (they would be readable in "
             "volume backups). Generate a key with `openssl rand -base64 32` "
             "and keep it OUT of the backups.")
@@ -101,7 +101,7 @@ async def _auth(request: Request, call_next):
 
     sub = _session_sub(request)
     # A password-mode session ("password" subject) does not carry over
-    # into OIDC mode — it has no identity to map to a tenant.
+    # into OIDC mode - it has no identity to map to a tenant.
     if mode == "oidc" and sub == "password":
         sub = None
     if sub:
@@ -211,7 +211,7 @@ def get_oidc_callback(request: Request, code: str = Query(""),
     cfg = cfgmod.load_config()
     if cfg["auth"]["mode"] != "oidc":
         raise HTTPException(400, "OIDC login is not enabled")
-    if error:      # the IdP rejected the authorization request — say why
+    if error:      # the IdP rejected the authorization request - say why
         logging.getLogger("pmc.auth").warning(
             "OIDC login rejected by the IdP: %s (%s)",
             error, error_description)
@@ -219,7 +219,7 @@ def get_oidc_callback(request: Request, code: str = Query(""),
             502, f"the identity provider rejected the login: "
                  f"{error_description or error}")
     if not code or not authmod.verify_state(state):
-        raise HTTPException(400, "invalid or expired login state — "
+        raise HTTPException(400, "invalid or expired login state - "
                             "try signing in again")
     redirect = _external_base(request) + "/api/oidc/callback"
     verifier = request.cookies.get(_PKCE_COOKIE, "")
@@ -239,7 +239,7 @@ def get_oidc_callback(request: Request, code: str = Query(""),
     # claims the pre-tenancy workspace (set OIDC_ADMIN to pin it upfront).
     if cfgmod.claim_admin(sub):
         logging.getLogger("pmc.auth").warning(
-            "OIDC admin claimed by %s — this identity now owns the "
+            "OIDC admin claimed by %s - this identity now owns the "
             "existing workspace and the server settings", sub)
     resp = RedirectResponse("/")
     resp.delete_cookie(_PKCE_COOKIE)          # one roundtrip, one verifier
@@ -410,7 +410,7 @@ def get_duplicates(account: str | None = Query(None)):
 
 @app.get("/api/admin/stats")
 def get_admin_stats():
-    """Usage overview over ALL tenants — admin only. Counts, spend and
+    """Usage overview over ALL tenants - admin only. Counts, spend and
     disk footprint; never account names or mail-derived data."""
     if not cfgmod.is_admin():
         raise HTTPException(403, "admin only")
@@ -760,7 +760,7 @@ def post_import_config(body: dict):
 @app.get("/api/events")
 async def get_events(account: str | None = Query(None)):
     """Server-sent events: streams ONE account's slim status (~1/s).
-    Group lists are NOT included — clients refetch /api/state when the
+    Group lists are NOT included - clients refetch /api/state when the
     payload's groups_rev changes."""
     acc = _acc(account)
 
@@ -795,7 +795,7 @@ def post_config(body: dict):
         accountsmod.drop(str(body["delete_account"]))
         mailops.drop_snapshot(str(body["delete_account"]))
     if isinstance(body.get("rename_account"), dict):
-        # The config rename succeeded — carry every per-account artifact
+        # The config rename succeeded - carry every per-account artifact
         # (runtime state, verdicts, replied cache, stats, rules) along.
         old = str(body["rename_account"].get("from") or "")
         new = str(body["rename_account"].get("to") or "").strip()[:60]
@@ -820,7 +820,7 @@ if STATIC_DIR.is_dir():
     @app.get("/{path:path}", include_in_schema=False)
     def spa(path: str):
         # Containment check: `path` is percent-decoded and may contain ../ or
-        # be absolute (pathlib discards the left side then) — never serve
+        # be absolute (pathlib discards the left side then) - never serve
         # anything that resolves outside the static dir.
         file = (STATIC_DIR / path).resolve()
         if path and file.is_relative_to(STATIC_DIR) and file.is_file():
