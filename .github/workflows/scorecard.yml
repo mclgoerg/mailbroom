@@ -25,11 +25,11 @@ jobs:
       contents: read
       actions: read      # lets the CI-Tests check read workflow history
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           persist-credentials: false
 
-      - uses: ossf/scorecard-action@v2.4.4
+      - uses: ossf/scorecard-action@2d1146689b8cda280b9bc96326124645441f03bc # v2.4.4
         with:
           # The action requires a local results file even when only
           # publishing - it is never uploaded or persisted anywhere.
