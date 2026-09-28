@@ -1,6 +1,9 @@
 # Mailbroom
 
+[![CI](https://github.com/mclgoerg/mailbroom/actions/workflows/ci.yml/badge.svg)](https://github.com/mclgoerg/mailbroom/actions/workflows/ci.yml)
+[![Latest release](https://img.shields.io/github/v/release/mclgoerg/mailbroom)](https://github.com/mclgoerg/mailbroom/releases)
 [![OpenSSF Scorecard](https://api.securityscorecards.dev/projects/github.com/mclgoerg/mailbroom/badge)](https://scorecard.dev/viewer/?uri=github.com/mclgoerg/mailbroom)
+[![License: MIT](https://img.shields.io/github/license/mclgoerg/mailbroom)](LICENSE)
 
 **Tired of cleaning up your mailbox? Grab the broom.** 🧹
 
@@ -40,13 +43,14 @@ detected via SPECIAL-USE flags (RFC 6154) with a name fallback, Gmail's
 virtual "All Mail" is excluded automatically (no double counting), and
 servers without the `MOVE` capability get a COPY+EXPUNGE fallback. The
 settings dialog has a preset for each provider below that prefills
-host/port/security - you only add user + password:
+host/port/security - you only add a user + password, except Gmail and
+Outlook which connect via OAuth instead (see below the table):
 
 | Preset | IMAP host | SMTP host (unsubscribe) | Auth notes |
 |---|---|---|---|
 | **Proton Mail Bridge** | `127.0.0.1:1143` SSL | `127.0.0.1:1025` | Featured setup, see below. Paid Proton plan; use the Bridge-generated password and the exported Bridge certificate as CA file. |
 | **Gmail** | `imap.gmail.com:993` SSL | `smtp.gmail.com:465` SSL | OAuth only in the settings UI - see below. |
-| **Outlook / Microsoft 365** | `outlook.office365.com:993` SSL | `smtp.office365.com:587` STARTTLS | OAuth only - Microsoft has no app-password option for IMAP. Connect via the device-code flow in Settings (no setup needed); experimental, see below. |
+| **Outlook / Microsoft 365** | `outlook.office365.com:993` SSL | `smtp.office365.com:587` STARTTLS | OAuth only in the settings UI - see below. |
 | **iCloud Mail** | `imap.mail.me.com:993` SSL | `smtp.mail.me.com:587` STARTTLS | [App-specific password](https://account.apple.com/account/manage) required. |
 | **Fastmail** | `imap.fastmail.com:993` SSL | `smtp.fastmail.com:465` SSL | [App password](https://www.fastmail.help/hc/en-us/articles/360058752854) with IMAP scope. |
 | **GMX** | `imap.gmx.net:993` SSL | `mail.gmx.net:465` SSL | Enable IMAP in GMX mail settings first; app password if 2FA is on. |
@@ -55,14 +59,18 @@ host/port/security - you only add user + password:
 | **Custom** | anything | anything | Any IMAP server with SSL or STARTTLS (Dovecot, Courier, …). |
 
 **OAuth (Gmail / Outlook).** Both presets connect via OAuth only - no
-password field is offered for them. Outlook uses a device code: click
-Connect, then enter the code shown at microsoft.com/devicelogin on any
-device, no app registration needed. Gmail has no such shared option
-(Google requires per-app verification for the restricted mail scope),
-so you register your own free OAuth client first - see
-[docs/install.md](docs/install.md#gmail-oauth-setup) for the walk-
-through. Outlook support is experimental. The Sieve filter export is
-Proton-only and hidden for other presets.
+password field is offered for them. If this server has a shared
+Microsoft app configured, Outlook needs no setup at all: click Connect,
+then enter the code shown at microsoft.com/devicelogin on any device.
+Otherwise (and always for Gmail, which has no shared-client option -
+Google requires per-app verification for the restricted mail scope),
+you register your own free OAuth client first - see
+[docs/install.md](docs/install.md#gmail-oauth-setup) for the Gmail
+walkthrough and the Microsoft OAuth section for Entra ID. Outlook
+support is experimental (fake-tested only, pending confirmation from a
+real Microsoft 365 account - Gmail has been verified against a real
+mailbox). The Sieve filter export is Proton-only and hidden for other
+presets.
 
 ## Features
 
@@ -216,8 +224,9 @@ single-workspace.
 ### Secrets encryption at rest
 
 Set `MAILBROOM_SECRET_KEY` (e.g. `openssl rand -base64 32`) and every
-stored secret - IMAP passwords, AI API keys, the OIDC client secret -
-is encrypted on disk (Fernet/AES). That protects **volume backups**:
+stored secret - IMAP passwords, AI API keys, the OIDC client secret,
+OAuth client secrets and tokens - is encrypted on disk (Fernet/AES).
+That protects **volume backups**:
 without the key, a copied `/data` contains no usable credentials. Keep
 the key in the environment only, never in the backups; if it is lost,
 re-enter the secrets. Unset = plaintext as before (a startup log line
