@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { cleanup, fireEvent, render } from "@testing-library/react";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { GroupTable } from "./components/GroupTable";
 import { setLang } from "./i18n";
 import type { Group } from "./types";
@@ -10,7 +10,7 @@ const mk = (i: number): Group => ({
   count: i + 1, size: 1000 * (i + 1), unread: 0,
   first: "2024-01-01", last: "2025-01-01", tags: [], samples: [],
   bulk: false, unsub: false, ai: null, ratings: null, protected: false,
-  replied: false, att_size: 0,
+  replied: false, att_size: 0, unsubscribed: null,
 });
 
 const groups = Array.from({ length: 120 }, (_, i) => mk(i));
@@ -26,6 +26,7 @@ function renderTable(extra: Partial<Parameters<typeof GroupTable>[0]> = {}) {
       onToggleAll={noop}
       onOpen={noop}
       onTrash={noop}
+      onAckUnsub={noop}
       sortK="count"
       sortDir={-1}
       onSort={noop}
@@ -80,5 +81,51 @@ describe("GroupTable pagination", () => {
       focusedKey: "s70@x.example" });
     getByText("Page 2 / 3");
     expect(container.querySelector('[data-gidx="70"]')).toBeTruthy();
+  });
+});
+
+describe("unsubscribe badge", () => {
+  // Desktop table and mobile cards both render (only CSS toggles which is
+  // visible), so every assertion here is duplicate-aware.
+  beforeEach(() => setLang("en"));
+  afterEach(cleanup);
+
+  const withUnsub = (u: Group["unsubscribed"]) =>
+    [{ ...mk(0), unsubscribed: u }];
+
+  it("shows done", () => {
+    const { getAllByText } = renderTable({ groups: withUnsub(
+      { n: 1, of: 1, status: "done", link: "", addr: "" }) });
+    expect(getAllByText(/Unsubscribed/).length).toBe(2);
+  });
+
+  it("shows a link plus a mark-done button, which calls back with the addr",
+    () => {
+    const onAckUnsub = vi.fn();
+    const { getAllByText, getAllByTitle } = renderTable({ onAckUnsub, groups:
+      withUnsub({ n: 0, of: 1, status: "link",
+        link: "https://x.example/unsub", addr: "news@x.example" }) });
+    const links = getAllByText(/Confirm/) as HTMLAnchorElement[];
+    expect(links[0].href).toBe("https://x.example/unsub");
+    fireEvent.click(getAllByTitle("Mark as done")[0]);
+    expect(onAckUnsub).toHaveBeenCalledWith("news@x.example");
+  });
+
+  it("shows a partial-progress badge without claiming full completion",
+    () => {
+    const { getAllByText } = renderTable({ groups: withUnsub(
+      { n: 1, of: 3, status: "pending", link: "", addr: "" }) });
+    expect(getAllByText("1/3 unsubscribed").length).toBe(2);
+  });
+
+  it("shows a failed badge", () => {
+    const { getAllByText } = renderTable({ groups: withUnsub(
+      { n: 0, of: 1, status: "failed", link: "", addr: "" }) });
+    expect(getAllByText(/unsubscribe failed/).length).toBe(2);
+  });
+
+  it("shows nothing when never attempted", () => {
+    const { queryAllByText } = renderTable({ groups: withUnsub(null) });
+    expect(queryAllByText(/[Uu]nsubscri/).length).toBe(0);
   });
 });

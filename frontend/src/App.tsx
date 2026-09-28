@@ -95,7 +95,8 @@ export default function App() {
       // Polling fallback only drives itself when SSE isn't connected.
       if (!sse.current && (st.status === "scanning"
           || st.ai.status === "running" || st.delete.status === "running"
-          || st.atts?.status === "running")) {
+          || st.atts?.status === "running"
+          || st.unsub?.status === "running")) {
         timer.current = setTimeout(refresh, 1200);
       }
     } catch (e: any) {
@@ -173,7 +174,8 @@ export default function App() {
 
   /* Web notifications (opt-in via settings): fire when a background job
      finishes while the tab is hidden. */
-  const prevJobs = useRef<{ d?: string; a?: string; t?: string }>({});
+  const prevJobs = useRef<{ d?: string; a?: string; t?: string; u?: string }>(
+    {});
   useEffect(() => {
     if (!state) return;
     const fire = (body: string) => {
@@ -191,8 +193,10 @@ export default function App() {
       fire(t("notify.ai_done"));
     if (p.t === "running" && state.atts?.status === "done")
       fire(t("notify.atts_done"));
+    if (p.u === "running" && state.unsub?.status === "done")
+      fire(t("notify.unsub_done"));
     prevJobs.current = { d: state.delete.status, a: state.ai.status,
-      t: state.atts?.status };
+      t: state.atts?.status, u: state.unsub?.status };
   }, [state]);
 
   const groups = useMemo(() => {
@@ -217,6 +221,7 @@ export default function App() {
   const aiRunning = state?.ai.status === "running";
   const deleting = state?.delete.status === "running";
   const attsRunning = state?.atts?.status === "running";
+  const unsubRunning = state?.unsub?.status === "running";
   const aiEnabled = !!cfg?.ai.available;
   const acct = cfg?.accounts[account] ?? null;
   const anyModal = !!detail || searchOpen || settingsOpen || rulesOpen
@@ -239,7 +244,7 @@ export default function App() {
 
   const cancel = async () => {
     const target = scanning ? "scan" : aiRunning ? "ai"
-      : attsRunning ? "atts" : "delete";
+      : attsRunning ? "atts" : unsubRunning ? "unsub" : "delete";
     try { await api.cancel(target); refresh(); } catch { /* too late */ }
   };
 
@@ -275,6 +280,10 @@ export default function App() {
       const cutoff = new Date(Date.now() - months * 30.44 * 86400e3)
         .toISOString().slice(0, 10);
       groups.filter((g) => g.last && g.last < cutoff && !g.protected)
+        .forEach((g) => next.add(g.key));
+    } else if (preset === "unsub_pending") {
+      groups.filter((g) => g.unsub && g.unsubscribed?.status !== "done"
+          && !g.protected)
         .forEach((g) => next.add(g.key));
     }
     setSelected(next);
@@ -317,6 +326,24 @@ export default function App() {
     }
   };
 
+  // Unlike act() (move/trash), the selection is deliberately kept afterward:
+  // "select -> Unsubscribe -> Trash" stays a two-click flow on the same set.
+  const unsubscribeSelected = async () => {
+    if (!selected.size) return;
+    if (!confirm(t("confirm.unsubscribe", { k: selected.size }))) return;
+    try {
+      const r = await api.unsubscribeBulk(mode, [...selected]);
+      const skipped = r.skipped_protected + r.skipped_done + r.capped;
+      setToast(r.queued
+        ? t("toast.unsub_started", { n: r.queued })
+          + (skipped ? " " + t("toast.unsub_skipped", { n: skipped }) : "")
+        : t("toast.unsub_nothing"));
+      refresh();
+    } catch (e: any) {
+      setToast(`Error: ${e.message ?? e}`);
+    }
+  };
+
   // Sender mode protects the exact address, domain mode the whole domain.
   // Subject groups have no stable sender, so they get no protect toggle.
   const toggleProtect = mode === "subject" ? undefined : async (g: Group) => {
@@ -330,9 +357,15 @@ export default function App() {
     }
   };
 
+  const ackUnsub = async (addr: string) => {
+    try { await api.unsubscribeAck(addr); refresh(); }
+    catch (e: any) { setToast(`Error: ${e.message ?? e}`); }
+  };
+
   const onAction = (v: string) => {
     if (!selected.size) return;
     if (v === "move") setMoveDest("?");
+    else if (v === "unsubscribe") unsubscribeSelected();
     else act([...selected], v);
   };
 
@@ -402,6 +435,9 @@ export default function App() {
     if (attsRunning)
       return <>📎 {t("atts.running")} {state.atts.progress} <Spinner />{" "}
         <button className="underline" onClick={cancel}>{t("cancel")}</button></>;
+    if (unsubRunning)
+      return <>✉ {t("unsub.running")} {state.unsub.progress} <Spinner />{" "}
+        <button className="underline" onClick={cancel}>{t("cancel")}</button></>;
     const parts: string[] = [];
     if (groups.length) {
       const mails = groups.reduce((n, g) => n + g.count, 0);
@@ -415,6 +451,12 @@ export default function App() {
       parts.push(`Error: ${state.delete.error}`);
     else if (state.delete.status === "done" && state.delete.moved > 0)
       parts.push(t("done_moved", { n: state.delete.moved }));
+    if (state.unsub?.status === "error")
+      parts.push(`Unsubscribe error: ${state.unsub.error}`);
+    else if (state.unsub?.status === "done" && state.unsub.total > 0) {
+      parts.push(t("unsub.done", { done: state.unsub.done,
+        links: state.unsub.links, failed: state.unsub.failed }));
+    }
     if (state.ai.status === "error") parts.push(`AI error: ${state.ai.error}`);
     else if (state.ai.status === "done" && state.ai.usage) {
       const u = state.ai.usage;
@@ -508,7 +550,8 @@ export default function App() {
       {/* Row 1: primary actions - identical in every grouping mode. */}
       <div className="mb-2 flex flex-wrap items-center gap-2">
         <Button onClick={startScan}
-          disabled={scanning || aiRunning || deleting || attsRunning}>
+          disabled={scanning || aiRunning || deleting || attsRunning
+            || unsubRunning}>
           {scanning ? <Spinner className="!text-white" /> : t("Scan")}
         </Button>
         {/* order-2 + w-full: on phones the grouping toggle gets a full line
@@ -576,6 +619,7 @@ export default function App() {
           <option value="older6">{t("Inactive > 6 months")}</option>
           <option value="older12">{t("Inactive > 1 year")}</option>
           <option value="older24">{t("Inactive > 2 years")}</option>
+          <option value="unsub_pending">{t("sel.unsub_pending")}</option>
           <option value="none">{t("Clear selection")}</option>
         </Select>
         {/* Sort: field select + direction toggle as one segmented
@@ -633,6 +677,7 @@ export default function App() {
             <option value="archive">{t("Archive")}</option>
             <option value="move">{t("Move to folder…")}</option>
             <option value="mark_read">{t("Mark read")}</option>
+            <option value="unsubscribe">{t("Unsubscribe")}</option>
           </Select>
         )}
         {/* Desktop: pinned right (destructive, away from the rest).
@@ -734,6 +779,7 @@ export default function App() {
           onOpen={setDetail}
           onTrash={(g) => act([g.key], "trash")}
           onProtect={toggleProtect}
+          onAckUnsub={ackUnsub}
           sortK={sortK}
           sortDir={sortDir}
           onSort={(k) => {
@@ -758,6 +804,8 @@ export default function App() {
           aiEnabled={aiEnabled}
           protectedNow={state?.groups[mode][detail.key]?.protected
             ?? detail.protected}
+          unsubscribedNow={state?.groups[mode][detail.key]?.unsubscribed
+            ?? detail.unsubscribed}
           onProtect={toggleProtect}
           folders={state?.folders_raw ?? []}
           sieve={(acct?.preset ?? "proton") === "proton"}

@@ -18,6 +18,7 @@ interface Props {
   onOpen: (g: Group) => void;
   onTrash: (g: Group) => void;
   onProtect?: (g: Group) => void;   // absent in subject mode
+  onAckUnsub: (addr: string) => void;
   sortK: SortKey;
   sortDir: number;
   onSort: (k: SortKey) => void;
@@ -33,10 +34,65 @@ interface PageProps extends Props {
 const unreadPct = (g: Group) =>
   g.count ? Math.round((100 * g.unread) / g.count) : 0;
 
+/* Unsubscribe outcome, shown next to the other per-group tags. "pending"
+   (some senders done, the rest never tried - only possible for domain/
+   subject groupings with several senders) and "failed" are informational
+   only; "link" additionally offers the stashed URL plus a way to confirm
+   it without re-running the whole bulk job. */
+function UnsubBadge({ g, onAck }: { g: Group; onAck: (addr: string) => void }) {
+  const u = g.unsubscribed;
+  if (!u) return null;
+  if (u.status === "done") {
+    return (
+      <Tag className="!bg-emerald-950 !text-emerald-300 whitespace-nowrap">
+        ✓ {t("Unsubscribed")}
+      </Tag>
+    );
+  }
+  if (u.status === "failed") {
+    return (
+      <Tag className="!bg-rose-950 !text-rose-300 whitespace-nowrap">
+        ⚠ {t("unsub.badge_failed")}
+      </Tag>
+    );
+  }
+  if (u.status === "pending") {
+    return (
+      <Tag className="!bg-amber-950 !text-amber-300 whitespace-nowrap">
+        {t("unsub.badge_pending", { n: u.n, of: u.of })}
+      </Tag>
+    );
+  }
+  // "link": needs a manual confirmation page. Label stays short (unlike
+  // the DetailPanel's own button) - the desktop table's Type column is a
+  // fixed w-44, and the full "Open unsubscribe page" text wrapped onto
+  // two lines there and blew up the row height (390px + 1440px screenshot
+  // check against scripts/demo.py, 2026-09-28).
+  return (
+    <span className="inline-flex shrink-0 items-center gap-1">
+      <a href={u.link} target="_blank" rel="noopener noreferrer"
+        title={t("unsub.open_link")}
+        onClick={(e) => e.stopPropagation()}
+        className="whitespace-nowrap rounded !bg-amber-950 px-1.5 py-0.5
+          text-[0.68rem] leading-4 !text-amber-300 underline
+          hover:opacity-80">
+        ✉ {t("unsub.badge_link")}
+      </a>
+      <button title={t("unsub.mark_done")}
+        className="rounded bg-chip px-1.5 py-0.5 text-[0.68rem] leading-4
+          text-chiptext hover:bg-chiph"
+        onClick={(e) => { e.stopPropagation(); onAck(u.addr); }}>
+        ✓
+      </button>
+    </span>
+  );
+}
+
 /* Desktop: fixed-layout table so column widths never change when the
    grouping mode (and with it the content) changes. */
 function DesktopTable({ slice, baseIdx, selected, focusedKey, onToggle,
-  onToggleAll, onOpen, onTrash, onProtect, sortK, sortDir, onSort, groupLabel
+  onToggleAll, onOpen, onTrash, onProtect, onAckUnsub, sortK, sortDir,
+  onSort, groupLabel
 }: PageProps) {
   // Sort indicator: the active column shows an accent arrow that ROTATES
   // between directions; inactive sortable columns reserve the space
@@ -129,6 +185,7 @@ function DesktopTable({ slice, baseIdx, selected, focusedKey, onToggle,
                     📎 {fmtSize(g.att_size)}
                   </Tag>
                 )}
+                <UnsubBadge g={g} onAck={onAckUnsub} />
                 {g.tags.map((t) => <Tag key={t}>{t}</Tag>)}
               </div>
             </td>
@@ -171,7 +228,7 @@ function DesktopTable({ slice, baseIdx, selected, focusedKey, onToggle,
 
 /* Mobile: a card list - no table semantics, no horizontal squeeze. */
 function MobileCards({ slice, baseIdx, selected, focusedKey, onToggle,
-  onOpen, onTrash, onProtect }: PageProps) {
+  onOpen, onTrash, onProtect, onAckUnsub }: PageProps) {
   return (
     <div>
       {slice.map((g, i) => (
@@ -200,6 +257,7 @@ function MobileCards({ slice, baseIdx, selected, focusedKey, onToggle,
                   📎 {fmtSize(g.att_size)}
                 </Tag>
               )}
+              <UnsubBadge g={g} onAck={onAckUnsub} />
               {g.tags.map((t) => <Tag key={t}>{t}</Tag>)}
               {g.ai && <AiTag ai={g.ai} />}
               {g.ratings && <RatingChips ratings={g.ratings} />}

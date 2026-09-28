@@ -31,6 +31,7 @@ os.environ.update(
     CONFIG_PATH=str(DATA / "config.json"),
     STATS_PATH=str(DATA / "ai_usage.json"),
     VERDICTS_PATH=str(DATA / "ai_verdicts.json"),
+    UNSUB_STATE_PATH=str(DATA / "unsub_state.json"),
     REPLIED_PATH=str(DATA / "replied.json"),
     RULES_PATH=str(DATA / "rules.json"),
     STATS_HISTORY_PATH=str(DATA / "stats_history.json"),
@@ -170,7 +171,7 @@ ICLOUD = FakeIMAP({
 })
 
 FAKES = {"demo-proton": PROTON, "demo-icloud": ICLOUD}
-mailops.connect = lambda im: FAKES[im["host"]]
+mailops.connect = lambda im, name=None: FAKES[im["host"]]
 
 # Two configured accounts (hosts route to the fakes above).
 Path(os.environ["CONFIG_PATH"]).write_text(json.dumps({

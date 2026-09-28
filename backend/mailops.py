@@ -30,6 +30,7 @@ from . import accounts
 from . import config as cfgmod
 from . import stats as statsmod
 from . import tenants
+from . import unsubstore
 from . import verdictstore
 
 FETCH_CHUNK = 500
@@ -778,6 +779,50 @@ def _group_protected(rec: dict, paddrs: set[str], acc) -> bool:
     return False
 
 
+def group_unsub_senders(rec: dict, acc) -> dict[str, tuple[str, bool]]:
+    """{sender addr: (List-Unsubscribe header, one_click)} for the senders
+    of this group that offer an unsubscribe - the NEWEST mail per sender
+    wins, older headers can point at dead links (lock held). Domain and
+    subject groups can carry several senders; sender groups exactly one."""
+    newest: dict[str, tuple[int, str, bool]] = {}
+    for folder, uids in rec["folders"].items():
+        for uid in uids:
+            m = acc.index.get(ikey(folder, uid))
+            if not m or not m.get("unsub"):
+                continue
+            prev = newest.get(m["addr"])
+            if prev is None or m["ts"] > prev[0]:
+                newest[m["addr"]] = (m["ts"], m["unsub"],
+                                     bool(m.get("unsub_post")))
+    return {a: (h, oc) for a, (_, h, oc) in newest.items()}
+
+
+def _group_unsub(rec: dict, entries: dict[str, dict], acc) -> dict | None:
+    """This group's unsubscribe state, or None when none of its senders
+    has been dealt with (lock held). `n` of `of` senders are recorded
+    done; `status` is "done" only once EVERY sender is, "pending" when
+    some are done and the rest simply untried, or the worst outstanding
+    case ("failed"/"link") so the UI can't mistake a partially-handled
+    domain/subject group for a finished one."""
+    if not entries or not rec["unsub"]:
+        return None
+    senders = group_unsub_senders(rec, acc)
+    mine = {a: entries[a] for a in senders if a in entries}
+    if not mine:
+        return None
+    n = sum(1 for e in mine.values() if e["status"] == "done")
+    of = len(senders)
+    out = {"n": n, "of": of, "status": "done" if n == of else "pending",
+           "link": "", "addr": ""}
+    for status in ("failed", "link"):        # worst outstanding case wins
+        hit = next((a for a, e in mine.items() if e["status"] == status), None)
+        if hit:
+            out.update(status=status, addr=hit,
+                       link=mine[hit]["detail"] if status == "link" else "")
+            return out
+    return out
+
+
 def public_state(acc=None) -> dict:
     """One account's state for the API: group records without the internal
     UID lists, plus each group's per-mail rating summary."""
@@ -785,6 +830,7 @@ def public_state(acc=None) -> dict:
     mail_verdicts = verdictstore.load_mails()
     plist = cfgmod.normalize_protected(
         cfgmod.load_config().get("protected"))
+    unsub_entries = unsubstore.load_account(acc.name)
     with acc.lock:
         paddrs = _protected_addrs(plist, acc)
         out = {k: v for k, v in acc.state.items() if k != "groups"}
@@ -792,7 +838,8 @@ def public_state(acc=None) -> dict:
         out["groups"] = {
             g: {k: {**{kk: vv for kk, vv in rec.items() if kk != "folders"},
                     "ratings": _rating_counts(rec, mail_verdicts, acc),
-                    "protected": _group_protected(rec, paddrs, acc)}
+                    "protected": _group_protected(rec, paddrs, acc),
+                    "unsubscribed": _group_unsub(rec, unsub_entries, acc)}
                 for k, rec in recs.items()}
             for g, recs in acc.state["groups"].items()}
         return out
@@ -912,7 +959,8 @@ def start_scan(acc=None) -> None:
         if acc.state["status"] == "scanning" \
                 or acc.state["ai"]["status"] == "running" \
                 or acc.state["delete"]["status"] == "running" \
-                or acc.state["atts"]["status"] == "running":
+                or acc.state["atts"]["status"] == "running" \
+                or acc.state["unsub"]["status"] == "running":
             raise RuntimeError("busy")
         acc.state.update(status="scanning", progress="connecting…", error="",
                      notice=None, groups={g: {} for g in GROUPINGS},
@@ -920,6 +968,11 @@ def start_scan(acc=None) -> None:
         acc.state["groups_rev"] += 1
         acc.state["delete"] = {"status": "idle", "progress": "", "error": "",
                            "moved": 0}
+        # Last bulk unsubscribe's counters belong to the previous scan; the
+        # senders themselves stay recorded in unsubstore.
+        acc.state["unsub"] = {"status": "idle", "progress": "", "error": "",
+                          "total": 0, "done": 0, "links": 0, "failed": 0,
+                          "skipped": 0}
         # Attachment analysis is per-scan; a new scan invalidates it.
         acc.state["atts"] = {"status": "idle", "progress": "", "error": "",
                          "mails": 0, "size": 0}

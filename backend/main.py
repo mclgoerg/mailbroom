@@ -27,6 +27,7 @@ from . import rules as rulesmod
 from . import stats as statsmod
 from . import tenants
 from . import unsub
+from . import unsubstore
 from . import verdictstore
 from .mailops import GROUPINGS
 
@@ -398,6 +399,16 @@ class AiGroupBody(BaseModel):
     limit: int = 200
 
 
+class UnsubBulkBody(BaseModel):
+    grouping: str = "sender"
+    keys: list[str] = Field(min_length=1)
+
+
+class UnsubAckBody(BaseModel):
+    addr: str
+    done: bool = True              # false = forget the record, try again
+
+
 def _check_grouping(grouping: str) -> None:
     if grouping not in GROUPINGS:
         raise HTTPException(400, "bad grouping")
@@ -507,6 +518,34 @@ def post_unsubscribe(body: AiGroupBody, account: str | None = Query(None)):
         return unsub.unsubscribe(body.grouping, body.key, acc)
     except Exception as exc:
         raise HTTPException(500, f"{type(exc).__name__}: {exc}")
+
+
+@app.post("/api/unsubscribe_bulk")
+def post_unsubscribe_bulk(body: UnsubBulkBody,
+                          account: str | None = Query(None)):
+    """Unsubscribe from every sender of the selected groups, in the
+    background (see unsub.start_bulk)."""
+    _check_grouping(body.grouping)
+    acc = _acc(account)
+    try:
+        return unsub.start_bulk(body.grouping, body.keys, acc)
+    except RuntimeError as exc:
+        raise HTTPException(409, str(exc))
+    except Exception as exc:
+        raise HTTPException(500, f"{type(exc).__name__}: {exc}")
+
+
+@app.post("/api/unsubscribe/ack")
+def post_unsubscribe_ack(body: UnsubAckBody,
+                         account: str | None = Query(None)):
+    """Confirm a sender whose unsubscribe needed a manual page, or (with
+    done=false) forget a record so the sender can be tried again."""
+    acc = _acc(account)
+    if not body.addr.strip():
+        raise HTTPException(400, "addr required")
+    if body.done:
+        return unsub.acknowledge(body.addr, acc)
+    return unsub.forget(body.addr, acc)
 
 
 @app.post("/api/attachments")
@@ -671,7 +710,7 @@ def post_empty_trash(account: str | None = Query(None)):
 
 
 class CancelBody(BaseModel):
-    target: str  # "scan" | "ai" | "delete"
+    target: str  # "scan" | "ai" | "delete" | "atts" | "unsub"
 
 
 @app.post("/api/cancel")
@@ -789,6 +828,7 @@ def get_export_config():
         },
         "rules": rulesmod.load_rules(),
         "verdicts": verdictstore.load(),
+        "unsub": unsubstore.load(),
         "replied": {n: sorted(mailops.load_replied(accountsmod.get(n)))
                     for n in accountsmod.names()},
     }
@@ -871,11 +911,19 @@ def post_import_config(body: dict):
             if name in known and isinstance(entries, list):
                 nreplied += _import_replied(accountsmod.get(name), entries)
 
+    # Absent in backups taken before bulk unsubscribe existed. Merges (like
+    # every other import path) so restoring an older backup never erases
+    # unsubscribe records made since.
+    nunsub = 0
+    if isinstance(body.get("unsub"), dict):
+        nunsub = unsubstore.merge_import(body["unsub"],
+                                         set(accountsmod.names()))
+
     logging.getLogger("pmc.mail").info(
-        "config import: %d rules, %d verdicts, %d replied addrs",
-        nrules, nverdicts, nreplied)
+        "config import: %d rules, %d verdicts, %d replied addrs, "
+        "%d unsubscribed senders", nrules, nverdicts, nreplied, nunsub)
     return {"ok": True, "rules": nrules, "verdicts": nverdicts,
-            "replied": nreplied}
+            "replied": nreplied, "unsub": nunsub}
 
 
 @app.get("/api/events")
@@ -915,21 +963,24 @@ def post_config(body: dict):
     if body.get("delete_account"):
         accountsmod.drop(str(body["delete_account"]))
         mailops.drop_snapshot(str(body["delete_account"]))
+        unsubstore.drop_account(str(body["delete_account"]))
     if isinstance(body.get("rename_account"), dict):
         # The config rename succeeded - carry every per-account artifact
-        # (runtime state, verdicts, replied cache, stats, rules) along.
+        # (runtime state, verdicts, unsubscribes, replied cache, stats,
+        # rules) along.
         old = str(body["rename_account"].get("from") or "")
         new = str(body["rename_account"].get("to") or "").strip()[:60]
         if old != new:
             accountsmod.rename(old, new)
             mailops.rename_snapshot(old, new)
             verdictstore.rename_account(old, new)
+            unsubstore.rename_account(old, new)
             mailops.rename_replied_account(old, new)
             statsmod.rename_account(old, new)
             rulesmod.rename_account(old, new)
             logging.getLogger("pmc.mail").info(
-                "account renamed: %r -> %r (state, verdicts, replied, "
-                "stats, rules migrated)", old, new)
+                "account renamed: %r -> %r (state, verdicts, unsubscribes, "
+                "replied, stats, rules migrated)", old, new)
     return cfgmod.masked_config(cfg)
 
 

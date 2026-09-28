@@ -64,6 +64,8 @@ export function sieveSnippet(kind: "sender" | "domain", value: string,
  *   age:>1y  age:>6m    last activity older than N years/months
  *   unread:>80          unread percentage above N
  *   is:unsub            group has a List-Unsubscribe header
+ *   is:unsubscribed     every unsubscribable sender in the group is done
+ *   is:not-unsubscribed the opposite - some sender still needs action
  *   is:protected        group contains protected senders
  *   is:replied          the user has written to this sender before
  *   is:noreply-ever     the user has never written to any of its senders
@@ -81,6 +83,7 @@ export interface ParsedFilter {
   protectedOnly: boolean;
   replied: boolean | null;
   attMin: number | null;
+  unsubscribed: boolean | null;
 }
 
 const SIZE_UNIT: Record<string, number> = { k: 1024, m: 1048576, g: 1073741824 };
@@ -88,7 +91,7 @@ const SIZE_UNIT: Record<string, number> = { k: 1024, m: 1048576, g: 1073741824 }
 export function parseFilter(q: string): ParsedFilter {
   const out: ParsedFilter = { text: [], tags: [], ai: null,
     ageMonths: null, unreadMin: null, unsub: false, protectedOnly: false,
-    replied: null, attMin: null };
+    replied: null, attMin: null, unsubscribed: null };
   for (const tok of q.trim().toLowerCase().split(/\s+/).filter(Boolean)) {
     const m = tok.match(/^(tag|ai|age|unread|is|att):(.*)$/);
     if (!m) {
@@ -109,6 +112,10 @@ export function parseFilter(q: string): ParsedFilter {
     else if (kind === "is" && val === "protected") out.protectedOnly = true;
     else if (kind === "is" && val === "replied") out.replied = true;
     else if (kind === "is" && val === "noreply-ever") out.replied = false;
+    else if (kind === "is" && val === "unsubscribed") out.unsubscribed = true;
+    else if (kind === "is" && val === "not-unsubscribed") {
+      out.unsubscribed = false;
+    }
     else if (kind === "att") {
       const a = val.match(/^>?(\d+)(k|m|g)?$/);
       if (a) out.attMin = Number(a[1]) * (SIZE_UNIT[a[2]] ?? 1);
@@ -129,6 +136,10 @@ export function matchGroup(g: Group, f: ParsedFilter, now = Date.now()): boolean
   if (f.unsub && !g.unsub) return false;
   if (f.protectedOnly && !g.protected) return false;
   if (f.replied !== null && g.replied !== f.replied) return false;
+  if (f.unsubscribed !== null) {
+    const done = g.unsubscribed?.status === "done";
+    if (done !== f.unsubscribed) return false;
+  }
   if (f.attMin !== null && g.att_size < f.attMin) return false;
   if (f.unreadMin !== null) {
     const pct = g.count ? (100 * g.unread) / g.count : 0;

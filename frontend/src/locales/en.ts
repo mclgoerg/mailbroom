@@ -14,6 +14,8 @@ export const EN: Record<string, string> = {
   "notice.ai_cancelled": "AI review cancelled after {done}/{total} groups.",
   "confirm.act": "{verb}: {n} mails from {k} group(s)?",
   "confirm.act_mails": "{verb}: {n} selected mails?",
+  "confirm.unsubscribe":
+    "Unsubscribe from the senders of {k} selected group(s)?",
   "confirm.restore": "Restore {count} mails ({label})?",
   "confirm.empty_trash":
     "PERMANENTLY delete all {n} mails in Trash? This cannot be undone.",
@@ -107,6 +109,7 @@ export const EN: Record<string, string> = {
   "qb.att": "Attachments ≥",
   "qb.flags": "Only groups…",
   "qb.is_unsub": "with unsubscribe link",
+  "qb.is_not_unsubscribed": "not yet unsubscribed",
   "qb.is_noreply": "never replied to",
   "qb.is_replied": "replied to",
   "qb.is_protected": "protected",
@@ -162,6 +165,7 @@ export const EN: Record<string, string> = {
   "ai.rate": "AI rate mails",
   "sel.ai_safe": "AI: safe to delete",
   "sel.ai_review": "AI: review",
+  "sel.unsub_pending": "Not yet unsubscribed",
   "endpoint.label": "Endpoint / base URL",
   "key.optional": "(optional for local models)",
   "note.ai_resume":
@@ -218,6 +222,7 @@ export const EN: Record<string, string> = {
   "mode.report": "report",
   "mode.execute": "execute",
   "notice.atts_cancelled": "Attachment analysis cancelled.",
+  "notice.unsub_cancelled": "Unsubscribe cancelled.",
   "atts.hint":
     "Find the mails hogging your storage. Analysis reads only the mail "
     + "structure (no content is downloaded).",
@@ -230,6 +235,22 @@ export const EN: Record<string, string> = {
     + "attachments over IMAP - deleting removes the whole mail (undoable).",
   "atts.none": "No attachments found in the scanned folders.",
   "atts.running": "Analyzing attachments…",
+  "unsub.running": "Unsubscribing…",
+  "unsub.done":
+    "Unsubscribe done: {done} done, {links} need confirmation, "
+    + "{failed} failed.",
+  "unsub.open_link": "Open unsubscribe page",
+  "unsub.badge_link": "Confirm ↗",
+  "unsub.mark_done": "Mark as done",
+  "unsub.retry": "Retry unsubscribe",
+  "unsub.badge_pending": "{n}/{of} unsubscribed",
+  "unsub.badge_failed": "unsubscribe failed",
+  "toast.unsub_started": "Unsubscribing from {n} sender(s)…",
+  "toast.unsub_skipped":
+    "({n} sender(s) already handled, protected, or over the per-run limit.)",
+  "toast.unsub_nothing":
+    "Nothing to unsubscribe from - every sender is already handled or "
+    + "protected.",
   "dups.hint": "Same Message-ID, or identical sender + subject + size.",
   "dups.summary": "{n} duplicate sets · {size} reclaimable",
   "dups.keep_newest": "Select all but newest",
@@ -314,6 +335,7 @@ export const EN: Record<string, string> = {
   "notify.delete_done": "Done: {n} mails processed.",
   "notify.ai_done": "AI review finished.",
   "notify.atts_done": "Attachment analysis finished.",
+  "notify.unsub_done": "Bulk unsubscribe finished.",
   "preset.label": "Provider preset (prefills the fields below)",
   "preset.hint.proton":
     "Proton needs the Mail Bridge (paid plans): switch its IMAP mode to "

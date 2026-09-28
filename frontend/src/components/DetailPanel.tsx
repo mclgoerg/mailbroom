@@ -3,17 +3,18 @@ import { api } from "../api";
 import { t } from "../i18n";
 import { fmtSize, fmtUsd, mailKey, olderThan, sieveSnippet,
   type SieveAction } from "../lib";
-import type { AppState, Group, Grouping, Mail } from "../types";
+import type { AppState, Group, Grouping, GroupUnsub, Mail } from "../types";
 import { MailRows, MessageView } from "./MailList";
 import { Button, ensureAiAck, Input, Loading, Modal, PanelHeader,
   ProtectButton, Select, Spinner, Toolbar } from "./ui";
 
 export function DetailPanel({ grouping, group, aiEnabled, protectedNow,
-  onProtect, folders, sieve = true, onClose, onDeleted }: {
+  unsubscribedNow, onProtect, folders, sieve = true, onClose, onDeleted }: {
   grouping: Grouping;
   group: Group;
   aiEnabled: boolean;
   protectedNow: boolean;                 // live value; `group` is a snapshot
+  unsubscribedNow: GroupUnsub | null;     // live value; `group` is a snapshot
   onProtect?: (g: Group) => void;        // absent in subject mode
   folders: AppState["folders_raw"];
   sieve?: boolean;                       // Sieve export is Proton-only
@@ -138,8 +139,22 @@ export function DetailPanel({ grouping, group, aiEnabled, protectedNow,
       } else {
         setNote(`${t("Unsubscribed")} (${r.method}).`);
       }
+      onDeleted();   // refresh App's state so the persisted status shows up
     } catch (e: any) {
       setNote(`Unsubscribe error: ${e.message ?? e}`);
+    }
+    setBusy(false);
+  };
+
+  const ackUnsubscribe = async () => {
+    const addr = unsubscribedNow?.addr || group.key;
+    setBusy(true);
+    try {
+      await api.unsubscribeAck(addr);
+      setNote(t("Marked as unsubscribed."));
+      onDeleted();
+    } catch (e: any) {
+      setNote(`Error: ${e.message ?? e}`);
     }
     setBusy(false);
   };
@@ -245,9 +260,28 @@ export function DetailPanel({ grouping, group, aiEnabled, protectedNow,
               </Button>
             ))}
             {group.unsub && (
-              <Button variant="ghost" onClick={unsubscribe} disabled={busy}>
-                {t("Unsubscribe")}
-              </Button>
+              unsubscribedNow?.status === "done" ? (
+                <span className="rounded bg-chip px-2 py-1 text-xs
+                  text-chiptext">
+                  ✓ {t("Unsubscribed")}
+                </span>
+              ) : unsubscribedNow?.status === "link" ? (
+                <>
+                  <Button variant="ghost" disabled={busy} onClick={() =>
+                    window.open(unsubscribedNow.link, "_blank", "noopener")}>
+                    {t("unsub.open_link")}
+                  </Button>
+                  <Button variant="ghost" onClick={ackUnsubscribe}
+                    disabled={busy}>
+                    {t("unsub.mark_done")}
+                  </Button>
+                </>
+              ) : (
+                <Button variant="ghost" onClick={unsubscribe} disabled={busy}>
+                  {unsubscribedNow?.status === "failed"
+                    ? t("unsub.retry") : t("Unsubscribe")}
+                </Button>
+              )
             )}
             {sieve && grouping !== "subject" && (
               <Button variant="ghost" onClick={() => setSieveOpen(!sieveOpen)}>

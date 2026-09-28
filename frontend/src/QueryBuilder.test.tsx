@@ -40,6 +40,13 @@ test("clicking conditions appends valid DSL tokens", () => {
   expect(f.ageMonths).toBe(12);
 });
 
+test("not-yet-unsubscribed chip emits the DSL token", () => {
+  const s = setup();
+  fireEvent.click(screen.getByText("not yet unsubscribed"));
+  expect(s.get()).toBe("is:not-unsubscribed");
+  expect(parseFilter(s.get()).unsubscribed).toBe(false);
+});
+
 test("tokens are never added twice", () => {
   const s = setup("is:unsub");
   fireEvent.click(screen.getByText("with unsubscribe link"));
