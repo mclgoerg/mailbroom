@@ -326,19 +326,17 @@ export const EN: Record<string, string> = {
   "preset.hint.imap_toggle":
     "IMAP must be enabled first in the provider's mail settings; then "
     + "use an app password if two-factor auth is on.",
+  "preset.hint.oauth_only":
+    "Microsoft has no app-password option for IMAP - connect via OAuth "
+    + "below (experimental).",
   "imap.security": "IMAP security",
   "smtp.host": "SMTP host (unsubscribe mails)",
   "smtp.host_placeholder": "empty = IMAP host",
   "smtp.security": "SMTP security",
   "sec.auto": "auto",
   "cafile.label": "Custom CA file (optional, e.g. the Bridge certificate)",
-  "oauth.title": "Connect via OAuth (optional)",
-  "oauth.help":
-    "Sign in instead of using a password. Recommended for Outlook; for "
-    + "Gmail an app password (above) is simpler unless you specifically "
-    + "want OAuth.",
-  "oauth.provider": "OAuth provider",
-  "oauth.provider_off": "Off (use the password above)",
+  "oauth.title": "Connect your {provider} account via OAuth",
+  "oauth.password_unused": "Not needed - this account uses OAuth",
   "oauth.client_id": "Client ID",
   "oauth.client_secret": "Client secret",
   "oauth.google_help":

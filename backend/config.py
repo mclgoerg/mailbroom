@@ -214,8 +214,8 @@ DEFAULT_CONFIG = {
 AI_PROVIDERS = ("anthropic", "foundry", "openai", "ollama")
 IMAP_SECURITY = ("ssl", "starttls")
 SMTP_SECURITY = ("auto", "ssl", "starttls")
-PRESETS = ("proton", "gmail", "icloud", "fastmail", "gmx", "mailbox",
-           "yahoo", "custom")
+PRESETS = ("proton", "gmail", "outlook", "icloud", "fastmail", "gmx",
+           "mailbox", "yahoo", "custom")
 
 
 def normalize_protected(entries) -> list[str]:
