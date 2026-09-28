@@ -86,8 +86,9 @@ test("gmail preset prefills IMAP + SMTP fields", () => {
   // Bridge cert must not leak into a non-Proton account
   expect((screen.getByLabelText(/CA file/) as HTMLInputElement).value)
     .toBe("");
-  // app-password hint shown
-  expect(screen.getByText(/app-specific password/)).toBeTruthy();
+  // Gmail connects via OAuth only - no password field, OAuth-only hint
+  expect(screen.getByText(/connects via OAuth only/)).toBeTruthy();
+  expect(screen.queryByLabelText("Password")).toBeNull();
 });
 
 test("custom preset keeps the current fields", () => {

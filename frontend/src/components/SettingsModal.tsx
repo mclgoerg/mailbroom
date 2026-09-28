@@ -20,7 +20,7 @@ const PRESETS: Record<Exclude<Preset, "custom">, {
     cafile: "/certs/bridge-cert.pem", hint: "preset.hint.proton" },
   gmail: { host: "imap.gmail.com", port: 993, security: "ssl",
     smtpHost: "smtp.gmail.com", smtpPort: 465, smtpSecurity: "ssl",
-    cafile: "", hint: "preset.hint.apppw" },
+    cafile: "", hint: "preset.hint.oauth_gmail" },
   outlook: { host: "outlook.office365.com", port: 993, security: "ssl",
     smtpHost: "smtp.office365.com", smtpPort: 587, smtpSecurity: "starttls",
     cafile: "", hint: "preset.hint.oauth_only" },
@@ -499,15 +499,14 @@ export function SettingsModal({ cfg, account, onClose, onSaved,
         <Field label={t("User")}>
           <Input className="w-full" value={f.user} onChange={set("user")} />
         </Field>
+        {!oauthProvider && (
         <Field label={t("Password")}>
           <Input className="w-full" type="password" value={f.password}
-            disabled={f.oauthConnected}
-            placeholder={f.oauthConnected ? t("oauth.password_unused")
-              : oauthProvider ? t("oauth.password_optional")
-              : imapOf(cfg, editAcct).password_set
-                ? t("(unchanged)") : t("required")}
+            placeholder={imapOf(cfg, editAcct).password_set
+              ? t("(unchanged)") : t("required")}
             onChange={set("password")} />
         </Field>
+        )}
         <Field label={t("smtp.host")}>
           <Input className="w-full" value={f.smtpHost}
             placeholder={t("smtp.host_placeholder")}
