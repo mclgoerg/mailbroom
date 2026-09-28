@@ -5,9 +5,10 @@ on real mailboxes - security reports are taken seriously.
 
 ## Reporting a vulnerability
 
-Please use GitHub's **private vulnerability reporting** on this
-repository ("Security" tab → "Report a vulnerability"). Do not open a
-public issue for security problems.
+Please use GitHub's **private vulnerability reporting**:
+[Report a vulnerability](https://github.com/mclgoerg/mailbroom/security/advisories/new)
+("Security" tab → "Report a vulnerability" works the same way). Do not
+open a public issue for security problems.
 
 You can expect an initial response within a week. Please include steps
 to reproduce and the deployment mode (reverse proxy / built-in login /
