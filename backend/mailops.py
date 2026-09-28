@@ -463,18 +463,28 @@ def _uid_move(conn, uidstr: str, dest: str) -> bool:
 
 
 def decode_mutf7(name: str) -> str:
-    """Decode IMAP modified-UTF-7 folder names for display (RFC 3501 5.1.3)."""
-    def repl(m):
-        b64 = m.group(1)
-        if not b64:
-            return "&"
-        pad = "=" * (-len(b64) % 4)
-        try:
-            return base64.b64decode(
-                b64.replace(",", "/") + pad).decode("utf-16-be")
-        except Exception:
-            return m.group(0)
-    return re.sub(r"&([^-]*)-", repl, name)
+    """Decode IMAP modified-UTF-7 folder names for display (RFC 3501
+    5.1.3). Split-based instead of regex: folder names come from the
+    (semi-trusted) IMAP server, and `&([^-]*)-` is quadratic on hostile
+    inputs like "&&&&..." (CodeQL py/polynomial-redos)."""
+    if "&" not in name:
+        return name
+    parts = name.split("&")
+    out = [parts[0]]
+    for part in parts[1:]:
+        b64, sep, rest = part.partition("-")
+        if not sep:                      # unterminated shift: keep literal
+            out.append("&" + part)
+        elif not b64:                    # "&-" encodes a literal '&'
+            out.append("&" + rest)
+        else:
+            pad = "=" * (-len(b64) % 4)
+            try:
+                out.append(base64.b64decode(
+                    b64.replace(",", "/") + pad).decode("utf-16-be") + rest)
+            except Exception:
+                out.append("&" + part)   # undecodable: keep as-is
+    return "".join(out)
 
 
 def excluded(folder: str, rules: list[str]) -> bool:

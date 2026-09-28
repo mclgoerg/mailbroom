@@ -124,3 +124,14 @@ def test_decode_mime_survives_raw_8bit_headers():
     assert decode_mime(subject) == "Angebot f\u00fcr dich \u2728"
     assert decode_mime(None) == ""
     assert decode_mime("=?utf-8?q?caf=C3=A9?=") == "caf\u00e9"
+
+
+def test_decode_mutf7_hostile_inputs_stay_fast_and_total():
+    import time
+    # each '&' starts its own shift; undecodable runs stay literal
+    assert mailops.decode_mutf7("&ab&AOQ-c") == "&ab" + "ä" + "c"
+    assert mailops.decode_mutf7("&unterminated") == "&unterminated"
+    # the old regex was quadratic on this shape (py/polynomial-redos)
+    t0 = time.time()
+    out = mailops.decode_mutf7("&" * 200_000)
+    assert time.time() - t0 < 1.0 and isinstance(out, str)
