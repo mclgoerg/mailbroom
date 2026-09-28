@@ -1,5 +1,7 @@
 # Mailbroom
 
+[![OpenSSF Scorecard](https://api.securityscorecards.dev/projects/github.com/mclgoerg/mailbroom/badge)](https://scorecard.dev/viewer/?uri=github.com/mclgoerg/mailbroom)
+
 **Tired of cleaning up your mailbox? Grab the broom.** 🧹
 
 Mailbroom sweeps any IMAP mailbox - built with love for
