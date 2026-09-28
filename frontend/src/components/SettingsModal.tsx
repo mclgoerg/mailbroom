@@ -503,6 +503,7 @@ export function SettingsModal({ cfg, account, onClose, onSaved,
           <Input className="w-full" type="password" value={f.password}
             disabled={f.oauthConnected}
             placeholder={f.oauthConnected ? t("oauth.password_unused")
+              : oauthProvider ? t("oauth.password_optional")
               : imapOf(cfg, editAcct).password_set
                 ? t("(unchanged)") : t("required")}
             onChange={set("password")} />
