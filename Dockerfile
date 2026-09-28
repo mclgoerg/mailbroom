@@ -1,5 +1,5 @@
 # Stage 1: build the React frontend
-FROM node:26-alpine AS web
+FROM node:26-alpine@sha256:0b36e8c136b94cd4fcf02188228e76c31ad5872eef3fec8cbd2eee500cfd9e80 AS web
 WORKDIR /web
 COPY frontend/package.json frontend/package-lock.json ./
 RUN npm ci --no-audit --no-fund
@@ -7,7 +7,7 @@ COPY frontend/ ./
 RUN npm run build
 
 # Stage 2: FastAPI backend serving the built bundle
-FROM python:3.13-slim
+FROM python:3.13-slim@sha256:7c61056e61ac89e852de05f3dc6fa51a6dd2181797bceed46aa725dd7cb2cd3b
 WORKDIR /app
 COPY backend/requirements.txt ./
 # pip is build-time only: removing it (and its vendored msgpack/
