@@ -10,7 +10,8 @@ from hypothesis import strategies as st
 from backend import config as cfgmod
 from backend import secretbox
 
-KEY = "0Yl6dY0zXhP0aXkQ0T5S5vC9m3o0J8m1kU4dY2wG9pA="   # any string works
+KEY = "0Yl6dY0zXhP0aXkQ0T5S5vC9m3o0J8m1kU4dY2wG9pA="   # gitleaks:allow
+# ^ made-up fixture (any string works as a key) — NOT a real secret
 
 
 def test_seal_unseal_roundtrip(monkeypatch):
@@ -37,7 +38,7 @@ def test_config_secrets_never_hit_disk_in_plaintext(monkeypatch):
         "account": "default",
         "imap": {"password": "imap-secret-xyz"},
         "ai": {"api_key": "sk-ai-secret"},
-        "auth": {"oidc": {"client_secret": "oidc-secret-123"}},
+        "auth": {"oidc": {"client_secret": "oidc-secret-123"}},  # gitleaks:allow
         "shared_ai": {"api_key": "sk-shared-secret"},
     })
     raw_cfg = cfgmod.CONFIG_PATH.read_text()

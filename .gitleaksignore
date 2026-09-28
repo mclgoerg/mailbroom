@@ -1,0 +1,5 @@
+# Known-benign findings in HISTORICAL commits (fake fixtures in
+# tests/test_secretbox.py — the current file carries gitleaks:allow
+# markers, but old commits predate them).
+dc0f597a7c3e53c9350ff72a607c661d5894b91e:tests/test_secretbox.py:generic-api-key:13
+dc0f597a7c3e53c9350ff72a607c661d5894b91e:tests/test_secretbox.py:generic-api-key:40
