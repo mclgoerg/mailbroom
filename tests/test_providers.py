@@ -36,7 +36,7 @@ def _gmail(monkeypatch, extra_trash=0) -> FakeIMAP:
         flags={"[Gmail]/All Mail": "\\All", "[Gmail]/Sent Mail": "\\Sent",
                "[Gmail]/Spam": "\\Junk", "[Gmail]/Drafts": "\\Drafts",
                "[Gmail]/Trash": "\\Trash"})
-    monkeypatch.setattr(mailops, "connect", lambda cfg: fake)
+    monkeypatch.setattr(mailops, "connect", lambda cfg, name=None: fake)
     return fake
 
 
@@ -92,7 +92,7 @@ def test_icloud_deleted_messages_as_trash(monkeypatch):
         "Deleted Messages": [make_msg(9, frm="old@x.example")],
         "Sent Messages": [],
     })
-    monkeypatch.setattr(mailops, "connect", lambda cfg: fake)
+    monkeypatch.setattr(mailops, "connect", lambda cfg, name=None: fake)
     mailops.run_scan()
     assert set(mailops.STATE["groups"]["sender"]) == {"a@x.example"}
     mailops.delete_groups("sender", ["a@x.example"])
@@ -111,7 +111,7 @@ def test_move_fallback_without_capability(monkeypatch):
                   make_msg(2, frm="a@x.example")],
         "Trash": [],
     }, move=False)
-    monkeypatch.setattr(mailops, "connect", lambda cfg: fake)
+    monkeypatch.setattr(mailops, "connect", lambda cfg, name=None: fake)
     mailops.run_scan()
     mailops.delete_groups("sender", ["a@x.example"])
     st = wait_delete_done()

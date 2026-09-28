@@ -42,7 +42,7 @@ def _two_accounts(monkeypatch):
             "Trash": [],
         }),
     }
-    monkeypatch.setattr(mailops, "connect", lambda im: fakes[im["host"]])
+    monkeypatch.setattr(mailops, "connect", lambda im, name=None: fakes[im["host"]])
     return fakes
 
 

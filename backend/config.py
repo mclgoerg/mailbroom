@@ -49,6 +49,10 @@ ENV_IMAP = {
     # Which provider preset filled the fields (UI prefill + Proton-only
     # features like Sieve export). Existing configs default to proton.
     "preset": "proton",
+    # None, or {provider, client_id, client_secret?, refresh_token,
+    # access_token, expires_at} once connected via /api/oauth/imap/*.
+    # Present -> mailops.connect() uses XOAUTH2 instead of the password.
+    "oauth": None,
 }
 
 # Blank slate for ADDITIONAL accounts - env values (e.g. the Bridge
@@ -57,6 +61,7 @@ NEUTRAL_IMAP = {
     "host": "", "port": 993, "security": "ssl",
     "smtp_host": "", "smtp_port": 465, "smtp_security": "auto",
     "user": "", "password": "", "cafile": "", "preset": "custom",
+    "oauth": None,
 }
 
 _ENV_AUTH_CACHE: dict | None = None
@@ -334,6 +339,12 @@ def load_config() -> dict:
         pass
     for block in cfg["accounts"].values():
         block["password"] = secretbox.unseal(block.get("password"))
+        if isinstance(block.get("oauth"), dict):
+            oauth = dict(block["oauth"])
+            for key in ("client_secret", "refresh_token", "access_token"):
+                if oauth.get(key):
+                    oauth[key] = secretbox.unseal(oauth[key])
+            block["oauth"] = oauth
     cfg["ai"]["api_key"] = secretbox.unseal(cfg["ai"].get("api_key"))
     cfg["auth"] = load_server()["auth"]
     return cfg
@@ -363,6 +374,11 @@ def _write_tenant_config(cfg: dict) -> None:
         {k: v for k, v in cfg.items() if k != "auth"}))
     for block in out.get("accounts", {}).values():
         block["password"] = secretbox.seal(block.get("password"))
+        if isinstance(block.get("oauth"), dict):
+            oauth = block["oauth"]
+            for key in ("client_secret", "refresh_token", "access_token"):
+                if oauth.get(key):
+                    oauth[key] = secretbox.seal(oauth[key])
     out["ai"]["api_key"] = secretbox.seal(out["ai"].get("api_key"))
     _write(config_path(), out)
 
@@ -390,6 +406,45 @@ def _apply_imap(block: dict, imap_in: dict) -> None:
         block["preset"] = imap_in["preset"]
     if imap_in.get("password"):
         block["password"] = str(imap_in["password"])
+    if isinstance(imap_in.get("oauth"), dict):
+        oauth_in = imap_in["oauth"]
+        if oauth_in.get("disconnect"):
+            block["oauth"] = None
+        else:
+            from . import oauthflow
+            oauth = dict(block.get("oauth") or {})
+            if oauth_in.get("provider") in oauthflow.PROVIDERS:
+                oauth["provider"] = oauth_in["provider"]
+            if "client_id" in oauth_in:
+                oauth["client_id"] = str(oauth_in["client_id"]).strip()
+            if oauth_in.get("client_secret"):
+                oauth["client_secret"] = str(oauth_in["client_secret"])
+            if oauth.get("provider"):
+                block["oauth"] = oauth
+
+
+def save_oauth(account: str, oauth: dict) -> None:
+    """Persist a connected/refreshed oauth token block for one account -
+    called from the /api/oauth/imap/* endpoints and by mailops.connect()
+    after a silent token refresh."""
+    with _LOCK:
+        cfg = load_config()
+        if account not in cfg["accounts"]:
+            return
+        existing = cfg["accounts"][account].get("oauth") or {}
+        cfg["accounts"][account]["oauth"] = {**existing, **oauth}
+        _write_tenant_config(cfg)
+
+
+def _mask_oauth(oauth: dict | None) -> dict | None:
+    """Never hand the UI a token - only enough to render the connect
+    status and let the user re-enter their own client credentials."""
+    if not oauth:
+        return None
+    return {"provider": oauth.get("provider", ""),
+            "client_id": oauth.get("client_id", ""),
+            "client_secret_set": bool(oauth.get("client_secret")),
+            "connected": bool(oauth.get("refresh_token"))}
 
 
 def update_config(body: dict) -> dict:
@@ -561,11 +616,15 @@ def effective_ai(cfg: dict) -> tuple[dict, str | None]:
 def masked_config(cfg: dict) -> dict:
     admin = is_admin()
     ai_eff, ai_source = effective_ai(cfg)
+    from . import oauthflow
     out = {
         "accounts": {
-            n: {**b, "password": "", "password_set": bool(b["password"])}
+            n: {**b, "password": "", "password_set": bool(b["password"]),
+                "oauth": _mask_oauth(b.get("oauth"))}
             for n, b in cfg["accounts"].items()},
         "default_account": next(iter(cfg["accounts"])),
+        "oauth_providers": list(oauthflow.PROVIDERS),
+        "oauth_ms_device_available": oauthflow.has_shared_microsoft_client(),
         "protected": normalize_protected(cfg.get("protected")),
         "categories": cfg.get("categories") or {},
         # Non-admins get the mode (their UI needs it) but none of the

@@ -80,6 +80,10 @@ class FakeIMAP:
     def login(self, user, password):
         return "OK", [b"LOGIN done"]
 
+    def authenticate(self, mechanism, authobject):
+        self.authenticated_as = authobject(b"")
+        return "OK", [b"AUTHENTICATE done"]
+
     def logout(self):
         self.logged_out = True
         return "BYE", [b""]
@@ -266,7 +270,7 @@ def bridge(monkeypatch):
         "Trash": [],
         "Spam": [],
     })
-    monkeypatch.setattr(mailops, "connect", lambda cfg: fake)
+    monkeypatch.setattr(mailops, "connect", lambda cfg, name=None: fake)
     return fake
 
 

@@ -22,6 +22,7 @@ from . import aihelper
 from . import auth as authmod
 from . import config as cfgmod
 from . import mailops
+from . import oauthflow
 from . import rules as rulesmod
 from . import stats as statsmod
 from . import tenants
@@ -246,6 +247,126 @@ def get_oidc_callback(request: Request, code: str = Query(""),
     _set_session(resp, request, sub)
     logging.getLogger("pmc.auth").info("OIDC login ok: %s", sub)
     return resp
+
+
+# ------------------------------------------------------ IMAP account OAuth
+#
+# Connecting a mail ACCOUNT to Gmail/Outlook via OAuth, distinct from the
+# OIDC login above (that authenticates a Mailbroom user; this authorizes
+# XOAUTH2 access to one IMAP account). Requires an existing session - the
+# tenant is whatever the middleware already resolved for this request.
+
+_OAUTH_PENDING_COOKIE = "pmc_oauth_pending"
+
+
+def _oauth_account_imap(account: str) -> dict:
+    try:
+        return cfgmod.account_imap(account)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc))
+
+
+@app.get("/api/oauth/imap/login")
+def get_oauth_imap_login(request: Request, account: str = Query(...),
+                         provider: str = Query(...)):
+    if provider not in oauthflow.PROVIDERS:
+        raise HTTPException(400, f"unknown provider {provider!r}")
+    im = _oauth_account_imap(account)
+    oauth = im.get("oauth") or {}
+    client_id = oauth.get("client_id") if oauth.get("provider") == provider \
+        else ""
+    if not client_id:
+        raise HTTPException(
+            400, "enter this account's OAuth client ID first")
+    redirect = _external_base(request) + "/api/oauth/imap/callback"
+    verifier = authmod.make_verifier()
+    url = oauthflow.auth_url(provider, client_id, redirect,
+                             authmod.make_state(), verifier)
+    resp = RedirectResponse(url)
+    pending = json.dumps({"account": account, "provider": provider,
+                          "verifier": verifier})
+    resp.set_cookie(_OAUTH_PENDING_COOKIE, pending, httponly=True,
+                    samesite="lax",
+                    secure=_external_base(request).startswith("https://"),
+                    max_age=authmod.STATE_MAX_AGE)
+    return resp
+
+
+@app.get("/api/oauth/imap/callback")
+def get_oauth_imap_callback(request: Request, code: str = Query(""),
+                            state: str = Query(""), error: str = Query(""),
+                            error_description: str = Query("")):
+    if error:
+        raise HTTPException(
+            502, f"the identity provider rejected the connection: "
+                 f"{error_description or error}")
+    if not code or not authmod.verify_state(state):
+        raise HTTPException(400, "invalid or expired connection attempt - "
+                            "try again")
+    try:
+        pending = json.loads(
+            request.cookies.get(_OAUTH_PENDING_COOKIE, "") or "{}")
+        account, provider = pending["account"], pending["provider"]
+        verifier = pending["verifier"]
+    except (json.JSONDecodeError, KeyError):
+        raise HTTPException(400, "invalid or expired connection attempt - "
+                            "try again")
+    im = _oauth_account_imap(account)
+    oauth = im.get("oauth") or {}
+    client_id = oauth.get("client_id", "")
+    client_secret = oauth.get("client_secret", "")
+    redirect = _external_base(request) + "/api/oauth/imap/callback"
+    try:
+        tokens = oauthflow.exchange_code(provider, client_id, client_secret,
+                                         redirect, code, verifier)
+    except Exception as exc:
+        raise HTTPException(502, f"token exchange failed: {exc}")
+    cfgmod.save_oauth(account, {"provider": provider, "client_id": client_id,
+                                "client_secret": client_secret, **tokens})
+    logging.getLogger("pmc.oauth").info(
+        "IMAP OAuth connected: account=%r provider=%s", account, provider)
+    resp = RedirectResponse("/")
+    resp.delete_cookie(_OAUTH_PENDING_COOKIE)
+    return resp
+
+
+@app.post("/api/oauth/imap/device/start")
+def post_oauth_imap_device_start(account: str = Query(...)):
+    """Microsoft device-code flow, using the server's shared public
+    client - no per-user app registration needed."""
+    _oauth_account_imap(account)   # 400 on an unknown account
+    try:
+        info = oauthflow.device_start()
+    except Exception as exc:
+        raise HTTPException(502, str(exc))
+    return {"device_code": info["device_code"],
+            "user_code": info["user_code"],
+            "verification_uri": info.get("verification_uri")
+            or info.get("verification_uri_complete", ""),
+            "expires_in": info.get("expires_in", 900),
+            "interval": info.get("interval", 5)}
+
+
+@app.post("/api/oauth/imap/device/poll")
+def post_oauth_imap_device_poll(account: str = Query(...),
+                                device_code: str = Query(...)):
+    _oauth_account_imap(account)
+    result = oauthflow.device_poll(device_code)
+    if result["status"] == "complete":
+        cfgmod.save_oauth(account, {k: v for k, v in result.items()
+                                    if k != "status"})
+        logging.getLogger("pmc.oauth").info(
+            "IMAP OAuth connected: account=%r provider=microsoft (device "
+            "code)", account)
+    return result
+
+
+@app.post("/api/oauth/imap/disconnect")
+def post_oauth_imap_disconnect(account: str = Query(...)):
+    _oauth_account_imap(account)
+    cfgmod.update_config({"account": account, "imap": {
+        "oauth": {"disconnect": True}}})
+    return {"ok": True}
 
 
 class GroupingBody(BaseModel):
@@ -579,7 +700,7 @@ def post_test_connection(account: str | None = Query(None)):
     if not im["password"]:
         raise HTTPException(400, "no password configured")
     try:
-        conn = mailops.connect(im)
+        conn = mailops.connect(im, acc.name)
         try:
             n = len(mailops.list_folders(conn))
         finally:
@@ -598,7 +719,7 @@ def get_folders(account: str | None = Query(None)):
     acc = _acc(account)
     cfg = cfgmod.load_config()
     try:
-        conn = mailops.connect(cfgmod.account_imap(acc.name))
+        conn = mailops.connect(cfgmod.account_imap(acc.name), acc.name)
         try:
             names = mailops.list_folders(conn)
             roles = mailops.folder_roles(conn, acc)
