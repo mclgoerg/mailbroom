@@ -20,6 +20,7 @@ RUN pip install --no-cache-dir -r requirements.txt \
     && useradd --uid 1000 --create-home app \
     && mkdir -p /data && chown app:app /data
 COPY backend/ ./backend/
+COPY LICENSE ./LICENSE
 COPY --from=web /web/dist ./static/
 # COPY preserves host file modes, which may not be world-readable.
 RUN chmod -R a+rX /app
