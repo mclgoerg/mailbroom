@@ -62,9 +62,9 @@ in-memory fake IMAP server (`tests/conftest.py`).
 
 ## AI-assisted contributions
 
-AI-generated code is welcome (most of this codebase started that way -
-see the README's AI disclosure), with the same expectations as any other
-code: you understood it, you tested it, and you can discuss it in
+AI-generated code is welcome (this codebase was built with AI
+assistance - see the README's AI disclosure), with the same expectations
+as any other code: you understood it, you tested it, and you can discuss it in
 review.
 
 ## Security issues

@@ -229,9 +229,8 @@ python -m pytest tests/ -q
 
 ## AI disclosure
 
-Mailbroom was built with heavy AI assistance (Anthropic's Claude via
-Claude Code): most of the code, tests and documentation were
-AI-generated, directed and reviewed by the maintainer, and every feature
+Mailbroom was built with AI assistance (Anthropic's Claude via
+Claude Code), directed and reviewed by the maintainer, and every feature
 was verified against real mailboxes before release. Independent of how
 the code was written, the safety properties are enforced by tests:
 deletions are reversible moves, UIDVALIDITY is checked before every
