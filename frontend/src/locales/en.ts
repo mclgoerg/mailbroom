@@ -329,9 +329,12 @@ export const EN: Record<string, string> = {
   "preset.hint.oauth_gmail":
     "Gmail connects via OAuth only here (below) - register your own "
     + "free Google OAuth client, see the install guide.",
-  "preset.hint.oauth_only":
-    "Microsoft has no app-password option for IMAP - connect via OAuth "
-    + "below (experimental).",
+  "preset.hint.oauth_outlook_device":
+    "Outlook connects via OAuth only here (below) - no setup needed, "
+    + "see the install guide.",
+  "preset.hint.oauth_outlook_byo":
+    "Outlook connects via OAuth only here (below) - register your own "
+    + "OAuth client in Entra ID, see the install guide.",
   "imap.security": "IMAP security",
   "smtp.host": "SMTP host (unsubscribe mails)",
   "smtp.host_placeholder": "empty = IMAP host",
@@ -342,17 +345,17 @@ export const EN: Record<string, string> = {
   "oauth.client_id": "Client ID",
   "oauth.client_secret": "Client secret",
   "oauth.google_help":
-    "Gmail's restricted mail scope needs Google's own verification for "
-    + "any shared client, so there is no universal \"Sign in with "
-    + "Google\" button - every self-hoster registers their own OAuth "
-    + "client (see the install guide). A client in \"testing\" mode "
-    + "issues a refresh token that expires after 7 days.",
+    "Paste your Google OAuth client's ID and secret below, then click "
+    + "Connect (setup steps in the install guide). A client left in "
+    + "\"testing\" mode issues a refresh token that expires after 7 "
+    + "days - request Google verification to remove that limit.",
   "oauth.ms_device_help":
     "No app registration needed: click below, then enter the code shown "
     + "at microsoft.com/devicelogin on any device.",
   "oauth.ms_byo_help":
-    "This server has no shared Microsoft app configured - register your "
-    + "own OAuth client in Entra ID (see the install guide).",
+    "Paste your Entra ID app's client ID below, then click Connect "
+    + "(setup steps in the install guide) - a public client needs no "
+    + "secret.",
   "oauth.connect": "Connect account",
   "oauth.connect_device": "Connect with a device code",
   "oauth.connected": "Connected",

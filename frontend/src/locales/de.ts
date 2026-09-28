@@ -357,9 +357,13 @@ export const DE: Record<string, string> = {
   "preset.hint.oauth_gmail":
     "Gmail verbindet hier nur per OAuth (unten) - eigenen, kostenlosen "
     + "Google-OAuth-Client registrieren, siehe Installationsanleitung.",
-  "preset.hint.oauth_only":
-    "Microsoft bietet für IMAP kein App-Passwort - unten per OAuth "
-    + "verbinden (experimentell).",
+  "preset.hint.oauth_outlook_device":
+    "Outlook verbindet hier nur per OAuth (unten) - keine Einrichtung "
+    + "nötig, siehe Installationsanleitung.",
+  "preset.hint.oauth_outlook_byo":
+    "Outlook verbindet hier nur per OAuth (unten) - eigenen "
+    + "OAuth-Client in Entra ID registrieren, siehe "
+    + "Installationsanleitung.",
   "imap.security": "IMAP-Verschlüsselung",
   "smtp.host": "SMTP-Host (Abbestell-Mails)",
   "smtp.host_placeholder": "leer = IMAP-Host",
@@ -370,20 +374,19 @@ export const DE: Record<string, string> = {
   "oauth.client_id": "Client-ID",
   "oauth.client_secret": "Client-Secret",
   "oauth.google_help":
-    "Der eingeschr\u00e4nkte Mail-Scope von Gmail ben\u00f6tigt f\u00fcr jeden "
-    + "gemeinsam genutzten Client eine Google-Verifizierung - es gibt "
-    + "daher keinen universellen \"Mit Google anmelden\"-Button. Jeder "
-    + "Selbsthoster registriert einen eigenen OAuth-Client (siehe "
+    "Client-ID und Client-Secret deines Google-OAuth-Clients unten "
+    + "eintragen, dann auf Verbinden klicken (Einrichtung siehe "
     + "Installationsanleitung). Ein Client im Testmodus stellt ein "
-    + "Refresh-Token aus, das nach 7 Tagen abl\u00e4uft.",
+    + "Refresh-Token aus, das nach 7 Tagen abl\u00e4uft - f\u00fcr "
+    + "unbegrenzte G\u00fcltigkeit bei Google die Verifizierung beantragen.",
   "oauth.ms_device_help":
     "Keine App-Registrierung n\u00f6tig: unten klicken, dann den "
     + "angezeigten Code auf microsoft.com/devicelogin auf einem "
     + "beliebigen Ger\u00e4t eingeben.",
   "oauth.ms_byo_help":
-    "Dieser Server hat keine gemeinsame Microsoft-App konfiguriert - "
-    + "eigenen OAuth-Client in Entra ID registrieren (siehe "
-    + "Installationsanleitung).",
+    "Client-ID deiner Entra-ID-App unten eintragen, dann auf Verbinden "
+    + "klicken (Einrichtung siehe Installationsanleitung) - ein "
+    + "\u00f6ffentlicher Client ben\u00f6tigt kein Secret.",
   "oauth.connect": "Konto verbinden",
   "oauth.connect_device": "Mit Ger\u00e4tecode verbinden",
   "oauth.connected": "Verbunden",
