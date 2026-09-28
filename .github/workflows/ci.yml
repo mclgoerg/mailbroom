@@ -10,6 +10,15 @@ permissions:
   contents: read
   packages: write
 
+# One run per ref: a newer push to main (or to a PR branch) cancels the
+# in-progress run of the older commit. Prevents N parallel runs after a
+# dependabot merge train AND the :latest race where an older run could
+# finish last and win the image push. Tags each have their own ref, so
+# releases are never cancelled.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build:
     runs-on: ubuntu-latest
