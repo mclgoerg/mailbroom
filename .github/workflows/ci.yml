@@ -20,6 +20,21 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # PRs only: flags newly-introduced dependencies with a known
+  # vulnerability before merge, complementing Dependabot alerts (which
+  # only fire after the fact on main).
+  dependency-review:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/dependency-review-action@v5.0.0
+        with:
+          fail-on-severity: high
+
   build:
     runs-on: ubuntu-latest
     steps:
