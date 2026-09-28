@@ -2,8 +2,8 @@ import { useEffect, useState } from "react";
 import { api, fmtUsd } from "../api";
 import { getLang, setLang, t, type Lang } from "../i18n";
 import { fmtAgo, fmtSize } from "../lib";
-import type { AdminTenantStats, AuthMode, Config, FoldersResp, Preset,
-  Security, SmtpSecurity } from "../types";
+import type { AdminTenantStats, AuthMode, Config, FoldersResp, OauthProvider,
+  Preset, Security, SmtpSecurity } from "../types";
 import { Button, Field, Input, Loading, Modal, PanelHeader,
   SectionLabel, Select, TextArea } from "./ui";
 
@@ -73,6 +73,11 @@ export function SettingsModal({ cfg, account, onClose, onSaved,
       cafile: im.cafile ?? "",
       user: im.user,
       password: "",
+      oauthProvider: (im.oauth?.provider ?? "") as "" | OauthProvider,
+      oauthClientId: im.oauth?.client_id ?? "",
+      oauthClientSecret: "",
+      oauthClientSecretSet: im.oauth?.client_secret_set ?? false,
+      oauthConnected: im.oauth?.connected ?? false,
     };
   };
   const [f, setF] = useState({
@@ -185,7 +190,11 @@ export function SettingsModal({ cfg, account, onClose, onSaved,
           security: f.security, smtp_host: f.smtpHost,
           smtp_port: +f.smtpPort || 1025, smtp_security: f.smtpSecurity,
           cafile: f.cafile, preset: f.preset, user: f.user,
-          ...(f.password ? { password: f.password } : {}) },
+          ...(f.password ? { password: f.password } : {}),
+          ...(f.oauthProvider ? { oauth: { provider: f.oauthProvider,
+            client_id: f.oauthClientId,
+            ...(f.oauthClientSecret
+              ? { client_secret: f.oauthClientSecret } : {}) } } : {}) },
         ...(excluded ? { excluded_folders: excluded } : {}),
         protected: protectedText.split("\n")
           .map((s) => s.trim()).filter(Boolean),
@@ -273,6 +282,67 @@ export function SettingsModal({ cfg, account, onClose, onSaved,
       setMsg(`Error: ${e.message ?? e}`);
     }
   };
+
+  // OAuth connect: the auth-code+PKCE flow is a full-page redirect (the
+  // provider's consent screen), so client_id/secret must be saved first.
+  // The device-code flow needs neither - it polls this modal instead.
+  const [deviceInfo, setDeviceInfo] = useState<{
+    userCode: string; verificationUri: string; deviceCode: string;
+    interval: number;
+  } | null>(null);
+  const [oauthMsg, setOauthMsg] = useState("");
+
+  const connectOauth = async () => {
+    const next = await save();
+    if (!next) return;
+    window.location.href = `/api/oauth/imap/login?account=` +
+      `${encodeURIComponent(editAcct)}&provider=${f.oauthProvider}`;
+  };
+
+  const disconnectOauth = async () => {
+    if (!confirm(t("oauth.confirm_disconnect"))) return;
+    await api.oauthDisconnect(editAcct);
+    const next = await api.getConfig();
+    onSaved(next);
+    setF({ ...f, ...imapFields(next, editAcct) });
+  };
+
+  const startDeviceConnect = async () => {
+    setOauthMsg("");
+    try {
+      const r = await api.oauthDeviceStart(editAcct);
+      setDeviceInfo({ userCode: r.user_code,
+        verificationUri: r.verification_uri, deviceCode: r.device_code,
+        interval: r.interval || 5 });
+    } catch (e: any) {
+      setOauthMsg(`Error: ${e.message ?? e}`);
+    }
+  };
+
+  useEffect(() => {
+    if (!deviceInfo) return;
+    const id = setInterval(async () => {
+      try {
+        const r = await api.oauthDevicePoll(editAcct, deviceInfo.deviceCode);
+        if (r.status === "complete") {
+          clearInterval(id);
+          setDeviceInfo(null);
+          const next = await api.getConfig();
+          onSaved(next);
+          setF((old) => ({ ...old, ...imapFields(next, editAcct) }));
+          setOauthMsg(t("oauth.connected"));
+        } else if (r.status === "error") {
+          clearInterval(id);
+          setDeviceInfo(null);
+          setOauthMsg(`Error: ${r.error}`);
+        }
+      } catch {
+        /* transient network error - keep polling until it expires */
+      }
+    }, deviceInfo.interval * 1000);
+    return () => clearInterval(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [deviceInfo?.deviceCode]);
 
   const resetStats = async () => {
     if (!confirm(t("confirm.reset_spend"))) return;
@@ -446,6 +516,89 @@ export function SettingsModal({ cfg, account, onClose, onSaved,
               placeholder="/certs/bridge-cert.pem"
               onChange={set("cafile")} />
           </Field>
+        </div>
+
+        <div className="sm:col-span-2 rounded-md border border-line
+          bg-panel2 p-3">
+          <SectionLabel>{t("oauth.title")}</SectionLabel>
+          <p className="mb-2 text-xs text-muted">{t("oauth.help")}</p>
+          <Field label={t("oauth.provider")}>
+            <Select className="w-full" value={f.oauthProvider}
+              onChange={(e) => setF({ ...f,
+                oauthProvider: e.target.value as "" | OauthProvider })}>
+              <option value="">{t("oauth.provider_off")}</option>
+              <option value="google">Gmail (Google)</option>
+              <option value="microsoft">Outlook / Microsoft 365</option>
+            </Select>
+          </Field>
+
+          {f.oauthProvider === "google" && (
+            <p className="my-2 text-xs text-muted">{t("oauth.google_help")}</p>
+          )}
+          {f.oauthProvider === "microsoft" && cfg.oauth_ms_device_available && (
+            <p className="my-2 text-xs text-muted">{t("oauth.ms_device_help")}</p>
+          )}
+          {f.oauthProvider === "microsoft" && !cfg.oauth_ms_device_available && (
+            <p className="my-2 text-xs text-muted">{t("oauth.ms_byo_help")}</p>
+          )}
+
+          {f.oauthProvider && !(f.oauthProvider === "microsoft"
+            && cfg.oauth_ms_device_available) && (
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+              <Field label={t("oauth.client_id")}>
+                <Input className="w-full" value={f.oauthClientId}
+                  onChange={set("oauthClientId")} />
+              </Field>
+              <Field label={t("oauth.client_secret")}>
+                <Input className="w-full" type="password"
+                  value={f.oauthClientSecret}
+                  placeholder={f.oauthClientSecretSet
+                    ? t("(unchanged)") : t("required")}
+                  onChange={set("oauthClientSecret")} />
+              </Field>
+            </div>
+          )}
+
+          {f.oauthProvider && (
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              {f.oauthConnected ? (<>
+                <span className="text-sm text-emerald-400">
+                  ✓ {t("oauth.connected")}
+                </span>
+                <Button variant="ghost" onClick={disconnectOauth}>
+                  {t("oauth.disconnect")}
+                </Button>
+              </>) : f.oauthProvider === "microsoft"
+                && cfg.oauth_ms_device_available ? (
+                <Button onClick={startDeviceConnect}>
+                  {t("oauth.connect_device")}
+                </Button>
+              ) : (
+                <Button onClick={connectOauth} disabled={!f.oauthClientId}>
+                  {t("oauth.connect")}
+                </Button>
+              )}
+            </div>
+          )}
+
+          {deviceInfo && (
+            <div className="mt-2 rounded-md border border-line bg-panel p-3
+              text-sm">
+              <p>{t("oauth.device_instructions")}</p>
+              <p className="mt-1">
+                <a href={deviceInfo.verificationUri} target="_blank"
+                  rel="noreferrer" className="text-accent underline">
+                  {deviceInfo.verificationUri}
+                </a>
+              </p>
+              <p className="mt-1 font-mono text-lg tracking-widest">
+                {deviceInfo.userCode}
+              </p>
+            </div>
+          )}
+          {oauthMsg && (
+            <p className="mt-2 text-xs text-muted">{oauthMsg}</p>
+          )}
         </div>
 
         <div className="sm:col-span-2">

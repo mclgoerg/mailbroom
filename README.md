@@ -43,7 +43,8 @@ host/port/security - you only add user + password:
 | Preset | IMAP host | SMTP host (unsubscribe) | Auth notes |
 |---|---|---|---|
 | **Proton Mail Bridge** | `127.0.0.1:1143` SSL | `127.0.0.1:1025` | Featured setup, see below. Paid Proton plan; use the Bridge-generated password and the exported Bridge certificate as CA file. |
-| **Gmail** | `imap.gmail.com:993` SSL | `smtp.gmail.com:465` SSL | [App password](https://myaccount.google.com/apppasswords) required (2-step verification must be on). |
+| **Gmail** | `imap.gmail.com:993` SSL | `smtp.gmail.com:465` SSL | [App password](https://myaccount.google.com/apppasswords) required (2-step verification must be on), or connect via OAuth (see below) - either works. |
+| **Outlook / Microsoft 365** | `outlook.office365.com:993` SSL | `smtp.office365.com:587` STARTTLS | OAuth only - Microsoft has no app-password option for IMAP. Connect via the device-code flow in Settings (no setup needed); experimental, see below. |
 | **iCloud Mail** | `imap.mail.me.com:993` SSL | `smtp.mail.me.com:587` STARTTLS | [App-specific password](https://account.apple.com/account/manage) required. |
 | **Fastmail** | `imap.fastmail.com:993` SSL | `smtp.fastmail.com:465` SSL | [App password](https://www.fastmail.help/hc/en-us/articles/360058752854) with IMAP scope. |
 | **GMX** | `imap.gmx.net:993` SSL | `mail.gmx.net:465` SSL | Enable IMAP in GMX mail settings first; app password if 2FA is on. |
@@ -51,10 +52,15 @@ host/port/security - you only add user + password:
 | **Yahoo Mail** | `imap.mail.yahoo.com:993` SSL | `smtp.mail.yahoo.com:465` SSL | [App password](https://help.yahoo.com/kb/SLN15241.html) required. |
 | **Custom** | anything | anything | Any IMAP server with SSL or STARTTLS (Dovecot, Courier, …). |
 
-**Not supported: Outlook.com / Microsoft 365 / Hotmail.** Microsoft
-allows IMAP access only via OAuth2, which Mailbroom deliberately does
-not implement (no client secrets, no token flows). The Sieve filter
-export is Proton-only and hidden for other presets.
+**OAuth (Gmail / Outlook).** In an account's settings, under "Connect
+via OAuth", pick a provider. Outlook uses a device code - click
+Connect, then enter the code shown at microsoft.com/devicelogin on any
+device; no app registration needed. Gmail has no such shared option
+(Google requires per-app verification for the restricted mail scope),
+so you register your own free OAuth client first - see
+[docs/install.md](docs/install.md#gmail-oauth-setup) for the walk-
+through. Outlook support is experimental. The Sieve filter export is
+Proton-only and hidden for other presets.
 
 ## Features
 

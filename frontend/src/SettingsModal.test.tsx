@@ -40,6 +40,7 @@ const acct = {
   smtp_host: "", smtp_port: 1025, smtp_security: "auto" as const,
   user: "me@proton.example", password: "", password_set: true,
   cafile: "/certs/bridge-cert.pem", preset: "proton" as const,
+  oauth: null,
 };
 const cfg: Config = {
   accounts: {
@@ -48,6 +49,8 @@ const cfg: Config = {
       user: "me@icloud.example" },
   },
   default_account: "default",
+  oauth_providers: ["google", "microsoft"],
+  oauth_ms_device_available: false,
   auth: {
     mode: "none", is_admin: true, password_set: false,
     oidc: { issuer: "", client_id: "", client_secret_set: false,
