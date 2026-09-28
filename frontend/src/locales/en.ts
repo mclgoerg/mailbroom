@@ -165,6 +165,7 @@ export const EN: Record<string, string> = {
   "ai.rate": "AI rate mails",
   "sel.ai_safe": "AI: safe to delete",
   "sel.ai_review": "AI: review",
+  "sel.unsub_pending": "Not yet unsubscribed",
   "endpoint.label": "Endpoint / base URL",
   "key.optional": "(optional for local models)",
   "note.ai_resume":

@@ -281,6 +281,10 @@ export default function App() {
         .toISOString().slice(0, 10);
       groups.filter((g) => g.last && g.last < cutoff && !g.protected)
         .forEach((g) => next.add(g.key));
+    } else if (preset === "unsub_pending") {
+      groups.filter((g) => g.unsub && g.unsubscribed?.status !== "done"
+          && !g.protected)
+        .forEach((g) => next.add(g.key));
     }
     setSelected(next);
   };
@@ -615,6 +619,7 @@ export default function App() {
           <option value="older6">{t("Inactive > 6 months")}</option>
           <option value="older12">{t("Inactive > 1 year")}</option>
           <option value="older24">{t("Inactive > 2 years")}</option>
+          <option value="unsub_pending">{t("sel.unsub_pending")}</option>
           <option value="none">{t("Clear selection")}</option>
         </Select>
         {/* Sort: field select + direction toggle as one segmented

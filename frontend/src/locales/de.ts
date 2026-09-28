@@ -132,6 +132,7 @@ export const DE: Record<string, string> = {
   "ai.rate": "KI: Mails bewerten",
   "sel.ai_safe": "KI: sicher löschbar",
   "sel.ai_review": "KI: prüfen",
+  "sel.unsub_pending": "Noch nicht abbestellt",
   "endpoint.label": "Endpunkt / Basis-URL",
   "key.optional": "(optional bei lokalen Modellen)",
   "note.ai_resume":
