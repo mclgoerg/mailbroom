@@ -1,0 +1,169 @@
+// @vitest-environment jsdom
+/* Header account switcher: lives in the profile menu once >1 account is
+ * configured. Covers the redesign that replaced the truncated pill strip
+ * (frontend/src/App.tsx header) - see ai-workspaces/proton-mail-cleaner
+ * PLAN.md "header redesign + account switcher". */
+
+import { cleanup, fireEvent, render, screen, waitFor } from
+  "@testing-library/react";
+import { afterEach, expect, test, vi } from "vitest";
+
+const stateCalls = { n: 0 };
+let state: any;
+
+vi.mock("./api", () => ({
+  api: {
+    authProbe: () => Promise.resolve({ mode: "none", authed: true }),
+    getConfig: () => Promise.resolve(cfg),
+    state: () => { stateCalls.n++; return Promise.resolve(state); },
+    emptyTrash: () => Promise.resolve({ ok: true }),
+    logout: () => Promise.resolve(),
+    exportUrl: (mode: string) => `/api/export?grouping=${mode}`,
+  },
+  setAccount: () => {},
+  withAccount: (p: string) => p,
+}));
+
+import App from "./App";
+import type { AppState, Config } from "./types";
+
+const acct = {
+  excluded_folders: [] as string[],
+  host: "h", port: 993, security: "ssl" as const,
+  smtp_host: "", smtp_port: 587, smtp_security: "auto" as const,
+  user: "", password: "", password_set: true,
+  cafile: "", preset: "custom" as const, oauth: null,
+};
+
+const cfgBase: Omit<Config, "accounts" | "default_account"> = {
+  oauth_providers: [], oauth_ms_device_available: false,
+  auth: { mode: "none", is_admin: false },
+  protected: [], categories: {},
+  ai: { provider: "anthropic", model: "claude-sonnet-5",
+    foundry_endpoint: "", price_in: 0, price_out: 0, budget_usd: 0,
+    month_cost: 0, prices_effective: [2, 10], api_key: "",
+    api_key_set: false, available: false, source: null,
+    shared_budget_usd: 0 },
+  ai_stats: { input_tokens: 0, output_tokens: 0, cost: 0, runs: 0 },
+};
+
+const multiCfg: Config = {
+  ...cfgBase,
+  default_account: "proton",
+  accounts: {
+    proton: { ...acct, user: "marcel@proton.example" },
+    icloud: { ...acct, user: "marcel@icloud.example" },
+    gmail: { ...acct, user: "marcel@gmail.example" },
+  },
+};
+
+const singleCfg: Config = {
+  ...cfgBase,
+  default_account: "proton",
+  accounts: { proton: { ...acct, user: "marcel@proton.example" } },
+};
+
+let cfg: Config = multiCfg;
+
+const baseState: AppState = {
+  account: "proton", status: "idle", scanned_ts: null, groups_rev: 0,
+  progress: "", error: "", folders: [],
+  groups: { sender: {}, domain: {}, subject: {} },
+  ai: { status: "idle", grouping: "sender", progress: "", error: "",
+    usage: null },
+  delete: { status: "idle", progress: "", error: "", moved: 0 },
+  atts: { status: "idle", progress: "", error: "", mails: 0, size: 0 },
+  unsub: { status: "idle", progress: "", error: "", total: 0, done: 0,
+    links: 0, failed: 0, skipped: 0 },
+  trash_count: 0, notice: null, undo: [], folders_raw: [], rules: [],
+};
+
+afterEach(() => {
+  cleanup();
+  localStorage.clear();
+  stateCalls.n = 0;
+});
+
+const openMenu = async () => {
+  await waitFor(() =>
+    expect(screen.getByLabelText("Profile & settings")).toBeTruthy());
+  fireEvent.click(screen.getByLabelText("Profile & settings"));
+};
+
+test("profile menu lists every account with its address", async () => {
+  cfg = multiCfg;
+  state = { ...baseState };
+  render(<App />);
+  // Wait for config to load (multi-account trigger) before opening the
+  // menu - opening too early would still show the single-account menu.
+  await waitFor(() => expect(screen.getByLabelText("Profile & settings")
+    .textContent).toContain("proton"));
+  await openMenu();
+  expect(screen.getByText("Accounts")).toBeTruthy();
+  expect(screen.getByText("marcel@proton.example")).toBeTruthy();
+  expect(screen.getByText("marcel@icloud.example")).toBeTruthy();
+  expect(screen.getByText("marcel@gmail.example")).toBeTruthy();
+});
+
+test("the active account is marked and the trigger shows its name",
+  async () => {
+    cfg = multiCfg;
+    state = { ...baseState };
+    render(<App />);
+    await waitFor(() => expect(screen.getByLabelText("Profile & settings")
+      .textContent).toContain("proton"));
+    await openMenu();
+    const rows = screen.getAllByRole("menuitemradio");
+    const active = rows.find((r) => r.getAttribute("aria-checked") === "true");
+    expect(active?.textContent).toContain("proton");
+    expect(rows.filter((r) => r.getAttribute("aria-checked") === "true"))
+      .toHaveLength(1);
+  });
+
+test("clicking a different account switches; clicking the active one " +
+  "does not re-fetch", async () => {
+  cfg = multiCfg;
+  state = { ...baseState };
+  render(<App />);
+  await waitFor(() => expect(screen.getByLabelText("Profile & settings")
+    .textContent).toContain("proton"));
+  const callsAfterMount = stateCalls.n;
+
+  // Clicking the ALREADY active account must not trigger a state refetch.
+  await openMenu();
+  fireEvent.click(screen.getByText("marcel@proton.example"));
+  expect(stateCalls.n).toBe(callsAfterMount);
+
+  // Clicking a DIFFERENT account switches (new refresh, trigger updates).
+  await openMenu();
+  fireEvent.click(screen.getByText("marcel@icloud.example"));
+  await waitFor(() => expect(screen.getByLabelText("Profile & settings")
+    .textContent).toContain("icloud"));
+  expect(stateCalls.n).toBeGreaterThan(callsAfterMount);
+  expect(localStorage.getItem("pmc_account")).toBe("icloud");
+});
+
+test("single account: no Accounts section, header keeps the plain " +
+  "profile trigger", async () => {
+  cfg = singleCfg;
+  state = { ...baseState };
+  render(<App />);
+  await openMenu();
+  expect(screen.queryByText("Accounts")).toBeNull();
+  expect(screen.queryByRole("menuitemradio")).toBeNull();
+});
+
+test("header has a single account control, not a separate pill strip",
+  async () => {
+    cfg = multiCfg;
+    state = { ...baseState };
+    render(<App />);
+    await waitFor(() => expect(screen.getByLabelText("Profile & settings")
+      .textContent).toContain("proton"));
+    // Before opening the menu, only the trigger mentions account names -
+    // no standalone per-account pill buttons sit in the header.
+    const matches = screen.getAllByText((_, el) =>
+      el?.textContent === "proton" || el?.textContent === "icloud"
+      || el?.textContent === "gmail");
+    expect(matches).toHaveLength(1);
+  });

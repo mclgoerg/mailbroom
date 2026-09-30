@@ -30,7 +30,7 @@ export const EN: Record<string, string> = {
   "account.confirm_delete":
     'Remove account "{name}"? Its rules keep their account name and stop '
     + "running; mails on the server are untouched.",
-  "account.switch_tip": "Switch account - every view is per account",
+  "menu.accounts": "Accounts",
   "scan.age": "scanned {ago} ago",
   "login.section": "Login (optional)",
   "login.help":

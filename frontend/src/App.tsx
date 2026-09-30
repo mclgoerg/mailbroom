@@ -11,8 +11,8 @@ import { SettingsModal } from "./components/SettingsModal";
 import { StatsPanel } from "./components/StatsPanel";
 import { QueryBuilder } from "./components/QueryBuilder";
 import { TrashPanel } from "./components/TrashPanel";
-import { applyTheme, Button, currentTheme, ensureAiAck, Input, Menu,
-  MenuHeading, MenuItem, Select, Spinner } from "./components/ui";
+import { AccountAvatar, applyTheme, Button, currentTheme, ensureAiAck, Input,
+  Menu, MenuHeading, MenuItem, Select, Spinner } from "./components/ui";
 import { t } from "./i18n";
 import { applyStatus, fmtAgo, fmtSize, fmtUsd, matchGroup, parseFilter }
   from "./lib";
@@ -224,6 +224,7 @@ export default function App() {
   const unsubRunning = state?.unsub?.status === "running";
   const aiEnabled = !!cfg?.ai.available;
   const acct = cfg?.accounts[account] ?? null;
+  const multiAccount = !!cfg && Object.keys(cfg.accounts).length > 1;
   const anyModal = !!detail || searchOpen || settingsOpen || rulesOpen
     || attsOpen || dupsOpen || statsOpen || trashOpen;
 
@@ -482,40 +483,53 @@ export default function App() {
   return (
     <div className="mx-auto max-w-6xl p-3 sm:p-5">
       <header className="mb-4 flex items-center gap-3">
-        <h1 className="text-lg font-bold tracking-tight">
+        <h1 className="text-lg font-bold">
           Mailbroom
         </h1>
-        {/* Account switcher - only when more than one account exists.
-            Switching swaps the entire view; nothing mixes across accounts. */}
-        {cfg && Object.keys(cfg.accounts).length > 1 && (
-          <div className="flex overflow-hidden rounded-md border border-line"
-            title={t("account.switch_tip")}>
-            {Object.keys(cfg.accounts).map((n) => (
-              <button key={n}
-                onClick={() => n !== account && switchAccount(n)}
-                className={`max-w-32 truncate px-2.5 py-1 text-xs ${
-                  n === account
-                    ? "bg-accent text-white"
-                    : "bg-panel2 text-body hover:bg-chip"}`}>
-                {n}
-              </button>
-            ))}
-          </div>
-        )}
         <span className="ml-auto flex items-center gap-2">
           {state?.trash_count != null && state.trash_count > 0 && (
-            <button className="text-xs text-muted underline-offset-2
-              hover:underline"
+            <button className="flex min-h-8 items-center gap-1
+              whitespace-nowrap rounded-md px-2 text-xs text-muted
+              hover:bg-chip"
               title={t("trash.browse")}
               onClick={() => setTrashOpen(true)}>
-              {t("Trash")}: {state.trash_count}
+              🗑 {state.trash_count}
             </button>
           )}
-          {/* Profile menu: identity, theme, settings, trash, logout -
-              keeps the header to three compact elements on phones. */}
+          {/* Profile menu: account switcher (when >1 account), identity,
+              theme, settings, trash, logout - keeps the header to three
+              elements on one min-h-8 baseline on phones. */}
           <Menu label={t("menu.profile")}
-            trigger={<>👤{auth.is_admin && auth.mode === "oidc"
-              ? <span className="ml-0.5 text-xs">★</span> : null}</>}>
+            trigger={multiAccount
+              ? <>
+                  <AccountAvatar name={account} />
+                  <span className="max-w-24 truncate" title={account}>
+                    {account}
+                  </span>
+                  {auth.is_admin && auth.mode === "oidc"
+                    ? <span className="text-xs">★</span> : null}
+                  <span className="text-faint">▾</span>
+                </>
+              : <>👤{auth.is_admin && auth.mode === "oidc"
+                  ? <span className="ml-0.5 text-xs">★</span> : null}</>}>
+            {multiAccount && (
+              <>
+                <MenuHeading>{t("menu.accounts")}</MenuHeading>
+                {Object.entries(cfg!.accounts).map(([n, a]) => (
+                  <MenuItem key={n} active={n === account} sub={a.user}
+                    onClick={() => n !== account && switchAccount(n)}>
+                    <span className="flex items-center gap-2">
+                      <AccountAvatar name={n} />
+                      {n}
+                    </span>
+                  </MenuItem>
+                ))}
+                <MenuItem onClick={() => setSettingsOpen(true)}>
+                  ＋ {t("account.add")}…
+                </MenuItem>
+                <div className="my-1 border-t border-line" />
+              </>
+            )}
             {auth.mode === "oidc" && !!auth.sub && (
               <MenuHeading>
                 {auth.sub}

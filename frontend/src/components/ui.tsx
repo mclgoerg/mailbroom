@@ -257,17 +257,59 @@ export function Menu({ trigger, label, children }: {
   );
 }
 
-export function MenuItem({ children, onClick, disabled }: {
+export function MenuItem({ children, onClick, disabled, active, sub }: {
   children: ReactNode;
   onClick?: () => void;
   disabled?: boolean;
+  active?: boolean;    // renders a trailing check, role=menuitemradio
+  sub?: ReactNode;     // muted second line (e.g. an account's address)
 }) {
   return (
-    <button className="block w-full rounded-md px-3 py-2 text-left text-sm
-      text-body hover:bg-chip disabled:opacity-50"
+    <button
+      role={active === undefined ? undefined : "menuitemradio"}
+      aria-checked={active}
+      className="flex w-full items-center gap-2 rounded-md px-3 py-2
+        text-left text-sm text-body hover:bg-chip disabled:opacity-50"
       onClick={onClick} disabled={disabled}>
-      {children}
+      <span className="min-w-0 flex-1 truncate">
+        {children}
+        {sub != null && sub !== "" && (
+          <span className="block truncate text-xs text-muted">{sub}</span>
+        )}
+      </span>
+      {active && <span className="text-accent">✓</span>}
     </button>
+  );
+}
+
+/* Non-semantic identity hues (never emerald/amber/rose/sky/orange - those
+ * are reserved: delete-safe/review/keep/replied/attachments). */
+const ACCOUNT_HUES = [
+  "bg-violet-900 text-violet-300",
+  "bg-teal-900 text-teal-300",
+  "bg-cyan-900 text-cyan-300",
+  "bg-lime-900 text-lime-300",
+  "bg-indigo-900 text-indigo-300",
+  "bg-fuchsia-900 text-fuchsia-300",
+];
+
+const hueOf = (name: string): string => {
+  let h = 0;
+  for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) | 0;
+  return ACCOUNT_HUES[Math.abs(h) % ACCOUNT_HUES.length];
+};
+
+/** Letter avatar identifying one account, tinted by a stable hash of its
+ *  name so accounts stay visually distinct in the switcher/menu. */
+export function AccountAvatar({ name, className = "" }: {
+  name: string; className?: string;
+}) {
+  return (
+    <span className={`inline-flex size-5 shrink-0 items-center
+      justify-center rounded-full text-[0.65rem] font-semibold uppercase
+      ${hueOf(name)} ${className}`}>
+      {name.charAt(0)}
+    </span>
   );
 }
 
