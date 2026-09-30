@@ -580,7 +580,9 @@ export default function App() {
               </MenuItem>
             )}
             {buildId && (
-              <MenuHeading>{t("menu.build", { id: buildId })}</MenuHeading>
+              <MenuHeading>
+                {t("menu.version", { version: __APP_VERSION__, id: buildId })}
+              </MenuHeading>
             )}
           </Menu>
         </span>

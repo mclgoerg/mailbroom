@@ -204,12 +204,14 @@ test("shows an update banner once the server build changes, and " +
   }
 });
 
-test("profile menu shows the build this tab actually loaded with",
-  async () => {
+test("profile menu shows the release version and the build this tab " +
+  "actually loaded with", async () => {
     cfg = singleCfg;
     state = { ...baseState };
     versions = ["abc123"];
     render(<App />);
     await openMenu();
-    expect(screen.getByText("Build abc123")).toBeTruthy();
+    // package.json's version baked in via vite.config.ts's define, plus
+    // the loaded build hash from the (mocked) /api/version poll.
+    expect(screen.getByText(/^v[\d.]+ \(build abc123\)$/)).toBeTruthy();
   });
