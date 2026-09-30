@@ -356,6 +356,11 @@ export function Modal({ children, onClose, full = false }: {
 export const applyTheme = (theme: "dark" | "light"): void => {
   document.documentElement.dataset.theme = theme;
   localStorage.setItem("pmc_theme", theme);
+  // Keep the iOS status bar style in sync with a live theme switch too
+  // (index.html sets the initial value before first paint).
+  const bar = document.querySelector(
+    'meta[name="apple-mobile-web-app-status-bar-style"]');
+  if (bar) bar.setAttribute("content", theme === "dark" ? "black" : "default");
 };
 
 export const currentTheme = (): "dark" | "light" =>
