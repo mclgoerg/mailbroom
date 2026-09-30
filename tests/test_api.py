@@ -55,6 +55,13 @@ def test_spa_fallback_is_contained():
         assert b"placeholder index" in r.content, path
 
 
+def test_spa_index_is_never_cached():
+    # index.html references the current build's hashed /assets bundle - it
+    # must always be revalidated, or an installed PWA can keep showing a
+    # stale shell indefinitely (no service worker to force an update).
+    assert client.get("/").headers["cache-control"] == "no-cache"
+
+
 def test_scan_group_delete_via_api(bridge):
     assert client.post("/api/scan", json={}).json() == {"ok": True}
     for _ in range(200):

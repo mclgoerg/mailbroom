@@ -1002,4 +1002,8 @@ if STATIC_DIR.is_dir():
         file = (_STATIC_ROOT / path).resolve()
         if path and file.is_relative_to(_STATIC_ROOT) and file.is_file():
             return FileResponse(file)
-        return FileResponse(_STATIC_ROOT / "index.html")
+        # index.html references the CURRENT build's hashed /assets bundle -
+        # it must always be revalidated, or an installed PWA can keep
+        # showing a stale shell (and stale hashed bundle) indefinitely.
+        return FileResponse(_STATIC_ROOT / "index.html",
+                             headers={"Cache-Control": "no-cache"})
