@@ -2,18 +2,32 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport"
+      content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <title>Mailbroom</title>
     <link rel="icon" href="/icon.svg" type="image/svg+xml" />
     <link rel="manifest" href="/manifest.webmanifest" />
     <meta name="theme-color" content="#a16207" />
     <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <!-- Without an explicit style, iOS defaults an installed ("Add to
+         Home Screen") app's status bar to an overlay that blurs the
+         page content scrolling underneath it - not a CSS bug in this
+         app, just a missing meta tag. "black"/"default" (never
+         "black-translucent") keep the status bar opaque instead. -->
+    <meta name="apple-mobile-web-app-status-bar-style" content="black" />
     <meta name="apple-mobile-web-app-title" content="Mailbroom" />
+    <!-- This file's content is hashed by GET /api/version (see
+         backend/main.py) so an already-open tab can detect a new build. -->
     <script>
-      // Apply the persisted theme before first paint to avoid a flash.
+      // Apply the persisted theme before first paint to avoid a flash,
+      // and match the iOS status bar style to it (see the comment above).
       try {
-        document.documentElement.dataset.theme =
-          localStorage.getItem("pmc_theme") || "dark";
+        var theme = localStorage.getItem("pmc_theme") || "dark";
+        document.documentElement.dataset.theme = theme;
+        document.querySelector(
+          'meta[name="apple-mobile-web-app-status-bar-style"]',
+        ).content = theme === "dark" ? "black" : "default";
       } catch (e) {}
     </script>
   </head>
