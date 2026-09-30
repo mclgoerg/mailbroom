@@ -31,6 +31,8 @@ export const EN: Record<string, string> = {
     'Remove account "{name}"? Its rules keep their account name and stop '
     + "running; mails on the server are untouched.",
   "menu.accounts": "Accounts",
+  "update.available": "A new version of Mailbroom is available.",
+  "update.reload": "Reload",
   "scan.age": "scanned {ago} ago",
   "login.section": "Login (optional)",
   "login.help":

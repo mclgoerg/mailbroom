@@ -10,6 +10,8 @@ import { afterEach, expect, test, vi } from "vitest";
 
 const stateCalls = { n: 0 };
 let state: any;
+let versions = ["v1"];        // api.version() walks through this in order
+let versionCalls = 0;
 
 vi.mock("./api", () => ({
   api: {
@@ -19,6 +21,8 @@ vi.mock("./api", () => ({
     emptyTrash: () => Promise.resolve({ ok: true }),
     logout: () => Promise.resolve(),
     exportUrl: (mode: string) => `/api/export?grouping=${mode}`,
+    version: () => Promise.resolve(
+      { build: versions[Math.min(versionCalls++, versions.length - 1)] }),
   },
   setAccount: () => {},
   withAccount: (p: string) => p,
@@ -82,6 +86,8 @@ afterEach(() => {
   cleanup();
   localStorage.clear();
   stateCalls.n = 0;
+  versions = ["v1"];
+  versionCalls = 0;
 });
 
 const openMenu = async () => {
@@ -167,3 +173,25 @@ test("header has a single account control, not a separate pill strip",
       || el?.textContent === "gmail");
     expect(matches).toHaveLength(1);
   });
+
+test("shows an update banner once the server build changes, and " +
+  "reloading works", async () => {
+  cfg = singleCfg;
+  state = { ...baseState };
+  versions = ["v1", "v2"];       // first poll establishes the baseline
+  vi.useFakeTimers();
+  try {
+    render(<App />);
+    await vi.advanceTimersByTimeAsync(0);        // flush the initial check
+    expect(screen.queryByText(/new version/i)).toBeNull();
+    await vi.advanceTimersByTimeAsync(120_000);  // the next poll tick
+    expect(screen.getByText(/new version/i)).toBeTruthy();
+    const reload = vi.fn();
+    vi.stubGlobal("location", { ...window.location, reload });
+    fireEvent.click(screen.getByText("Reload"));
+    expect(reload).toHaveBeenCalledOnce();
+    vi.unstubAllGlobals();
+  } finally {
+    vi.useRealTimers();
+  }
+});

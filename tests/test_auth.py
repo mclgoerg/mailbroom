@@ -171,6 +171,8 @@ def test_every_api_route_is_locked_without_a_session():
 
     # the public probe leaks nothing but the mode
     assert set(c.get("/api/auth").json()) == {"mode", "authed"}
+    # the update-check probe stays reachable too - no session leaked either
+    assert c.get("/api/version").status_code == 200
     # ... and the SSE stream is locked too (it is in the route walk, but
     # make the flagship data stream explicit)
     assert c.get("/api/events").status_code == 401

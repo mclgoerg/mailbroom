@@ -199,6 +199,25 @@ export default function App() {
       t: state.atts?.status, u: state.unsub?.status };
   }, [state]);
 
+  /* Update check: installed PWAs have no service worker here, so an
+     already-open tab can only learn a new build is live by asking the
+     server directly - a real, never-cached fetch (see api.version) -
+     rather than depending on the browser ever re-fetching index.html. */
+  const [updateAvailable, setUpdateAvailable] = useState(false);
+  const buildRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!authOk) return;
+    let cancelled = false;
+    const check = () => api.version().then(({ build }) => {
+      if (cancelled) return;
+      if (buildRef.current == null) buildRef.current = build;
+      else if (build !== buildRef.current) setUpdateAvailable(true);
+    }).catch(() => { /* offline/unreachable - try again next tick */ });
+    check();
+    const id = setInterval(check, 120_000);
+    return () => { cancelled = true; clearInterval(id); };
+  }, [authOk]);
+
   const groups = useMemo(() => {
     const all = Object.values(state?.groups?.[mode] ?? {});
     const f = parseFilter(filter);
@@ -560,6 +579,17 @@ export default function App() {
           </Menu>
         </span>
       </header>
+
+      {updateAvailable && (
+        <div className="mb-3 flex items-center justify-between gap-2
+          rounded-md border border-accent/40 bg-panel2 px-3 py-2 text-sm">
+          <span>✨ {t("update.available")}</span>
+          <Button className="!min-h-7 !px-2.5 !py-1 !text-xs"
+            onClick={() => window.location.reload()}>
+            {t("update.reload")}
+          </Button>
+        </div>
+      )}
 
       {/* Row 1: primary actions - identical in every grouping mode. */}
       <div className="mb-2 flex flex-wrap items-center gap-2">

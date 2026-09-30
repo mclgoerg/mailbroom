@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import csv
+import hashlib
 import io
 import json
 from pathlib import Path
@@ -69,7 +70,7 @@ SESSION_COOKIE = "pmc_session"
 # Reachable without a session: the login endpoints themselves plus the
 # auth-mode probe the login screen needs.
 _PUBLIC_API = {"/api/auth", "/api/login", "/api/logout",
-               "/api/oidc/login", "/api/oidc/callback"}
+               "/api/oidc/login", "/api/oidc/callback", "/api/version"}
 
 
 def _session_sub(request: Request) -> str | None:
@@ -155,6 +156,25 @@ def get_auth(request: Request):
         out["sub"] = sub if mode == "oidc" else ""
         out["is_admin"] = tenants.current().is_default
     return out
+
+
+_build_id: str | None = None
+
+
+@app.get("/api/version")
+def get_version():
+    """Public, unauthenticated: lets an already-open tab/PWA detect that a
+    newer frontend build is live (see frontend's update-check poll) without
+    depending on the browser ever re-fetching index.html on its own - an
+    installed PWA (no service worker here) can otherwise keep a stale app
+    shell indefinitely regardless of HTTP caching headers."""
+    global _build_id
+    if _build_id is None:
+        idx = STATIC_DIR / "index.html"
+        _build_id = (hashlib.sha256(idx.read_bytes()).hexdigest()[:12]
+                     if idx.is_file() else "dev")
+    return JSONResponse({"build": _build_id},
+                         headers={"Cache-Control": "no-store"})
 
 
 @app.post("/api/login")

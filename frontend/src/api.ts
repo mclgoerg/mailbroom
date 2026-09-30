@@ -99,6 +99,10 @@ export const api = {
   testConnection: () =>
     req<{ ok: boolean; folders: number }>("/api/test_connection", {}),
   authProbe: () => req<AuthProbe>("/api/auth"),
+  // cache: "no-store" - this specifically must never answer from a cached
+  // response, or an update-available check can never detect anything.
+  version: () => fetch(withAccount("/api/version"), { cache: "no-store" })
+    .then((r) => r.json() as Promise<{ build: string }>),
   login: (password: string) =>
     req<{ ok: boolean }>("/api/login", { password }),
   logout: () => req<{ ok: boolean }>("/api/logout", {}),
