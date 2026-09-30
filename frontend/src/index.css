@@ -40,6 +40,12 @@ html[data-theme="light"] {
 
 body {
   @apply bg-surface text-body antialiased;
+  /* viewport-fit=cover (index.html) hands the safe areas (notch/status
+     bar, home indicator) to the page - without reserving them here, iOS
+     renders its OWN translucent/blur treatment over whatever content
+     scrolls into that space instead of our solid background. */
+  padding: env(safe-area-inset-top) env(safe-area-inset-right)
+    env(safe-area-inset-bottom) env(safe-area-inset-left);
 }
 
 /* Shared loading animation: a "comet" ring in currentColor (defaults to
