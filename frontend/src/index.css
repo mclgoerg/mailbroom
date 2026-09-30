@@ -58,8 +58,13 @@ body {
   /* viewport-fit=cover (index.html) hands the safe areas (notch/status
      bar, home indicator) to the page - without reserving them here, iOS
      renders its OWN translucent/blur treatment over whatever content
-     scrolls into that space instead of our solid background. */
-  padding: env(safe-area-inset-top) env(safe-area-inset-right)
+     scrolls into that space instead of our solid background. The extra
+     8px on top is a deliberate buffer beyond the raw inset (TREK's own
+     mobile header does the same, +10px) - a small gap between the
+     status bar and the first line of content reads as intentional
+     design and hides any residual edge artifact instead of sitting
+     content flush against the system chrome. */
+  padding: calc(env(safe-area-inset-top) + 8px) env(safe-area-inset-right)
     env(safe-area-inset-bottom) env(safe-area-inset-left);
 }
 
