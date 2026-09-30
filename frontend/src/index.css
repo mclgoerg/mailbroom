@@ -20,6 +20,13 @@
 
 html {
   color-scheme: dark;
+  /* html stays fixed and non-scrolling with its OWN solid background;
+     body (below) becomes the actual scroll container. Without this, the
+     document itself rubber-bands on iOS - that bounce is exactly the
+     blur users see when pulling past the top/bottom of a PWA. */
+  height: 100%;
+  overflow: hidden;
+  @apply bg-surface;
 }
 
 html[data-theme="light"] {
@@ -40,6 +47,14 @@ html[data-theme="light"] {
 
 body {
   @apply bg-surface text-body antialiased;
+  /* The real scroll container (html is fixed, see above). overscroll-
+     behavior: none is the actual fix for the reported blur - it disables
+     iOS's rubber-band bounce at the top/bottom entirely, rather than
+     trying to make that bounce look right. */
+  height: 100%;
+  overflow: auto;
+  overscroll-behavior: none;
+  -webkit-overflow-scrolling: touch;
   /* viewport-fit=cover (index.html) hands the safe areas (notch/status
      bar, home indicator) to the page - without reserving them here, iOS
      renders its OWN translucent/blur treatment over whatever content
