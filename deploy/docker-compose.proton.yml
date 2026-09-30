@@ -21,7 +21,10 @@ services:
       - protonbridge_data:/root
     ports:
       # The UI port lives on the BRIDGE service (shared namespace below).
-      - "127.0.0.1:8765:8765"
+      # Localhost only by default - override MAILBROOM_BIND in .env (to
+      # e.g. 0.0.0.0) only once you enabled AUTH_MODE or run a reverse
+      # proxy with its own auth in front. Docker ports bypass ufw!
+      - "${MAILBROOM_BIND:-127.0.0.1}:${MAILBROOM_PORT:-8765}:8765"
 
   mailbroom:
     image: ghcr.io/mclgoerg/mailbroom:latest
