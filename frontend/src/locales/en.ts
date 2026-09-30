@@ -33,6 +33,7 @@ export const EN: Record<string, string> = {
   "menu.accounts": "Accounts",
   "update.available": "A new version of Mailbroom is available.",
   "update.reload": "Reload",
+  "menu.build": "Build {id}",
   "scan.age": "scanned {ago} ago",
   "login.section": "Login (optional)",
   "login.help":

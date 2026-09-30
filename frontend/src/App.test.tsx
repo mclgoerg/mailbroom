@@ -96,6 +96,13 @@ const openMenu = async () => {
   fireEvent.click(screen.getByLabelText("Profile & settings"));
 };
 
+// Mounting with an empty stored account always fires exactly 2
+// api.state() calls before things settle (the initial data-fetch effect,
+// then again once switchAccount resolves the default account) - wait for
+// both, or a race can catch the count between them and read it as final.
+const settleStateCalls = () =>
+  waitFor(() => expect(stateCalls.n).toBeGreaterThanOrEqual(2));
+
 test("profile menu lists every account with its address", async () => {
   cfg = multiCfg;
   state = { ...baseState };
@@ -133,6 +140,7 @@ test("clicking a different account switches; clicking the active one " +
   render(<App />);
   await waitFor(() => expect(screen.getByLabelText("Profile & settings")
     .textContent).toContain("proton"));
+  await settleStateCalls();
   const callsAfterMount = stateCalls.n;
 
   // Clicking the ALREADY active account must not trigger a state refetch.
@@ -184,7 +192,7 @@ test("shows an update banner once the server build changes, and " +
     render(<App />);
     await vi.advanceTimersByTimeAsync(0);        // flush the initial check
     expect(screen.queryByText(/new version/i)).toBeNull();
-    await vi.advanceTimersByTimeAsync(120_000);  // the next poll tick
+    await vi.advanceTimersByTimeAsync(20_000);   // the next poll tick
     expect(screen.getByText(/new version/i)).toBeTruthy();
     const reload = vi.fn();
     vi.stubGlobal("location", { ...window.location, reload });
@@ -195,3 +203,13 @@ test("shows an update banner once the server build changes, and " +
     vi.useRealTimers();
   }
 });
+
+test("profile menu shows the build this tab actually loaded with",
+  async () => {
+    cfg = singleCfg;
+    state = { ...baseState };
+    versions = ["abc123"];
+    render(<App />);
+    await openMenu();
+    expect(screen.getByText("Build abc123")).toBeTruthy();
+  });

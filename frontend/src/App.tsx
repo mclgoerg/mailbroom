@@ -204,17 +204,20 @@ export default function App() {
      server directly - a real, never-cached fetch (see api.version) -
      rather than depending on the browser ever re-fetching index.html. */
   const [updateAvailable, setUpdateAvailable] = useState(false);
+  // The build this tab actually loaded with - shown in the profile menu so
+  // a stuck/stale tab is visible at a glance instead of guessed at.
+  const [buildId, setBuildId] = useState<string | null>(null);
   const buildRef = useRef<string | null>(null);
   useEffect(() => {
     if (!authOk) return;
     let cancelled = false;
     const check = () => api.version().then(({ build }) => {
       if (cancelled) return;
-      if (buildRef.current == null) buildRef.current = build;
+      if (buildRef.current == null) { buildRef.current = build; setBuildId(build); }
       else if (build !== buildRef.current) setUpdateAvailable(true);
     }).catch(() => { /* offline/unreachable - try again next tick */ });
     check();
-    const id = setInterval(check, 120_000);
+    const id = setInterval(check, 20_000);
     return () => { cancelled = true; clearInterval(id); };
   }, [authOk]);
 
@@ -575,6 +578,9 @@ export default function App() {
               }}>
                 ⏻ {t("login.logout")}
               </MenuItem>
+            )}
+            {buildId && (
+              <MenuHeading>{t("menu.build", { id: buildId })}</MenuHeading>
             )}
           </Menu>
         </span>
