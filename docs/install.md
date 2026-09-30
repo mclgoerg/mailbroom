@@ -33,7 +33,7 @@ generic IMAP case (Gmail, iCloud, Fastmail, ...).
 ```bash
 git clone https://github.com/mclgoerg/mailbroom
 cd mailbroom/deploy
-cp .env.example .env        # fill in provider + credentials
+cp .env.example .env        # optional edits - account setup is in the UI
 docker compose up -d
 ```
 

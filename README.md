@@ -168,7 +168,7 @@ The quickest start is the starter kit in [`deploy/`](deploy/):
 
 ```bash
 cd deploy
-cp .env.example .env        # fill in your provider + credentials
+cp .env.example .env        # optional edits - account setup is in the UI
 docker compose up -d        # generic IMAP (Gmail, iCloud, Fastmail, …)
 # or, for Proton Mail via the Bridge (setup steps in the file header):
 docker compose -f docker-compose.proton.yml up -d
