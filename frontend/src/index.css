@@ -20,6 +20,13 @@
 
 html {
   color-scheme: dark;
+  /* html stays fixed and non-scrolling with its OWN solid background;
+     body (below) becomes the actual scroll container. Without this, the
+     document itself rubber-bands on iOS - that bounce is exactly the
+     blur users see when pulling past the top/bottom of a PWA. */
+  height: 100%;
+  overflow: hidden;
+  @apply bg-surface;
 }
 
 html[data-theme="light"] {
@@ -40,6 +47,25 @@ html[data-theme="light"] {
 
 body {
   @apply bg-surface text-body antialiased;
+  /* The real scroll container (html is fixed, see above). overscroll-
+     behavior: none is the actual fix for the reported blur - it disables
+     iOS's rubber-band bounce at the top/bottom entirely, rather than
+     trying to make that bounce look right. */
+  height: 100%;
+  overflow: auto;
+  overscroll-behavior: none;
+  -webkit-overflow-scrolling: touch;
+  /* viewport-fit=cover (index.html) hands the safe areas (notch/status
+     bar, home indicator) to the page - without reserving them here, iOS
+     renders its OWN translucent/blur treatment over whatever content
+     scrolls into that space instead of our solid background. The extra
+     8px on top is a deliberate buffer beyond the raw inset (TREK's own
+     mobile header does the same, +10px) - a small gap between the
+     status bar and the first line of content reads as intentional
+     design and hides any residual edge artifact instead of sitting
+     content flush against the system chrome. */
+  padding: calc(env(safe-area-inset-top) + 8px) env(safe-area-inset-right)
+    env(safe-area-inset-bottom) env(safe-area-inset-left);
 }
 
 /* Shared loading animation: a "comet" ring in currentColor (defaults to

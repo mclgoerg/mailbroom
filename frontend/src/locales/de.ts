@@ -430,7 +430,10 @@ export const DE: Record<string, string> = {
   "account.confirm_delete":
     'Konto "{name}" entfernen? Seine Regeln behalten den Kontonamen und '
     + "laufen nicht mehr; Mails auf dem Server bleiben unangetastet.",
-  "account.switch_tip": "Konto wechseln - jede Ansicht gilt pro Konto",
+  "menu.accounts": "Konten",
+  "update.available": "Eine neue Version von Mailbroom ist verfügbar.",
+  "update.reload": "Neu laden",
+  "menu.version": "v{version} (Build {id})",
   "scan.age": "gescannt vor {ago}",
   "login.section": "Anmeldung (optional)",
   "login.help":
