@@ -441,4 +441,6 @@ export const EN: Record<string, string> = {
   "export.csv": "Export CSV",
   "export.csv_tip": "Export the current grouping as CSV",
   "bar.selected": "{n} groups selected · {mails} mails",
+  "bar.limit_to": "Limit to:",
+  "Cancel": "Cancel",
 };

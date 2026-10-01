@@ -399,3 +399,39 @@ test("the overflow menu exposes CSV export without requiring a selection",
     .closest("a") as HTMLAnchorElement;
   expect(link.href).toContain("/api/export?grouping=sender");
 });
+
+// Regression: the folder picker used to be a dead end - once "Move to
+// folder…" was picked there was no way back to Action… short of
+// reloading the whole app (not even deselecting helped, since it
+// reappeared pre-selected on the next selection).
+test("the Move-to-folder picker has an explicit Cancel back to Action…, " +
+  "and clearing the selection also resets it", async () => {
+  renderWithOneSenderGroup();
+  await waitFor(() => expect(screen.getAllByText("DHL Paket").length)
+    .toBeGreaterThan(0));
+  await selectRowCheckbox();
+  await waitFor(() => expect(screen.getByText(/^Trash \d+$/)).toBeTruthy());
+
+  fireEvent.change(screen.getByDisplayValue("Action…"),
+    { target: { value: "move" } });
+  await waitFor(() => expect(screen.getAllByText("Move to folder…").length)
+    .toBeGreaterThan(1));   // the Action… option AND the picker's own placeholder
+
+  // Cancel goes back to a plain Action… select, not stuck mid-move.
+  fireEvent.click(screen.getByTitle("Cancel"));
+  await waitFor(() => expect(screen.getByDisplayValue("Action…")).toBeTruthy());
+
+  // Re-enter the picker, then clear the selection entirely instead of
+  // cancelling - the bar disappears, and selecting again must NOT reopen
+  // mid-move.
+  fireEvent.change(screen.getByDisplayValue("Action…"),
+    { target: { value: "move" } });
+  await waitFor(() => expect(screen.getAllByText("Move to folder…").length)
+    .toBeGreaterThan(1));
+  fireEvent.click(screen.getByText("Clear selection"));
+  await waitFor(() => expect(screen.queryByText(/^Trash \d+$/)).toBeNull());
+
+  await selectRowCheckbox();
+  await waitFor(() => expect(screen.getByText(/^Trash \d+$/)).toBeTruthy());
+  expect(screen.getByDisplayValue("Action…")).toBeTruthy();
+});

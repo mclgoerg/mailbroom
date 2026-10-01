@@ -596,4 +596,6 @@ export const DE: Record<string, string> = {
   "export.csv": "CSV exportieren",
   "export.csv_tip": "Aktuelle Gruppierung als CSV exportieren",
   "bar.selected": "{n} Gruppen ausgewählt · {mails} Mails",
+  "bar.limit_to": "Beschränken auf:",
+  "Cancel": "Abbrechen",
 };

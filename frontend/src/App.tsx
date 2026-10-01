@@ -1,6 +1,6 @@
 import { ArrowDown, BarChart3, ChevronDown, ClipboardList, Copy, Download,
   Moon, MoreHorizontal, Paperclip, Plus, Power, ScrollText, Search,
-  Settings as SettingsIcon, Sparkles, Star, Sun, Trash2, User, Wand2 }
+  Settings as SettingsIcon, Sparkles, Star, Sun, Trash2, User, Wand2, X }
   from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api, setAccount as apiSetAccount, withAccount } from "./api";
@@ -91,6 +91,13 @@ export default function App() {
   const [trashOpen, setTrashOpen] = useState(false);
   const [undoOpen, setUndoOpen] = useState(false);
   const [moveDest, setMoveDest] = useState("");
+  // The folder picker must never be a dead end: clearing the selection
+  // (the bar disappearing entirely) also resets it, so re-selecting
+  // something always starts back at the plain Action… control instead of
+  // reopening mid-move with no way back short of reloading.
+  useEffect(() => {
+    if (!selected.size) setMoveDest("");
+  }, [selected.size]);
   // Retention restriction for bulk group actions: act on everything beyond
   // a keep-window instead of the whole group (mutually exclusive variants).
   const [retention, setRetention] =
@@ -885,8 +892,10 @@ export default function App() {
 
       {/* Contextual bulk-action bar: the ONLY bulk-action chrome in the
           app - it does not exist at all until something is selected.
-          Kept to two tight rows (info+clear, then controls) rather than
-          a stack of individual pill buttons. */}
+          Three clearly separate rows: (1) what's selected, (2) the
+          retention limit - a modifier that applies to WHICHEVER action
+          runs below, labelled instead of relying on a hover-only title
+          (useless on touch), (3) the actions themselves. */}
       {selected.size > 0 && (
         <div className="fixed inset-x-0 bottom-0 z-10 border-t border-line
           bg-panel px-3 py-2 shadow-[0_-4px_16px_rgba(0,0,0,0.3)]"
@@ -903,29 +912,9 @@ export default function App() {
                 {t("Clear selection")}
               </button>
             </div>
-            <div className="flex flex-wrap items-center gap-2">
-              {moveDest === "?" ? (
-                <Select value="" className="min-w-0 flex-1"
-                  onChange={(e) => {
-                    setMoveDest("");
-                    if (e.target.value) act([...selected], "move",
-                      e.target.value, ...retentionParams());
-                  }}>
-                  <option value="" disabled>{t("Move to folder…")}</option>
-                  {(state?.folders_raw ?? []).map((f, i) => (
-                    <option key={f} value={f}>{state?.folders[i] ?? f}</option>
-                  ))}
-                </Select>
-              ) : (
-                <Select value="" className="min-w-0 flex-1"
-                  onChange={(e) => onAction(e.target.value)}>
-                  <option value="" disabled>{t("Action…")}</option>
-                  <option value="archive">{t("Archive")}</option>
-                  <option value="move">{t("Move to folder…")}</option>
-                  <option value="mark_read">{t("Mark read")}</option>
-                  <option value="unsubscribe">{t("Unsubscribe")}</option>
-                </Select>
-              )}
+            <div className="flex flex-wrap items-center gap-2 text-xs
+              text-muted">
+              <span className="shrink-0">{t("bar.limit_to")}</span>
               <Select value={retention} title={t("retention.help")}
                 className="min-w-0 flex-1"
                 onChange={(e) =>
@@ -941,6 +930,37 @@ export default function App() {
                   placeholder={t("retention.n_placeholder")}
                   value={retentionN}
                   onChange={(e) => setRetentionN(e.target.value)} />
+              )}
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <Select value="" className="min-w-0 flex-1"
+                onChange={(e) => onAction(e.target.value)}>
+                <option value="" disabled>{t("Action…")}</option>
+                <option value="archive">{t("Archive")}</option>
+                <option value="move">{t("Move to folder…")}</option>
+                <option value="mark_read">{t("Mark read")}</option>
+                <option value="unsubscribe">{t("Unsubscribe")}</option>
+              </Select>
+              {moveDest === "?" && (
+                <>
+                  <Select value="" className="min-w-0 flex-1"
+                    onChange={(e) => {
+                      if (e.target.value) act([...selected], "move",
+                        e.target.value, ...retentionParams());
+                      setMoveDest("");
+                    }}>
+                    <option value="" disabled>{t("Move to folder…")}</option>
+                    {(state?.folders_raw ?? []).map((f, i) => (
+                      <option key={f} value={f}>
+                        {state?.folders[i] ?? f}
+                      </option>
+                    ))}
+                  </Select>
+                  <Button variant="ghost" className="!px-2 shrink-0"
+                    title={t("Cancel")} onClick={() => setMoveDest("")}>
+                    <X size={15} />
+                  </Button>
+                </>
               )}
               <Button variant="danger" disabled={selCountPending}
                 className="ml-auto shrink-0"
