@@ -1,3 +1,4 @@
+import { ArrowLeft } from "lucide-react";
 import { useEffect, useState } from "react";
 import { api, fmtSize, mailKey } from "../api";
 import type { Mail, MessageDetail } from "../types";
@@ -34,7 +35,10 @@ export function MessageView({ mail, onBack }: {
         {detail?.text}
       </pre>
       <div className="border-t border-line px-4 py-2">
-        <Button variant="ghost" onClick={onBack}>← {t("back to list")}</Button>
+        <Button variant="ghost" onClick={onBack}>
+          <ArrowLeft size={15} className="mr-1 inline align-text-bottom" />
+          {t("back to list")}
+        </Button>
       </div>
     </div>
   );

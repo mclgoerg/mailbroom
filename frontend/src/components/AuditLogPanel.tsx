@@ -1,3 +1,4 @@
+import { ChevronLeft, ChevronRight, ScrollText } from "lucide-react";
 import { useEffect, useState } from "react";
 import { api, fmtSize } from "../api";
 import { t } from "../i18n";
@@ -46,7 +47,9 @@ export function AuditLogPanel({ rules, onClose }: {
   return (
     <Modal onClose={onClose} full>
       <PanelHeader
-        title={<>📜 {t("Audit Log")}</>}
+        title={<span className="inline-flex items-center gap-2">
+          <ScrollText size={18} /> {t("Audit Log")}
+        </span>}
         sub={total != null
           ? t("audit.page", {
               from: total ? offset + 1 : 0,
@@ -62,12 +65,14 @@ export function AuditLogPanel({ rules, onClose }: {
       <Toolbar>
         <Button variant="ghost" disabled={offset === 0}
           onClick={() => setOffset(Math.max(0, offset - PAGE_SIZE))}>
-          ← {t("Previous")}
+          <ChevronLeft size={16} className="mr-1 inline align-text-bottom" />
+          {t("Previous")}
         </Button>
         <Button variant="ghost"
           disabled={total == null || offset + PAGE_SIZE >= total}
           onClick={() => setOffset(offset + PAGE_SIZE)}>
-          {t("Next")} →
+          {t("Next")}
+          <ChevronRight size={16} className="ml-1 inline align-text-bottom" />
         </Button>
       </Toolbar>
       <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-4">

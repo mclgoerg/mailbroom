@@ -1,3 +1,4 @@
+import { Copy } from "lucide-react";
 import { useEffect, useState } from "react";
 import { api, fmtSize, mailKey } from "../api";
 import { t } from "../i18n";
@@ -67,7 +68,9 @@ export function DuplicatesPanel({ onClose, onDeleted }: {
   return (
     <Modal onClose={onClose} full>
       <PanelHeader
-        title={<>📑 {t("Duplicates")}</>}
+        title={<span className="inline-flex items-center gap-2">
+          <Copy size={18} /> {t("Duplicates")}
+        </span>}
         sub={sets
           ? t("dups.summary", { n: sets.length, size: fmtSize(wastedTotal) })
           : t("dups.hint")}

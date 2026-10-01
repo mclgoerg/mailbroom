@@ -1,3 +1,4 @@
+import { Shield } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { api } from "../api";
 import { t } from "../i18n";
@@ -208,7 +209,11 @@ export function DetailPanel({ grouping, group, aiEnabled, protectedNow,
             ? `${shown.length} / ${mails.length}`
             : mails ? mails.length : group.count} {t("mails")} ·{" "}
           {fmtSize(group.size)}
-          {protectedNow && <> · 🛡️ {t("protected")}</>}
+          {protectedNow && (
+            <span className="inline-flex items-center gap-1">
+              {" "}· <Shield size={13} /> {t("protected")}
+            </span>
+          )}
           {blocked && <> · 🚫 {t("Blocked")}</>}
         </>}
         actions={<>

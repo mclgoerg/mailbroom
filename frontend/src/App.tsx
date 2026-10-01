@@ -1,3 +1,6 @@
+import { ArrowDown, BarChart3, ChevronDown, ClipboardList, Copy,
+  Moon, Paperclip, Plus, Power, ScrollText, Search, Settings as SettingsIcon,
+  Sparkles, Star, Sun, Trash2, User } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api, setAccount as apiSetAccount, withAccount } from "./api";
 import { AuditLogPanel } from "./components/AuditLogPanel";
@@ -635,7 +638,7 @@ export default function App() {
               hover:bg-chip"
               title={t("trash.browse")}
               onClick={() => setTrashOpen(true)}>
-              🗑 {state.trash_count}
+              <Trash2 size={14} /> {state.trash_count}
             </button>
           )}
           {/* Profile menu: account switcher (when >1 account), identity,
@@ -649,11 +652,14 @@ export default function App() {
                     {account}
                   </span>
                   {auth.is_admin && auth.mode === "oidc"
-                    ? <span className="text-xs">★</span> : null}
-                  <span className="text-faint">▾</span>
+                    ? <Star size={12} className="shrink-0" /> : null}
+                  <ChevronDown size={14} className="shrink-0 text-faint" />
                 </>
-              : <>👤{auth.is_admin && auth.mode === "oidc"
-                  ? <span className="ml-0.5 text-xs">★</span> : null}</>}>
+              : <span className="inline-flex items-center gap-0.5">
+                  <User size={18} />
+                  {auth.is_admin && auth.mode === "oidc"
+                    && <Star size={11} />}
+                </span>}>
             {multiAccount && (
               <>
                 <MenuHeading>{t("menu.accounts")}</MenuHeading>
@@ -667,7 +673,8 @@ export default function App() {
                   </MenuItem>
                 ))}
                 <MenuItem onClick={() => setSettingsOpen(true)}>
-                  ＋ {t("account.add")}…
+                  <Plus size={15} className="mr-1 inline align-text-bottom" />
+                  {t("account.add")}…
                 </MenuItem>
                 <div className="my-1 border-t border-line" />
               </>
@@ -675,20 +682,28 @@ export default function App() {
             {auth.mode === "oidc" && !!auth.sub && (
               <MenuHeading>
                 {auth.sub}
-                {auth.is_admin ? ` ★ ${t("login.admin_tip")}` : ""}
+                {auth.is_admin && (
+                  <span className="inline-flex items-center gap-1">
+                    {" "}<Star size={11} /> {t("login.admin_tip")}
+                  </span>
+                )}
               </MenuHeading>
             )}
             <MenuItem onClick={toggleTheme}>
-              {theme === "dark" ? "☀ " : "🌙 "}
+              {theme === "dark"
+                ? <Sun size={15} className="mr-1 inline align-text-bottom" />
+                : <Moon size={15} className="mr-1 inline align-text-bottom" />}
               {t("menu.theme", {
                 next: theme === "dark" ? t("menu.light") : t("menu.dark") })}
             </MenuItem>
             <MenuItem onClick={() => setSettingsOpen(true)}>
-              ⚙ {t("Settings")}
+              <SettingsIcon size={15} className="mr-1 inline align-text-bottom" />
+              {t("Settings")}
             </MenuItem>
             {state?.trash_count != null && state.trash_count > 0 && (
               <MenuItem onClick={emptyTrash}>
-                🗑 {t("Empty Trash")} ({state.trash_count})
+                <Trash2 size={15} className="mr-1 inline align-text-bottom" />
+                {t("Empty Trash")} ({state.trash_count})
               </MenuItem>
             )}
             {auth.mode !== "none" && (
@@ -696,7 +711,8 @@ export default function App() {
                 try { await api.logout(); } catch { /* session gone */ }
                 window.location.reload();
               }}>
-                ⏻ {t("login.logout")}
+                <Power size={15} className="mr-1 inline align-text-bottom" />
+                {t("login.logout")}
               </MenuItem>
             )}
             {buildId && (
@@ -711,7 +727,9 @@ export default function App() {
       {updateAvailable && (
         <div className="mb-3 flex items-center justify-between gap-2
           rounded-md border border-accent/40 bg-panel2 px-3 py-2 text-sm">
-          <span>✨ {t("update.available")}</span>
+          <span className="inline-flex items-center gap-1.5">
+            <Sparkles size={15} /> {t("update.available")}
+          </span>
           <Button className="!min-h-7 !px-2.5 !py-1 !text-xs"
             onClick={() => window.location.reload()}>
             {t("update.reload")}
@@ -742,9 +760,9 @@ export default function App() {
             </button>
           ))}
         </div>
-        {/* Filter + builder share one flex-wrap unit: the 🧰 sits right
-            next to the input on every width, and the builder panel
-            (w-full) wraps to its own line directly underneath. */}
+        {/* Filter + builder share one flex-wrap unit: the builder toggle
+            sits right next to the input on every width, and the builder
+            panel (w-full) wraps to its own line directly underneath. */}
         <div className="relative order-last flex w-full flex-wrap
           items-center gap-2 sm:order-none sm:w-auto sm:min-w-24 sm:flex-1">
           <Input
@@ -762,23 +780,25 @@ export default function App() {
         <div className="ml-auto flex items-center gap-1.5 sm:ml-0 sm:gap-2">
           <Button variant="ghost" className="!px-2 sm:!px-3"
             title={t("Search all mails")}
-            onClick={() => setSearchOpen(true)}>🔍</Button>
+            onClick={() => setSearchOpen(true)}><Search size={17} /></Button>
           <Button variant="ghost" className="!px-2 sm:!px-3"
             title={t("Rules")}
-            onClick={() => setRulesOpen(true)}>📋</Button>
+            onClick={() => setRulesOpen(true)}>
+            <ClipboardList size={17} />
+          </Button>
           <Button variant="ghost" className="!px-2 sm:!px-3"
             title={t("Attachments")}
-            onClick={() => setAttsOpen(true)}>📎</Button>
+            onClick={() => setAttsOpen(true)}><Paperclip size={17} /></Button>
           <Button variant="ghost" className="!px-2 sm:!px-3"
             title={t("Duplicates")}
             disabled={state?.status !== "done"}
-            onClick={() => setDupsOpen(true)}>📑</Button>
+            onClick={() => setDupsOpen(true)}><Copy size={17} /></Button>
           <Button variant="ghost" className="!px-2 sm:!px-3"
             title={t("Statistics")}
-            onClick={() => setStatsOpen(true)}>📊</Button>
+            onClick={() => setStatsOpen(true)}><BarChart3 size={17} /></Button>
           <Button variant="ghost" className="!px-2 sm:!px-3"
             title={t("Audit Log")}
-            onClick={() => setAuditOpen(true)}>📜</Button>
+            onClick={() => setAuditOpen(true)}><ScrollText size={17} /></Button>
         </div>
       </div>
       {/* Row 2: selection / sorting / bulk tools. */}
@@ -818,10 +838,9 @@ export default function App() {
             title={t(sortDir < 0 ? "sort.desc_tip" : "sort.asc_tip")}
             aria-label={t(sortDir < 0 ? "sort.desc_tip" : "sort.asc_tip")}
             onClick={() => setSortDir(-sortDir)}>
-            <span aria-hidden className={`inline-block transition-transform
-              duration-200 ${sortDir > 0 ? "rotate-180" : ""}`}>
-              ↓
-            </span>
+            <ArrowDown aria-hidden size={16}
+              className={`transition-transform duration-200
+                ${sortDir > 0 ? "rotate-180" : ""}`} />
           </button>
         </div>
         {aiEnabled && (
@@ -895,7 +914,9 @@ export default function App() {
           <span className="relative">
             <Button variant="ghost" className="!min-h-7 !px-2 !py-0.5 !text-xs"
               onClick={() => setUndoOpen(!undoOpen)}>
-              {t("Undo")} ▾
+              {t("Undo")}
+              <ChevronDown size={13}
+                className="ml-0.5 inline align-text-bottom" />
             </Button>
             {undoOpen && (
               <span className="absolute left-0 top-8 z-10 block w-72

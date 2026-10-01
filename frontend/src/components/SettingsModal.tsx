@@ -1,3 +1,5 @@
+import { RefreshCw, Settings as SettingsIcon, Shield, Star, X }
+  from "lucide-react";
 import { useEffect, useState } from "react";
 import { api, fmtUsd } from "../api";
 import { getLang, setLang, t, type Lang } from "../i18n";
@@ -405,7 +407,9 @@ export function SettingsModal({ cfg, account, onClose, onSaved,
     // re-center the modal (only the content area scrolls; header, tab
     // bar and the Save footer stay put).
     <Modal full onClose={onClose}>
-      <PanelHeader title={<>⚙ {t("Settings")}</>} onClose={onClose} />
+      <PanelHeader title={<span className="inline-flex items-center gap-2">
+        <SettingsIcon size={18} /> {t("Settings")}
+      </span>} onClose={onClose} />
       <div role="tablist" className="flex flex-wrap gap-1 border-b
         border-line px-5 pt-3">
         {tabs.map(([k, label]) => (
@@ -626,7 +630,8 @@ export function SettingsModal({ cfg, account, onClose, onSaved,
             <Button variant="ghost" className="!min-h-7 !px-2 !py-0.5 !text-xs"
               title={t("folders.discover_tip")}
               onClick={() => discoverFolders(editAcct)}>
-              🔄 {t("folders.discover")}
+              <RefreshCw size={14} className="mr-1 inline align-text-bottom" />
+              {t("folders.discover")}
             </Button>
           </div>
           {!folders && !foldersErr && <Loading className="!p-3" />}
@@ -679,11 +684,12 @@ export function SettingsModal({ cfg, account, onClose, onSaved,
                     <span key={w} className="rounded bg-chip px-1.5 py-0.5
                       text-chiptext">
                       {w}{" "}
-                      <button className="text-muted hover:text-body"
-                        title="✕"
+                      <button className="inline-flex align-text-bottom
+                          text-muted hover:text-body"
+                        title={t("Remove")}
                         onClick={() => setWildcards(
                           wildcards.filter((x) => x !== w))}>
-                        ✕
+                        <X size={12} />
                       </button>
                     </span>
                   ))}
@@ -696,7 +702,9 @@ export function SettingsModal({ cfg, account, onClose, onSaved,
 
         {tab === "general" && (<>
         <div className="sm:col-span-2">
-          <Field label={`🛡️ ${t("Protected senders")}`}>
+          <Field label={<span className="inline-flex items-center gap-1">
+            <Shield size={13} /> {t("Protected senders")}
+          </span>}>
             <TextArea
               value={protectedText}
               placeholder={"boss@work.example\n@mybank.example"}
@@ -875,7 +883,10 @@ export function SettingsModal({ cfg, account, onClose, onSaved,
                           title={`${u.id} - ${u.accounts} account(s), ${
                             u.scans} scan(s), ${u.rules} rule(s), ${
                             u.verdicts} AI verdict(s)`}>
-                          {u.is_admin_workspace ? "★ " : ""}
+                          {u.is_admin_workspace && (
+                            <Star size={11}
+                              className="mr-1 inline align-text-bottom" />
+                          )}
                           {u.label || u.id}
                         </td>
                         <td className="px-2 py-1.5">

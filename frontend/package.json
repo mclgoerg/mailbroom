@@ -10,6 +10,7 @@
     "test": "tsc --noEmit && vitest run"
   },
   "dependencies": {
+    "lucide-react": "^1.49.0",
     "react": "^19.1.0",
     "react-dom": "^19.1.0"
   },
@@ -19,8 +20,8 @@
     "@types/react": "^19.1.0",
     "@types/react-dom": "^19.1.0",
     "@vitejs/plugin-react": "^6.1.1",
-    "tailwindcss": "^4.1.0",
     "jsdom": "^30.1.1",
+    "tailwindcss": "^4.1.0",
     "typescript": "^7.0.2",
     "vite": "^8.3.1",
     "vitest": "^5.0.1"

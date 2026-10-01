@@ -1,3 +1,4 @@
+import { X } from "lucide-react";
 import { useState } from "react";
 import { api, mailKey } from "../api";
 import { t } from "../i18n";
@@ -67,7 +68,9 @@ export function SearchPanel({ onClose, onDeleted }: {
         <Button onClick={run} disabled={busy || q.trim().length < 2}>
           {busy ? <Spinner className="!text-white" /> : t("Search")}
         </Button>
-        <Button variant="ghost" onClick={onClose}>✕</Button>
+        <Button variant="ghost" onClick={onClose} title={t("Close")}>
+          <X size={17} />
+        </Button>
       </div>
 
       {view ? (

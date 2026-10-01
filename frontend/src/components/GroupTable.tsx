@@ -1,3 +1,4 @@
+import { ArrowDown } from "lucide-react";
 import { useEffect, useState } from "react";
 import { fmtSize } from "../api";
 import type { Group } from "../types";
@@ -101,13 +102,11 @@ function DesktopTable({ slice, baseIdx, selected, focusedKey, onToggle,
   // between directions; inactive sortable columns reserve the space
   // (no layout shift) and reveal a faint hint on hover.
   const arrow = (k: SortKey) => (
-    <span aria-hidden
+    <ArrowDown aria-hidden size={13}
       className={`ml-0.5 inline-block transition-all duration-200 ${
         sortK === k
           ? `text-accent ${sortDir > 0 ? "rotate-180" : ""}`
-          : "opacity-0 group-hover/th:opacity-50"}`}>
-      ↓
-    </span>
+          : "opacity-0 group-hover/th:opacity-50"}`} />
   );
   const ariaSort = (k: SortKey) =>
     sortK === k ? (sortDir < 0 ? "descending" as const

@@ -1,3 +1,4 @@
+import { Trash2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { api, fmtSize, mailKey } from "../api";
 import { t } from "../i18n";
@@ -66,7 +67,9 @@ export function TrashPanel({ state, onClose, onChanged }: {
   return (
     <Modal onClose={onClose} full>
       <PanelHeader
-        title={<>🗑 {t("Trash")}</>}
+        title={<span className="inline-flex items-center gap-2">
+          <Trash2 size={18} /> {t("Trash")}
+        </span>}
         sub={trash
           ? `${trash.total} ${t("mails")}`
             + (trash.total > trash.mails.length

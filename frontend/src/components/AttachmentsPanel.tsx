@@ -1,3 +1,4 @@
+import { Paperclip } from "lucide-react";
 import { useEffect, useState } from "react";
 import { api, fmtSize, mailKey } from "../api";
 import { t } from "../i18n";
@@ -76,7 +77,9 @@ export function AttachmentsPanel({ state, onClose, onDeleted }: {
   return (
     <Modal onClose={onClose} full>
       <PanelHeader
-        title={<>📎 {t("Attachments")}</>}
+        title={<span className="inline-flex items-center gap-2">
+          <Paperclip size={18} /> {t("Attachments")}
+        </span>}
         sub={atts?.status === "done"
           ? t("atts.summary", { n: atts.mails, size: fmtSize(atts.size) })
           : t("atts.hint")}

@@ -588,4 +588,6 @@ export const DE: Record<string, string> = {
   "audit.outcome.done": "erledigt",
   "audit.outcome.link": "Link",
   "audit.outcome.failed": "fehlgeschlagen",
+  "Close": "Schließen",
+  "Remove": "Entfernen",
 };

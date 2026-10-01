@@ -51,7 +51,7 @@ test("close button calls onClose", async () => {
   const onClose = vi.fn();
   render(<AuditLogPanel rules={[]} onClose={onClose} />);
   await waitFor(() => screen.getByText(/item 0/));
-  fireEvent.click(screen.getByText("✕"));
+  fireEvent.click(screen.getByTitle("Close"));
   expect(onClose).toHaveBeenCalled();
 });
 
