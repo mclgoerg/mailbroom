@@ -9,13 +9,17 @@ import { Button, ensureAiAck, Input, Loading, Modal, PanelHeader,
   ProtectButton, Select, Spinner, Toolbar } from "./ui";
 
 export function DetailPanel({ grouping, group, aiEnabled, protectedNow,
-  unsubscribedNow, onProtect, folders, sieve = true, onClose, onDeleted }: {
+  unsubscribedNow, onProtect, onBlock, onUnblock, blocked, folders,
+  sieve = true, onClose, onDeleted }: {
   grouping: Grouping;
   group: Group;
   aiEnabled: boolean;
   protectedNow: boolean;                 // live value; `group` is a snapshot
   unsubscribedNow: GroupUnsub | null;     // live value; `group` is a snapshot
   onProtect?: (g: Group) => void;        // absent in subject mode
+  onBlock?: (g: Group) => void;          // sender/domain groupings only
+  onUnblock?: (g: Group) => void;
+  blocked?: boolean;
   folders: AppState["folders_raw"];
   sieve?: boolean;                       // Sieve export is Proton-only
   onClose: () => void;
@@ -205,11 +209,26 @@ export function DetailPanel({ grouping, group, aiEnabled, protectedNow,
             : mails ? mails.length : group.count} {t("mails")} ·{" "}
           {fmtSize(group.size)}
           {protectedNow && <> · 🛡️ {t("protected")}</>}
+          {blocked && <> · 🚫 {t("Blocked")}</>}
         </>}
-        actions={onProtect && (
-          <ProtectButton on={protectedNow}
-            onClick={() => onProtect({ ...group, protected: protectedNow })} />
-        )}
+        actions={<>
+          {onBlock && !blocked && (
+            <Button variant="ghost" title={t("block.tip")}
+              onClick={() => onBlock(group)}>
+              {t("Block")}
+            </Button>
+          )}
+          {onUnblock && blocked && (
+            <Button variant="ghost" title={t("unblock.tip")}
+              onClick={() => onUnblock(group)}>
+              {t("Unblock")}
+            </Button>
+          )}
+          {onProtect && (
+            <ProtectButton on={protectedNow}
+              onClick={() => onProtect({ ...group, protected: protectedNow })} />
+          )}
+        </>}
         onClose={onClose}
       />
 

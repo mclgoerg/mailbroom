@@ -54,6 +54,26 @@ export const DE: Record<string, string> = {
   "confirm.protected_skipped": "({n} geschützte Gruppe(n) übersprungen.)",
   "toast.all_protected":
     "Alle ausgewählten Gruppen sind geschützt - nichts wurde gelöscht.",
+  "confirm.block":
+    "„{label}“ blockieren? Dies legt eine dauerhafte Regel an, die "
+    + "künftige Mails täglich automatisch in den Papierkorb verschiebt - "
+    + "umkehrbar durch Löschen der Regel in Regeln.",
+  "confirm.block_trash_existing":
+    "Auch die {n} vorhandene(n) Mail(s) jetzt in den Papierkorb "
+    + "verschieben?",
+  "toast.blocked": "„{label}“ blockiert.",
+  "block.tip":
+    "Diesen Absender/diese Domain blockieren: legt eine dauerhafte Regel "
+    + "an, die künftige Mails automatisch in den Papierkorb verschiebt",
+  "Block": "Blockieren",
+  "Blocked": "Blockiert",
+  "confirm.unblock":
+    "„{label}“ entblocken? Dies löscht die dauerhafte Regel - künftige "
+    + "Mails werden nicht mehr automatisch in den Papierkorb verschoben.",
+  "toast.unblocked": "„{label}“ entblockt.",
+  "unblock.tip":
+    "Entblocken: löscht die von Blockieren angelegte dauerhafte Regel",
+  "Unblock": "Entblocken",
   "protect.tip":
     "Diesen Absender schützen - Massenlöschungen und KI-Vorschläge "
     + "überspringen ihn",

@@ -47,7 +47,7 @@ _RUN_LOCK = threading.Lock()      # one rule run at a time
 
 # ------------------------------------------------- filter DSL (port of lib.ts)
 
-_QUAL_RE = re.compile(r"^(tag|ai|age|unread|is|att):(.*)$")
+_QUAL_RE = re.compile(r"^(tag|ai|age|unread|is|att|from|domain):(.*)$")
 _AGE_RE = re.compile(r"^>?(\d+)(m|y)$")
 _UNREAD_RE = re.compile(r"^>?(\d+)$")
 _ATT_RE = re.compile(r"^>?(\d+)(k|m|g)?$")
@@ -57,7 +57,8 @@ _SIZE_UNIT = {"k": 1024, "m": 1048576, "g": 1073741824}
 def parse_filter(q: str) -> dict:
     out = {"text": [], "tags": [], "ai": None, "age_months": None,
            "unread_min": None, "unsub": False, "protected_only": False,
-           "replied": None, "att_min": None, "unsubscribed": None}
+           "replied": None, "att_min": None, "unsubscribed": None,
+           "from_addr": None, "domain": None}
     for tok in (q or "").strip().lower().split():
         m = _QUAL_RE.match(tok)
         if not m:
@@ -94,6 +95,10 @@ def parse_filter(q: str) -> dict:
             if a:
                 out["att_min"] = int(a.group(1)) * \
                     _SIZE_UNIT.get(a.group(2) or "", 1)
+        elif kind == "from" and val:
+            out["from_addr"] = val
+        elif kind == "domain" and val:
+            out["domain"] = val
         else:
             out["text"].append(tok)
     return out
@@ -103,6 +108,10 @@ def match_group(g: dict, f: dict, now: float | None = None) -> bool:
     """`g` is a public_state()-shaped group record (has protected/replied)."""
     label = (g.get("label") or "").lower()
     sub = (g.get("sub") or "").lower()
+    if f["from_addr"] is not None and g["key"] != f["from_addr"]:
+        return False
+    if f["domain"] is not None and g["key"] != f["domain"]:
+        return False
     for t in f["text"]:
         if t not in g["key"] and t not in label and t not in sub:
             return False
@@ -147,6 +156,7 @@ def load_rules() -> list[dict]:
     for r in rules:                       # tolerate pre-retention rules.json
         r.setdefault("keep_latest", None)
         r.setdefault("older_than_days", None)
+        r.setdefault("origin", "manual")  # tolerate pre-block rules.json
     return rules
 
 
@@ -195,6 +205,10 @@ def _validate(body: dict, rule: dict) -> dict:
         if body["schedule"] not in SCHEDULES:
             raise ValueError("bad schedule")
         rule["schedule"] = body["schedule"]
+    if "origin" in body:
+        if body["origin"] not in ("manual", "block"):
+            raise ValueError("bad origin")
+        rule["origin"] = body["origin"]
     if "account" in body and body["account"]:
         if body["account"] not in accounts.names():
             raise ValueError(f"unknown account {body['account']!r}")
@@ -249,7 +263,7 @@ def create_rule(body: dict) -> dict:
             "query": "", "action": "trash", "dest": "",
             "account": accounts.default_name(),
             "schedule": "manual", "mode": "report",   # ALWAYS starts report
-            "keep_latest": None, "older_than_days": None,
+            "keep_latest": None, "older_than_days": None, "origin": "manual",
             "report_runs": 0, "created": int(time.time()), "last_run": None}
     body = dict(body)
     body.pop("mode", None)                            # not on create

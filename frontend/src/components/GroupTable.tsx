@@ -18,6 +18,9 @@ interface Props {
   onOpen: (g: Group) => void;
   onTrash: (g: Group) => void;
   onProtect?: (g: Group) => void;   // absent in subject mode
+  onBlock?: (g: Group) => void;     // sender/domain groupings only
+  onUnblock?: (g: Group) => void;
+  blockedKeys?: Map<string, string>;   // group key -> blocking rule id
   onAckUnsub: (addr: string) => void;
   sortK: SortKey;
   sortDir: number;
@@ -91,8 +94,8 @@ function UnsubBadge({ g, onAck }: { g: Group; onAck: (addr: string) => void }) {
 /* Desktop: fixed-layout table so column widths never change when the
    grouping mode (and with it the content) changes. */
 function DesktopTable({ slice, baseIdx, selected, focusedKey, onToggle,
-  onToggleAll, onOpen, onTrash, onProtect, onAckUnsub, sortK, sortDir,
-  onSort, groupLabel
+  onToggleAll, onOpen, onTrash, onProtect, onBlock, onUnblock, blockedKeys,
+  onAckUnsub, sortK, sortDir, onSort, groupLabel
 }: PageProps) {
   // Sort indicator: the active column shows an accent arrow that ROTATES
   // between directions; inactive sortable columns reserve the space
@@ -186,6 +189,11 @@ function DesktopTable({ slice, baseIdx, selected, focusedKey, onToggle,
                   </Tag>
                 )}
                 <UnsubBadge g={g} onAck={onAckUnsub} />
+                {blockedKeys?.has(g.key) && (
+                  <Tag className="!bg-rose-950 !text-rose-300">
+                    🚫 {t("Blocked")}
+                  </Tag>
+                )}
                 {g.tags.map((t) => <Tag key={t}>{t}</Tag>)}
               </div>
             </td>
@@ -212,6 +220,20 @@ function DesktopTable({ slice, baseIdx, selected, focusedKey, onToggle,
                   <ProtectButton on={g.protected}
                     onClick={() => onProtect(g)} />
                 )}
+                {onBlock && !blockedKeys?.has(g.key) && (
+                  <Button variant="ghost" title={t("block.tip")}
+                    className="!min-h-7 !px-2 !py-0.5 !text-xs"
+                    onClick={() => onBlock(g)}>
+                    {t("Block")}
+                  </Button>
+                )}
+                {onUnblock && blockedKeys?.has(g.key) && (
+                  <Button variant="ghost" title={t("unblock.tip")}
+                    className="!min-h-7 !px-2 !py-0.5 !text-xs"
+                    onClick={() => onUnblock(g)}>
+                    {t("Unblock")}
+                  </Button>
+                )}
                 <Button variant="danger"
                   className="!min-h-7 !px-2 !py-0.5 !text-xs"
                   onClick={() => onTrash(g)}>
@@ -228,7 +250,8 @@ function DesktopTable({ slice, baseIdx, selected, focusedKey, onToggle,
 
 /* Mobile: a card list - no table semantics, no horizontal squeeze. */
 function MobileCards({ slice, baseIdx, selected, focusedKey, onToggle,
-  onOpen, onTrash, onProtect, onAckUnsub }: PageProps) {
+  onOpen, onTrash, onProtect, onBlock, onUnblock, blockedKeys, onAckUnsub
+}: PageProps) {
   return (
     <div>
       {slice.map((g, i) => (
@@ -258,6 +281,11 @@ function MobileCards({ slice, baseIdx, selected, focusedKey, onToggle,
                 </Tag>
               )}
               <UnsubBadge g={g} onAck={onAckUnsub} />
+              {blockedKeys?.has(g.key) && (
+                <Tag className="!bg-rose-950 !text-rose-300">
+                  🚫 {t("Blocked")}
+                </Tag>
+              )}
               {g.tags.map((t) => <Tag key={t}>{t}</Tag>)}
               {g.ai && <AiTag ai={g.ai} />}
               {g.ratings && <RatingChips ratings={g.ratings} />}
@@ -268,6 +296,20 @@ function MobileCards({ slice, baseIdx, selected, focusedKey, onToggle,
               onClick={() => onTrash(g)}>
               {t("Trash")}
             </Button>
+            {onBlock && !blockedKeys?.has(g.key) && (
+              <Button variant="ghost" title={t("block.tip")}
+                className="!min-h-7 !px-2 !py-0.5 !text-xs"
+                onClick={() => onBlock(g)}>
+                {t("Block")}
+              </Button>
+            )}
+            {onUnblock && blockedKeys?.has(g.key) && (
+              <Button variant="ghost" title={t("unblock.tip")}
+                className="!min-h-7 !px-2 !py-0.5 !text-xs"
+                onClick={() => onUnblock(g)}>
+                {t("Unblock")}
+              </Button>
+            )}
             {onProtect && (
               <ProtectButton on={g.protected} onClick={() => onProtect(g)} />
             )}

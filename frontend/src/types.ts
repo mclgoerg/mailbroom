@@ -144,6 +144,7 @@ export interface Rule {
   mode: "report" | "execute";
   keep_latest: number | null;
   older_than_days: number | null;
+  origin: "manual" | "block";
   report_runs: number;
   created: number;
   last_run: RuleRun | null;
