@@ -100,13 +100,12 @@ afterEach(() => {
 // -> refetch) that otherwise races with the assertions below.
 const mountReady = () => localStorage.setItem("pmc_account", "proton");
 
-// Both the toolbar's bulk Trash button AND each row's quick-trash button
-// render the literal text "Trash" while the toolbar one is pending (no
-// count yet) - disambiguate by the toolbar button's distinguishing class.
+// The contextual bulk-action bar's Trash button is the only element
+// matching this pattern now - rows no longer have their own Trash button
+// (that moved into DetailPanel for a single group).
 const bulkTrashButton = (): HTMLButtonElement =>
   screen.getAllByText(/^Trash( \d+)?$/)
-    .map((el) => el.closest("button") as HTMLButtonElement)
-    .find((btn) => btn.className.includes("sm:ml-auto"))!;
+    .map((el) => el.closest("button") as HTMLButtonElement)[0];
 
 const selectFirstGroup = async () => {
   await waitFor(() => expect(screen.getAllByRole("checkbox").length)

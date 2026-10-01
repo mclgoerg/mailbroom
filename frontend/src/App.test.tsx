@@ -226,8 +226,10 @@ test("profile menu shows the release version and the build this tab " +
     render(<App />);
     await openMenu();
     // package.json's version baked in via vite.config.ts's define, plus
-    // the loaded build hash from the (mocked) /api/version poll.
-    expect(screen.getByText(/^v[\d.]+ \(build abc123\)$/)).toBeTruthy();
+    // the loaded build hash from the (mocked) /api/version poll - async,
+    // so wait for it rather than assuming it has already landed.
+    await waitFor(() => expect(
+      screen.getByText(/^v[\d.]+ \(build abc123\)$/)).toBeTruthy());
   });
 
 const groupFixture = {
@@ -346,4 +348,54 @@ test("declining the detail panel's Trash confirmation leaves it open and " +
   expect(deleteGroups).not.toHaveBeenCalled();
   expect(screen.getAllByText("Block").length).toBeGreaterThan(0);
   confirmSpy.mockRestore();
+});
+
+// The contextual bulk-action bar: the ONLY bulk-action chrome in the app -
+// it must not exist at all until something is selected, and disappear
+// again once the selection is cleared.
+const selectRowCheckbox = async () => {
+  await waitFor(() => expect(screen.getAllByRole("checkbox").length)
+    .toBeGreaterThan(1));
+  const boxes = screen.getAllByRole("checkbox") as HTMLInputElement[];
+  fireEvent.click(boxes[1]);   // [0] is the header's select-all checkbox
+};
+
+test("the bulk-action bar does not exist until a group is selected",
+  async () => {
+  renderWithOneSenderGroup();
+  await waitFor(() => expect(screen.getAllByText("DHL Paket").length)
+    .toBeGreaterThan(0));
+  expect(screen.queryByText(/^Trash \d+$/)).toBeNull();
+  expect(screen.queryByText("Archive")).toBeNull();
+});
+
+test("selecting a group reveals the bulk-action bar; Clear selection " +
+  "hides it again", async () => {
+  renderWithOneSenderGroup();
+  await waitFor(() => expect(screen.getAllByText("DHL Paket").length)
+    .toBeGreaterThan(0));
+  await selectRowCheckbox();
+  await waitFor(() => expect(screen.getByText(/^Trash \d+$/)).toBeTruthy());
+  expect(screen.getByText("Archive")).toBeTruthy();
+  fireEvent.click(screen.getByText("Clear selection"));
+  await waitFor(() => expect(screen.queryByText(/^Trash \d+$/)).toBeNull());
+});
+
+test("a quick-select chip adds matching groups to the selection", async () => {
+  renderWithOneSenderGroup();
+  await waitFor(() => expect(screen.getAllByText("DHL Paket").length)
+    .toBeGreaterThan(0));
+  fireEvent.click(screen.getByText("Inactive > 6 months"));
+  await waitFor(() => expect(screen.getByText(/^Trash \d+$/)).toBeTruthy());
+});
+
+test("the overflow menu exposes CSV export without requiring a selection",
+  async () => {
+  renderWithOneSenderGroup();
+  await waitFor(() => expect(screen.getAllByText("DHL Paket").length)
+    .toBeGreaterThan(0));
+  fireEvent.click(screen.getByLabelText("More"));
+  const link = screen.getByText("Export CSV")
+    .closest("a") as HTMLAnchorElement;
+  expect(link.href).toContain("/api/export?grouping=sender");
 });

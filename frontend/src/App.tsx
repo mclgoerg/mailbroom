@@ -1,6 +1,7 @@
-import { ArrowDown, BarChart3, ChevronDown, ClipboardList, Copy,
-  Moon, Paperclip, Plus, Power, ScrollText, Search, Settings as SettingsIcon,
-  Sparkles, Star, Sun, Trash2, User } from "lucide-react";
+import { ArrowDown, BarChart3, ChevronDown, ClipboardList, Copy, Download,
+  Moon, MoreHorizontal, Paperclip, Plus, Power, ScrollText, Search,
+  Settings as SettingsIcon, Sparkles, Star, Sun, Trash2, User, Wand2 }
+  from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api, setAccount as apiSetAccount, withAccount } from "./api";
 import { AuditLogPanel } from "./components/AuditLogPanel";
@@ -33,6 +34,17 @@ const SORT_OPTIONS: { k: SortKey; label: string }[] = [
   { k: "last", label: "Sort: last activity" },
   { k: "unreadPct", label: "Sort: unread %" },
   { k: "label", label: "Sort: name" },
+];
+
+// Quick-select presets, rendered as one-tap chips (same selectPreset()
+// logic as before - each chip ADDS matching groups to the selection,
+// it is not a toggle/filter).
+const PRESET_CHIPS: { key: string; label: string }[] = [
+  { key: "aisafe", label: "AI-safe groups" },
+  { key: "older6", label: "Inactive > 6 months" },
+  { key: "older12", label: "Inactive > 1 year" },
+  { key: "older24", label: "Inactive > 2 years" },
+  { key: "unsub_pending", label: "sel.unsub_pending" },
 ];
 
 const sortValue = (g: Group, k: SortKey): number | string => {
@@ -634,7 +646,8 @@ export default function App() {
   }
 
   return (
-    <div className="mx-auto max-w-6xl p-3 sm:p-5">
+    <div className={`mx-auto max-w-6xl p-3 sm:p-5
+      ${selected.size > 0 ? "pb-28 sm:pb-20" : ""}`}>
       <header className="mb-4 flex items-center gap-3">
         <h1 className="text-lg font-bold">
           Mailbroom
@@ -807,28 +820,42 @@ export default function App() {
           <Button variant="ghost" className="!px-2 sm:!px-3"
             title={t("Audit Log")}
             onClick={() => setAuditOpen(true)}><ScrollText size={17} /></Button>
+          <Menu label={t("menu.more")} trigger={<MoreHorizontal size={17} />}>
+            {aiEnabled && (
+              <MenuItem onClick={startAi}
+                disabled={scanning || aiRunning || state?.status !== "done"}>
+                <Wand2 size={15} className="mr-1 inline align-text-bottom" />
+                {t("AI review")}
+              </MenuItem>
+            )}
+            <a href={api.exportUrl(mode)} download
+              title={t("export.csv_tip")}
+              className="flex w-full items-center gap-2 rounded-md px-3
+                py-2 text-left text-sm text-body hover:bg-chip">
+              <Download size={15} /> {t("export.csv")}
+            </a>
+          </Menu>
         </div>
       </div>
-      {/* Row 2: selection / sorting / bulk tools. */}
+      {/* Row 2: quick-select preset chips + sort - always visible, no
+          selection-dependent chrome (that lives in the bottom bar below,
+          which only renders once something is selected). */}
       <div className="mb-3 flex flex-wrap items-center gap-2">
-        {/* min-w-[42%/46%]: on phones the two selects claim the whole
-            first line together, so AI review/CSV/… wrap to the next one
-            instead of squeezing the sort control to nothing. */}
-        <Select className="min-w-[42%] flex-1 sm:min-w-0 sm:flex-none"
-          value=""
-          onChange={(e) => selectPreset(e.target.value)}>
-          <option value="" disabled>{t("Select…")}</option>
-          <option value="aisafe">{t("AI-safe groups")}</option>
-          <option value="older6">{t("Inactive > 6 months")}</option>
-          <option value="older12">{t("Inactive > 1 year")}</option>
-          <option value="older24">{t("Inactive > 2 years")}</option>
-          <option value="unsub_pending">{t("sel.unsub_pending")}</option>
-          <option value="none">{t("Clear selection")}</option>
-        </Select>
+        <div className="flex min-w-0 flex-1 gap-2 overflow-x-auto pb-1">
+          {PRESET_CHIPS.map((p) => (
+            <button key={p.key}
+              className="shrink-0 rounded-full border border-line bg-panel2
+                px-3 py-1.5 text-xs whitespace-nowrap text-muted
+                hover:bg-chip hover:text-body"
+              onClick={() => selectPreset(p.key)}>
+              {t(p.label)}
+            </button>
+          ))}
+        </div>
         {/* Sort: field select + direction toggle as one segmented
             control; the arrow rotates instead of swapping glyphs. */}
-        <div className="flex min-w-[46%] flex-1 items-stretch overflow-hidden
-          rounded-md border border-line sm:min-w-0 sm:flex-none">
+        <div className="flex shrink-0 items-stretch overflow-hidden
+          rounded-md border border-line">
           <Select className="min-w-0 flex-1 !rounded-none !border-0"
             value={sortK}
             onChange={(e) => {
@@ -851,63 +878,77 @@ export default function App() {
                 ${sortDir > 0 ? "rotate-180" : ""}`} />
           </button>
         </div>
-        {aiEnabled && (
-          <Button variant="ghost" onClick={startAi}
-            disabled={scanning || aiRunning || state?.status !== "done"}>
-            {t("AI review")}
-          </Button>
-        )}
-        <a href={api.exportUrl(mode)} download
-          className="min-h-9 rounded-md bg-chip px-3 py-1.5 text-sm
-            font-medium text-body hover:bg-chiph"
-          title="Export current grouping as CSV">CSV</a>
-        {moveDest === "?" ? (
-          <Select value=""
-            onChange={(e) => {
-              setMoveDest("");
-              if (e.target.value)
-                act([...selected], "move", e.target.value, ...retentionParams());
-            }}>
-            <option value="" disabled>{t("Move to folder…")}</option>
-            {(state?.folders_raw ?? []).map((f, i) => (
-              <option key={f} value={f}>{state?.folders[i] ?? f}</option>
-            ))}
-          </Select>
-        ) : (
-          <Select value="" disabled={!selected.size}
-            onChange={(e) => onAction(e.target.value)}>
-            <option value="" disabled>{t("Action…")}</option>
-            <option value="archive">{t("Archive")}</option>
-            <option value="move">{t("Move to folder…")}</option>
-            <option value="mark_read">{t("Mark read")}</option>
-            <option value="unsubscribe">{t("Unsubscribe")}</option>
-          </Select>
-        )}
-        <Select value={retention} title={t("retention.help")}
-          onChange={(e) => setRetention(e.target.value as typeof retention)}>
-          <option value="none">{t("retention.none")}</option>
-          <option value="keep_latest">{t("retention.keep_latest")}</option>
-          <option value="older_than_days">
-            {t("retention.older_than_days")}
-          </option>
-        </Select>
-        {retention !== "none" && (
-          <Input type="number" min={1} className="w-20"
-            placeholder={t("retention.n_placeholder")}
-            value={retentionN}
-            onChange={(e) => setRetentionN(e.target.value)} />
-        )}
-        {/* Desktop: pinned right (destructive, away from the rest).
-            Phones: fills its wrapped row instead of floating alone. */}
-        <Button variant="danger"
-          disabled={selected.size === 0 || selCountPending}
-          className="flex-1 sm:ml-auto sm:flex-none"
-          onClick={() => act([...selected], "trash", "", ...retentionParams())}>
-          {!selected.size ? t("Trash")
-            : selCountPending ? <>{t("Trash")} <Spinner /></>
-            : `${t("Trash")} ${selCount}`}
-        </Button>
       </div>
+
+      {/* Contextual bulk-action bar: the ONLY bulk-action chrome in the
+          app - it does not exist at all until something is selected. */}
+      {selected.size > 0 && (
+        <div className="fixed inset-x-0 bottom-0 z-10 border-t border-line
+          bg-panel px-3 py-2 shadow-[0_-4px_16px_rgba(0,0,0,0.3)]"
+          style={{ paddingBottom: "calc(env(safe-area-inset-bottom) + 0.5rem)" }}>
+          <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-2">
+            <span className="text-sm text-muted">
+              {selCountPending
+                ? <>{selected.size} {t("groups")} <Spinner /></>
+                : t("bar.selected", { n: selected.size, mails: selCount })}
+            </span>
+            <button className="text-xs text-muted underline"
+              onClick={() => setSelected(new Set())}>
+              {t("Clear selection")}
+            </button>
+            <div className="ml-auto flex flex-wrap items-center gap-2">
+              <Button variant="ghost" onClick={() => onAction("archive")}>
+                {t("Archive")}
+              </Button>
+              <Button variant="ghost" onClick={() => onAction("mark_read")}>
+                {t("Mark read")}
+              </Button>
+              {moveDest === "?" ? (
+                <Select value=""
+                  onChange={(e) => {
+                    setMoveDest("");
+                    if (e.target.value) act([...selected], "move",
+                      e.target.value, ...retentionParams());
+                  }}>
+                  <option value="" disabled>{t("Move to folder…")}</option>
+                  {(state?.folders_raw ?? []).map((f, i) => (
+                    <option key={f} value={f}>{state?.folders[i] ?? f}</option>
+                  ))}
+                </Select>
+              ) : (
+                <Button variant="ghost" onClick={() => onAction("move")}>
+                  {t("Move to folder…")}
+                </Button>
+              )}
+              <Button variant="ghost" onClick={() => onAction("unsubscribe")}>
+                {t("Unsubscribe")}
+              </Button>
+              <Select value={retention} title={t("retention.help")}
+                onChange={(e) =>
+                  setRetention(e.target.value as typeof retention)}>
+                <option value="none">{t("retention.none")}</option>
+                <option value="keep_latest">{t("retention.keep_latest")}</option>
+                <option value="older_than_days">
+                  {t("retention.older_than_days")}
+                </option>
+              </Select>
+              {retention !== "none" && (
+                <Input type="number" min={1} className="w-20"
+                  placeholder={t("retention.n_placeholder")}
+                  value={retentionN}
+                  onChange={(e) => setRetentionN(e.target.value)} />
+              )}
+              <Button variant="danger" disabled={selCountPending}
+                onClick={() =>
+                  act([...selected], "trash", "", ...retentionParams())}>
+                {selCountPending
+                  ? <>{t("Trash")} <Spinner /></>
+                  : `${t("Trash")} ${selCount}`}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="mb-1 min-h-5 text-xs text-muted">{statusLine()}</div>
       <div className="mb-2 flex flex-wrap items-center gap-2 text-xs">

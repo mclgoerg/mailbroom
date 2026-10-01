@@ -592,4 +592,8 @@ export const DE: Record<string, string> = {
   "Remove": "Entfernen",
   "View details": "Details anzeigen",
   "trash_group.tip": "Alle Mails dieser Gruppe in den Papierkorb verschieben",
+  "menu.more": "Mehr",
+  "export.csv": "CSV exportieren",
+  "export.csv_tip": "Aktuelle Gruppierung als CSV exportieren",
+  "bar.selected": "{n} Gruppen ausgewählt · {mails} Mails",
 };
