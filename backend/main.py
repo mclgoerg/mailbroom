@@ -400,6 +400,8 @@ class DeleteBody(BaseModel):
     action: str = "trash"          # trash | archive | move | mark_read
     dest: str = ""                 # raw folder name, for action == "move"
     force: bool = False            # trash protected groups anyway
+    keep_latest: int | None = Field(None, ge=1)       # keep N newest mails
+    older_than_days: int | None = Field(None, ge=1)   # act only past N days
 
 
 class DeleteMessagesBody(BaseModel):
@@ -480,6 +482,7 @@ def post_delete(body: DeleteBody, account: str | None = Query(None)):
     try:
         return mailops.delete_groups(body.grouping, body.keys,
                                      body.action, body.dest, body.force,
+                                     body.keep_latest, body.older_than_days,
                                      acc=acc)
     except ValueError as exc:
         raise HTTPException(400, str(exc))
@@ -615,6 +618,8 @@ class RuleBody(BaseModel):
     account: str | None = None     # None = default account
     schedule: str = "manual"
     mode: str | None = None        # only honoured on update
+    keep_latest: int | None = None
+    older_than_days: int | None = None
 
 
 @app.get("/api/rules")

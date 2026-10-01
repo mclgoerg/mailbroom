@@ -14,8 +14,8 @@ import { TrashPanel } from "./components/TrashPanel";
 import { AccountAvatar, applyTheme, Button, currentTheme, ensureAiAck, Input,
   Menu, MenuHeading, MenuItem, Select, Spinner } from "./components/ui";
 import { t } from "./i18n";
-import { applyStatus, fmtAgo, fmtSize, fmtUsd, matchGroup, parseFilter }
-  from "./lib";
+import { applyStatus, fmtAgo, fmtSize, fmtUsd, matchGroup, parseFilter,
+  retainedMailKeys } from "./lib";
 import type { AppState, AuthProbe, Config, Group, Grouping, StatusMsg }
   from "./types";
 
@@ -74,6 +74,19 @@ export default function App() {
   const [trashOpen, setTrashOpen] = useState(false);
   const [undoOpen, setUndoOpen] = useState(false);
   const [moveDest, setMoveDest] = useState("");
+  // Retention restriction for bulk group actions: act on everything beyond
+  // a keep-window instead of the whole group (mutually exclusive variants).
+  const [retention, setRetention] =
+    useState<"none" | "keep_latest" | "older_than_days">("none");
+  const [retentionN, setRetentionN] = useState("");
+  // Current retention selector as (keep_latest, older_than_days), both null
+  // when unset/invalid - "none" means act on every mail, today's behavior.
+  const retentionParams = (): [number | null, number | null] => {
+    const n = Number(retentionN);
+    if (retention === "keep_latest" && n > 0) return [n, null];
+    if (retention === "older_than_days" && n > 0) return [null, n];
+    return [null, null];
+  };
   const [focusIdx, setFocusIdx] = useState(-1);
   const [toast, setToast] = useState("");
   const [theme, setTheme] = useState<"dark" | "light">(currentTheme());
@@ -232,12 +245,66 @@ export default function App() {
     });
   }, [state, mode, filter, sortK, sortDir]);
 
+  // How many mails `keys` would actually move: the full group counts when
+  // no retention restriction applies, or (when one does) the real count
+  // fetched per group and reduced by the same keep-window logic the
+  // backend applies (lib.ts's retainedMailKeys mirrors mailops.py).
+  const retentionAdjustedCount = async (keys: string[],
+      keepLatest: number | null, olderThanDays: number | null,
+      ): Promise<number> => {
+    const all = state?.groups[mode] ?? {};
+    if (!keepLatest && !olderThanDays) {
+      return keys.reduce((n, k) => n + (all[k]?.count ?? 0), 0);
+    }
+    const counts = await Promise.all(keys.map(async (k) => {
+      try {
+        const mails = await api.group(mode, k);
+        return mails.length
+          - retainedMailKeys(mails, keepLatest, olderThanDays).size;
+      } catch {
+        return all[k]?.count ?? 0;      // fetch failed: fall back to "all"
+      }
+    }));
+    return counts.reduce((a, b) => a + b, 0);
+  };
+
   // Count over ALL groups of the mode, not the filtered view - actions apply
-  // to every selected key, including ones a filter is hiding.
-  const selCount = useMemo(() => {
+  // to every selected key, including ones a filter is hiding. Without
+  // retention this is instant (just a sum already in `state`). With
+  // retention active, the real count needs a fetch - rather than flash
+  // the naive total and then correct it (confusing to watch), selCount
+  // stays at its last settled value and selCountPending gates display
+  // until the new one is ready.
+  const [selCount, setSelCount] = useState(0);
+  const [selCountPending, setSelCountPending] = useState(false);
+  useEffect(() => {
     const all = state?.groups?.[mode] ?? {};
-    return [...selected].reduce((n, k) => n + (all[k]?.count ?? 0), 0);
-  }, [state, mode, selected]);
+    const keys = [...selected];
+    const [keepLatest, olderThanDays] = retentionParams();
+    if (!keys.length || (!keepLatest && !olderThanDays)) {
+      setSelCount(keys.reduce((n, k) => n + (all[k]?.count ?? 0), 0));
+      setSelCountPending(false);
+      return;
+    }
+    setSelCountPending(true);
+    let cancelled = false;
+    const timer = setTimeout(() => {
+      retentionAdjustedCount(keys, keepLatest, olderThanDays)
+        .then((n) => {
+          if (cancelled) return;
+          setSelCount(n);
+          setSelCountPending(false);
+        });
+    }, 250);
+    return () => { cancelled = true; clearTimeout(timer); };
+    // groups_rev/account (not the whole `state` object) are the actual
+    // signals that group data changed - the SSE stream pushes a new
+    // `state` reference on every slim status tick (job progress, etc.)
+    // even when nothing relevant moved, which made this flap between the
+    // naive and adjusted count forever instead of settling.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state?.groups_rev, state?.account, mode, selected, retention,
+      retentionN]);
 
   const scanning = state?.status === "scanning";
   const aiRunning = state?.ai.status === "running";
@@ -312,7 +379,8 @@ export default function App() {
     setSelected(next);
   };
 
-  const act = async (keys: string[], action: string, dest = "") => {
+  const act = async (keys: string[], action: string, dest = "",
+      keepLatest: number | null = null, olderThanDays: number | null = null) => {
     const all = state?.groups[mode] ?? {};
     let force = false;
     let effective = keys;
@@ -332,7 +400,7 @@ export default function App() {
         }
       }
     }
-    const n = effective.reduce((acc, k) => acc + (all[k]?.count ?? 0), 0);
+    const n = await retentionAdjustedCount(effective, keepLatest, olderThanDays);
     const verb = actionVerb(action) + (dest ? ` → ${dest}` : "");
     const skipNote = effective.length !== keys.length
       ? " " + t("confirm.protected_skipped",
@@ -340,7 +408,8 @@ export default function App() {
     if (!force && !confirm(
       t("confirm.act", { verb, n, k: effective.length }) + skipNote)) return;
     try {
-      await api.deleteGroups(mode, effective, action, dest, force);
+      await api.deleteGroups(mode, effective, action, dest, force,
+        keepLatest, olderThanDays);
       setToast("");
       setSelected(new Set());
       refresh();   // runs in the background; SSE/polling follows it
@@ -389,7 +458,7 @@ export default function App() {
     if (!selected.size) return;
     if (v === "move") setMoveDest("?");
     else if (v === "unsubscribe") unsubscribeSelected();
-    else act([...selected], v);
+    else act([...selected], v, "", ...retentionParams());
   };
 
   const dismissNotice = async () => {
@@ -428,8 +497,9 @@ export default function App() {
       } else if ((e.key === "Enter" || e.key === "o") && focusIdx >= 0) {
         setDetail(groups[focusIdx]);
       } else if (e.key === "#") {
-        if (selected.size) act([...selected], "trash");
-        else if (focusIdx >= 0) act([groups[focusIdx].key], "trash");
+        if (selected.size) act([...selected], "trash", "", ...retentionParams());
+        else if (focusIdx >= 0)
+          act([groups[focusIdx].key], "trash", "", ...retentionParams());
       }
     };
     window.addEventListener("keydown", handler);
@@ -715,7 +785,8 @@ export default function App() {
           <Select value=""
             onChange={(e) => {
               setMoveDest("");
-              if (e.target.value) act([...selected], "move", e.target.value);
+              if (e.target.value)
+                act([...selected], "move", e.target.value, ...retentionParams());
             }}>
             <option value="" disabled>{t("Move to folder…")}</option>
             {(state?.folders_raw ?? []).map((f, i) => (
@@ -732,12 +803,29 @@ export default function App() {
             <option value="unsubscribe">{t("Unsubscribe")}</option>
           </Select>
         )}
+        <Select value={retention} title={t("retention.help")}
+          onChange={(e) => setRetention(e.target.value as typeof retention)}>
+          <option value="none">{t("retention.none")}</option>
+          <option value="keep_latest">{t("retention.keep_latest")}</option>
+          <option value="older_than_days">
+            {t("retention.older_than_days")}
+          </option>
+        </Select>
+        {retention !== "none" && (
+          <Input type="number" min={1} className="w-20"
+            placeholder={t("retention.n_placeholder")}
+            value={retentionN}
+            onChange={(e) => setRetentionN(e.target.value)} />
+        )}
         {/* Desktop: pinned right (destructive, away from the rest).
             Phones: fills its wrapped row instead of floating alone. */}
-        <Button variant="danger" disabled={selected.size === 0}
+        <Button variant="danger"
+          disabled={selected.size === 0 || selCountPending}
           className="flex-1 sm:ml-auto sm:flex-none"
-          onClick={() => act([...selected], "trash")}>
-          {selected.size ? `${t("Trash")} ${selCount}` : t("Trash")}
+          onClick={() => act([...selected], "trash", "", ...retentionParams())}>
+          {!selected.size ? t("Trash")
+            : selCountPending ? <>{t("Trash")} <Spinner /></>
+            : `${t("Trash")} ${selCount}`}
         </Button>
       </div>
 

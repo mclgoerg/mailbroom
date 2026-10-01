@@ -46,9 +46,12 @@ export const api = {
     req<MessageDetail>(
       `/api/message?folder=${encodeURIComponent(folder)}&uid=${uid}`),
   deleteGroups: (grouping: Grouping, keys: string[],
-                 action = "trash", dest = "", force = false) =>
+                 action = "trash", dest = "", force = false,
+                 keepLatest: number | null = null,
+                 olderThanDays: number | null = null) =>
     req<{ ok: boolean; queued: number; skipped: number }>("/api/delete",
-      { grouping, keys, action, dest, force }),
+      { grouping, keys, action, dest, force, keep_latest: keepLatest,
+        older_than_days: olderThanDays }),
   protect: (entry: string, on: boolean) =>
     req<{ protected: string[] }>("/api/protect", { entry, on }),
   deleteMessages: (items: [string, number][], action = "trash", dest = "") =>

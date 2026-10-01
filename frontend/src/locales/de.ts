@@ -232,6 +232,15 @@ export const DE: Record<string, string> = {
   "sched.weekly": "wöchentlich",
   "mode.report": "Bericht",
   "mode.execute": "Ausführen",
+  "retention.none": "Alle Mails",
+  "retention.keep_latest": "Neueste N behalten, Rest bearbeiten",
+  "retention.older_than_days": "Nur Mails älter als N Tage",
+  "retention.n_placeholder": "N",
+  "retention.help":
+    "Beschränkt diese Aktion auf Mails jenseits eines Aufbewahrungsfensters "
+    + "statt auf jede Mail der ausgewählten Gruppen.",
+  "retention.tag_keep_latest": "neueste {n} behalten",
+  "retention.tag_older_than_days": "älter als {n}T",
   "Edit": "Bearbeiten",
   "Delete": "Löschen",
   "Attachments": "Anhänge",

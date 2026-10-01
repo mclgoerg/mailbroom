@@ -1271,10 +1271,55 @@ def _start_delete(by_folder: dict[str, set[int]], label: str, acc,
                          daemon=True).start()
 
 
+def _group_mail_items(rec: dict, acc) -> list[tuple[str, int, int]]:
+    """[(folder, uid, ts)] for every mail in one group record."""
+    out = []
+    for folder, uids in rec["folders"].items():
+        for uid in uids:
+            m = acc.index.get(ikey(folder, uid))
+            out.append((folder, uid, m["ts"] if m else 0))
+    return out
+
+
+def retained_mails(rec: dict, acc, keep_latest: int | None = None,
+                   older_than_days: int | None = None) -> dict[str, set[int]]:
+    """{folder: {uid, …}} of mails in `rec` that a retention restriction
+    EXEMPTS from the action (the keep-window) - empty when neither setting
+    is given, meaning today's "act on everything" behavior. Mails sort
+    newest-first by `ts` (ts == 0 counts as oldest; ties break by
+    folder+uid for determinism)."""
+    if not keep_latest and not older_than_days:
+        return {}
+    items = sorted(_group_mail_items(rec, acc),
+                   key=lambda it: (-it[2], it[0], it[1]))
+    if keep_latest:
+        keep = items[:keep_latest]
+    else:
+        cutoff = time.time() - older_than_days * 86400
+        keep = [it for it in items if it[2] != 0 and it[2] >= cutoff]
+    out: dict[str, set[int]] = {}
+    for folder, uid, _ in keep:
+        out.setdefault(folder, set()).add(uid)
+    return out
+
+
+def group_act_count(rec: dict, acc, keep_latest: int | None = None,
+                    older_than_days: int | None = None) -> int:
+    """How many of this group's mails a retention restriction leaves to
+    act on (i.e. its count minus the exempted keep-window)."""
+    keep = retained_mails(rec, acc, keep_latest, older_than_days)
+    total = sum(len(uids) for uids in rec["folders"].values())
+    return total - sum(len(s) for s in keep.values())
+
+
 def delete_groups(grouping: str, keys: list[str],
                   action: str = "trash", dest: str = "",
-                  force: bool = False, acc=None) -> dict:
+                  force: bool = False, keep_latest: int | None = None,
+                  older_than_days: int | None = None, acc=None) -> dict:
     acc = acc or accounts.get()
+    if keep_latest is not None and older_than_days is not None:
+        raise ValueError(
+            "keep_latest and older_than_days are mutually exclusive")
     skipped = 0
     with acc.lock:
         if acc.state["status"] != "done":
@@ -1300,8 +1345,11 @@ def delete_groups(grouping: str, keys: list[str],
                 raise ValueError("all selected groups are protected")
         by_folder: dict[str, set[int]] = {}
         for rec in jobs.values():
+            keep = retained_mails(rec, acc, keep_latest, older_than_days)
             for folder, uids in rec["folders"].items():
-                by_folder.setdefault(folder, set()).update(uids)
+                remainder = set(uids) - keep.get(folder, set())
+                if remainder:
+                    by_folder.setdefault(folder, set()).update(remainder)
         if not by_folder:
             raise RuntimeError("no known groups selected")
         labels = [jobs[k]["label"] for k in list(jobs)[:3]]
