@@ -121,6 +121,23 @@ export interface StatsResp {
     mark_read: number; freed: number }>;
 }
 
+export interface AuditEntry {
+  ts: number;
+  account: string;
+  actor: string;
+  action: string;
+  count: number;
+  bytes: number;
+  label: string;
+  outcome: string;
+  error: string;
+}
+
+export interface AuditResp {
+  total: number;
+  entries: AuditEntry[];
+}
+
 export interface RuleRun {
   ts: number;
   mode: "report" | "execute";

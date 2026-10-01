@@ -1,6 +1,6 @@
 import type {
-  AdminTenantStats, AiGroupResult, AppState, AttMail, AuthProbe, Config,
-  DupSet, FoldersResp, Grouping, Mail, MessageDetail, Rule, RuleRun,
+  AdminTenantStats, AiGroupResult, AppState, AttMail, AuditResp, AuthProbe,
+  Config, DupSet, FoldersResp, Grouping, Mail, MessageDetail, Rule, RuleRun,
   StatsResp, TrashResp, UnsubBulkResult, UnsubResult,
 } from "./types";
 
@@ -101,6 +101,9 @@ export const api = {
   attachments: () => req<AttMail[]>("/api/attachments"),
   duplicates: () => req<DupSet[]>("/api/duplicates"),
   stats: () => req<StatsResp>("/api/stats"),
+  audit: (offset = 0, limit = 50) =>
+    req<AuditResp>(`/api/audit?offset=${offset}&limit=${limit}`),
+  auditExportUrl: () => withAccount("/api/audit/export"),
   trash: () => req<TrashResp>("/api/trash"),
   trashRestore: (uids: number[], dest: string, uv: number) =>
     req<{ restored: number }>("/api/trash/restore", { uids, dest, uv }),

@@ -24,6 +24,7 @@ import uuid
 from pathlib import Path
 
 from . import accounts
+from . import auditlog
 from . import config as cfgmod
 from . import mailops
 from . import tenants
@@ -308,6 +309,12 @@ def _record_run(rule_id: str, result: dict) -> None:
         if result.get("mode") == "report" and not result.get("error"):
             rule["report_runs"] = rule.get("report_runs", 0) + 1
         _save(rules)
+    auditlog.record(
+        f"rule_{result.get('mode', 'report')}", actor=f"rule:{rule_id}",
+        account=rule.get("account"), count=result.get("mails", 0),
+        label=rule.get("name", ""),
+        outcome="error" if result.get("error") else "ok",
+        error=result.get("error", ""))
 
 
 # --------------------------------------------------------------------- engine
@@ -388,7 +395,8 @@ def run_rule(rule_id: str, rescan: bool = True) -> dict:
             r = mailops.delete_groups(
                 rule["grouping"], [g["key"] for g in picked],
                 rule["action"], rule["dest"], keep_latest=keep_latest,
-                older_than_days=older_than_days, acc=acc)
+                older_than_days=older_than_days, acc=acc,
+                actor=f"rule:{rule_id}")
             result["acted"] = r["queued"]
         log.info("rule %s (%r, %s) ran: %d groups / %d mails matched, "
                  "%d acted, %d capped, %d protected skipped",

@@ -11,6 +11,7 @@ import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from backend import accounts as accountsmod   # noqa: E402
+from backend import auditlog as auditlogmod   # noqa: E402
 from backend import auth as authmod            # noqa: E402
 from backend import config as cfgmod          # noqa: E402
 from backend import mailops                   # noqa: E402
@@ -42,6 +43,8 @@ def isolate(tmp_path, monkeypatch):
     monkeypatch.setattr(rulesmod, "RULES_PATH", tmp_path / "rules.json")
     monkeypatch.setattr(statsmod, "HISTORY_PATH",
                         tmp_path / "stats_history.json")
+    monkeypatch.setattr(auditlogmod, "AUDIT_PATH",
+                        tmp_path / "audit_log.jsonl")
     verdictstore._mails_cache.clear()
     unsubstore._cache.clear()
     accountsmod.reset()
