@@ -15,6 +15,8 @@ let versionCalls = 0;
 
 const block = vi.fn().mockResolvedValue({ rule: { id: "r1" } });
 const deleteRule = vi.fn().mockResolvedValue(undefined);
+const deleteGroups = vi.fn()
+  .mockResolvedValue({ ok: true, queued: 1, skipped: 0 });
 
 vi.mock("./api", () => ({
   api: {
@@ -28,6 +30,8 @@ vi.mock("./api", () => ({
       { build: versions[Math.min(versionCalls++, versions.length - 1)] }),
     block: (...args: unknown[]) => block(...args),
     deleteRule: (...args: unknown[]) => deleteRule(...args),
+    group: () => Promise.resolve([]),
+    deleteGroups: (...args: unknown[]) => deleteGroups(...args),
   },
   setAccount: () => {},
   withAccount: (p: string) => p,
@@ -246,12 +250,20 @@ const renderWithOneSenderGroup = () => {
   return render(<App />);
 };
 
+// Block/Unblock/Protect moved from the group row into DetailPanel (single-
+// group actions only) - open it the same way a user would, by clicking the
+// row, before looking for those buttons.
+const openDetail = async () => {
+  await waitFor(() => expect(screen.getAllByText("DHL Paket").length)
+    .toBeGreaterThan(0));
+  fireEvent.click(screen.getAllByText("DHL Paket")[0]);
+};
+
 test("Block button confirms, then calls api.block with the trash-existing " +
   "choice", async () => {
   const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(true);
   renderWithOneSenderGroup();
-  await waitFor(() => expect(screen.getAllByText("DHL Paket").length)
-    .toBeGreaterThan(0));
+  await openDetail();
   fireEvent.click(screen.getAllByText("Block")[0]);
   expect(confirmSpy).toHaveBeenCalledWith(
     expect.stringContaining("DHL Paket"));
@@ -263,8 +275,7 @@ test("Block button confirms, then calls api.block with the trash-existing " +
 test("declining the block confirmation never calls api.block", async () => {
   const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(false);
   renderWithOneSenderGroup();
-  await waitFor(() => expect(screen.getAllByText("DHL Paket").length)
-    .toBeGreaterThan(0));
+  await openDetail();
   fireEvent.click(screen.getAllByText("Block")[0]);
   expect(block).not.toHaveBeenCalled();
   confirmSpy.mockRestore();
@@ -292,8 +303,7 @@ test("a blocked group shows Unblock (not Block), which confirms and " +
   "deletes the rule", async () => {
   const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(true);
   renderWithOneBlockedSenderGroup();
-  await waitFor(() => expect(screen.getAllByText("DHL Paket").length)
-    .toBeGreaterThan(0));
+  await openDetail();
   expect(screen.queryAllByText("Block").length).toBe(0);
   fireEvent.click(screen.getAllByText("Unblock")[0]);
   expect(confirmSpy).toHaveBeenCalledWith(
@@ -306,9 +316,34 @@ test("declining the unblock confirmation never calls api.deleteRule",
   async () => {
   const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(false);
   renderWithOneBlockedSenderGroup();
-  await waitFor(() => expect(screen.getAllByText("DHL Paket").length)
-    .toBeGreaterThan(0));
+  await openDetail();
   fireEvent.click(screen.getAllByText("Unblock")[0]);
   expect(deleteRule).not.toHaveBeenCalled();
+  confirmSpy.mockRestore();
+});
+
+test("the detail panel's Trash button confirms, trashes the whole group " +
+  "and closes the panel", async () => {
+  const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(true);
+  renderWithOneSenderGroup();
+  await openDetail();
+  fireEvent.click(screen.getByTitle("Move every mail in this group to Trash"));
+  await waitFor(() => expect(deleteGroups).toHaveBeenCalledWith(
+    "sender", [groupFixture.key], "trash", "", false, null, null));
+  expect(confirmSpy).toHaveBeenCalled();
+  // the panel closed: its Block action (detail-only) is gone again
+  await waitFor(() => expect(screen.queryAllByText("Block").length).toBe(0));
+  confirmSpy.mockRestore();
+});
+
+test("declining the detail panel's Trash confirmation leaves it open and " +
+  "never calls api.deleteGroups", async () => {
+  const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(false);
+  renderWithOneSenderGroup();
+  await openDetail();
+  fireEvent.click(screen.getByTitle("Move every mail in this group to Trash"));
+  await waitFor(() => expect(confirmSpy).toHaveBeenCalled());
+  expect(deleteGroups).not.toHaveBeenCalled();
+  expect(screen.getAllByText("Block").length).toBeGreaterThan(0);
   confirmSpy.mockRestore();
 });

@@ -401,8 +401,13 @@ export default function App() {
     setSelected(next);
   };
 
+  // Returns whether the action actually proceeded (false = the user
+  // declined the confirmation, or every selected group turned out
+  // protected) - callers that need to react afterward (e.g. closing a
+  // panel once its group is gone) check this instead of assuming success.
   const act = async (keys: string[], action: string, dest = "",
-      keepLatest: number | null = null, olderThanDays: number | null = null) => {
+      keepLatest: number | null = null,
+      olderThanDays: number | null = null): Promise<boolean> => {
     const all = state?.groups[mode] ?? {};
     let force = false;
     let effective = keys;
@@ -412,13 +417,13 @@ export default function App() {
         // Explicitly trashing one protected group: allow, after its own
         // warning (the backend requires force for this).
         if (!confirm(t("confirm.trash_protected",
-          { label: all[keys[0]]?.label ?? keys[0] }))) return;
+          { label: all[keys[0]]?.label ?? keys[0] }))) return false;
         force = true;
       } else if (prot.length) {
         effective = keys.filter((k) => !all[k]?.protected);
         if (!effective.length) {
           setToast(t("toast.all_protected"));
-          return;
+          return false;
         }
       }
     }
@@ -428,15 +433,18 @@ export default function App() {
       ? " " + t("confirm.protected_skipped",
           { n: keys.length - effective.length }) : "";
     if (!force && !confirm(
-      t("confirm.act", { verb, n, k: effective.length }) + skipNote)) return;
+      t("confirm.act", { verb, n, k: effective.length }) + skipNote))
+      return false;
     try {
       await api.deleteGroups(mode, effective, action, dest, force,
         keepLatest, olderThanDays);
       setToast("");
       setSelected(new Set());
       refresh();   // runs in the background; SSE/polling follows it
+      return true;
     } catch (e: any) {
       setToast(`Error: ${e.message ?? e}`);
+      return false;
     }
   };
 
@@ -991,10 +999,6 @@ export default function App() {
             setSelected(next);
           }}
           onOpen={setDetail}
-          onTrash={(g) => act([g.key], "trash")}
-          onProtect={toggleProtect}
-          onBlock={blockGroup}
-          onUnblock={unblockGroup}
           blockedKeys={blockedRules}
           onAckUnsub={ackUnsub}
           sortK={sortK}
@@ -1023,6 +1027,7 @@ export default function App() {
             ?? detail.protected}
           unsubscribedNow={state?.groups[mode][detail.key]?.unsubscribed
             ?? detail.unsubscribed}
+          onTrash={(g) => act([g.key], "trash")}
           onProtect={toggleProtect}
           onBlock={blockGroup}
           onUnblock={unblockGroup}

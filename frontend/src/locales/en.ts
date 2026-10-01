@@ -436,4 +436,5 @@ export const EN: Record<string, string> = {
   "audit.outcome.done": "done",
   "audit.outcome.link": "link",
   "audit.outcome.failed": "failed",
+  "trash_group.tip": "Move every mail in this group to Trash",
 };

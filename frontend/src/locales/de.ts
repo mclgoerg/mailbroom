@@ -590,4 +590,6 @@ export const DE: Record<string, string> = {
   "audit.outcome.failed": "fehlgeschlagen",
   "Close": "Schließen",
   "Remove": "Entfernen",
+  "View details": "Details anzeigen",
+  "trash_group.tip": "Alle Mails dieser Gruppe in den Papierkorb verschieben",
 };

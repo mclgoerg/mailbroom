@@ -302,18 +302,27 @@ const hueOf = (name: string): string => {
   return ACCOUNT_HUES[Math.abs(h) % ACCOUNT_HUES.length];
 };
 
-/** Letter avatar identifying one account, tinted by a stable hash of its
- *  name so accounts stay visually distinct in the switcher/menu. */
-export function AccountAvatar({ name, className = "" }: {
-  name: string; className?: string;
+/** Letter avatar identifying one account/sender/domain, tinted by a
+ *  stable hash of its name so entries stay visually distinct. `size`
+ *  controls the diameter: "sm" (account switcher) or "md" (group rows). */
+export function Avatar({ name, size = "sm", className = "" }: {
+  name: string; size?: "sm" | "md"; className?: string;
 }) {
+  const dims = size === "md" ? "size-8 text-xs" : "size-5 text-[0.65rem]";
   return (
-    <span className={`inline-flex size-5 shrink-0 items-center
-      justify-center rounded-full text-[0.65rem] font-semibold uppercase
+    <span className={`inline-flex ${dims} shrink-0 items-center
+      justify-center rounded-full font-semibold uppercase
       ${hueOf(name)} ${className}`}>
       {name.charAt(0)}
     </span>
   );
+}
+
+/** Account-switcher-sized avatar - thin wrapper around `Avatar`. */
+export function AccountAvatar({ name, className = "" }: {
+  name: string; className?: string;
+}) {
+  return <Avatar name={name} className={className} />;
 }
 
 /** Non-interactive heading line inside a Menu (e.g. the identity). */

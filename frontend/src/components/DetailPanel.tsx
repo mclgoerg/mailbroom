@@ -10,13 +10,18 @@ import { Button, ensureAiAck, Input, Loading, Modal, PanelHeader,
   ProtectButton, Select, Spinner, Toolbar } from "./ui";
 
 export function DetailPanel({ grouping, group, aiEnabled, protectedNow,
-  unsubscribedNow, onProtect, onBlock, onUnblock, blocked, folders,
+  unsubscribedNow, onTrash, onProtect, onBlock, onUnblock, blocked, folders,
   sieve = true, onClose, onDeleted }: {
   grouping: Grouping;
   group: Group;
   aiEnabled: boolean;
   protectedNow: boolean;                 // live value; `group` is a snapshot
   unsubscribedNow: GroupUnsub | null;     // live value; `group` is a snapshot
+  // One-tap whole-group trash (distinct from the mail-list "Trash selected"
+  // below, which only acts on individually checked mails). Resolves false
+  // if the user declined the confirmation, in which case the panel stays
+  // open instead of closing on a no-op.
+  onTrash: (g: Group) => Promise<boolean>;
   onProtect?: (g: Group) => void;        // absent in subject mode
   onBlock?: (g: Group) => void;          // sender/domain groupings only
   onUnblock?: (g: Group) => void;
@@ -217,6 +222,10 @@ export function DetailPanel({ grouping, group, aiEnabled, protectedNow,
           {blocked && <> · 🚫 {t("Blocked")}</>}
         </>}
         actions={<>
+          <Button variant="danger" title={t("trash_group.tip")}
+            onClick={async () => { if (await onTrash(group)) onClose(); }}>
+            {t("Trash")}
+          </Button>
           {onBlock && !blocked && (
             <Button variant="ghost" title={t("block.tip")}
               onClick={() => onBlock(group)}>
