@@ -134,7 +134,8 @@ export function Button({ children, onClick, disabled, variant = "primary",
  * locally. They accept all native props incl. ref (React 19). */
 
 const CONTROL = `min-h-9 rounded-md border border-line bg-panel2 px-3 py-1.5
-  text-sm outline-none focus:border-accent`;
+  text-sm outline-none focus:border-accent
+  disabled:cursor-default disabled:opacity-40`;
 
 export function Input({ className = "", ...rest }:
   ComponentProps<"input">) {
