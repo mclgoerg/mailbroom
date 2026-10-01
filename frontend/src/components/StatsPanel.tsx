@@ -1,3 +1,4 @@
+import { BarChart3 } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
 import { api, fmtSize } from "../api";
 import { t } from "../i18n";
@@ -67,7 +68,9 @@ export function StatsPanel({ onClose }: { onClose: () => void }) {
 
   return (
     <Modal onClose={onClose}>
-      <PanelHeader title={<>📊 {t("Statistics")}</>} onClose={onClose} />
+      <PanelHeader title={<span className="inline-flex items-center gap-2">
+        <BarChart3 size={18} /> {t("Statistics")}
+      </span>} onClose={onClose} />
       <div className="space-y-5 p-5 text-sm">
         {error && <div className="text-rose-400">{error}</div>}
         {!stats && !error && <Loading />}

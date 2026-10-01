@@ -1,3 +1,4 @@
+import { ClipboardList, Shield } from "lucide-react";
 import { useMemo, useState } from "react";
 import { api } from "../api";
 import { t } from "../i18n";
@@ -25,7 +26,10 @@ function RunSummary({ rule }: { rule: Rule }) {
         groups: r.groups, mails: r.mails, acted: r.acted })}
       {r.capped > 0 && <> · {t("rule.capped", { n: r.capped })}</>}
       {r.skipped_protected > 0 &&
-        <> · 🛡️ {t("rule.protected_skipped", { n: r.skipped_protected })}</>}
+        <span className="inline-flex items-center gap-1">
+          {" "}· <Shield size={13} />
+          {t("rule.protected_skipped", { n: r.skipped_protected })}
+        </span>}
       {r.preview.length > 0 && (
         <span className="block text-faint">
           {r.preview.map((p) => `${p.label} (${p.count})`).join(" · ")}
@@ -131,7 +135,9 @@ export function RulesModal({ state, onClose, onChanged }: {
 
   return (
     <Modal onClose={onClose}>
-      <PanelHeader title={<>📋 {t("Rules")}</>} onClose={onClose} />
+      <PanelHeader title={<span className="inline-flex items-center gap-2">
+        <ClipboardList size={18} /> {t("Rules")}
+      </span>} onClose={onClose} />
       <div className="space-y-4 p-5">
         <p className="text-xs text-muted">{t("rules.help")}</p>
 

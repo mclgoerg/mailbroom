@@ -1,3 +1,4 @@
+import { SlidersHorizontal } from "lucide-react";
 import { useState } from "react";
 import { t } from "../i18n";
 import { Button, Input, Select } from "./ui";
@@ -5,7 +6,7 @@ import { Button, Input, Select } from "./ui";
 /* Interactive helper for the filter/rule query DSL: instead of
  * remembering the syntax, users click conditions together - each one
  * appends its token to the query (tokens AND together). Renders as a
- * 🧰 toggle plus a panel: a dropdown anchored to the (relative!) parent
+ * toggle button plus a panel: a dropdown anchored to the (relative!) parent
  * on >=sm, but IN-FLOW full-width on phones, where an absolute panel
  * would overflow the viewport. Parents must set `relative`. */
 
@@ -51,7 +52,7 @@ export function QueryBuilder({ value, onChange, className = "" }: {
       <Button variant="ghost" className={`!px-2 ${className}`}
         title={t("qb.tip")} aria-expanded={open}
         onClick={() => setOpen(!open)}>
-        🧰
+        <SlidersHorizontal size={17} />
       </Button>
       {/* z-20: must cover the group table's sticky header (z-10). */}
       {open && (

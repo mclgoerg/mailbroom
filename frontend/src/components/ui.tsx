@@ -1,3 +1,4 @@
+import { Shield, X } from "lucide-react";
 import { useEffect, useRef, useState,
   type ComponentProps, type ReactNode } from "react";
 import { t } from "../i18n";
@@ -65,9 +66,9 @@ export function ProtectButton({ on, onClick, className = "" }: {
     <button
       title={t(on ? "unprotect.tip" : "protect.tip")}
       onClick={onClick}
-      className={`min-h-7 rounded px-1 text-sm transition-opacity
+      className={`flex min-h-7 items-center rounded px-1 transition-opacity
         ${on ? "" : "opacity-30 grayscale hover:opacity-70"} ${className}`}>
-      🛡️
+      <Shield size={16} />
     </button>
   );
 }
@@ -156,7 +157,7 @@ export function TextArea({ className = "", ...rest }:
 
 /** Labelled form control (label above, muted). */
 export function Field({ label, children }: {
-  label: string; children: ReactNode;
+  label: ReactNode; children: ReactNode;
 }) {
   return (
     <label className="block">
@@ -183,7 +184,9 @@ export function PanelHeader({ title, sub, actions, onClose }: {
         )}
       </div>
       {actions}
-      <Button variant="ghost" onClick={onClose}>✕</Button>
+      <Button variant="ghost" onClick={onClose} title={t("Close")}>
+        <X size={17} />
+      </Button>
     </div>
   );
 }
