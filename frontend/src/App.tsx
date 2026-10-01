@@ -14,8 +14,8 @@ import { TrashPanel } from "./components/TrashPanel";
 import { AccountAvatar, applyTheme, Button, currentTheme, ensureAiAck, Input,
   Menu, MenuHeading, MenuItem, Select, Spinner } from "./components/ui";
 import { t } from "./i18n";
-import { applyStatus, fmtAgo, fmtSize, fmtUsd, matchGroup, parseFilter }
-  from "./lib";
+import { applyStatus, fmtAgo, fmtSize, fmtUsd, matchGroup, parseFilter,
+  retainedMailKeys } from "./lib";
 import type { AppState, AuthProbe, Config, Group, Grouping, StatusMsg }
   from "./types";
 
@@ -79,6 +79,14 @@ export default function App() {
   const [retention, setRetention] =
     useState<"none" | "keep_latest" | "older_than_days">("none");
   const [retentionN, setRetentionN] = useState("");
+  // Current retention selector as (keep_latest, older_than_days), both null
+  // when unset/invalid - "none" means act on every mail, today's behavior.
+  const retentionParams = (): [number | null, number | null] => {
+    const n = Number(retentionN);
+    if (retention === "keep_latest" && n > 0) return [n, null];
+    if (retention === "older_than_days" && n > 0) return [null, n];
+    return [null, null];
+  };
   const [focusIdx, setFocusIdx] = useState(-1);
   const [toast, setToast] = useState("");
   const [theme, setTheme] = useState<"dark" | "light">(currentTheme());
@@ -237,12 +245,49 @@ export default function App() {
     });
   }, [state, mode, filter, sortK, sortDir]);
 
+  // How many mails `keys` would actually move: the full group counts when
+  // no retention restriction applies, or (when one does) the real count
+  // fetched per group and reduced by the same keep-window logic the
+  // backend applies (lib.ts's retainedMailKeys mirrors mailops.py).
+  const retentionAdjustedCount = async (keys: string[],
+      keepLatest: number | null, olderThanDays: number | null,
+      ): Promise<number> => {
+    const all = state?.groups[mode] ?? {};
+    if (!keepLatest && !olderThanDays) {
+      return keys.reduce((n, k) => n + (all[k]?.count ?? 0), 0);
+    }
+    const counts = await Promise.all(keys.map(async (k) => {
+      try {
+        const mails = await api.group(mode, k);
+        return mails.length
+          - retainedMailKeys(mails, keepLatest, olderThanDays).size;
+      } catch {
+        return all[k]?.count ?? 0;      // fetch failed: fall back to "all"
+      }
+    }));
+    return counts.reduce((a, b) => a + b, 0);
+  };
+
   // Count over ALL groups of the mode, not the filtered view - actions apply
-  // to every selected key, including ones a filter is hiding.
-  const selCount = useMemo(() => {
+  // to every selected key, including ones a filter is hiding. Shown
+  // optimistically as the full (naive) count first, then corrected once
+  // the retention-adjusted fetch resolves (debounced against fast typing
+  // in the N field).
+  const [selCount, setSelCount] = useState(0);
+  useEffect(() => {
     const all = state?.groups?.[mode] ?? {};
-    return [...selected].reduce((n, k) => n + (all[k]?.count ?? 0), 0);
-  }, [state, mode, selected]);
+    const keys = [...selected];
+    setSelCount(keys.reduce((n, k) => n + (all[k]?.count ?? 0), 0));
+    const [keepLatest, olderThanDays] = retentionParams();
+    if (!keys.length || (!keepLatest && !olderThanDays)) return;
+    let cancelled = false;
+    const timer = setTimeout(() => {
+      retentionAdjustedCount(keys, keepLatest, olderThanDays)
+        .then((n) => { if (!cancelled) setSelCount(n); });
+    }, 250);
+    return () => { cancelled = true; clearTimeout(timer); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state, mode, selected, retention, retentionN]);
 
   const scanning = state?.status === "scanning";
   const aiRunning = state?.ai.status === "running";
@@ -317,15 +362,6 @@ export default function App() {
     setSelected(next);
   };
 
-  // Current retention selector as (keep_latest, older_than_days), both null
-  // when unset/invalid - "none" means act on every mail, today's behavior.
-  const retentionParams = (): [number | null, number | null] => {
-    const n = Number(retentionN);
-    if (retention === "keep_latest" && n > 0) return [n, null];
-    if (retention === "older_than_days" && n > 0) return [null, n];
-    return [null, null];
-  };
-
   const act = async (keys: string[], action: string, dest = "",
       keepLatest: number | null = null, olderThanDays: number | null = null) => {
     const all = state?.groups[mode] ?? {};
@@ -347,7 +383,7 @@ export default function App() {
         }
       }
     }
-    const n = effective.reduce((acc, k) => acc + (all[k]?.count ?? 0), 0);
+    const n = await retentionAdjustedCount(effective, keepLatest, olderThanDays);
     const verb = actionVerb(action) + (dest ? ` → ${dest}` : "");
     const skipNote = effective.length !== keys.length
       ? " " + t("confirm.protected_skipped",

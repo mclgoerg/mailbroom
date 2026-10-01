@@ -36,6 +36,27 @@ export const applyStatus = <S extends { account: string; groups_rev: number;
 export const olderThan = (m: { ts: number }, months: number): boolean =>
   m.ts > 0 && m.ts < Date.now() / 1000 - months * 30.44 * 86400;
 
+/** Mirrors backend/mailops.py retained_mails(): the mails a retention
+ * restriction EXEMPTS from an action (the keep-window), as mailKey()s.
+ * Newest-first; ts == 0 sorts oldest; ties break by folder+uid - same
+ * order the backend applies, so a client-side preview count matches what
+ * the server will actually act on. */
+export function retainedMailKeys(
+    mails: { folder: string; uid: number; ts: number }[],
+    keepLatest: number | null, olderThanDays: number | null): Set<string> {
+  if (!keepLatest && !olderThanDays) return new Set();
+  const items = [...mails].sort((a, b) =>
+    b.ts - a.ts || a.folder.localeCompare(b.folder) || a.uid - b.uid);
+  let keep: typeof items;
+  if (keepLatest) {
+    keep = items.slice(0, keepLatest);
+  } else {
+    const cutoff = Date.now() / 1000 - (olderThanDays as number) * 86400;
+    keep = items.filter((m) => m.ts !== 0 && m.ts >= cutoff);
+  }
+  return new Set(keep.map(mailKey));
+}
+
 /* Proton Sieve snippet for a sender/domain, pasteable into
  * Settings → Filters → Add sieve filter. Pure template, no server state. */
 export type SieveAction = "discard" | "fileinto" | "markread";

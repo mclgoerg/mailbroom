@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { applyStatus, fmtAgo, fmtSize, fmtUsd, mailKey, matchGroup,
-  olderThan, parseFilter, sieveSnippet } from "./lib";
+  olderThan, parseFilter, retainedMailKeys, sieveSnippet } from "./lib";
 import type { Group } from "./types";
 
 const g = (over: Partial<Group> = {}): Group => ({
@@ -31,6 +31,42 @@ describe("formatters", () => {
     expect(olderThan({ ts: now - 400 * 86400 }, 12)).toBe(true);
     expect(olderThan({ ts: now - 10 * 86400 }, 12)).toBe(false);
     expect(olderThan({ ts: 0 }, 12)).toBe(false);
+  });
+});
+
+// Mirrors backend/mailops.py::retained_mails - same fixture shape as
+// tests/test_retention.py so the two stay in lockstep.
+describe("retainedMailKeys", () => {
+  const mails = [
+    { folder: "INBOX", uid: 1, ts: 500 },
+    { folder: "INBOX", uid: 2, ts: 500 },      // ties uid1 on ts
+    { folder: "Archive", uid: 10, ts: 100 },   // oldest real timestamp
+  ];
+
+  it("no restriction exempts nothing", () => {
+    expect(retainedMailKeys(mails, null, null)).toEqual(new Set());
+  });
+
+  it("keep_latest keeps the newest N, ties break by folder then uid", () => {
+    expect(retainedMailKeys(mails, 1, null)).toEqual(new Set(["INBOX 1"]));
+    expect(retainedMailKeys(mails, 2, null))
+      .toEqual(new Set(["INBOX 1", "INBOX 2"]));
+  });
+
+  it("ts == 0 sorts as oldest for keep_latest", () => {
+    const withZero = [...mails, { folder: "INBOX", uid: 3, ts: 0 }];
+    const keep = retainedMailKeys(withZero, 3, null);
+    expect(keep.has("INBOX 3")).toBe(false);
+  });
+
+  it("older_than_days exempts recent mails, treats ts == 0 as old", () => {
+    const now = Date.now() / 1000;
+    const recent = [
+      { folder: "INBOX", uid: 1, ts: now },
+      { folder: "INBOX", uid: 2, ts: 0 },
+      { folder: "Archive", uid: 10, ts: now - 400 * 86400 },
+    ];
+    expect(retainedMailKeys(recent, null, 30)).toEqual(new Set(["INBOX 1"]));
   });
 });
 

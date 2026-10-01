@@ -18,6 +18,7 @@ vi.mock("./api", async (importOriginal) => ({
     exportUrl: (mode: string) => `/api/export?grouping=${mode}`,
     version: () => Promise.resolve({ build: "v1" }),
     deleteGroups: vi.fn().mockResolvedValue({ ok: true, queued: 1, skipped: 0 }),
+    group: vi.fn().mockResolvedValue([]),
   },
   setAccount: () => {},
   withAccount: (p: string) => p,
@@ -25,6 +26,7 @@ vi.mock("./api", async (importOriginal) => ({
 
 const { api } = await import("./api");
 const deleteGroups = api.deleteGroups as ReturnType<typeof vi.fn>;
+const groupApi = api.group as ReturnType<typeof vi.fn>;
 
 import App from "./App";
 import type { AppState, Config, Group } from "./types";
@@ -76,6 +78,8 @@ afterEach(() => {
   cleanup();
   localStorage.clear();
   deleteGroups.mockClear();
+  groupApi.mockClear();
+  groupApi.mockResolvedValue([]);
 });
 
 // Pre-seed the active account so the initial render skips the
@@ -120,6 +124,32 @@ test("keep-latest-N is sent through to the delete call", async () => {
   await waitFor(() => expect(deleteGroups).toHaveBeenCalledOnce());
   expect(deleteGroups).toHaveBeenCalledWith(
     "sender", [group.key], "trash", "", false, 3, null);
+});
+
+test("the Trash button count corrects itself to the retention-adjusted " +
+  "number instead of the full group count", async () => {
+  state = { ...baseState };
+  mountReady();
+  // group.count is 12; only 7 of those mails would survive a keep_latest:5
+  // restriction (5 kept as the newest, per retainedMailKeys parity logic).
+  groupApi.mockResolvedValue(
+    Array.from({ length: 12 }, (_, i) => (
+      { folder: "INBOX", uid: i + 1, ts: 1000 + i })));
+  render(<App />);
+  await selectFirstGroup();
+
+  // Before the fetch resolves, the button shows the naive (full) count.
+  expect(screen.getByText("Trash 12")).toBeTruthy();
+
+  fireEvent.change(screen.getByTitle("Restrict this action to mails " +
+    "beyond a keep-window instead of every mail in the selected groups."),
+    { target: { value: "keep_latest" } });
+  const n = await screen.findByPlaceholderText("N");
+  fireEvent.change(n, { target: { value: "5" } });
+
+  await waitFor(() => expect(screen.getByText("Trash 7")).toBeTruthy(),
+    { timeout: 2000 });
+  expect(groupApi).toHaveBeenCalledWith("sender", group.key);
 });
 
 test("older-than-days is sent through to the delete call", async () => {
