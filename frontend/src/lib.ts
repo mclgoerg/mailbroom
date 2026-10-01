@@ -91,6 +91,8 @@ export function sieveSnippet(kind: "sender" | "domain", value: string,
  *   is:replied          the user has written to this sender before
  *   is:noreply-ever     the user has never written to any of its senders
  *   att:>10m att:>500k  attachment size above N (needs attachment analysis)
+ *   from:<addr>         exact sender address (sender grouping only)
+ *   domain:<domain>     exact domain (domain grouping only)
  *   anything else       substring match on name / address / key
  */
 
@@ -105,6 +107,8 @@ export interface ParsedFilter {
   replied: boolean | null;
   attMin: number | null;
   unsubscribed: boolean | null;
+  fromAddr: string | null;
+  domain: string | null;
 }
 
 const SIZE_UNIT: Record<string, number> = { k: 1024, m: 1048576, g: 1073741824 };
@@ -112,9 +116,10 @@ const SIZE_UNIT: Record<string, number> = { k: 1024, m: 1048576, g: 1073741824 }
 export function parseFilter(q: string): ParsedFilter {
   const out: ParsedFilter = { text: [], tags: [], ai: null,
     ageMonths: null, unreadMin: null, unsub: false, protectedOnly: false,
-    replied: null, attMin: null, unsubscribed: null };
+    replied: null, attMin: null, unsubscribed: null, fromAddr: null,
+    domain: null };
   for (const tok of q.trim().toLowerCase().split(/\s+/).filter(Boolean)) {
-    const m = tok.match(/^(tag|ai|age|unread|is|att):(.*)$/);
+    const m = tok.match(/^(tag|ai|age|unread|is|att|from|domain):(.*)$/);
     if (!m) {
       out.text.push(tok);
       continue;
@@ -140,12 +145,16 @@ export function parseFilter(q: string): ParsedFilter {
     else if (kind === "att") {
       const a = val.match(/^>?(\d+)(k|m|g)?$/);
       if (a) out.attMin = Number(a[1]) * (SIZE_UNIT[a[2]] ?? 1);
-    } else out.text.push(tok);
+    } else if (kind === "from" && val) out.fromAddr = val;
+    else if (kind === "domain" && val) out.domain = val;
+    else out.text.push(tok);
   }
   return out;
 }
 
 export function matchGroup(g: Group, f: ParsedFilter, now = Date.now()): boolean {
+  if (f.fromAddr !== null && g.key !== f.fromAddr) return false;
+  if (f.domain !== null && g.key !== f.domain) return false;
   for (const t of f.text) {
     if (!g.key.includes(t) && !g.label.toLowerCase().includes(t) &&
         !g.sub.toLowerCase().includes(t)) return false;

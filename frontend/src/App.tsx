@@ -245,6 +245,23 @@ export default function App() {
     });
   }, [state, mode, filter, sortK, sortDir]);
 
+  // Block rules are visible, ordinary rules: a "block:<key>" query is
+  // `from:<key>`/`domain:<key>` with origin "block" - derive which group
+  // keys are currently blocked so rows/detail can show a badge and hide
+  // the Block button.
+  const blockedKeys = useMemo(() => {
+    const keys = new Set<string>();
+    if (mode === "subject") return keys;
+    const prefix = mode === "sender" ? "from:" : "domain:";
+    for (const r of state?.rules ?? []) {
+      if (r.origin === "block" && r.grouping === mode
+          && r.query.startsWith(prefix)) {
+        keys.add(r.query.slice(prefix.length));
+      }
+    }
+    return keys;
+  }, [state?.rules, mode]);
+
   // How many mails `keys` would actually move: the full group counts when
   // no retention restriction applies, or (when one does) the real count
   // fetched per group and reduced by the same keep-window logic the
@@ -443,6 +460,21 @@ export default function App() {
     try {
       const r = await api.protect(entry, !g.protected);
       setCfg((c) => (c ? { ...c, protected: r.protected } : c));
+      refresh();
+    } catch (e: any) {
+      setToast(`Error: ${e.message ?? e}`);
+    }
+  };
+
+  // Sender/domain only (same restriction as protect - subject groups have
+  // no stable sender to build a from:/domain: rule from).
+  const blockGroup = mode === "subject" ? undefined : async (g: Group) => {
+    if (!confirm(t("confirm.block", { label: g.label }))) return;
+    const trashExisting = g.count > 0
+      && confirm(t("confirm.block_trash_existing", { n: g.count }));
+    try {
+      await api.block(mode, g.key, g.label, trashExisting);
+      setToast(t("toast.blocked", { label: g.label }));
       refresh();
     } catch (e: any) {
       setToast(`Error: ${e.message ?? e}`);
@@ -919,6 +951,8 @@ export default function App() {
           onOpen={setDetail}
           onTrash={(g) => act([g.key], "trash")}
           onProtect={toggleProtect}
+          onBlock={blockGroup}
+          blockedKeys={blockedKeys}
           onAckUnsub={ackUnsub}
           sortK={sortK}
           sortDir={sortDir}
@@ -947,6 +981,8 @@ export default function App() {
           unsubscribedNow={state?.groups[mode][detail.key]?.unsubscribed
             ?? detail.unsubscribed}
           onProtect={toggleProtect}
+          onBlock={blockGroup}
+          blocked={blockedKeys.has(detail.key)}
           folders={state?.folders_raw ?? []}
           sieve={(acct?.preset ?? "proton") === "proton"}
           onClose={() => { setDetail(null); refresh(); }}

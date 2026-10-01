@@ -154,6 +154,16 @@ export const EN: Record<string, string> = {
   "confirm.protected_skipped": "({n} protected group(s) skipped.)",
   "toast.all_protected":
     "All selected groups are protected - nothing was deleted.",
+  "confirm.block":
+    'Block "{label}"? This creates a standing rule that automatically '
+    + "moves its future mail to Trash on the daily schedule - reversible "
+    + "by deleting the rule in Rules.",
+  "confirm.block_trash_existing":
+    "Also move its {n} existing mail(s) to Trash now?",
+  "toast.blocked": 'Blocked "{label}".',
+  "block.tip":
+    "Block this sender/domain: creates a standing rule that auto-trashes "
+    + "future mail",
   "protect.tip":
     "Protect this sender - bulk deletes and AI suggestions will skip it",
   "unprotect.tip": "Protected - click to remove protection",

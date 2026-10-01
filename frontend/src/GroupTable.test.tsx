@@ -129,3 +129,32 @@ describe("unsubscribe badge", () => {
     expect(queryAllByText(/[Uu]nsubscri/).length).toBe(0);
   });
 });
+
+describe("block button + blocked badge", () => {
+  beforeEach(() => setLang("en"));
+  afterEach(cleanup);
+
+  it("hides the Block button and shows no badge without onBlock", () => {
+    const { queryAllByText } = renderTable({ groups: [mk(0)] });
+    expect(queryAllByText("Block").length).toBe(0);
+    expect(queryAllByText("Blocked").length).toBe(0);
+  });
+
+  it("shows a Block button that calls back with the group", () => {
+    const onBlock = vi.fn();
+    const { getAllByText } = renderTable({ onBlock, groups: [mk(0)] });
+    const buttons = getAllByText("Block");
+    expect(buttons.length).toBe(2);           // desktop + mobile
+    fireEvent.click(buttons[0]);
+    expect(onBlock).toHaveBeenCalledWith(mk(0));
+  });
+
+  it("shows a Blocked badge and hides the Block button for blocked keys",
+    () => {
+    const onBlock = vi.fn();
+    const { getAllByText, queryAllByText } = renderTable({ onBlock,
+      groups: [mk(0)], blockedKeys: new Set([mk(0).key]) });
+    expect(getAllByText(/Blocked/).length).toBe(2);
+    expect(queryAllByText("Block").length).toBe(0);
+  });
+});

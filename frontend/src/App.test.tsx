@@ -13,6 +13,8 @@ let state: any;
 let versions = ["v1"];        // api.version() walks through this in order
 let versionCalls = 0;
 
+const block = vi.fn().mockResolvedValue({ rule: { id: "r1" } });
+
 vi.mock("./api", () => ({
   api: {
     authProbe: () => Promise.resolve({ mode: "none", authed: true }),
@@ -23,9 +25,13 @@ vi.mock("./api", () => ({
     exportUrl: (mode: string) => `/api/export?grouping=${mode}`,
     version: () => Promise.resolve(
       { build: versions[Math.min(versionCalls++, versions.length - 1)] }),
+    block: (...args: unknown[]) => block(...args),
   },
   setAccount: () => {},
   withAccount: (p: string) => p,
+  fmtSize: (b: number) => `${b} B`,
+  fmtUsd: (c: number) => `$${c}`,
+  mailKey: (m: { folder: string; uid: number }) => `${m.folder} ${m.uid}`,
 }));
 
 import App from "./App";
@@ -88,6 +94,7 @@ afterEach(() => {
   stateCalls.n = 0;
   versions = ["v1"];
   versionCalls = 0;
+  block.mockClear();
 });
 
 const openMenu = async () => {
@@ -215,3 +222,42 @@ test("profile menu shows the release version and the build this tab " +
     // the loaded build hash from the (mocked) /api/version poll.
     expect(screen.getByText(/^v[\d.]+ \(build abc123\)$/)).toBeTruthy();
   });
+
+const groupFixture = {
+  key: "noreply@dhl.example", label: "DHL Paket", sub: "noreply@dhl.example",
+  count: 3, size: 1000, unread: 0, first: "2024-01-01", last: "2024-06-01",
+  tags: [], samples: [], bulk: false, unsub: false, ai: null, ratings: null,
+  protected: false, replied: false, att_size: 0, unsubscribed: null,
+};
+
+const renderWithOneSenderGroup = () => {
+  cfg = singleCfg;
+  state = { ...baseState, status: "done",
+    groups: { sender: { [groupFixture.key]: groupFixture },
+              domain: {}, subject: {} } };
+  return render(<App />);
+};
+
+test("Block button confirms, then calls api.block with the trash-existing " +
+  "choice", async () => {
+  const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(true);
+  renderWithOneSenderGroup();
+  await waitFor(() => expect(screen.getAllByText("DHL Paket").length)
+    .toBeGreaterThan(0));
+  fireEvent.click(screen.getAllByText("Block")[0]);
+  expect(confirmSpy).toHaveBeenCalledWith(
+    expect.stringContaining("DHL Paket"));
+  await waitFor(() => expect(block).toHaveBeenCalledWith(
+    "sender", "noreply@dhl.example", "DHL Paket", true));
+  confirmSpy.mockRestore();
+});
+
+test("declining the block confirmation never calls api.block", async () => {
+  const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(false);
+  renderWithOneSenderGroup();
+  await waitFor(() => expect(screen.getAllByText("DHL Paket").length)
+    .toBeGreaterThan(0));
+  fireEvent.click(screen.getAllByText("Block")[0]);
+  expect(block).not.toHaveBeenCalled();
+  confirmSpy.mockRestore();
+});

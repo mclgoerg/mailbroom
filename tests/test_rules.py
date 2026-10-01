@@ -54,6 +54,26 @@ def test_parse_filter_splits_qualifiers_and_text():
         "is:not-unsubscribed")["unsubscribed"] is False
     assert rulesmod.parse_filter("dhl")["unsubscribed"] is None
 
+    assert rulesmod.parse_filter(
+        "from:noreply@dhl.example")["from_addr"] == "noreply@dhl.example"
+    assert rulesmod.parse_filter("dhl")["from_addr"] is None
+    assert rulesmod.parse_filter("domain:dhl.example")["domain"] == \
+        "dhl.example"
+    assert rulesmod.parse_filter("dhl")["domain"] is None
+
+
+def test_match_group_from_and_domain_are_exact_not_substring():
+    f = rulesmod.parse_filter("from:noreply@dhl.example")
+    assert rulesmod.match_group(g(key="noreply@dhl.example"), f, NOW)
+    assert not rulesmod.match_group(
+        g(key="other-noreply@dhl.example"), f, NOW)
+    assert not rulesmod.match_group(g(key="dhl.example"), f, NOW)
+
+    f = rulesmod.parse_filter("domain:dhl.example")
+    assert rulesmod.match_group(g(key="dhl.example"), f, NOW)
+    assert not rulesmod.match_group(g(key="sub.dhl.example"), f, NOW)
+    assert not rulesmod.match_group(g(key="noreply@dhl.example"), f, NOW)
+
 
 def test_match_group_combines_criteria_and():
     f = rulesmod.parse_filter("tag:shipping ai:safe unread:>80 is:unsub dhl")

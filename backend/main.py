@@ -665,6 +665,54 @@ def post_rule_run(rule_id: str):
         raise HTTPException(409, str(exc))
 
 
+class BlockBody(BaseModel):
+    grouping: str                  # sender | domain
+    key: str
+    label: str = ""
+    trash_existing: bool = False
+
+
+@app.post("/api/block")
+def post_block(body: BlockBody, account: str | None = Query(None)):
+    """One-click "Block sender/domain": create a visible, ordinary rule
+    that auto-trashes future mail on the daily schedule, optionally also
+    trashing the group's existing mail right away. Unblock = delete the
+    rule in the Rules modal.
+
+    Rules must report-run at least once before they may execute (the
+    usual safety rule - see rules._validate), so this runs one immediate
+    report pass and then switches the fresh rule straight to execute."""
+    if body.grouping not in ("sender", "domain"):
+        raise HTTPException(400, "bad grouping")
+    acc = _acc(account)
+    check_addr = body.key if body.grouping == "sender" else f"@{body.key}"
+    plist = cfgmod.normalize_protected(cfgmod.load_config().get("protected"))
+    if cfgmod.is_protected(check_addr, plist):
+        raise HTTPException(400, "refusing to block a protected sender")
+    query = f"{'from' if body.grouping == 'sender' else 'domain'}:{body.key}"
+    if any(r.get("origin") == "block" and r["grouping"] == body.grouping
+           and r["query"] == query for r in rulesmod.load_rules()):
+        raise HTTPException(400, "already blocked")
+    rule = rulesmod.create_rule({
+        "name": body.label or body.key, "grouping": body.grouping,
+        "query": query, "action": "trash", "schedule": "daily",
+        "account": account, "origin": "block"})
+    try:
+        rulesmod.run_rule(rule["id"], rescan=False)   # satisfies report-first
+        rule = rulesmod.update_rule(rule["id"], {"mode": "execute"})
+    except Exception as exc:
+        rulesmod.delete_rule(rule["id"])
+        raise HTTPException(500, f"{type(exc).__name__}: {exc}")
+    result: dict = {"rule": rule}
+    if body.trash_existing:
+        try:
+            result["trashed"] = mailops.delete_groups(
+                body.grouping, [body.key], "trash", acc=acc)
+        except (ValueError, RuntimeError) as exc:
+            result["trash_error"] = str(exc)
+    return result
+
+
 class ProtectBody(BaseModel):
     entry: str                     # "user@example.com" or "@example.com"
     on: bool = True

@@ -92,6 +92,11 @@ export const api = {
     if (!res.ok) throw new Error(await res.text());
   },
   runRule: (id: string) => req<RuleRun>(`/api/rules/${id}/run`, {}),
+  block: (grouping: Grouping, key: string, label = "",
+          trashExisting = false) =>
+    req<{ rule: Rule; trashed?: { queued: number; skipped: number };
+          trash_error?: string }>("/api/block",
+      { grouping, key, label, trash_existing: trashExisting }),
   startAttachments: () => req<{ ok: boolean }>("/api/attachments", {}),
   attachments: () => req<AttMail[]>("/api/attachments"),
   duplicates: () => req<DupSet[]>("/api/duplicates"),

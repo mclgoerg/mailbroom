@@ -105,6 +105,13 @@ describe("parseFilter", () => {
     expect(parseFilter("att:5").attMin).toBe(5);
     expect(parseFilter("att:bogus").attMin).toBeNull();
   });
+  it("recognises from:/domain: (block-sender exact qualifiers)", () => {
+    expect(parseFilter("from:noreply@dhl.example").fromAddr)
+      .toBe("noreply@dhl.example");
+    expect(parseFilter("dhl").fromAddr).toBeNull();
+    expect(parseFilter("domain:dhl.example").domain).toBe("dhl.example");
+    expect(parseFilter("dhl").domain).toBeNull();
+  });
 });
 
 describe("sieveSnippet", () => {
@@ -181,6 +188,17 @@ describe("matchGroup", () => {
     expect(matchGroup(g({ last: "2024-06-01" }), f, NOW)).toBe(true);
     expect(matchGroup(g({ last: "2025-12-30" }), f, NOW)).toBe(false);
     expect(matchGroup(g({ last: "" }), f, NOW)).toBe(false);
+  });
+  it("from:/domain: match the exact key, never a substring", () => {
+    const f = parseFilter("from:noreply@dhl.example");
+    expect(matchGroup(g({ key: "noreply@dhl.example" }), f, NOW)).toBe(true);
+    expect(matchGroup(
+      g({ key: "other-noreply@dhl.example" }), f, NOW)).toBe(false);
+    expect(matchGroup(g({ key: "dhl.example" }), f, NOW)).toBe(false);
+
+    const fd = parseFilter("domain:dhl.example");
+    expect(matchGroup(g({ key: "dhl.example" }), fd, NOW)).toBe(true);
+    expect(matchGroup(g({ key: "sub.dhl.example" }), fd, NOW)).toBe(false);
   });
 });
 

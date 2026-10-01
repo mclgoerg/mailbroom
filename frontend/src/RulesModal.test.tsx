@@ -31,8 +31,8 @@ const baseState: AppState = {
 const rule: Rule = {
   id: "abc1", name: "Old shop mail", grouping: "sender", query: "",
   action: "trash", dest: "", schedule: "manual", mode: "report",
-  keep_latest: null, older_than_days: 30, report_runs: 1, created: 0,
-  last_run: null,
+  keep_latest: null, older_than_days: 30, origin: "manual", report_runs: 1,
+  created: 0, last_run: null,
 };
 
 afterEach(() => {
