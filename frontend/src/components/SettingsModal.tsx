@@ -843,7 +843,7 @@ export function SettingsModal({ cfg, account, onClose, onSaved,
           <p className="sm:col-span-2 -mt-2 text-xs text-muted">
             {t("usage.help")}
           </p>
-          <div className="sm:col-span-2">
+          <div className="min-w-0 sm:col-span-2">
             {!tenantStats && !tenantStatsErr && <Loading className="!p-3" />}
             {tenantStatsErr && (
               <div className="text-xs text-rose-400">{tenantStatsErr}</div>
