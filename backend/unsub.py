@@ -30,6 +30,7 @@ import urllib.parse
 import urllib.request
 
 from . import accounts
+from . import auditlog
 from . import config as cfgmod
 from . import mailops
 from . import tenants
@@ -190,9 +191,14 @@ def unsubscribe(grouping: str, key: str, acc=None) -> dict:
     res = unsubscribe_addr(cfgmod.account_imap(acc.name), newest["addr"],
                            newest["unsub"], newest["unsub_post"], acc.name)
     if res["status"] == "failed":
+        auditlog.record("unsubscribe", account=acc.name, count=1,
+                        label=newest["addr"], outcome="failed",
+                        error=res["error"])
         raise RuntimeError(res["error"])
     unsubstore.record(newest["addr"], res["status"], res["method"],
                       res["detail"], account=acc.name)
+    auditlog.record("unsubscribe", account=acc.name, count=1,
+                    label=newest["addr"], outcome=res["status"])
     with acc.lock:
         acc.state["groups_rev"] += 1
     return {"action": res["status"], "method": res["method"],
@@ -268,6 +274,9 @@ def _run_bulk(acc, items: list) -> None:
             # not lose the senders that were already dealt with.
             unsubstore.record(addr, res["status"], res["method"],
                               res["detail"], res["error"], acc.name)
+            auditlog.record("unsubscribe", account=acc.name, count=1,
+                            label=addr, outcome=res["status"],
+                            error=res.get("error", ""))
             with acc.lock:
                 st = acc.state["unsub"]
                 st[{"done": "done", "link": "links",

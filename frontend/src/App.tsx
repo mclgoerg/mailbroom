@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api, setAccount as apiSetAccount, withAccount } from "./api";
+import { AuditLogPanel } from "./components/AuditLogPanel";
 import { DetailPanel } from "./components/DetailPanel";
 import { Login } from "./components/Login";
 import { AttachmentsPanel } from "./components/AttachmentsPanel";
@@ -71,6 +72,7 @@ export default function App() {
   const [attsOpen, setAttsOpen] = useState(false);
   const [dupsOpen, setDupsOpen] = useState(false);
   const [statsOpen, setStatsOpen] = useState(false);
+  const [auditOpen, setAuditOpen] = useState(false);
   const [trashOpen, setTrashOpen] = useState(false);
   const [undoOpen, setUndoOpen] = useState(false);
   const [moveDest, setMoveDest] = useState("");
@@ -332,7 +334,7 @@ export default function App() {
   const acct = cfg?.accounts[account] ?? null;
   const multiAccount = !!cfg && Object.keys(cfg.accounts).length > 1;
   const anyModal = !!detail || searchOpen || settingsOpen || rulesOpen
-    || attsOpen || dupsOpen || statsOpen || trashOpen;
+    || attsOpen || dupsOpen || statsOpen || auditOpen || trashOpen;
 
   const startScan = async () => {
     setSelected(new Set());
@@ -774,6 +776,9 @@ export default function App() {
           <Button variant="ghost" className="!px-2 sm:!px-3"
             title={t("Statistics")}
             onClick={() => setStatsOpen(true)}>📊</Button>
+          <Button variant="ghost" className="!px-2 sm:!px-3"
+            title={t("Audit Log")}
+            onClick={() => setAuditOpen(true)}>📜</Button>
         </div>
       </div>
       {/* Row 2: selection / sorting / bulk tools. */}
@@ -1014,6 +1019,10 @@ export default function App() {
         />
       )}
       {statsOpen && <StatsPanel onClose={() => setStatsOpen(false)} />}
+      {auditOpen && (
+        <AuditLogPanel rules={state?.rules ?? []}
+          onClose={() => setAuditOpen(false)} />
+      )}
       {trashOpen && state && (
         <TrashPanel
           state={state}

@@ -20,6 +20,7 @@ from pydantic import BaseModel, Field
 
 from . import accounts as accountsmod
 from . import aihelper
+from . import auditlog
 from . import auth as authmod
 from . import config as cfgmod
 from . import mailops
@@ -609,6 +610,31 @@ def get_stats(account: str | None = Query(None)):
             "actions": history["actions"]}
 
 
+@app.get("/api/audit")
+def get_audit(offset: int = Query(0, ge=0), limit: int = Query(50, ge=1, le=500),
+             account: str | None = Query(None)):
+    acc = _acc(account)
+    return auditlog.load(acc.name, offset, limit)
+
+
+@app.get("/api/audit/export")
+def get_audit_export(account: str | None = Query(None)):
+    acc = _acc(account)
+    entries = auditlog.load(acc.name, 0, 10**9)["entries"]
+    buf = io.StringIO()
+    w = csv.writer(buf)
+    w.writerow(["ts", "account", "actor", "action", "count", "bytes",
+                "label", "outcome", "error"])
+    for e in entries:
+        w.writerow([e["ts"], e["account"], e["actor"], e["action"],
+                    e["count"], e["bytes"], e["label"], e["outcome"],
+                    e["error"]])
+    return StreamingResponse(
+        iter([buf.getvalue()]), media_type="text/csv",
+        headers={"Content-Disposition":
+                 'attachment; filename="mailbroom-audit-log.csv"'})
+
+
 class RuleBody(BaseModel):
     name: str = ""
     grouping: str = "sender"
@@ -1051,9 +1077,10 @@ def post_config(body: dict):
             mailops.rename_replied_account(old, new)
             statsmod.rename_account(old, new)
             rulesmod.rename_account(old, new)
+            auditlog.rename_account(old, new)
             logging.getLogger("pmc.mail").info(
                 "account renamed: %r -> %r (state, verdicts, unsubscribes, "
-                "replied, stats, rules migrated)", old, new)
+                "replied, stats, rules, audit log migrated)", old, new)
     return cfgmod.masked_config(cfg)
 
 

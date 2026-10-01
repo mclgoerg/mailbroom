@@ -27,6 +27,7 @@ import imaplib
 imaplib._MAXLINE = 10_000_000  # bulk FETCH responses exceed the default 1MB
 
 from . import accounts
+from . import auditlog
 from . import config as cfgmod
 from . import stats as statsmod
 from . import tenants
@@ -1181,6 +1182,7 @@ def _delete_worker(acc) -> None:
             return
         by_folder, label = job["by_folder"], job["label"]
         action, dest = job["action"], job["dest"]
+        actor = job.get("actor", "user")
 
         def progress_cb(moved, total):
             with acc.lock:
@@ -1191,6 +1193,7 @@ def _delete_worker(acc) -> None:
                     + (f" (+{queued} job(s) queued)" if queued else ""))
 
         moved_uids: dict[str, set[int]] = {}
+        done = 0
         t0 = time.time()
         log.info("action %r started: %d mails (%s)", action,
                  sum(len(s) for s in by_folder.values()), label)
@@ -1209,6 +1212,8 @@ def _delete_worker(acc) -> None:
 
         resolved = [dest]
         freed = [0, 0]                      # [bytes moved, mails moved]
+        error = ""
+        cancelled = False
         try:
             if action == "mark_read":
                 done = _mark_read(by_folder, acc, progress_cb)
@@ -1224,24 +1229,33 @@ def _delete_worker(acc) -> None:
                      moved if action != "mark_read" else done,
                      time.time() - t0)
         except Cancelled:
+            cancelled = True
             with acc.lock:
                 apply_partial()
                 acc.delete_pending.clear()
                 acc.state["notice"] = {"key": "action_cancelled", "params": {}}
         except Exception as exc:
+            error = f"{type(exc).__name__}: {exc}"
             log.exception("action %r failed after %.1fs", action,
                           time.time() - t0)
             # Fold in whatever DID get moved before the failure, so the state
             # never claims moved mails still exist where they were.
             with acc.lock:
                 apply_partial()
-                acc.state["delete"]["error"] = f"{type(exc).__name__}: {exc}"
+                acc.state["delete"]["error"] = error
         if action != "mark_read" and freed[1]:
             statsmod.record_action(action, freed[1], freed[0], acc.name)
+        auditlog.record(
+            action, actor=actor, account=acc.name,
+            count=done if action == "mark_read" else freed[1],
+            size=0 if action == "mark_read" else freed[0], label=label,
+            outcome="error" if error else ("cancelled" if cancelled else "ok"),
+            error=error)
 
 
 def _start_delete(by_folder: dict[str, set[int]], label: str, acc,
-                  action: str = "trash", dest: str = "") -> None:
+                  action: str = "trash", dest: str = "",
+                  actor: str = "user") -> None:
     """Enqueue a background mail action (acc.lock held by caller)."""
     if action not in ACTIONS:
         raise ValueError("bad action")
@@ -1261,7 +1275,7 @@ def _start_delete(by_folder: dict[str, set[int]], label: str, acc,
     if not by_folder:
         return
     acc.delete_pending.append({"by_folder": by_folder, "label": label,
-                            "action": action, "dest": dest})
+                            "action": action, "dest": dest, "actor": actor})
     if acc.state["delete"]["status"] != "running":
         acc.state["delete"] = {"status": "running", "progress": "queued…",
                            "error": "", "moved": 0}
@@ -1315,7 +1329,8 @@ def group_act_count(rec: dict, acc, keep_latest: int | None = None,
 def delete_groups(grouping: str, keys: list[str],
                   action: str = "trash", dest: str = "",
                   force: bool = False, keep_latest: int | None = None,
-                  older_than_days: int | None = None, acc=None) -> dict:
+                  older_than_days: int | None = None, acc=None,
+                  actor: str = "user") -> dict:
     acc = acc or accounts.get()
     if keep_latest is not None and older_than_days is not None:
         raise ValueError(
@@ -1354,7 +1369,7 @@ def delete_groups(grouping: str, keys: list[str],
             raise RuntimeError("no known groups selected")
         labels = [jobs[k]["label"] for k in list(jobs)[:3]]
         label = ", ".join(labels) + ("…" if len(jobs) > 3 else "")
-        _start_delete(by_folder, label, acc, action, dest)
+        _start_delete(by_folder, label, acc, action, dest, actor)
     return {"ok": True, "queued": sum(len(s) for s in by_folder.values()),
             "skipped": skipped}
 
@@ -1780,6 +1795,9 @@ def undo_last(index: int = -1, acc=None) -> dict:
         acc.state["notice"] = {"key": "restored", "params": {
             "restored": restored, "of": entry["count"],
             "label": entry["label"]}}
+    auditlog.record(
+        "undo", account=acc.name, count=restored, label=entry["label"],
+        outcome="ok" if restored == entry["count"] else "partial")
     return {"restored": restored, "of": entry["count"]}
 
 
@@ -1885,6 +1903,7 @@ def empty_trash(acc=None) -> dict:
     with acc.lock:
         acc.state["trash_count"] = 0
         acc.state["notice"] = {"key": "emptied_trash", "params": {"count": count}}
+    auditlog.record("empty_trash", account=acc.name, count=count)
     return {"deleted": count}
 
 
