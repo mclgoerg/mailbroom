@@ -840,7 +840,7 @@ export default function App() {
                 {t("AI review")}
               </MenuItem>
             )}
-            <a href={api.exportUrl(mode)} download
+            <a href={api.exportUrl(mode)} target="_blank" rel="noopener"
               title={t("export.csv_tip")}
               className="flex w-full items-center gap-2 rounded-md px-3
                 py-2 text-left text-sm text-body hover:bg-chip">
@@ -916,7 +916,8 @@ export default function App() {
                 onClick={() => setSelected(new Set())}>
                 {t("Clear selection")}
               </button>
-              <a href={api.exportUrl(mode, [...selected])} download
+              <a href={api.exportUrl(mode, [...selected])}
+                target="_blank" rel="noopener"
                 title={t("export.csv_tip")}
                 className="ml-auto flex items-center gap-1 hover:text-body">
                 <Download size={14} /> {t("export.csv")}
