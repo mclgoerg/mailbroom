@@ -1018,9 +1018,17 @@ if STATIC_DIR.is_dir():
     def spa(path: str):
         # Containment check: `path` is percent-decoded and may contain ../ or
         # be absolute (pathlib discards the left side then) - never serve
-        # anything that resolves outside the static dir.
+        # anything that resolves outside the static dir. CodeQL's
+        # py/path-injection sanitizer model does not recognize
+        # Path.is_relative_to() as a guard (confirmed against its query
+        # source - no built-in or stdlib-modeled sanitizer covers it), so
+        # it flags both returns below despite the check actually being
+        # correct; test_spa_fallback_is_contained exercises real traversal
+        # payloads (../, double-encoded, absolute) and asserts none escape.
         file = (_STATIC_ROOT / path).resolve()
+        # codeql[py/path-injection]
         if path and file.is_relative_to(_STATIC_ROOT) and file.is_file():
+            # codeql[py/path-injection]
             return FileResponse(file)
         # index.html references the CURRENT build's hashed /assets bundle -
         # it must always be revalidated, or an installed PWA can keep
