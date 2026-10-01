@@ -141,9 +141,13 @@ def match_group(g: dict, f: dict, now: float | None = None) -> bool:
 def load_rules() -> list[dict]:
     try:
         data = json.loads(_path().read_text())
-        return data.get("rules", []) if isinstance(data, dict) else []
+        rules = data.get("rules", []) if isinstance(data, dict) else []
     except (OSError, json.JSONDecodeError):
         return []
+    for r in rules:                       # tolerate pre-retention rules.json
+        r.setdefault("keep_latest", None)
+        r.setdefault("older_than_days", None)
+    return rules
 
 
 def _save(rules: list[dict]) -> None:
@@ -203,6 +207,23 @@ def _validate(body: dict, rule: dict) -> dict:
         if body["mode"] == "execute" and rule.get("report_runs", 0) < 1:
             raise ValueError("run this rule in report mode first")
         rule["mode"] = body["mode"]
+    for field in ("keep_latest", "older_than_days"):
+        if field in body:
+            val = body[field]
+            if val is None:
+                rule[field] = None
+                continue
+            try:
+                val = int(val)
+            except (TypeError, ValueError):
+                raise ValueError(f"{field} must be an integer")
+            if val < 1:
+                raise ValueError(f"{field} must be >= 1")
+            rule[field] = val
+    if rule.get("keep_latest") is not None \
+            and rule.get("older_than_days") is not None:
+        raise ValueError(
+            "keep_latest and older_than_days are mutually exclusive")
     if not rule["name"]:
         raise ValueError("rule needs a name")
     if rule["action"] == "move" and not rule["dest"]:
@@ -228,6 +249,7 @@ def create_rule(body: dict) -> dict:
             "query": "", "action": "trash", "dest": "",
             "account": accounts.default_name(),
             "schedule": "manual", "mode": "report",   # ALWAYS starts report
+            "keep_latest": None, "older_than_days": None,
             "report_runs": 0, "created": int(time.time()), "last_run": None}
     body = dict(body)
     body.pop("mode", None)                            # not on create
@@ -319,18 +341,29 @@ def run_rule(rule_id: str, rescan: bool = True) -> dict:
         acted_on = [g for g in matched if not g["protected"]]
         result["skipped_protected"] = len(matched) - len(acted_on)
         result["groups"] = len(acted_on)
-        result["mails"] = sum(g["count"] for g in acted_on)
+
+        keep_latest = rule.get("keep_latest")
+        older_than_days = rule.get("older_than_days")
+        # Report counts must reflect the retention restriction: only mails
+        # that would ACTUALLY be acted on (i.e. beyond the keep-window).
+        with acc.lock:
+            recs = acc.state["groups"][rule["grouping"]]
+            counts = {g["key"]: mailops.group_act_count(
+                          recs[g["key"]], acc, keep_latest, older_than_days)
+                      for g in acted_on if g["key"] in recs}
+        result["mails"] = sum(counts.values())
 
         # Cap: take groups (largest first) while they fit into RULE_CAP.
         picked, total = [], 0
-        for g in sorted(acted_on, key=lambda g: -g["count"]):
-            if total + g["count"] <= RULE_CAP:
+        for g in sorted(acted_on, key=lambda g: -counts.get(g["key"], 0)):
+            c = counts.get(g["key"], 0)
+            if c and total + c <= RULE_CAP:
                 picked.append(g)
-                total += g["count"]
+                total += c
         result["capped"] = result["mails"] - total
         result["preview"] = [
-            {"key": g["key"], "label": g["label"], "count": g["count"]}
-            for g in sorted(picked, key=lambda g: -g["count"])[:10]]
+            {"key": g["key"], "label": g["label"], "count": counts[g["key"]]}
+            for g in sorted(picked, key=lambda g: -counts[g["key"]])[:10]]
 
         if rule["mode"] == "execute" and rule["action"] == "move":
             with acc.lock:
@@ -340,7 +373,8 @@ def run_rule(rule_id: str, rescan: bool = True) -> dict:
         if rule["mode"] == "execute" and picked:
             r = mailops.delete_groups(
                 rule["grouping"], [g["key"] for g in picked],
-                rule["action"], rule["dest"], acc=acc)
+                rule["action"], rule["dest"], keep_latest=keep_latest,
+                older_than_days=older_than_days, acc=acc)
             result["acted"] = r["queued"]
         log.info("rule %s (%r, %s) ran: %d groups / %d mails matched, "
                  "%d acted, %d capped, %d protected skipped",

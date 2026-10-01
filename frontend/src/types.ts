@@ -142,6 +142,8 @@ export interface Rule {
   dest: string;
   schedule: "manual" | "daily" | "weekly";
   mode: "report" | "execute";
+  keep_latest: number | null;
+  older_than_days: number | null;
   report_runs: number;
   created: number;
   last_run: RuleRun | null;

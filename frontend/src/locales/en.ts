@@ -224,6 +224,15 @@ export const EN: Record<string, string> = {
   "sched.weekly": "weekly",
   "mode.report": "report",
   "mode.execute": "execute",
+  "retention.none": "All mails",
+  "retention.keep_latest": "Keep newest N, act on the rest",
+  "retention.older_than_days": "Only mails older than N days",
+  "retention.n_placeholder": "N",
+  "retention.help":
+    "Restrict this action to mails beyond a keep-window instead of every "
+    + "mail in the selected groups.",
+  "retention.tag_keep_latest": "keep newest {n}",
+  "retention.tag_older_than_days": "older than {n}d",
   "notice.atts_cancelled": "Attachment analysis cancelled.",
   "notice.unsub_cancelled": "Unsubscribe cancelled.",
   "atts.hint":

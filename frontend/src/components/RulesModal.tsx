@@ -10,6 +10,8 @@ import { Button, EmptyState, Input, Modal, PanelHeader, SectionLabel,
 const EMPTY = {
   name: "", grouping: "sender" as Grouping, query: "", action: "trash",
   dest: "", schedule: "manual" as Rule["schedule"],
+  retention: "none" as "none" | "keep_latest" | "older_than_days",
+  retentionN: "",
 };
 
 function RunSummary({ rule }: { rule: Rule }) {
@@ -62,9 +64,16 @@ export function RulesModal({ state, onClose, onChanged }: {
 
   const save = async () => {
     setMsg("");
+    const { retention, retentionN, ...rest } = form;
+    const n = Number(retentionN);
+    const body = {
+      ...rest,
+      keep_latest: retention === "keep_latest" && n > 0 ? n : null,
+      older_than_days: retention === "older_than_days" && n > 0 ? n : null,
+    };
     try {
-      if (editId) await api.updateRule(editId, form);
-      else await api.createRule(form);
+      if (editId) await api.updateRule(editId, body);
+      else await api.createRule(body);
       setForm({ ...EMPTY });
       setEditId(null);
       onChanged();
@@ -114,7 +123,10 @@ export function RulesModal({ state, onClose, onChanged }: {
   const edit = (rule: Rule) => {
     setEditId(rule.id);
     setForm({ name: rule.name, grouping: rule.grouping, query: rule.query,
-      action: rule.action, dest: rule.dest, schedule: rule.schedule });
+      action: rule.action, dest: rule.dest, schedule: rule.schedule,
+      retention: rule.keep_latest != null ? "keep_latest"
+        : rule.older_than_days != null ? "older_than_days" : "none",
+      retentionN: String(rule.keep_latest ?? rule.older_than_days ?? "") });
   };
 
   return (
@@ -133,6 +145,13 @@ export function RulesModal({ state, onClose, onChanged }: {
               <Tag>{t(`action.${rule.action}`)}
                 {rule.dest ? ` → ${rule.dest}` : ""}</Tag>
               <Tag>{t(`sched.${rule.schedule}`)}</Tag>
+              {rule.keep_latest != null && (
+                <Tag>{t("retention.tag_keep_latest", { n: rule.keep_latest })}</Tag>
+              )}
+              {rule.older_than_days != null && (
+                <Tag>{t("retention.tag_older_than_days",
+                  { n: rule.older_than_days })}</Tag>
+              )}
               <Tag className={rule.mode === "execute"
                 ? "!bg-rose-950 !text-rose-300"
                 : "!bg-emerald-950 !text-emerald-300"}>
@@ -210,6 +229,19 @@ export function RulesModal({ state, onClose, onChanged }: {
               <option value="daily">{t("sched.daily")}</option>
               <option value="weekly">{t("sched.weekly")}</option>
             </Select>
+            <Select className="w-full" value={form.retention}
+              onChange={set("retention")}>
+              <option value="none">{t("retention.none")}</option>
+              <option value="keep_latest">{t("retention.keep_latest")}</option>
+              <option value="older_than_days">
+                {t("retention.older_than_days")}
+              </option>
+            </Select>
+            {form.retention !== "none" && (
+              <Input className="w-full" type="number" min={1}
+                placeholder={t("retention.n_placeholder")}
+                value={form.retentionN} onChange={set("retentionN")} />
+            )}
             {form.action === "move" && (
               <Select className="w-full sm:col-span-2" value={form.dest}
                 onChange={set("dest")}>
