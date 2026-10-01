@@ -18,6 +18,7 @@ const deleteRule = vi.fn().mockResolvedValue(undefined);
 const deleteGroups = vi.fn()
   .mockResolvedValue({ ok: true, queued: 1, skipped: 0 });
 const aiReview = vi.fn().mockResolvedValue({ ok: true });
+const downloadFile = vi.fn().mockResolvedValue(undefined);
 
 vi.mock("./api", () => ({
   api: {
@@ -37,6 +38,7 @@ vi.mock("./api", () => ({
     deleteGroups: (...args: unknown[]) => deleteGroups(...args),
     aiReview: (...args: unknown[]) => aiReview(...args),
   },
+  downloadFile: (...args: unknown[]) => downloadFile(...args),
   setAccount: () => {},
   withAccount: (p: string) => p,
   fmtSize: (b: number) => `${b} B`,
@@ -108,6 +110,7 @@ afterEach(() => {
   deleteRule.mockClear();
   deleteGroups.mockClear();
   aiReview.mockClear();
+  downloadFile.mockClear();
 });
 
 const openMenu = async () => {
@@ -401,9 +404,8 @@ test("the overflow menu exposes CSV export without requiring a selection",
   await waitFor(() => expect(screen.getAllByText("DHL Paket").length)
     .toBeGreaterThan(0));
   fireEvent.click(screen.getByLabelText("More"));
-  const link = screen.getByText("Export CSV")
-    .closest("a") as HTMLAnchorElement;
-  expect(link.href).toContain("/api/export?grouping=sender");
+  fireEvent.click(screen.getByText("Export CSV"));
+  expect(downloadFile).toHaveBeenCalledWith("/api/export?grouping=sender");
 });
 
 // Regression: the folder picker used to be a dead end - once "Move to
@@ -472,7 +474,7 @@ test("the bar's CSV export link is scoped to the current selection", async () =>
   await selectRowCheckbox();
   await waitFor(() => expect(screen.getByText(/^Trash \d+$/)).toBeTruthy());
 
-  const link = screen.getByText("Export CSV").closest("a") as HTMLAnchorElement;
-  expect(link.getAttribute("href")).toBe(
+  fireEvent.click(screen.getByText("Export CSV"));
+  expect(downloadFile).toHaveBeenCalledWith(
     `/api/export?grouping=sender&keys=${groupFixture.key}`);
 });

@@ -3,7 +3,8 @@ import { ArrowDown, BarChart3, ChevronDown, ClipboardList, Copy, Download,
   Settings as SettingsIcon, Sparkles, Star, Sun, Trash2, User, Wand2, X }
   from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { api, setAccount as apiSetAccount, withAccount } from "./api";
+import { api, downloadFile, setAccount as apiSetAccount, withAccount }
+  from "./api";
 import { AuditLogPanel } from "./components/AuditLogPanel";
 import { DetailPanel } from "./components/DetailPanel";
 import { Login } from "./components/Login";
@@ -840,12 +841,12 @@ export default function App() {
                 {t("AI review")}
               </MenuItem>
             )}
-            <a href={api.exportUrl(mode)} target="_blank" rel="noopener"
+            <button onClick={() => downloadFile(api.exportUrl(mode))}
               title={t("export.csv_tip")}
               className="flex w-full items-center gap-2 rounded-md px-3
                 py-2 text-left text-sm text-body hover:bg-chip">
               <Download size={15} /> {t("export.csv")}
-            </a>
+            </button>
           </Menu>
         </div>
       </div>
@@ -916,12 +917,12 @@ export default function App() {
                 onClick={() => setSelected(new Set())}>
                 {t("Clear selection")}
               </button>
-              <a href={api.exportUrl(mode, [...selected])}
-                target="_blank" rel="noopener"
+              <button
+                onClick={() => downloadFile(api.exportUrl(mode, [...selected]))}
                 title={t("export.csv_tip")}
                 className="ml-auto flex items-center gap-1 hover:text-body">
                 <Download size={14} /> {t("export.csv")}
-              </a>
+              </button>
             </div>
             <div className="flex flex-wrap items-center gap-2 text-xs
               text-muted">
