@@ -5,16 +5,34 @@ for changes is: **safe by default, tested, and translated.**
 
 ## Workflow
 
-1. Fork (or branch, if you have access) from `main`.
+1. Fork (or branch, if you have access) from `main`. Branch names
+   aren't enforced, but `feature/...`, `fix/...`, `chore/...` and
+   `docs/...` (matching the commit type below) keep things scannable.
 2. One topic per pull request; keep diffs reviewable. **Everything**
    lands through a PR - `main` takes no direct pushes, and the
    maintainer holds themselves to the same rule.
-3. CI must be green - it runs the backend tests, the frontend tests
+3. **PR titles are checked against [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/)**
+   (`feat: ...`, `fix: ...`, `chore: ...`, `docs: ...`, `refactor: ...`,
+   `perf: ...`, `test: ...`, `build: ...`, `ci: ...`; add `!` after the
+   type for a breaking change). This isn't just style - `main` only
+   takes squash merges, so your PR title becomes the commit message,
+   and [release-please](https://github.com/googleapis/release-please)
+   parses that history to compute the next version and `CHANGELOG.md`
+   entry. An unconventional title is invisible to both.
+4. CI must be green - it runs the backend tests, the frontend tests
    **including the TypeScript check**, and a full multi-arch Docker
-   build. `main` only takes squash merges, so your PR title becomes the
-   commit message: write it like a changelog line.
-4. External PRs get a maintainer review; @mclgoerg is auto-requested
+   build.
+5. External PRs get a maintainer review; @mclgoerg is auto-requested
    via CODEOWNERS.
+
+## Releasing (maintainer)
+
+release-please keeps a standing "Release please" PR up to date on
+every push to `main`, bumping `frontend/package.json` +
+`package-lock.json` and writing `CHANGELOG.md` from the Conventional
+Commit history since the last release - merging it (whenever, no fixed
+schedule) is the entire release process: it tags the version, publishes
+the versioned image to GHCR, and creates the GitHub Release.
 
 ## Running everything locally
 
