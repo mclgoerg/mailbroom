@@ -15,6 +15,8 @@ let versionCalls = 0;
 
 const block = vi.fn().mockResolvedValue({ rule: { id: "r1" } });
 const deleteRule = vi.fn().mockResolvedValue(undefined);
+const deleteGroups = vi.fn()
+  .mockResolvedValue({ ok: true, queued: 1, skipped: 0 });
 
 vi.mock("./api", () => ({
   api: {
@@ -29,6 +31,7 @@ vi.mock("./api", () => ({
     block: (...args: unknown[]) => block(...args),
     deleteRule: (...args: unknown[]) => deleteRule(...args),
     group: () => Promise.resolve([]),
+    deleteGroups: (...args: unknown[]) => deleteGroups(...args),
   },
   setAccount: () => {},
   withAccount: (p: string) => p,
@@ -316,5 +319,31 @@ test("declining the unblock confirmation never calls api.deleteRule",
   await openDetail();
   fireEvent.click(screen.getAllByText("Unblock")[0]);
   expect(deleteRule).not.toHaveBeenCalled();
+  confirmSpy.mockRestore();
+});
+
+test("the detail panel's Trash button confirms, trashes the whole group " +
+  "and closes the panel", async () => {
+  const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(true);
+  renderWithOneSenderGroup();
+  await openDetail();
+  fireEvent.click(screen.getByTitle("Move every mail in this group to Trash"));
+  await waitFor(() => expect(deleteGroups).toHaveBeenCalledWith(
+    "sender", [groupFixture.key], "trash", "", false, null, null));
+  expect(confirmSpy).toHaveBeenCalled();
+  // the panel closed: its Block action (detail-only) is gone again
+  await waitFor(() => expect(screen.queryAllByText("Block").length).toBe(0));
+  confirmSpy.mockRestore();
+});
+
+test("declining the detail panel's Trash confirmation leaves it open and " +
+  "never calls api.deleteGroups", async () => {
+  const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(false);
+  renderWithOneSenderGroup();
+  await openDetail();
+  fireEvent.click(screen.getByTitle("Move every mail in this group to Trash"));
+  await waitFor(() => expect(confirmSpy).toHaveBeenCalled());
+  expect(deleteGroups).not.toHaveBeenCalled();
+  expect(screen.getAllByText("Block").length).toBeGreaterThan(0);
   confirmSpy.mockRestore();
 });

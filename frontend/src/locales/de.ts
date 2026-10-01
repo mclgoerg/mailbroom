@@ -591,4 +591,5 @@ export const DE: Record<string, string> = {
   "Close": "Schließen",
   "Remove": "Entfernen",
   "View details": "Details anzeigen",
+  "trash_group.tip": "Alle Mails dieser Gruppe in den Papierkorb verschieben",
 };
