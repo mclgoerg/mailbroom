@@ -28,11 +28,12 @@ for changes is: **safe by default, tested, and translated.**
 ## Releasing (maintainer)
 
 release-please keeps a standing "Release please" PR up to date on
-every push to `main`, bumping `frontend/package.json` +
-`package-lock.json` and writing `CHANGELOG.md` from the Conventional
-Commit history since the last release - merging it (whenever, no fixed
-schedule) is the entire release process: it tags the version, publishes
-the versioned image to GHCR, and creates the GitHub Release.
+every push to `main`, bumping `version.txt` (mirrored into
+`frontend/package.json`) and writing `CHANGELOG.md` from the
+Conventional Commit history since the last release - merging it
+(whenever, no fixed schedule) is the entire release process: it tags
+the version, publishes the versioned image to GHCR, and creates the
+GitHub Release.
 
 ## Running everything locally
 

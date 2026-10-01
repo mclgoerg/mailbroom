@@ -1,11 +1,16 @@
 name: Release Please
 
 # Keeps a single standing "release PR" up to date on every push to main
-# (version bump in frontend/package.json + package-lock.json, CHANGELOG.md
-# entry), computed from Conventional Commit PR titles since the last
-# release - this job itself never tags or publishes anything. A release
-# only happens when a human deliberately merges that PR; this workflow
-# then detects the merge and builds the versioned image.
+# (version bump in version.txt, mirrored into frontend/package.json;
+# CHANGELOG.md entry) computed from Conventional Commit PR titles since
+# the last release - this job itself never tags or publishes anything.
+# A release only happens when a human deliberately merges that PR; this
+# workflow then detects the merge and builds the versioned image.
+#
+# Versioned at the repo root (not frontend/), deliberately: Mailbroom
+# ships backend + frontend as one container under one version, so EVERY
+# commit must count, not just ones touching frontend/ - release-please
+# only considers commits that touch a package's own path.
 on:
   push:
     branches: [main]
@@ -24,11 +29,11 @@ jobs:
       contents: write        # commits/tags the release, via the release PR
       pull-requests: write   # opens/updates the standing release PR
     outputs:
-      released: ${{ steps.release.outputs['frontend--release_created'] }}
-      tag_name: ${{ steps.release.outputs['frontend--tag_name'] }}
-      version: ${{ steps.release.outputs['frontend--version'] }}
-      major: ${{ steps.release.outputs['frontend--major'] }}
-      minor: ${{ steps.release.outputs['frontend--minor'] }}
+      released: ${{ steps.release.outputs.release_created }}
+      tag_name: ${{ steps.release.outputs.tag_name }}
+      version: ${{ steps.release.outputs.version }}
+      major: ${{ steps.release.outputs.major }}
+      minor: ${{ steps.release.outputs.minor }}
     steps:
       - uses: googleapis/release-please-action@5c625bfb5d1ff62eadeeb3772007f7f66fdcf071 # v4
         id: release
