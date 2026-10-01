@@ -223,8 +223,10 @@ test("profile menu shows the release version and the build this tab " +
     render(<App />);
     await openMenu();
     // package.json's version baked in via vite.config.ts's define, plus
-    // the loaded build hash from the (mocked) /api/version poll.
-    expect(screen.getByText(/^v[\d.]+ \(build abc123\)$/)).toBeTruthy();
+    // the loaded build hash from the (mocked) /api/version poll - async,
+    // so wait for it rather than assuming it has already landed.
+    await waitFor(() => expect(
+      screen.getByText(/^v[\d.]+ \(build abc123\)$/)).toBeTruthy());
   });
 
 const groupFixture = {
