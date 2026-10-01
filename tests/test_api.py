@@ -106,3 +106,36 @@ def test_scan_group_delete_via_api(bridge):
     assert client.get("/api/state").json()["notice"]["key"] == "restored"
     client.post("/api/notice/clear", json={})
     assert client.get("/api/state").json()["notice"] is None
+
+
+def test_export_can_be_scoped_to_keys(bridge):
+    mailops.run_scan()
+    everything = client.get("/api/export", params={"grouping": "sender"}).text
+    assert "noreply@dhl.example" in everything
+    assert "alice@friends.example" in everything
+
+    scoped = client.get("/api/export", params={
+        "grouping": "sender", "keys": ["noreply@dhl.example"]}).text
+    assert "noreply@dhl.example" in scoped
+    assert "alice@friends.example" not in scoped
+
+    # An unknown key is silently ignored (no existence oracle), not an error.
+    header_only = client.get("/api/export", params={
+        "grouping": "sender", "keys": ["nope@nowhere.example"]}).text
+    assert header_only.splitlines() == [everything.splitlines()[0]]
+
+
+def test_post_ai_threads_keys_through_to_start_group_review(bridge, monkeypatch):
+    from backend import aihelper
+    mailops.run_scan()
+    captured = {}
+    monkeypatch.setattr(aihelper, "start_group_review",
+        lambda grouping, acc=None, keys=None:
+            captured.update(grouping=grouping, keys=keys))
+
+    assert client.post("/api/ai", json={"grouping": "sender",
+        "keys": ["noreply@dhl.example"]}).json() == {"ok": True}
+    assert captured == {"grouping": "sender", "keys": ["noreply@dhl.example"]}
+
+    client.post("/api/ai", json={"grouping": "sender"})
+    assert captured["keys"] is None   # omitted -> every unrated group

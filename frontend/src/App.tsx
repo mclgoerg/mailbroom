@@ -366,10 +366,14 @@ export default function App() {
     catch (e: any) { setToast(`Error: ${e.message ?? e}`); }
   };
 
-  const startAi = async () => {
+  // No `keys` = every unrated group in the current grouping (today's
+  // behavior, reachable from the "⋯" overflow menu); a `keys` list scopes
+  // the run to just those groups (the contextual bar's selection-aware
+  // entry).
+  const startAi = async (keys?: string[]) => {
     if (!ensureAiAck()) return;
     setToast(t("Starting…"));
-    try { await api.aiReview(mode); setToast(""); refresh(); }
+    try { await api.aiReview(mode, keys); setToast(""); refresh(); }
     catch (e: any) { setToast(`AI error: ${e.message ?? e}`); }
   };
 
@@ -538,6 +542,7 @@ export default function App() {
     if (!selected.size) return;
     if (v === "move") setMoveDest("?");
     else if (v === "unsubscribe") unsubscribeSelected();
+    else if (v === "ai_review") startAi([...selected]);
     else act([...selected], v, "", ...retentionParams());
   };
 
@@ -829,7 +834,7 @@ export default function App() {
             onClick={() => setAuditOpen(true)}><ScrollText size={17} /></Button>
           <Menu label={t("menu.more")} trigger={<MoreHorizontal size={17} />}>
             {aiEnabled && (
-              <MenuItem onClick={startAi}
+              <MenuItem onClick={() => startAi()}
                 disabled={scanning || aiRunning || state?.status !== "done"}>
                 <Wand2 size={15} className="mr-1 inline align-text-bottom" />
                 {t("AI review")}
@@ -911,6 +916,11 @@ export default function App() {
                 onClick={() => setSelected(new Set())}>
                 {t("Clear selection")}
               </button>
+              <a href={api.exportUrl(mode, [...selected])} download
+                title={t("export.csv_tip")}
+                className="ml-auto flex items-center gap-1 hover:text-body">
+                <Download size={14} /> {t("export.csv")}
+              </a>
             </div>
             <div className="flex flex-wrap items-center gap-2 text-xs
               text-muted">
@@ -940,6 +950,9 @@ export default function App() {
                 <option value="move">{t("Move to folder…")}</option>
                 <option value="mark_read">{t("Mark read")}</option>
                 <option value="unsubscribe">{t("Unsubscribe")}</option>
+                {aiEnabled && (
+                  <option value="ai_review">{t("AI review")}</option>
+                )}
               </Select>
               {moveDest === "?" && (
                 <>

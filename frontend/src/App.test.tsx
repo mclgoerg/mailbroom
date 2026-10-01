@@ -17,6 +17,7 @@ const block = vi.fn().mockResolvedValue({ rule: { id: "r1" } });
 const deleteRule = vi.fn().mockResolvedValue(undefined);
 const deleteGroups = vi.fn()
   .mockResolvedValue({ ok: true, queued: 1, skipped: 0 });
+const aiReview = vi.fn().mockResolvedValue({ ok: true });
 
 vi.mock("./api", () => ({
   api: {
@@ -25,13 +26,16 @@ vi.mock("./api", () => ({
     state: () => { stateCalls.n++; return Promise.resolve(state); },
     emptyTrash: () => Promise.resolve({ ok: true }),
     logout: () => Promise.resolve(),
-    exportUrl: (mode: string) => `/api/export?grouping=${mode}`,
+    exportUrl: (mode: string, keys?: string[]) =>
+      `/api/export?grouping=${mode}`
+      + (keys?.length ? `&keys=${keys.join(",")}` : ""),
     version: () => Promise.resolve(
       { build: versions[Math.min(versionCalls++, versions.length - 1)] }),
     block: (...args: unknown[]) => block(...args),
     deleteRule: (...args: unknown[]) => deleteRule(...args),
     group: () => Promise.resolve([]),
     deleteGroups: (...args: unknown[]) => deleteGroups(...args),
+    aiReview: (...args: unknown[]) => aiReview(...args),
   },
   setAccount: () => {},
   withAccount: (p: string) => p,
@@ -102,6 +106,8 @@ afterEach(() => {
   versionCalls = 0;
   block.mockClear();
   deleteRule.mockClear();
+  deleteGroups.mockClear();
+  aiReview.mockClear();
 });
 
 const openMenu = async () => {
@@ -434,4 +440,39 @@ test("the Move-to-folder picker has an explicit Cancel back to Action…, " +
   await selectRowCheckbox();
   await waitFor(() => expect(screen.getByText(/^Trash \d+$/)).toBeTruthy());
   expect(screen.getByDisplayValue("Action…")).toBeTruthy();
+});
+
+// Selection-scoped AI review + CSV export: the overflow menu's versions
+// (nothing selected) act on everything, like before; the bar's versions
+// (something selected) scope to just the selected groups.
+test("the bar's Action… offers AI review (only when AI is enabled) and " +
+  "runs it scoped to the current selection", async () => {
+  cfg = { ...singleCfg, ai: { ...singleCfg.ai, available: true } };
+  localStorage.setItem("pmc_account", "proton");
+  localStorage.setItem("pmc_ai_ack", "1");   // skip the metadata-sharing confirm
+  state = { ...baseState, status: "done",
+    groups: { sender: { [groupFixture.key]: groupFixture },
+              domain: {}, subject: {} } };
+  render(<App />);
+  await waitFor(() => expect(screen.getAllByText("DHL Paket").length)
+    .toBeGreaterThan(0));
+  await selectRowCheckbox();
+  await waitFor(() => expect(screen.getByText(/^Trash \d+$/)).toBeTruthy());
+
+  fireEvent.change(screen.getByDisplayValue("Action…"),
+    { target: { value: "ai_review" } });
+  await waitFor(() => expect(aiReview).toHaveBeenCalledWith(
+    "sender", [groupFixture.key]));
+});
+
+test("the bar's CSV export link is scoped to the current selection", async () => {
+  renderWithOneSenderGroup();
+  await waitFor(() => expect(screen.getAllByText("DHL Paket").length)
+    .toBeGreaterThan(0));
+  await selectRowCheckbox();
+  await waitFor(() => expect(screen.getByText(/^Trash \d+$/)).toBeTruthy());
+
+  const link = screen.getByText("Export CSV").closest("a") as HTMLAnchorElement;
+  expect(link.getAttribute("href")).toBe(
+    `/api/export?grouping=sender&keys=${groupFixture.key}`);
 });

@@ -57,7 +57,8 @@ export const api = {
   deleteMessages: (items: [string, number][], action = "trash", dest = "") =>
     req<{ ok: boolean; queued: number }>("/api/delete_messages",
       { items, action, dest }),
-  aiReview: (grouping: Grouping) => req<{ ok: boolean }>("/api/ai", { grouping }),
+  aiReview: (grouping: Grouping, keys?: string[]) =>
+    req<{ ok: boolean }>("/api/ai", { grouping, keys: keys ?? null }),
   aiGroup: (grouping: Grouping, key: string, offset = 0, limit = 200) =>
     req<AiGroupResult>("/api/ai_group", { grouping, key, offset, limit }),
   getConfig: () => req<Config>("/api/config"),
@@ -81,8 +82,11 @@ export const api = {
     req<FoldersResp>(account
       ? `/api/folders?account=${encodeURIComponent(account)}`
       : "/api/folders"),
-  exportUrl: (grouping: Grouping) =>
-    withAccount(`/api/export?grouping=${grouping}`),
+  exportUrl: (grouping: Grouping, keys?: string[]) =>
+    withAccount(`/api/export?grouping=${grouping}`
+      + (keys?.length
+        ? keys.map((k) => `&keys=${encodeURIComponent(k)}`).join("")
+        : "")),
   rules: () => req<{ rules: Rule[] }>("/api/rules"),
   createRule: (body: Partial<Rule>) => req<Rule>("/api/rules", body),
   updateRule: (id: string, body: Partial<Rule>) =>

@@ -393,6 +393,7 @@ def post_oauth_imap_disconnect(account: str = Query(...)):
 
 class GroupingBody(BaseModel):
     grouping: str = "sender"
+    keys: list[str] | None = None    # None = every unrated group (default)
 
 
 class DeleteBody(BaseModel):
@@ -513,7 +514,7 @@ def post_ai(body: GroupingBody, account: str | None = Query(None)):
     _check_grouping(body.grouping)
     acc = _acc(account)
     try:
-        aihelper.start_group_review(body.grouping, acc)
+        aihelper.start_group_review(body.grouping, acc, body.keys)
     except ValueError as exc:
         raise HTTPException(400, str(exc))
     except RuntimeError as exc:
@@ -889,7 +890,11 @@ def get_search(q: str = Query(...), account: str | None = Query(None)):
 
 @app.get("/api/export")
 def get_export(grouping: str = Query("sender"),
+               keys: list[str] | None = Query(None),
                account: str | None = Query(None)):
+    """CSV of every group in `grouping`, or (when `keys` is given, e.g.
+    `?keys=a&keys=b`) just those - the user's current selection instead
+    of the whole view."""
     _check_grouping(grouping)
     acc = _acc(account)
     buf = io.StringIO()
@@ -897,8 +902,10 @@ def get_export(grouping: str = Query("sender"),
     w.writerow(["key", "label", "mails", "size_bytes", "unread", "first",
                 "last", "tags", "ai_verdict", "ai_reason"])
     with acc.lock:
-        recs = sorted(acc.state["groups"][grouping].values(),
-                      key=lambda r: -r["count"])
+        all_recs = acc.state["groups"][grouping]
+        wanted = all_recs.values() if keys is None \
+            else (all_recs[k] for k in keys if k in all_recs)
+        recs = sorted(wanted, key=lambda r: -r["count"])
         for r in recs:
             w.writerow([r["key"], r["label"], r["count"], r["size"],
                         r["unread"], r["first"], r["last"],

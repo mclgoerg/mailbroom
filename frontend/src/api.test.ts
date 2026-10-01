@@ -1,7 +1,7 @@
 /* Account scoping: every API path is tagged with the active account. */
 
 import { expect, test } from "vitest";
-import { setAccount, withAccount } from "./api";
+import { api, setAccount, withAccount } from "./api";
 
 test("withAccount appends the active account to every path", () => {
   setAccount("");
@@ -11,4 +11,13 @@ test("withAccount appends the active account to every path", () => {
   expect(withAccount("/api/group?grouping=sender&key=x"))
     .toBe("/api/group?grouping=sender&key=x&account=work%20mail");
   setAccount("");   // don't leak into other tests
+});
+
+test("exportUrl appends repeated keys params only when keys are given",
+  () => {
+  expect(api.exportUrl("sender")).toBe("/api/export?grouping=sender");
+  expect(api.exportUrl("sender", [])).toBe("/api/export?grouping=sender");
+  expect(api.exportUrl("sender", ["a@x.example", "b c@x.example"])).toBe(
+    "/api/export?grouping=sender&keys=a%40x.example"
+    + "&keys=b%20c%40x.example");
 });
