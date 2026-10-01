@@ -13,16 +13,18 @@ const entries: AuditEntry[] = Array.from({ length: 3 }, (_, i) => ({
 }));
 
 const audit = vi.fn().mockResolvedValue({ total: 3, entries });
+const downloadFile = vi.fn().mockResolvedValue(undefined);
 
 vi.mock("./api", () => ({
   api: { audit: (...args: unknown[]) => audit(...args),
     auditExportUrl: () => "/api/audit/export" },
+  downloadFile: (...args: unknown[]) => downloadFile(...args),
   fmtSize: (b: number) => `${b} B`,
 }));
 
 import { AuditLogPanel } from "./components/AuditLogPanel";
 
-afterEach(() => { cleanup(); audit.mockClear(); });
+afterEach(() => { cleanup(); audit.mockClear(); downloadFile.mockClear(); });
 
 test("renders entries newest-fetched-order with actor/outcome", async () => {
   render(<AuditLogPanel rules={[]} onClose={() => {}} />);
@@ -60,4 +62,11 @@ test("resolves a rule actor to its current name when known", async () => {
   render(<AuditLogPanel rules={[rule]} onClose={() => {}} />);
   await waitFor(() => screen.getByText(/rule “Grok”/));
   expect(screen.queryByText(/rule “abc123”/)).toBeNull();
+});
+
+test("CSV export fetches and saves a blob instead of navigating", async () => {
+  render(<AuditLogPanel rules={[]} onClose={() => {}} />);
+  await waitFor(() => screen.getByText(/item 0/));
+  fireEvent.click(screen.getByText("CSV"));
+  expect(downloadFile).toHaveBeenCalledWith("/api/audit/export");
 });

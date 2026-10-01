@@ -29,6 +29,7 @@ vi.mock("./api", () => ({
     block: (...args: unknown[]) => block(...args),
     deleteRule: (...args: unknown[]) => deleteRule(...args),
   },
+  downloadFile: () => Promise.resolve(),
   setAccount: () => {},
   withAccount: (p: string) => p,
   fmtSize: (b: number) => `${b} B`,

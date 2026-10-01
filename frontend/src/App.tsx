@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { api, setAccount as apiSetAccount, withAccount } from "./api";
+import { api, downloadFile, setAccount as apiSetAccount, withAccount }
+  from "./api";
 import { AuditLogPanel } from "./components/AuditLogPanel";
 import { DetailPanel } from "./components/DetailPanel";
 import { Login } from "./components/Login";
@@ -830,10 +831,10 @@ export default function App() {
             {t("AI review")}
           </Button>
         )}
-        <a href={api.exportUrl(mode)} target="_blank" rel="noopener"
+        <button onClick={() => downloadFile(api.exportUrl(mode))}
           className="min-h-9 rounded-md bg-chip px-3 py-1.5 text-sm
             font-medium text-body hover:bg-chiph"
-          title="Export current grouping as CSV">CSV</a>
+          title="Export current grouping as CSV">CSV</button>
         {moveDest === "?" ? (
           <Select value=""
             onChange={(e) => {
