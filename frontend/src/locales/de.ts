@@ -590,4 +590,5 @@ export const DE: Record<string, string> = {
   "audit.outcome.failed": "fehlgeschlagen",
   "Close": "Schließen",
   "Remove": "Entfernen",
+  "View details": "Details anzeigen",
 };

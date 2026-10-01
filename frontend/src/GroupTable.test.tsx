@@ -25,7 +25,6 @@ function renderTable(extra: Partial<Parameters<typeof GroupTable>[0]> = {}) {
       onToggle={noop}
       onToggleAll={noop}
       onOpen={noop}
-      onTrash={noop}
       onAckUnsub={noop}
       sortK="count"
       sortDir={-1}
@@ -130,49 +129,48 @@ describe("unsubscribe badge", () => {
   });
 });
 
-describe("block button + blocked badge", () => {
+describe("blocked badge", () => {
+  // Trash/Block/Protect buttons were removed from rows entirely - single-
+  // group actions live in DetailPanel now (opened via onOpen). Rows only
+  // keep the informational "Blocked" tag.
   beforeEach(() => setLang("en"));
   afterEach(cleanup);
 
-  it("hides the Block button and shows no badge without onBlock", () => {
+  it("shows no badge for an unblocked group", () => {
     const { queryAllByText } = renderTable({ groups: [mk(0)] });
-    expect(queryAllByText("Block").length).toBe(0);
     expect(queryAllByText("Blocked").length).toBe(0);
   });
 
-  it("shows a Block button that calls back with the group", () => {
-    const onBlock = vi.fn();
-    const { getAllByText } = renderTable({ onBlock, groups: [mk(0)] });
-    const buttons = getAllByText("Block");
-    expect(buttons.length).toBe(2);           // desktop + mobile
-    fireEvent.click(buttons[0]);
-    expect(onBlock).toHaveBeenCalledWith(mk(0));
-  });
-
-  it("shows a Blocked badge and hides the Block button for blocked keys",
-    () => {
-    const onBlock = vi.fn();
-    const { getAllByText, queryAllByText } = renderTable({ onBlock,
+  it("shows a Blocked badge for blocked keys", () => {
+    const { getAllByText } = renderTable({
       groups: [mk(0)], blockedKeys: new Map([[mk(0).key, "rule1"]]) });
-    expect(getAllByText(/Blocked/).length).toBe(2);
-    expect(queryAllByText("Block").length).toBe(0);
+    expect(getAllByText(/Blocked/).length).toBe(2);   // desktop + mobile
+  });
+});
+
+describe("row opens detail (avatar/chevron/label are all part of one tap target)", () => {
+  beforeEach(() => setLang("en"));
+  afterEach(cleanup);
+
+  it("calls onOpen with the group when the mobile row is tapped", () => {
+    const onOpen = vi.fn();
+    const { getAllByText } = renderTable({ onOpen, groups: [mk(0)] });
+    fireEvent.click(getAllByText("Sender 0")[1]);     // [0] desktop, [1] mobile
+    expect(onOpen).toHaveBeenCalledWith(mk(0));
   });
 
-  it("shows an Unblock button for blocked keys that calls back with the " +
-    "group", () => {
-    const onUnblock = vi.fn();
-    const { getAllByText, queryAllByText } = renderTable({ onUnblock,
-      groups: [mk(0)], blockedKeys: new Map([[mk(0).key, "rule1"]]) });
-    const buttons = getAllByText("Unblock");
-    expect(buttons.length).toBe(2);           // desktop + mobile
-    fireEvent.click(buttons[0]);
-    expect(onUnblock).toHaveBeenCalledWith(mk(0));
-    expect(queryAllByText("Block").length).toBe(0);
+  it("calls onOpen when the desktop sender button is clicked", () => {
+    const onOpen = vi.fn();
+    const { getAllByText } = renderTable({ onOpen, groups: [mk(0)] });
+    fireEvent.click(getAllByText("Sender 0")[0]);     // desktop
+    expect(onOpen).toHaveBeenCalledWith(mk(0));
   });
 
-  it("hides the Unblock button for keys that are not blocked", () => {
-    const onUnblock = vi.fn();
-    const { queryAllByText } = renderTable({ onUnblock, groups: [mk(0)] });
-    expect(queryAllByText("Unblock").length).toBe(0);
+  it("renders an initials avatar per row (desktop + mobile)", () => {
+    const { container } = renderTable({ groups: [mk(0)] });
+    // "Sender 0" -> initial "S", once in the desktop table, once in the
+    // mobile cards.
+    expect(container.querySelectorAll("tbody td span")[0]?.textContent)
+      .toBe("S");
   });
 });

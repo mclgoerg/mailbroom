@@ -991,10 +991,6 @@ export default function App() {
             setSelected(next);
           }}
           onOpen={setDetail}
-          onTrash={(g) => act([g.key], "trash")}
-          onProtect={toggleProtect}
-          onBlock={blockGroup}
-          onUnblock={unblockGroup}
           blockedKeys={blockedRules}
           onAckUnsub={ackUnsub}
           sortK={sortK}

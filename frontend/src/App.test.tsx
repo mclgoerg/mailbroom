@@ -28,6 +28,7 @@ vi.mock("./api", () => ({
       { build: versions[Math.min(versionCalls++, versions.length - 1)] }),
     block: (...args: unknown[]) => block(...args),
     deleteRule: (...args: unknown[]) => deleteRule(...args),
+    group: () => Promise.resolve([]),
   },
   setAccount: () => {},
   withAccount: (p: string) => p,
@@ -246,12 +247,20 @@ const renderWithOneSenderGroup = () => {
   return render(<App />);
 };
 
+// Block/Unblock/Protect moved from the group row into DetailPanel (single-
+// group actions only) - open it the same way a user would, by clicking the
+// row, before looking for those buttons.
+const openDetail = async () => {
+  await waitFor(() => expect(screen.getAllByText("DHL Paket").length)
+    .toBeGreaterThan(0));
+  fireEvent.click(screen.getAllByText("DHL Paket")[0]);
+};
+
 test("Block button confirms, then calls api.block with the trash-existing " +
   "choice", async () => {
   const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(true);
   renderWithOneSenderGroup();
-  await waitFor(() => expect(screen.getAllByText("DHL Paket").length)
-    .toBeGreaterThan(0));
+  await openDetail();
   fireEvent.click(screen.getAllByText("Block")[0]);
   expect(confirmSpy).toHaveBeenCalledWith(
     expect.stringContaining("DHL Paket"));
@@ -263,8 +272,7 @@ test("Block button confirms, then calls api.block with the trash-existing " +
 test("declining the block confirmation never calls api.block", async () => {
   const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(false);
   renderWithOneSenderGroup();
-  await waitFor(() => expect(screen.getAllByText("DHL Paket").length)
-    .toBeGreaterThan(0));
+  await openDetail();
   fireEvent.click(screen.getAllByText("Block")[0]);
   expect(block).not.toHaveBeenCalled();
   confirmSpy.mockRestore();
@@ -292,8 +300,7 @@ test("a blocked group shows Unblock (not Block), which confirms and " +
   "deletes the rule", async () => {
   const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(true);
   renderWithOneBlockedSenderGroup();
-  await waitFor(() => expect(screen.getAllByText("DHL Paket").length)
-    .toBeGreaterThan(0));
+  await openDetail();
   expect(screen.queryAllByText("Block").length).toBe(0);
   fireEvent.click(screen.getAllByText("Unblock")[0]);
   expect(confirmSpy).toHaveBeenCalledWith(
@@ -306,8 +313,7 @@ test("declining the unblock confirmation never calls api.deleteRule",
   async () => {
   const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(false);
   renderWithOneBlockedSenderGroup();
-  await waitFor(() => expect(screen.getAllByText("DHL Paket").length)
-    .toBeGreaterThan(0));
+  await openDetail();
   fireEvent.click(screen.getAllByText("Unblock")[0]);
   expect(deleteRule).not.toHaveBeenCalled();
   confirmSpy.mockRestore();

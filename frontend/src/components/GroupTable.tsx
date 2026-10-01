@@ -1,9 +1,9 @@
-import { ArrowDown } from "lucide-react";
+import { ArrowDown, ChevronRight } from "lucide-react";
 import { useEffect, useState } from "react";
 import { fmtSize } from "../api";
 import type { Group } from "../types";
 import { t } from "../i18n";
-import { AiTag, Button, ProtectButton, RatingChips, Select, Tag } from "./ui";
+import { AiTag, Avatar, Button, RatingChips, Tag, Select } from "./ui";
 
 export type SortKey = "count" | "size" | "label" | "last" | "unreadPct";
 
@@ -16,11 +16,9 @@ interface Props {
   focusedKey: string | null;
   onToggle: (key: string) => void;
   onToggleAll: (checked: boolean, keys: string[]) => void;
+  // Opens DetailPanel, which is where single-group actions (Trash/Block/
+  // Protect) now live - rows themselves are selection + navigation only.
   onOpen: (g: Group) => void;
-  onTrash: (g: Group) => void;
-  onProtect?: (g: Group) => void;   // absent in subject mode
-  onBlock?: (g: Group) => void;     // sender/domain groupings only
-  onUnblock?: (g: Group) => void;
   blockedKeys?: Map<string, string>;   // group key -> blocking rule id
   onAckUnsub: (addr: string) => void;
   sortK: SortKey;
@@ -95,7 +93,7 @@ function UnsubBadge({ g, onAck }: { g: Group; onAck: (addr: string) => void }) {
 /* Desktop: fixed-layout table so column widths never change when the
    grouping mode (and with it the content) changes. */
 function DesktopTable({ slice, baseIdx, selected, focusedKey, onToggle,
-  onToggleAll, onOpen, onTrash, onProtect, onBlock, onUnblock, blockedKeys,
+  onToggleAll, onOpen, blockedKeys,
   onAckUnsub, sortK, sortDir, onSort, groupLabel
 }: PageProps) {
   // Sort indicator: the active column shows an accent arrow that ROTATES
@@ -127,6 +125,7 @@ function DesktopTable({ slice, baseIdx, selected, focusedKey, onToggle,
               onChange={(e) => onToggleAll(e.target.checked,
                 slice.map((g) => g.key))} />
           </th>
+          <th className={`${th} w-10`} />
           <th className={sortableTh} aria-sort={ariaSort("label")}
             onClick={() => onSort("label")}>
             {groupLabel}{arrow("label")}
@@ -159,6 +158,9 @@ function DesktopTable({ slice, baseIdx, selected, focusedKey, onToggle,
             <td className="px-2 py-2 align-top">
               <input type="checkbox" checked={selected.has(g.key)}
                 onChange={() => onToggle(g.key)} />
+            </td>
+            <td className="px-2 py-2 align-top">
+              <Avatar name={g.label || g.key} size="md" />
             </td>
             <td className="min-w-0 px-2 py-2">
               <button
@@ -214,31 +216,13 @@ function DesktopTable({ slice, baseIdx, selected, focusedKey, onToggle,
               {g.last}
             </td>
             <td className="px-2 py-2 text-right align-top">
-              <div className="flex items-center justify-end gap-1">
-                {onProtect && (
-                  <ProtectButton on={g.protected}
-                    onClick={() => onProtect(g)} />
-                )}
-                {onBlock && !blockedKeys?.has(g.key) && (
-                  <Button variant="ghost" title={t("block.tip")}
-                    className="!min-h-7 !px-2 !py-0.5 !text-xs"
-                    onClick={() => onBlock(g)}>
-                    {t("Block")}
-                  </Button>
-                )}
-                {onUnblock && blockedKeys?.has(g.key) && (
-                  <Button variant="ghost" title={t("unblock.tip")}
-                    className="!min-h-7 !px-2 !py-0.5 !text-xs"
-                    onClick={() => onUnblock(g)}>
-                    {t("Unblock")}
-                  </Button>
-                )}
-                <Button variant="danger"
-                  className="!min-h-7 !px-2 !py-0.5 !text-xs"
-                  onClick={() => onTrash(g)}>
-                  {t("Trash")}
-                </Button>
-              </div>
+              <button
+                className="inline-flex items-center justify-center rounded
+                  p-1 text-faint hover:bg-chip hover:text-body"
+                title={t("View details")}
+                onClick={() => onOpen(g)}>
+                <ChevronRight size={18} />
+              </button>
             </td>
           </tr>
         ))}
@@ -249,69 +233,52 @@ function DesktopTable({ slice, baseIdx, selected, focusedKey, onToggle,
 
 /* Mobile: a card list - no table semantics, no horizontal squeeze. */
 function MobileCards({ slice, baseIdx, selected, focusedKey, onToggle,
-  onOpen, onTrash, onProtect, onBlock, onUnblock, blockedKeys, onAckUnsub
+  onOpen, blockedKeys, onAckUnsub
 }: PageProps) {
   return (
     <div>
       {slice.map((g, i) => (
         <div key={g.key} data-gidx={baseIdx + i}
-          className={`flex gap-3 border-b border-line px-1 py-2.5
-            ${g.key === focusedKey ? "bg-panel" : ""}`}>
-          <input type="checkbox" className="mt-1 shrink-0"
+          className={`flex items-center gap-3 border-b border-line px-1
+            py-2.5 ${g.key === focusedKey ? "bg-panel" : ""}`}>
+          <input type="checkbox" className="shrink-0"
             checked={selected.has(g.key)} onChange={() => onToggle(g.key)} />
-          <div className="min-w-0 flex-1" onClick={() => onOpen(g)}>
-            <div className="truncate font-medium">{g.label}</div>
-            {g.sub && (
-              <div className="truncate text-xs text-muted">{g.sub}</div>
-            )}
-            <div className="text-[0.7rem] text-faint">
-              {g.count} {t("mails")} · {fmtSize(g.size)} · {unreadPct(g)}%{" "}
-              {t("unread")} · {g.last}
+          <div className="flex min-w-0 flex-1 cursor-pointer items-center
+            gap-3" onClick={() => onOpen(g)}>
+            <Avatar name={g.label || g.key} size="md" />
+            <div className="min-w-0 flex-1">
+              <div className="truncate font-medium">{g.label}</div>
+              {g.sub && (
+                <div className="truncate text-xs text-muted">{g.sub}</div>
+              )}
+              <div className="text-[0.7rem] text-faint">
+                {g.count} {t("mails")} · {fmtSize(g.size)} · {unreadPct(g)}%{" "}
+                {t("unread")} · {g.last}
+              </div>
+              <div className="mt-1 flex flex-wrap items-center gap-1">
+                {g.replied && (
+                  <Tag className="!bg-sky-950 !text-sky-300">
+                    <span title={t("replied.tip")}>↩ {t("replied")}</span>
+                  </Tag>
+                )}
+                {g.att_size > 0 && (
+                  <Tag className="!bg-orange-950 !text-orange-300">
+                    📎 {fmtSize(g.att_size)}
+                  </Tag>
+                )}
+                <UnsubBadge g={g} onAck={onAckUnsub} />
+                {blockedKeys?.has(g.key) && (
+                  <Tag className="!bg-rose-950 !text-rose-300">
+                    🚫 {t("Blocked")}
+                  </Tag>
+                )}
+                {g.tags.map((t) => <Tag key={t}>{t}</Tag>)}
+                {g.ai && <AiTag ai={g.ai} />}
+                {g.ratings && <RatingChips ratings={g.ratings} />}
+              </div>
             </div>
-            <div className="mt-1 flex flex-wrap items-center gap-1">
-              {g.replied && (
-                <Tag className="!bg-sky-950 !text-sky-300">
-                  <span title={t("replied.tip")}>↩ {t("replied")}</span>
-                </Tag>
-              )}
-              {g.att_size > 0 && (
-                <Tag className="!bg-orange-950 !text-orange-300">
-                  📎 {fmtSize(g.att_size)}
-                </Tag>
-              )}
-              <UnsubBadge g={g} onAck={onAckUnsub} />
-              {blockedKeys?.has(g.key) && (
-                <Tag className="!bg-rose-950 !text-rose-300">
-                  🚫 {t("Blocked")}
-                </Tag>
-              )}
-              {g.tags.map((t) => <Tag key={t}>{t}</Tag>)}
-              {g.ai && <AiTag ai={g.ai} />}
-              {g.ratings && <RatingChips ratings={g.ratings} />}
-            </div>
-          </div>
-          <div className="flex shrink-0 flex-col items-end justify-between">
-            <Button variant="danger" className="!min-h-7 !px-2 !py-0.5 !text-xs"
-              onClick={() => onTrash(g)}>
-              {t("Trash")}
-            </Button>
-            {onBlock && !blockedKeys?.has(g.key) && (
-              <Button variant="ghost" title={t("block.tip")}
-                className="!min-h-7 !px-2 !py-0.5 !text-xs"
-                onClick={() => onBlock(g)}>
-                {t("Block")}
-              </Button>
-            )}
-            {onUnblock && blockedKeys?.has(g.key) && (
-              <Button variant="ghost" title={t("unblock.tip")}
-                className="!min-h-7 !px-2 !py-0.5 !text-xs"
-                onClick={() => onUnblock(g)}>
-                {t("Unblock")}
-              </Button>
-            )}
-            {onProtect && (
-              <ProtectButton on={g.protected} onClick={() => onProtect(g)} />
-            )}
+            <ChevronRight aria-hidden size={18}
+              className="shrink-0 text-faint" />
           </div>
         </div>
       ))}
