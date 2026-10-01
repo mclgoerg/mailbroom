@@ -1,11 +1,23 @@
 // @vitest-environment jsdom
 /* Bulk-action retention selector (keep-latest-N / older-than-N-days). */
 
-import { cleanup, fireEvent, render, screen, waitFor } from
+import { act, cleanup, fireEvent, render, screen, waitFor } from
   "@testing-library/react";
 import { afterEach, expect, test, vi } from "vitest";
 
 let state: any;
+
+// Stub EventSource so the SSE effect in App.tsx connects (instead of
+// hitting the try/catch "unavailable" fallback jsdom normally takes),
+// letting tests drive status ticks explicitly.
+class FakeEventSource {
+  static instances: FakeEventSource[] = [];
+  onmessage: ((ev: { data: string }) => void) | null = null;
+  onerror: (() => void) | null = null;
+  constructor() { FakeEventSource.instances.push(this); }
+  close() {}
+}
+vi.stubGlobal("EventSource", FakeEventSource);
 
 vi.mock("./api", async (importOriginal) => ({
   ...(await importOriginal<typeof import("./api")>()),
@@ -80,6 +92,7 @@ afterEach(() => {
   deleteGroups.mockClear();
   groupApi.mockClear();
   groupApi.mockResolvedValue([]);
+  FakeEventSource.instances.length = 0;
 });
 
 // Pre-seed the active account so the initial render skips the
@@ -150,6 +163,39 @@ test("the Trash button count corrects itself to the retention-adjusted " +
   await waitFor(() => expect(screen.getByText("Trash 7")).toBeTruthy(),
     { timeout: 2000 });
   expect(groupApi).toHaveBeenCalledWith("sender", group.key);
+});
+
+test("an unrelated SSE status tick does not flap the settled count back " +
+  "to the naive total or re-fetch", async () => {
+  state = { ...baseState };
+  mountReady();
+  groupApi.mockResolvedValue(
+    Array.from({ length: 12 }, (_, i) => (
+      { folder: "INBOX", uid: i + 1, ts: 1000 + i })));
+  render(<App />);
+  await selectFirstGroup();
+
+  fireEvent.change(screen.getByTitle("Restrict this action to mails " +
+    "beyond a keep-window instead of every mail in the selected groups."),
+    { target: { value: "keep_latest" } });
+  const n = await screen.findByPlaceholderText("N");
+  fireEvent.change(n, { target: { value: "5" } });
+  await waitFor(() => expect(screen.getByText("Trash 7")).toBeTruthy());
+  groupApi.mockClear();
+
+  // A slim status tick (job progress, heartbeat, …) with the SAME
+  // account/groups_rev as the current state - group data hasn't actually
+  // changed, so the settled count must neither reset nor re-fetch.
+  const es = FakeEventSource.instances.at(-1);
+  expect(es).toBeTruthy();
+  act(() => {
+    es!.onmessage?.({ data: JSON.stringify(
+      { ...baseState, progress: "tick", groups: undefined }) });
+  });
+
+  expect(screen.getByText("Trash 7")).toBeTruthy();
+  expect(screen.queryByText("Trash 12")).toBeNull();
+  expect(groupApi).not.toHaveBeenCalled();
 });
 
 test("older-than-days is sent through to the delete call", async () => {

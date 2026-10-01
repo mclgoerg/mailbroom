@@ -286,8 +286,14 @@ export default function App() {
         .then((n) => { if (!cancelled) setSelCount(n); });
     }, 250);
     return () => { cancelled = true; clearTimeout(timer); };
+    // groups_rev/account (not the whole `state` object) are the actual
+    // signals that group data changed - the SSE stream pushes a new
+    // `state` reference on every slim status tick (job progress, etc.)
+    // even when nothing relevant moved, which made this flap between the
+    // naive and adjusted count forever instead of settling.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state, mode, selected, retention, retentionN]);
+  }, [state?.groups_rev, state?.account, mode, selected, retention,
+      retentionN]);
 
   const scanning = state?.status === "scanning";
   const aiRunning = state?.ai.status === "running";
