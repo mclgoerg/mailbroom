@@ -1019,7 +1019,10 @@ export default function App() {
         />
       )}
       {statsOpen && <StatsPanel onClose={() => setStatsOpen(false)} />}
-      {auditOpen && <AuditLogPanel onClose={() => setAuditOpen(false)} />}
+      {auditOpen && (
+        <AuditLogPanel rules={state?.rules ?? []}
+          onClose={() => setAuditOpen(false)} />
+      )}
       {trashOpen && state && (
         <TrashPanel
           state={state}

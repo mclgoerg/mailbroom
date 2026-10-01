@@ -25,7 +25,7 @@ import { AuditLogPanel } from "./components/AuditLogPanel";
 afterEach(() => { cleanup(); audit.mockClear(); });
 
 test("renders entries newest-fetched-order with actor/outcome", async () => {
-  render(<AuditLogPanel onClose={() => {}} />);
+  render(<AuditLogPanel rules={[]} onClose={() => {}} />);
   await waitFor(() => screen.getByText(/item 0/));
   expect(screen.getByText(/item 1/)).toBeTruthy();
   expect(screen.getByText(/item 2/)).toBeTruthy();
@@ -36,12 +36,12 @@ test("renders entries newest-fetched-order with actor/outcome", async () => {
 
 test("empty state shows when there is nothing to show", async () => {
   audit.mockResolvedValueOnce({ total: 0, entries: [] });
-  render(<AuditLogPanel onClose={() => {}} />);
+  render(<AuditLogPanel rules={[]} onClose={() => {}} />);
   await waitFor(() => screen.getByText("Nothing recorded yet."));
 });
 
 test("Next/Previous page through results", async () => {
-  render(<AuditLogPanel onClose={() => {}} />);
+  render(<AuditLogPanel rules={[]} onClose={() => {}} />);
   await waitFor(() => screen.getByText(/item 0/));
   const next = screen.getByText(/Next/).closest("button");
   expect(next?.disabled).toBe(true);   // only 3 of 3 shown
@@ -49,8 +49,15 @@ test("Next/Previous page through results", async () => {
 
 test("close button calls onClose", async () => {
   const onClose = vi.fn();
-  render(<AuditLogPanel onClose={onClose} />);
+  render(<AuditLogPanel rules={[]} onClose={onClose} />);
   await waitFor(() => screen.getByText(/item 0/));
   fireEvent.click(screen.getByText("✕"));
   expect(onClose).toHaveBeenCalled();
+});
+
+test("resolves a rule actor to its current name when known", async () => {
+  const rule = { id: "abc123", name: "Grok" } as any;
+  render(<AuditLogPanel rules={[rule]} onClose={() => {}} />);
+  await waitFor(() => screen.getByText(/rule “Grok”/));
+  expect(screen.queryByText(/rule “abc123”/)).toBeNull();
 });

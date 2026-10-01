@@ -1,14 +1,20 @@
 import { useEffect, useState } from "react";
 import { api, fmtSize } from "../api";
 import { t } from "../i18n";
-import type { AuditEntry } from "../types";
+import type { AuditEntry, Rule } from "../types";
 import { Button, EmptyState, Loading, PanelHeader, Modal, Toolbar } from "./ui";
 
 const PAGE_SIZE = 50;
 
-const actorLabel = (actor: string): string =>
-  actor.startsWith("rule:") ? t("audit.by_rule", { name: actor.slice(5) })
-    : t("audit.by", { actor: t(actor) });
+/** Rules are referenced by id (stable across renames); resolve to the
+ *  rule's current name for display, falling back to the id if it was
+ *  since deleted. */
+const actorLabel = (actor: string, rules: Rule[]): string => {
+  if (!actor.startsWith("rule:")) return t("audit.by", { actor: t(actor) });
+  const id = actor.slice(5);
+  const name = rules.find((r) => r.id === id)?.name;
+  return t("audit.by_rule", { name: name || id });
+};
 
 /** `t()` with a tiered fallback: a `prefix.<key>` translation, or the raw
  *  key itself when there is no (yet) translated entry for it. */
@@ -21,7 +27,9 @@ const tOr = (prefix: string, key: string): string => {
 /** Append-only history of every action Mailbroom took on this mailbox:
  *  bulk/rule trash-archive-move-mark_read, rule runs, unsubscribes, undo,
  *  empty-trash. Paged, newest first, CSV export. */
-export function AuditLogPanel({ onClose }: { onClose: () => void }) {
+export function AuditLogPanel({ rules, onClose }: {
+  rules: Rule[]; onClose: () => void;
+}) {
   const [offset, setOffset] = useState(0);
   const [total, setTotal] = useState<number | null>(null);
   const [entries, setEntries] = useState<AuditEntry[] | null>(null);
@@ -86,7 +94,7 @@ export function AuditLogPanel({ onClose }: { onClose: () => void }) {
                 </span>
               )}
               <span className="block truncate text-xs text-faint">
-                {actorLabel(e.actor)}
+                {actorLabel(e.actor, rules)}
               </span>
             </span>
             {e.count > 0 && (
