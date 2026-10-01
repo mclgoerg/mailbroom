@@ -830,7 +830,7 @@ export default function App() {
             {t("AI review")}
           </Button>
         )}
-        <a href={api.exportUrl(mode)} download
+        <a href={api.exportUrl(mode)} target="_blank" rel="noopener"
           className="min-h-9 rounded-md bg-chip px-3 py-1.5 text-sm
             font-medium text-body hover:bg-chiph"
           title="Export current grouping as CSV">CSV</a>

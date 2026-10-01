@@ -53,7 +53,7 @@ export function AuditLogPanel({ rules, onClose }: {
               to: Math.min(offset + PAGE_SIZE, total), total })
           : t("loading…")}
         actions={
-          <a href={api.auditExportUrl()} download
+          <a href={api.auditExportUrl()} target="_blank" rel="noopener"
             className="min-h-9 rounded-md bg-chip px-3 py-1.5 text-sm
               font-medium text-body hover:bg-chiph"
             title={t("audit.export")}>CSV</a>}

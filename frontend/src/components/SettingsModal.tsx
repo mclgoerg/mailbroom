@@ -1002,7 +1002,7 @@ export function SettingsModal({ cfg, account, onClose, onSaved,
       <div className="flex flex-wrap items-center gap-3 border-t border-line
         px-5 py-3">
         <Button onClick={() => save()}>{t("Save")}</Button>
-        <a href="/api/export_config" download
+        <a href="/api/export_config" target="_blank" rel="noopener"
           className="min-h-9 rounded-md bg-chip px-3 py-1.5 text-sm
             font-medium text-body hover:bg-chiph"
           title={t("export.tip")}>{t("Export")}</a>
