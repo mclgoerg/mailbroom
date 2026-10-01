@@ -83,8 +83,10 @@ export const api = {
       { items, action, dest }),
   aiReview: (grouping: Grouping, keys?: string[]) =>
     req<{ ok: boolean }>("/api/ai", { grouping, keys: keys ?? null }),
-  aiGroup: (grouping: Grouping, key: string, offset = 0, limit = 200) =>
-    req<AiGroupResult>("/api/ai_group", { grouping, key, offset, limit }),
+  aiGroup: (grouping: Grouping, key: string, offset = 0, limit = 200,
+      uids?: [string, number][]) =>
+    req<AiGroupResult>("/api/ai_group",
+      { grouping, key, offset, limit, uids: uids ?? null }),
   getConfig: () => req<Config>("/api/config"),
   saveConfig: (body: unknown) => req<Config>("/api/config", body),
   unsubscribe: (grouping: Grouping, key: string) =>

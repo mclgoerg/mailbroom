@@ -421,6 +421,9 @@ class AiGroupBody(BaseModel):
     key: str
     offset: int = 0
     limit: int = 200
+    # Restrict rating to exactly these (folder, uid) mails instead of the
+    # whole group - the detail panel's "rate only what I selected" mode.
+    uids: list[tuple[str, int]] | None = None
 
 
 class UnsubBulkBody(BaseModel):
@@ -528,7 +531,8 @@ def post_ai_group(body: AiGroupBody, account: str | None = Query(None)):
     acc = _acc(account)
     try:
         return aihelper.ai_group(body.grouping, body.key,
-                                 body.offset, body.limit, acc)
+                                 body.offset, body.limit, acc,
+                                 only=set(body.uids) if body.uids else None)
     except ValueError as exc:              # e.g. monthly budget reached
         raise HTTPException(400, str(exc))
     except Exception as exc:

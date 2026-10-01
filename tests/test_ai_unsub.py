@@ -125,6 +125,29 @@ def test_ai_group_rates_and_caches(ai_ready):
     assert r3["reviewed"] == 2 and r3["remaining"] == 1
 
 
+def test_ai_group_can_be_scoped_to_uids(ai_ready):
+    """`only` limits a group rating run to specific (folder, uid) mails -
+    the detail panel's "rate only what I selected" mode, mirroring the
+    group-level `keys` filter (test_group_review_can_be_scoped_to_keys)."""
+    def payload(sent):
+        return {"items": [{"uid": m["uid"], "folder_i": m["folder_i"],
+                           "verdict": "delete_safe"} for m in sent["mails"]],
+                "note": "test"}
+    client = FakeClient(payload)
+    ai_ready.setattr(aihelper, "ai_client", lambda cfg: client)
+
+    r = aihelper.ai_group("sender", "noreply@dhl.example",
+                          only={("INBOX", 1)})
+    assert r["reviewed"] == 1 and r["total"] == 1 and r["remaining"] == 0
+    assert r["verdicts"] == [["INBOX", 1, "delete_safe"]]
+
+    mails = mailops.group_mails("sender", "noreply@dhl.example")
+    rated = {(m["folder"], m["uid"]): m["ai"] for m in mails}
+    assert rated[("INBOX", 1)] == "delete_safe"
+    assert rated[("INBOX", 2)] is None          # untouched - outside `only`
+    assert rated[("Archive", 10)] is None
+
+
 def test_unsubscribe_dispatch(bridge, monkeypatch):
     mailops.run_scan()
     posted, mailed = [], []

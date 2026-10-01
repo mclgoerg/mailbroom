@@ -7,6 +7,7 @@ import type { Group, Mail } from "./types";
 
 const group_ = vi.fn();
 const deleteMessages = vi.fn().mockResolvedValue({});
+const aiGroup = vi.fn();
 
 vi.mock("./api", async (importOriginal) => {
   const actual = await importOriginal<typeof import("./api")>();
@@ -15,7 +16,7 @@ vi.mock("./api", async (importOriginal) => {
     api: {
       group: (...args: unknown[]) => group_(...args),
       deleteMessages: (...args: unknown[]) => deleteMessages(...args),
-      aiGroup: vi.fn(),
+      aiGroup: (...args: unknown[]) => aiGroup(...args),
       unsubscribe: vi.fn(),
       unsubscribeAck: vi.fn(),
     },
@@ -65,7 +66,9 @@ describe("DetailPanel", () => {
     setLang("en");
     group_.mockClear();
     deleteMessages.mockClear();
+    aiGroup.mockReset();
     vi.spyOn(window, "confirm").mockReturnValue(true);
+    localStorage.setItem("pmc_ai_ack", "1");   // skip the AI consent prompt
   });
   afterEach(cleanup);
 
@@ -137,6 +140,38 @@ describe("DetailPanel", () => {
     fireEvent.click(document.querySelectorAll('input[type="checkbox"]')[0]);
     fireEvent.click(document.querySelectorAll('input[type="checkbox"]')[0]);
     expect(await screen.findByDisplayValue("Action…")).toBeTruthy();
+  });
+
+  it("AI rate mails is an Action… option (not the overflow menu) once "
+    + "something is selected, and scopes the run to the selection",
+    async () => {
+    aiGroup.mockResolvedValue({ verdicts: [], note: "", reviewed: 0,
+      remaining: 0, total: 1, usage: { input_tokens: 0, output_tokens: 0 } });
+    renderPanel([mkMail(1), mkMail(2)], { aiEnabled: true });
+    await waitFor(() => screen.getByText("Mail 1"));
+    fireEvent.click(document.querySelectorAll('input[type="checkbox"]')[0]);
+    // No longer offered in the overflow menu while something is selected -
+    // it promoted to the Action… select instead (mirrors the overview).
+    fireEvent.click(await screen.findByLabelText("More"));
+    expect(screen.queryByRole("button", { name: /AI rate mails/ })).toBeNull();
+    fireEvent.click(screen.getByLabelText("More"));   // close the menu back
+
+    fireEvent.change(await screen.findByDisplayValue("Action…"),
+      { target: { value: "ai_review" } });
+    await waitFor(() => expect(aiGroup).toHaveBeenCalledWith(
+      "sender", "s@x.example", 0, 50, [["INBOX", 1]]));
+  });
+
+  it("AI rate mails rates the whole group via the overflow menu when "
+    + "nothing is selected", async () => {
+    aiGroup.mockResolvedValue({ verdicts: [], note: "", reviewed: 0,
+      remaining: 0, total: 2, usage: { input_tokens: 0, output_tokens: 0 } });
+    renderPanel([mkMail(1), mkMail(2)], { aiEnabled: true });
+    await waitFor(() => screen.getByText("Mail 1"));
+    fireEvent.click(await screen.findByLabelText("More"));
+    fireEvent.click(screen.getByText("AI rate mails"));
+    await waitFor(() => expect(aiGroup).toHaveBeenCalledWith(
+      "sender", "s@x.example", 0, 50, undefined));
   });
 
   it("the whole-group Trash button closes the panel once it resolves true",

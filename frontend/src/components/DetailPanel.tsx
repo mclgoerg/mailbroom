@@ -110,12 +110,19 @@ export function DetailPanel({ grouping, group, aiEnabled, protectedNow,
     if (!mails || !ensureAiAck()) return;
     setBusy(true);
     cancelAi.current = false;
+    // With an active selection, rate ONLY those mails (and afterward narrow
+    // the selection down to the safe ones within it) rather than the whole
+    // group - picking "AI rate mails" shouldn't silently replace a
+    // selection the user already built by hand.
+    const scope = sel.size > 0 ? new Set(sel) : null;
+    const pool = (ms: Mail[]) =>
+      scope ? ms.filter((m) => scope.has(mailKey(m))) : ms;
     // Rate unrated mails in batches: verdicts land on the rows as they
     // arrive (and are cached server-side by Message-ID), progress is live,
     // and the run can be cancelled between batches.
     let current = mails;
-    let done = current.filter((m) => m.ai).length;
-    const total = current.length;
+    let done = pool(current).filter((m) => m.ai).length;
+    const total = pool(current).length;
     let cost = 0;
     let lastNote = "";
     setNote(t("note.ai_progress", { done, total }));
@@ -125,11 +132,17 @@ export function DetailPanel({ grouping, group, aiEnabled, protectedNow,
       // cached server-side, so a failed run resumes where it stopped.
       for (;;) {
         if (cancelAi.current) break;
+        const uids = scope
+          ? pool(current).filter((m) => !m.ai)
+              .map((m) => [m.folder, m.uid] as [string, number])
+          : undefined;
+        if (scope && uids!.length === 0) break;
         let r;
         try {
-          r = await api.aiGroup(grouping, group.key, 0, 50);
+          r = await api.aiGroup(grouping, group.key, 0, 50, uids);
         } catch {
-          r = await api.aiGroup(grouping, group.key, 0, 25);  // retry smaller
+          // retry smaller
+          r = await api.aiGroup(grouping, group.key, 0, 25, uids);
         }
         if (r.reviewed === 0) break;
         const map = new Map<string, Mail["ai"]>(r.verdicts.map(
@@ -143,7 +156,7 @@ export function DetailPanel({ grouping, group, aiEnabled, protectedNow,
         setNote(t("note.ai_progress", { done, total }));
         if (r.remaining === 0) break;
       }
-      const safe = current.filter((m) => m.ai === "delete_safe");
+      const safe = pool(current).filter((m) => m.ai === "delete_safe");
       setSel(new Set(safe.map(mailKey)));
       setNote(t("note.ai_selected",
           { note: lastNote, n: safe.length, of: done })
@@ -218,6 +231,7 @@ export function DetailPanel({ grouping, group, aiEnabled, protectedNow,
 
   const onAction = (v: string) => {
     if (v === "move") setMoveDest("?");   // reveal the folder picker
+    else if (v === "ai_review") aiSelect();
     else if (v) act(v);
   };
 
@@ -333,17 +347,25 @@ export function DetailPanel({ grouping, group, aiEnabled, protectedNow,
                 )
               )}
               <Menu label={t("menu.more")} trigger={<MoreHorizontal size={17} />}>
-                {aiEnabled && (busy ? (
+                {/* AI rate mails only lives here while nothing is selected
+                    (rate the whole group - secondary/occasional, like the
+                    overview's own overflow entry). Once something IS
+                    selected it promotes to the Action… select below instead
+                    of staying in two places at once - Cancel stays
+                    reachable here regardless, since a scoped run can still
+                    be mid-flight while selected. */}
+                {aiEnabled && busy && (
                   <MenuItem onClick={() => { cancelAi.current = true; }}>
                     <Spinner className="mr-1 inline align-text-bottom" />{" "}
                     {t("cancel")}
                   </MenuItem>
-                ) : (
+                )}
+                {aiEnabled && !busy && sel.size === 0 && (
                   <MenuItem onClick={aiSelect}>
                     <Wand2 size={15} className="mr-1 inline align-text-bottom" />
                     {t("ai.rate")}
                   </MenuItem>
-                ))}
+                )}
                 {sieve && grouping !== "subject" && (
                   <MenuItem onClick={() => setSieveOpen(!sieveOpen)}>
                     {t("sieve.button")}
@@ -416,12 +438,27 @@ export function DetailPanel({ grouping, group, aiEnabled, protectedNow,
                 </button>
               </div>
               <div className="flex flex-wrap items-center gap-2">
-                {moveDest === "?" ? (
+                {/* The Action… select stays mounted even once "Move to
+                    folder…" is picked (matching the overview's bulk bar) -
+                    swapping it out for the folder-picker in place made the
+                    native iOS option list occasionally show the wrong
+                    (stale) options, since both selects shared one DOM
+                    node. The folder picker is a separate, additional
+                    control instead. */}
+                <Select value="" className="min-w-0 flex-1" disabled={busy}
+                  onChange={(e) => onAction(e.target.value)}>
+                  <option value="" disabled>{t("Action…")}</option>
+                  <option value="archive">{t("Archive")}</option>
+                  <option value="move">{t("Move to folder…")}</option>
+                  <option value="mark_read">{t("Mark read")}</option>
+                  {aiEnabled && <option value="ai_review">{t("ai.rate")}</option>}
+                </Select>
+                {moveDest === "?" && (
                   <>
                     <Select value="" className="min-w-0 flex-1"
                       onChange={(e) => {
+                        if (e.target.value) act("move", e.target.value);
                         setMoveDest("");
-                        act("move", e.target.value);
                       }}>
                       <option value="" disabled>{t("Move to folder…")}</option>
                       {folders.map((f) => <option key={f} value={f}>{f}</option>)}
@@ -431,14 +468,6 @@ export function DetailPanel({ grouping, group, aiEnabled, protectedNow,
                       <X size={15} />
                     </Button>
                   </>
-                ) : (
-                  <Select value="" className="min-w-0 flex-1"
-                    onChange={(e) => onAction(e.target.value)}>
-                    <option value="" disabled>{t("Action…")}</option>
-                    <option value="archive">{t("Archive")}</option>
-                    <option value="move">{t("Move to folder…")}</option>
-                    <option value="mark_read">{t("Mark read")}</option>
-                  </Select>
                 )}
                 <Button variant="danger" disabled={busy}
                   className="ml-auto shrink-0"
