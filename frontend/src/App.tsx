@@ -837,24 +837,27 @@ export default function App() {
           </Menu>
         </div>
       </div>
-      {/* Row 2: quick-select preset chips + sort - always visible, no
-          selection-dependent chrome (that lives in the bottom bar below,
-          which only renders once something is selected). */}
+      {/* Row 2: quick-select preset chips + sort, as ONE wrapping flex
+          layout - chips wrap onto their own line(s) instead of competing
+          with Sort for a single line or hiding behind a horizontal
+          scroll. No selection-dependent chrome here (that lives in the
+          bottom bar below, which only renders once something is
+          selected). */}
       <div className="mb-3 flex flex-wrap items-center gap-2">
-        <div className="flex min-w-0 flex-1 gap-2 overflow-x-auto pb-1">
-          {PRESET_CHIPS.map((p) => (
-            <button key={p.key}
-              className="shrink-0 rounded-full border border-line bg-panel2
-                px-3 py-1.5 text-xs whitespace-nowrap text-muted
-                hover:bg-chip hover:text-body"
-              onClick={() => selectPreset(p.key)}>
-              {t(p.label)}
-            </button>
-          ))}
-        </div>
+        {PRESET_CHIPS.map((p) => (
+          <button key={p.key}
+            className="shrink-0 rounded-full border border-line bg-panel2
+              px-3 py-1.5 text-xs whitespace-nowrap text-muted
+              hover:bg-chip hover:text-body"
+            onClick={() => selectPreset(p.key)}>
+            {t(p.label)}
+          </button>
+        ))}
         {/* Sort: field select + direction toggle as one segmented
-            control; the arrow rotates instead of swapping glyphs. */}
-        <div className="flex shrink-0 items-stretch overflow-hidden
+            control; the arrow rotates instead of swapping glyphs.
+            ml-auto: shares the chips' line when there's room, otherwise
+            wraps to its own. */}
+        <div className="ml-auto flex shrink-0 items-stretch overflow-hidden
           rounded-md border border-line">
           <Select className="min-w-0 flex-1 !rounded-none !border-0"
             value={sortK}
@@ -881,30 +884,28 @@ export default function App() {
       </div>
 
       {/* Contextual bulk-action bar: the ONLY bulk-action chrome in the
-          app - it does not exist at all until something is selected. */}
+          app - it does not exist at all until something is selected.
+          Kept to two tight rows (info+clear, then controls) rather than
+          a stack of individual pill buttons. */}
       {selected.size > 0 && (
         <div className="fixed inset-x-0 bottom-0 z-10 border-t border-line
           bg-panel px-3 py-2 shadow-[0_-4px_16px_rgba(0,0,0,0.3)]"
           style={{ paddingBottom: "calc(env(safe-area-inset-bottom) + 0.5rem)" }}>
-          <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-2">
-            <span className="text-sm text-muted">
-              {selCountPending
-                ? <>{selected.size} {t("groups")} <Spinner /></>
-                : t("bar.selected", { n: selected.size, mails: selCount })}
-            </span>
-            <button className="text-xs text-muted underline"
-              onClick={() => setSelected(new Set())}>
-              {t("Clear selection")}
-            </button>
-            <div className="ml-auto flex flex-wrap items-center gap-2">
-              <Button variant="ghost" onClick={() => onAction("archive")}>
-                {t("Archive")}
-              </Button>
-              <Button variant="ghost" onClick={() => onAction("mark_read")}>
-                {t("Mark read")}
-              </Button>
+          <div className="mx-auto flex max-w-6xl flex-col gap-2">
+            <div className="flex items-center gap-2 text-xs text-muted">
+              <span>
+                {selCountPending
+                  ? <>{selected.size} {t("groups")} <Spinner /></>
+                  : t("bar.selected", { n: selected.size, mails: selCount })}
+              </span>
+              <button className="underline hover:text-body"
+                onClick={() => setSelected(new Set())}>
+                {t("Clear selection")}
+              </button>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
               {moveDest === "?" ? (
-                <Select value=""
+                <Select value="" className="min-w-0 flex-1"
                   onChange={(e) => {
                     setMoveDest("");
                     if (e.target.value) act([...selected], "move",
@@ -916,14 +917,17 @@ export default function App() {
                   ))}
                 </Select>
               ) : (
-                <Button variant="ghost" onClick={() => onAction("move")}>
-                  {t("Move to folder…")}
-                </Button>
+                <Select value="" className="min-w-0 flex-1"
+                  onChange={(e) => onAction(e.target.value)}>
+                  <option value="" disabled>{t("Action…")}</option>
+                  <option value="archive">{t("Archive")}</option>
+                  <option value="move">{t("Move to folder…")}</option>
+                  <option value="mark_read">{t("Mark read")}</option>
+                  <option value="unsubscribe">{t("Unsubscribe")}</option>
+                </Select>
               )}
-              <Button variant="ghost" onClick={() => onAction("unsubscribe")}>
-                {t("Unsubscribe")}
-              </Button>
               <Select value={retention} title={t("retention.help")}
+                className="min-w-0 flex-1"
                 onChange={(e) =>
                   setRetention(e.target.value as typeof retention)}>
                 <option value="none">{t("retention.none")}</option>
@@ -933,12 +937,13 @@ export default function App() {
                 </option>
               </Select>
               {retention !== "none" && (
-                <Input type="number" min={1} className="w-20"
+                <Input type="number" min={1} className="w-16 shrink-0"
                   placeholder={t("retention.n_placeholder")}
                   value={retentionN}
                   onChange={(e) => setRetentionN(e.target.value)} />
               )}
               <Button variant="danger" disabled={selCountPending}
+                className="ml-auto shrink-0"
                 onClick={() =>
                   act([...selected], "trash", "", ...retentionParams())}>
                 {selCountPending
