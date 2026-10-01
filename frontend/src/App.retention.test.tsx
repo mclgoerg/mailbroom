@@ -100,6 +100,14 @@ afterEach(() => {
 // -> refetch) that otherwise races with the assertions below.
 const mountReady = () => localStorage.setItem("pmc_account", "proton");
 
+// Both the toolbar's bulk Trash button AND each row's quick-trash button
+// render the literal text "Trash" while the toolbar one is pending (no
+// count yet) - disambiguate by the toolbar button's distinguishing class.
+const bulkTrashButton = (): HTMLButtonElement =>
+  screen.getAllByText(/^Trash( \d+)?$/)
+    .map((el) => el.closest("button") as HTMLButtonElement)
+    .find((btn) => btn.className.includes("sm:ml-auto"))!;
+
 const selectFirstGroup = async () => {
   await waitFor(() => expect(screen.getAllByRole("checkbox").length)
     .toBeGreaterThan(1), { timeout: 5000 });
@@ -133,14 +141,17 @@ test("keep-latest-N is sent through to the delete call", async () => {
   const n = await screen.findByPlaceholderText("N");
   fireEvent.change(n, { target: { value: "3" } });
 
+  // The button disables itself while the real count is computed; wait for
+  // it to settle before clicking.
+  await waitFor(() => expect(screen.getByText(/^Trash \d+$/)).toBeTruthy());
   fireEvent.click(screen.getByText(/^Trash \d+$/));
   await waitFor(() => expect(deleteGroups).toHaveBeenCalledOnce());
   expect(deleteGroups).toHaveBeenCalledWith(
     "sender", [group.key], "trash", "", false, 3, null);
 });
 
-test("the Trash button count corrects itself to the retention-adjusted " +
-  "number instead of the full group count", async () => {
+test("the Trash button shows the retention-adjusted number, not the " +
+  "full group count, and disables itself while computing it", async () => {
   state = { ...baseState };
   mountReady();
   // group.count is 12; only 7 of those mails would survive a keep_latest:5
@@ -151,8 +162,9 @@ test("the Trash button count corrects itself to the retention-adjusted " +
   render(<App />);
   await selectFirstGroup();
 
-  // Before the fetch resolves, the button shows the naive (full) count.
-  expect(screen.getByText("Trash 12")).toBeTruthy();
+  // No retention yet: shows the plain count immediately, button enabled.
+  expect(bulkTrashButton().textContent).toBe("Trash 12");
+  expect(bulkTrashButton().disabled).toBe(false);
 
   fireEvent.change(screen.getByTitle("Restrict this action to mails " +
     "beyond a keep-window instead of every mail in the selected groups."),
@@ -160,8 +172,15 @@ test("the Trash button count corrects itself to the retention-adjusted " +
   const n = await screen.findByPlaceholderText("N");
   fireEvent.change(n, { target: { value: "5" } });
 
-  await waitFor(() => expect(screen.getByText("Trash 7")).toBeTruthy(),
+  // While the real count is being computed, the button must NOT show the
+  // stale/naive 12 (confusing to watch it jump around) - it disables
+  // itself and shows a pending state instead.
+  await waitFor(() => expect(bulkTrashButton().textContent).not.toContain("12"));
+  expect(bulkTrashButton().disabled).toBe(true);
+
+  await waitFor(() => expect(bulkTrashButton().textContent).toBe("Trash 7"),
     { timeout: 2000 });
+  expect(bulkTrashButton().disabled).toBe(false);
   expect(groupApi).toHaveBeenCalledWith("sender", group.key);
 });
 
@@ -211,6 +230,7 @@ test("older-than-days is sent through to the delete call", async () => {
   const n = await screen.findByPlaceholderText("N");
   fireEvent.change(n, { target: { value: "30" } });
 
+  await waitFor(() => expect(screen.getByText(/^Trash \d+$/)).toBeTruthy());
   fireEvent.click(screen.getByText(/^Trash \d+$/));
   await waitFor(() => expect(deleteGroups).toHaveBeenCalledOnce());
   expect(deleteGroups).toHaveBeenCalledWith(

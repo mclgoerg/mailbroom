@@ -269,21 +269,32 @@ export default function App() {
   };
 
   // Count over ALL groups of the mode, not the filtered view - actions apply
-  // to every selected key, including ones a filter is hiding. Shown
-  // optimistically as the full (naive) count first, then corrected once
-  // the retention-adjusted fetch resolves (debounced against fast typing
-  // in the N field).
+  // to every selected key, including ones a filter is hiding. Without
+  // retention this is instant (just a sum already in `state`). With
+  // retention active, the real count needs a fetch - rather than flash
+  // the naive total and then correct it (confusing to watch), selCount
+  // stays at its last settled value and selCountPending gates display
+  // until the new one is ready.
   const [selCount, setSelCount] = useState(0);
+  const [selCountPending, setSelCountPending] = useState(false);
   useEffect(() => {
     const all = state?.groups?.[mode] ?? {};
     const keys = [...selected];
-    setSelCount(keys.reduce((n, k) => n + (all[k]?.count ?? 0), 0));
     const [keepLatest, olderThanDays] = retentionParams();
-    if (!keys.length || (!keepLatest && !olderThanDays)) return;
+    if (!keys.length || (!keepLatest && !olderThanDays)) {
+      setSelCount(keys.reduce((n, k) => n + (all[k]?.count ?? 0), 0));
+      setSelCountPending(false);
+      return;
+    }
+    setSelCountPending(true);
     let cancelled = false;
     const timer = setTimeout(() => {
       retentionAdjustedCount(keys, keepLatest, olderThanDays)
-        .then((n) => { if (!cancelled) setSelCount(n); });
+        .then((n) => {
+          if (cancelled) return;
+          setSelCount(n);
+          setSelCountPending(false);
+        });
     }, 250);
     return () => { cancelled = true; clearTimeout(timer); };
     // groups_rev/account (not the whole `state` object) are the actual
@@ -808,10 +819,13 @@ export default function App() {
         )}
         {/* Desktop: pinned right (destructive, away from the rest).
             Phones: fills its wrapped row instead of floating alone. */}
-        <Button variant="danger" disabled={selected.size === 0}
+        <Button variant="danger"
+          disabled={selected.size === 0 || selCountPending}
           className="flex-1 sm:ml-auto sm:flex-none"
           onClick={() => act([...selected], "trash", "", ...retentionParams())}>
-          {selected.size ? `${t("Trash")} ${selCount}` : t("Trash")}
+          {!selected.size ? t("Trash")
+            : selCountPending ? <>{t("Trash")} <Spinner /></>
+            : `${t("Trash")} ${selCount}`}
         </Button>
       </div>
 
