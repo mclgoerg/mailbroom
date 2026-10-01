@@ -84,12 +84,16 @@ export function MailRows({ mails, sel, onToggle, onOpen }: {
                   {m.subject || t("(no subject)")}
                 </span>
               </button>
-              <div className="mt-0.5 flex items-center gap-1.5 text-xs
-                text-faint">
-                <span className="min-w-0 flex-1 truncate">
+              <div className="mt-0.5 flex min-w-0 items-center gap-1.5
+                text-xs text-faint">
+                <span className="min-w-0 truncate">
                   {meta.join(" · ")}
                 </span>
-                {m.ai && <AiTag ai={{ verdict: m.ai, reason: "" }} />}
+                {m.ai && (
+                  <span className="shrink-0">
+                    <AiTag ai={{ verdict: m.ai, reason: "" }} />
+                  </span>
+                )}
               </div>
             </div>
           </div>
