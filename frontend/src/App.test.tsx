@@ -14,6 +14,7 @@ let versions = ["v1"];        // api.version() walks through this in order
 let versionCalls = 0;
 
 const block = vi.fn().mockResolvedValue({ rule: { id: "r1" } });
+const deleteRule = vi.fn().mockResolvedValue(undefined);
 
 vi.mock("./api", () => ({
   api: {
@@ -26,6 +27,7 @@ vi.mock("./api", () => ({
     version: () => Promise.resolve(
       { build: versions[Math.min(versionCalls++, versions.length - 1)] }),
     block: (...args: unknown[]) => block(...args),
+    deleteRule: (...args: unknown[]) => deleteRule(...args),
   },
   setAccount: () => {},
   withAccount: (p: string) => p,
@@ -95,6 +97,7 @@ afterEach(() => {
   versions = ["v1"];
   versionCalls = 0;
   block.mockClear();
+  deleteRule.mockClear();
 });
 
 const openMenu = async () => {
@@ -230,8 +233,13 @@ const groupFixture = {
   protected: false, replied: false, att_size: 0, unsubscribed: null,
 };
 
+// Pre-seed the active account so the initial render skips the "drop a
+// stale saved account" bootstrap round-trip (cfg -> switchAccount ->
+// refetch), which otherwise races with the assertions below (see the
+// same pattern/comment in App.retention.test.tsx).
 const renderWithOneSenderGroup = () => {
   cfg = singleCfg;
+  localStorage.setItem("pmc_account", "proton");
   state = { ...baseState, status: "done",
     groups: { sender: { [groupFixture.key]: groupFixture },
               domain: {}, subject: {} } };
@@ -259,5 +267,48 @@ test("declining the block confirmation never calls api.block", async () => {
     .toBeGreaterThan(0));
   fireEvent.click(screen.getAllByText("Block")[0]);
   expect(block).not.toHaveBeenCalled();
+  confirmSpy.mockRestore();
+});
+
+const blockRuleFixture = {
+  id: "rule1", name: "DHL Paket", grouping: "sender" as const,
+  query: "from:noreply@dhl.example", action: "trash", dest: "",
+  schedule: "daily" as const, mode: "execute" as const, keep_latest: null,
+  older_than_days: null, origin: "block" as const, report_runs: 1,
+  created: 0, last_run: null,
+};
+
+const renderWithOneBlockedSenderGroup = () => {
+  cfg = singleCfg;
+  localStorage.setItem("pmc_account", "proton");
+  state = { ...baseState, status: "done",
+    groups: { sender: { [groupFixture.key]: groupFixture },
+              domain: {}, subject: {} },
+    rules: [blockRuleFixture] };
+  return render(<App />);
+};
+
+test("a blocked group shows Unblock (not Block), which confirms and " +
+  "deletes the rule", async () => {
+  const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(true);
+  renderWithOneBlockedSenderGroup();
+  await waitFor(() => expect(screen.getAllByText("DHL Paket").length)
+    .toBeGreaterThan(0));
+  expect(screen.queryAllByText("Block").length).toBe(0);
+  fireEvent.click(screen.getAllByText("Unblock")[0]);
+  expect(confirmSpy).toHaveBeenCalledWith(
+    expect.stringContaining("DHL Paket"));
+  await waitFor(() => expect(deleteRule).toHaveBeenCalledWith("rule1"));
+  confirmSpy.mockRestore();
+});
+
+test("declining the unblock confirmation never calls api.deleteRule",
+  async () => {
+  const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(false);
+  renderWithOneBlockedSenderGroup();
+  await waitFor(() => expect(screen.getAllByText("DHL Paket").length)
+    .toBeGreaterThan(0));
+  fireEvent.click(screen.getAllByText("Unblock")[0]);
+  expect(deleteRule).not.toHaveBeenCalled();
   confirmSpy.mockRestore();
 });

@@ -164,6 +164,11 @@ export const EN: Record<string, string> = {
   "block.tip":
     "Block this sender/domain: creates a standing rule that auto-trashes "
     + "future mail",
+  "confirm.unblock":
+    'Unblock "{label}"? This deletes the standing rule - future mail is '
+    + "no longer auto-trashed.",
+  "toast.unblocked": 'Unblocked "{label}".',
+  "unblock.tip": "Unblock: deletes the standing rule created by Block",
   "protect.tip":
     "Protect this sender - bulk deletes and AI suggestions will skip it",
   "unprotect.tip": "Protected - click to remove protection",

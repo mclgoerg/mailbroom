@@ -19,7 +19,8 @@ interface Props {
   onTrash: (g: Group) => void;
   onProtect?: (g: Group) => void;   // absent in subject mode
   onBlock?: (g: Group) => void;     // sender/domain groupings only
-  blockedKeys?: Set<string>;
+  onUnblock?: (g: Group) => void;
+  blockedKeys?: Map<string, string>;   // group key -> blocking rule id
   onAckUnsub: (addr: string) => void;
   sortK: SortKey;
   sortDir: number;
@@ -93,8 +94,8 @@ function UnsubBadge({ g, onAck }: { g: Group; onAck: (addr: string) => void }) {
 /* Desktop: fixed-layout table so column widths never change when the
    grouping mode (and with it the content) changes. */
 function DesktopTable({ slice, baseIdx, selected, focusedKey, onToggle,
-  onToggleAll, onOpen, onTrash, onProtect, onBlock, blockedKeys, onAckUnsub,
-  sortK, sortDir, onSort, groupLabel
+  onToggleAll, onOpen, onTrash, onProtect, onBlock, onUnblock, blockedKeys,
+  onAckUnsub, sortK, sortDir, onSort, groupLabel
 }: PageProps) {
   // Sort indicator: the active column shows an accent arrow that ROTATES
   // between directions; inactive sortable columns reserve the space
@@ -226,6 +227,13 @@ function DesktopTable({ slice, baseIdx, selected, focusedKey, onToggle,
                     {t("Block")}
                   </Button>
                 )}
+                {onUnblock && blockedKeys?.has(g.key) && (
+                  <Button variant="ghost" title={t("unblock.tip")}
+                    className="!min-h-7 !px-2 !py-0.5 !text-xs"
+                    onClick={() => onUnblock(g)}>
+                    {t("Unblock")}
+                  </Button>
+                )}
                 <Button variant="danger"
                   className="!min-h-7 !px-2 !py-0.5 !text-xs"
                   onClick={() => onTrash(g)}>
@@ -242,7 +250,8 @@ function DesktopTable({ slice, baseIdx, selected, focusedKey, onToggle,
 
 /* Mobile: a card list - no table semantics, no horizontal squeeze. */
 function MobileCards({ slice, baseIdx, selected, focusedKey, onToggle,
-  onOpen, onTrash, onProtect, onBlock, blockedKeys, onAckUnsub }: PageProps) {
+  onOpen, onTrash, onProtect, onBlock, onUnblock, blockedKeys, onAckUnsub
+}: PageProps) {
   return (
     <div>
       {slice.map((g, i) => (
@@ -292,6 +301,13 @@ function MobileCards({ slice, baseIdx, selected, focusedKey, onToggle,
                 className="!min-h-7 !px-2 !py-0.5 !text-xs"
                 onClick={() => onBlock(g)}>
                 {t("Block")}
+              </Button>
+            )}
+            {onUnblock && blockedKeys?.has(g.key) && (
+              <Button variant="ghost" title={t("unblock.tip")}
+                className="!min-h-7 !px-2 !py-0.5 !text-xs"
+                onClick={() => onUnblock(g)}>
+                {t("Unblock")}
               </Button>
             )}
             {onProtect && (

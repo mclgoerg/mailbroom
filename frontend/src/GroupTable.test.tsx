@@ -153,8 +153,26 @@ describe("block button + blocked badge", () => {
     () => {
     const onBlock = vi.fn();
     const { getAllByText, queryAllByText } = renderTable({ onBlock,
-      groups: [mk(0)], blockedKeys: new Set([mk(0).key]) });
+      groups: [mk(0)], blockedKeys: new Map([[mk(0).key, "rule1"]]) });
     expect(getAllByText(/Blocked/).length).toBe(2);
     expect(queryAllByText("Block").length).toBe(0);
+  });
+
+  it("shows an Unblock button for blocked keys that calls back with the " +
+    "group", () => {
+    const onUnblock = vi.fn();
+    const { getAllByText, queryAllByText } = renderTable({ onUnblock,
+      groups: [mk(0)], blockedKeys: new Map([[mk(0).key, "rule1"]]) });
+    const buttons = getAllByText("Unblock");
+    expect(buttons.length).toBe(2);           // desktop + mobile
+    fireEvent.click(buttons[0]);
+    expect(onUnblock).toHaveBeenCalledWith(mk(0));
+    expect(queryAllByText("Block").length).toBe(0);
+  });
+
+  it("hides the Unblock button for keys that are not blocked", () => {
+    const onUnblock = vi.fn();
+    const { queryAllByText } = renderTable({ onUnblock, groups: [mk(0)] });
+    expect(queryAllByText("Unblock").length).toBe(0);
   });
 });

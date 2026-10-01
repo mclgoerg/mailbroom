@@ -67,6 +67,13 @@ export const DE: Record<string, string> = {
     + "an, die künftige Mails automatisch in den Papierkorb verschiebt",
   "Block": "Blockieren",
   "Blocked": "Blockiert",
+  "confirm.unblock":
+    "„{label}“ entblocken? Dies löscht die dauerhafte Regel - künftige "
+    + "Mails werden nicht mehr automatisch in den Papierkorb verschoben.",
+  "toast.unblocked": "„{label}“ entblockt.",
+  "unblock.tip":
+    "Entblocken: löscht die von Blockieren angelegte dauerhafte Regel",
+  "Unblock": "Entblocken",
   "protect.tip":
     "Diesen Absender schützen - Massenlöschungen und KI-Vorschläge "
     + "überspringen ihn",

@@ -247,19 +247,19 @@ export default function App() {
 
   // Block rules are visible, ordinary rules: a "block:<key>" query is
   // `from:<key>`/`domain:<key>` with origin "block" - derive which group
-  // keys are currently blocked so rows/detail can show a badge and hide
-  // the Block button.
-  const blockedKeys = useMemo(() => {
-    const keys = new Set<string>();
-    if (mode === "subject") return keys;
+  // keys are currently blocked (and their rule id, for one-click unblock)
+  // so rows/detail can show a badge+Unblock button and hide the Block one.
+  const blockedRules = useMemo(() => {
+    const map = new Map<string, string>();
+    if (mode === "subject") return map;
     const prefix = mode === "sender" ? "from:" : "domain:";
     for (const r of state?.rules ?? []) {
       if (r.origin === "block" && r.grouping === mode
           && r.query.startsWith(prefix)) {
-        keys.add(r.query.slice(prefix.length));
+        map.set(r.query.slice(prefix.length), r.id);
       }
     }
-    return keys;
+    return map;
   }, [state?.rules, mode]);
 
   // How many mails `keys` would actually move: the full group counts when
@@ -475,6 +475,22 @@ export default function App() {
     try {
       await api.block(mode, g.key, g.label, trashExisting);
       setToast(t("toast.blocked", { label: g.label }));
+      refresh();
+    } catch (e: any) {
+      setToast(`Error: ${e.message ?? e}`);
+    }
+  };
+
+  // Unblock = delete the standing rule the Block action created (same
+  // reversible path as deleting any other rule in the Rules modal, just
+  // reachable with one click from the group itself).
+  const unblockGroup = mode === "subject" ? undefined : async (g: Group) => {
+    const ruleId = blockedRules.get(g.key);
+    if (!ruleId) return;
+    if (!confirm(t("confirm.unblock", { label: g.label }))) return;
+    try {
+      await api.deleteRule(ruleId);
+      setToast(t("toast.unblocked", { label: g.label }));
       refresh();
     } catch (e: any) {
       setToast(`Error: ${e.message ?? e}`);
@@ -952,7 +968,8 @@ export default function App() {
           onTrash={(g) => act([g.key], "trash")}
           onProtect={toggleProtect}
           onBlock={blockGroup}
-          blockedKeys={blockedKeys}
+          onUnblock={unblockGroup}
+          blockedKeys={blockedRules}
           onAckUnsub={ackUnsub}
           sortK={sortK}
           sortDir={sortDir}
@@ -982,7 +999,8 @@ export default function App() {
             ?? detail.unsubscribed}
           onProtect={toggleProtect}
           onBlock={blockGroup}
-          blocked={blockedKeys.has(detail.key)}
+          onUnblock={unblockGroup}
+          blocked={blockedRules.has(detail.key)}
           folders={state?.folders_raw ?? []}
           sieve={(acct?.preset ?? "proton") === "proton"}
           onClose={() => { setDetail(null); refresh(); }}
