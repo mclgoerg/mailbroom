@@ -437,4 +437,10 @@ export const EN: Record<string, string> = {
   "audit.outcome.link": "link",
   "audit.outcome.failed": "failed",
   "trash_group.tip": "Move every mail in this group to Trash",
+  "menu.more": "More",
+  "export.csv": "Export CSV",
+  "export.csv_tip": "Export the current grouping as CSV",
+  "bar.selected": "{n} groups selected · {mails} mails",
+  "bar.limit_to": "Limit to:",
+  "Cancel": "Cancel",
 };
