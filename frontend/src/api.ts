@@ -19,6 +19,30 @@ export function withAccount(path: string): string {
   return `${path}${sep}account=${encodeURIComponent(ACCOUNT)}`;
 }
 
+/* iOS Safari, when installed as a standalone PWA, does not reliably
+ * handle a plain `<a href=url>` navigation to a Content-Disposition:
+ * attachment response: `download` opens its Quick Look preview with no
+ * way to dismiss it short of a swipe, and target="_blank" opens a blank
+ * in-app browser tab that neither renders nor saves anything. Fetching
+ * the file ourselves and handing the browser a blob: URL instead is the
+ * one approach that reliably triggers an actual save/share sheet on
+ * every platform. */
+export async function downloadFile(url: string): Promise<void> {
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(await res.text() || `HTTP ${res.status}`);
+  const blob = await res.blob();
+  const cd = res.headers.get("Content-Disposition") || "";
+  const name = /filename="?([^"]+)"?/.exec(cd)?.[1] ?? "download";
+  const blobUrl = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = blobUrl;
+  a.download = name;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
+}
+
 async function req<T>(path: string, body?: unknown): Promise<T> {
   const res = await fetch(withAccount(path), {
     method: body === undefined ? "GET" : "POST",
@@ -57,7 +81,8 @@ export const api = {
   deleteMessages: (items: [string, number][], action = "trash", dest = "") =>
     req<{ ok: boolean; queued: number }>("/api/delete_messages",
       { items, action, dest }),
-  aiReview: (grouping: Grouping) => req<{ ok: boolean }>("/api/ai", { grouping }),
+  aiReview: (grouping: Grouping, keys?: string[]) =>
+    req<{ ok: boolean }>("/api/ai", { grouping, keys: keys ?? null }),
   aiGroup: (grouping: Grouping, key: string, offset = 0, limit = 200) =>
     req<AiGroupResult>("/api/ai_group", { grouping, key, offset, limit }),
   getConfig: () => req<Config>("/api/config"),
@@ -81,8 +106,11 @@ export const api = {
     req<FoldersResp>(account
       ? `/api/folders?account=${encodeURIComponent(account)}`
       : "/api/folders"),
-  exportUrl: (grouping: Grouping) =>
-    withAccount(`/api/export?grouping=${grouping}`),
+  exportUrl: (grouping: Grouping, keys?: string[]) =>
+    withAccount(`/api/export?grouping=${grouping}`
+      + (keys?.length
+        ? keys.map((k) => `&keys=${encodeURIComponent(k)}`).join("")
+        : "")),
   rules: () => req<{ rules: Rule[] }>("/api/rules"),
   createRule: (body: Partial<Rule>) => req<Rule>("/api/rules", body),
   updateRule: (id: string, body: Partial<Rule>) =>

@@ -1,7 +1,7 @@
 import { RefreshCw, Settings as SettingsIcon, Shield, Star, X }
   from "lucide-react";
 import { useEffect, useState } from "react";
-import { api, fmtUsd } from "../api";
+import { api, downloadFile, fmtUsd } from "../api";
 import { getLang, setLang, t, type Lang } from "../i18n";
 import { fmtAgo, fmtSize } from "../lib";
 import type { AdminTenantStats, AuthMode, Config, FoldersResp, OauthProvider,
@@ -1013,10 +1013,10 @@ export function SettingsModal({ cfg, account, onClose, onSaved,
       <div className="flex flex-wrap items-center gap-3 border-t border-line
         px-5 py-3">
         <Button onClick={() => save()}>{t("Save")}</Button>
-        <a href="/api/export_config" download
+        <button onClick={() => downloadFile("/api/export_config")}
           className="min-h-9 rounded-md bg-chip px-3 py-1.5 text-sm
             font-medium text-body hover:bg-chiph"
-          title={t("export.tip")}>{t("Export")}</a>
+          title={t("export.tip")}>{t("Export")}</button>
         <label className="min-h-9 cursor-pointer rounded-md bg-chip px-3
           py-1.5 text-sm font-medium text-body hover:bg-chiph">
           {t("Import…")}

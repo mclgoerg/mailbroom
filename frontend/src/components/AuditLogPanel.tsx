@@ -1,6 +1,6 @@
 import { ChevronLeft, ChevronRight, ScrollText } from "lucide-react";
 import { useEffect, useState } from "react";
-import { api, fmtSize } from "../api";
+import { api, downloadFile, fmtSize } from "../api";
 import { t } from "../i18n";
 import type { AuditEntry, Rule } from "../types";
 import { Button, EmptyState, Loading, PanelHeader, Modal, Toolbar } from "./ui";
@@ -56,10 +56,10 @@ export function AuditLogPanel({ rules, onClose }: {
               to: Math.min(offset + PAGE_SIZE, total), total })
           : t("loading…")}
         actions={
-          <a href={api.auditExportUrl()} download
+          <button onClick={() => downloadFile(api.auditExportUrl())}
             className="min-h-9 rounded-md bg-chip px-3 py-1.5 text-sm
               font-medium text-body hover:bg-chiph"
-            title={t("audit.export")}>CSV</a>}
+            title={t("audit.export")}>CSV</button>}
         onClose={onClose}
       />
       <Toolbar>

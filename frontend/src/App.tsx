@@ -3,7 +3,8 @@ import { ArrowDown, BarChart3, ChevronDown, ClipboardList, Copy, Download,
   Settings as SettingsIcon, Sparkles, Star, Sun, Trash2, User, Wand2, X }
   from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { api, setAccount as apiSetAccount, withAccount } from "./api";
+import { api, downloadFile, setAccount as apiSetAccount, withAccount }
+  from "./api";
 import { AuditLogPanel } from "./components/AuditLogPanel";
 import { DetailPanel } from "./components/DetailPanel";
 import { Login } from "./components/Login";
@@ -366,10 +367,14 @@ export default function App() {
     catch (e: any) { setToast(`Error: ${e.message ?? e}`); }
   };
 
-  const startAi = async () => {
+  // No `keys` = every unrated group in the current grouping (today's
+  // behavior, reachable from the "⋯" overflow menu); a `keys` list scopes
+  // the run to just those groups (the contextual bar's selection-aware
+  // entry).
+  const startAi = async (keys?: string[]) => {
     if (!ensureAiAck()) return;
     setToast(t("Starting…"));
-    try { await api.aiReview(mode); setToast(""); refresh(); }
+    try { await api.aiReview(mode, keys); setToast(""); refresh(); }
     catch (e: any) { setToast(`AI error: ${e.message ?? e}`); }
   };
 
@@ -538,6 +543,7 @@ export default function App() {
     if (!selected.size) return;
     if (v === "move") setMoveDest("?");
     else if (v === "unsubscribe") unsubscribeSelected();
+    else if (v === "ai_review") startAi([...selected]);
     else act([...selected], v, "", ...retentionParams());
   };
 
@@ -829,18 +835,18 @@ export default function App() {
             onClick={() => setAuditOpen(true)}><ScrollText size={17} /></Button>
           <Menu label={t("menu.more")} trigger={<MoreHorizontal size={17} />}>
             {aiEnabled && (
-              <MenuItem onClick={startAi}
+              <MenuItem onClick={() => startAi()}
                 disabled={scanning || aiRunning || state?.status !== "done"}>
                 <Wand2 size={15} className="mr-1 inline align-text-bottom" />
                 {t("AI review")}
               </MenuItem>
             )}
-            <a href={api.exportUrl(mode)} download
+            <button onClick={() => downloadFile(api.exportUrl(mode))}
               title={t("export.csv_tip")}
               className="flex w-full items-center gap-2 rounded-md px-3
                 py-2 text-left text-sm text-body hover:bg-chip">
               <Download size={15} /> {t("export.csv")}
-            </a>
+            </button>
           </Menu>
         </div>
       </div>
@@ -911,6 +917,12 @@ export default function App() {
                 onClick={() => setSelected(new Set())}>
                 {t("Clear selection")}
               </button>
+              <button
+                onClick={() => downloadFile(api.exportUrl(mode, [...selected]))}
+                title={t("export.csv_tip")}
+                className="ml-auto flex items-center gap-1 hover:text-body">
+                <Download size={14} /> {t("export.csv")}
+              </button>
             </div>
             <div className="flex flex-wrap items-center gap-2 text-xs
               text-muted">
@@ -940,6 +952,9 @@ export default function App() {
                 <option value="move">{t("Move to folder…")}</option>
                 <option value="mark_read">{t("Mark read")}</option>
                 <option value="unsubscribe">{t("Unsubscribe")}</option>
+                {aiEnabled && (
+                  <option value="ai_review">{t("AI review")}</option>
+                )}
               </Select>
               {moveDest === "?" && (
                 <>

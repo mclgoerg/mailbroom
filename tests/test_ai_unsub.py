@@ -60,6 +60,30 @@ def test_group_review_applies_verdicts_and_cost(ai_ready):
     assert cfgmod.load_stats()["runs"] == 1
 
 
+def test_group_review_can_be_scoped_to_keys(ai_ready):
+    """A `keys` filter limits the run to just those groups - the
+    selection-scoped entry points (contextual bar) use this; the
+    unscoped "everything unrated" run (overflow menu) still passes
+    keys=None."""
+    def payload(sent):
+        return {"verdicts": [
+            {"key": g["key"], "verdict": "review", "reason": "test"}
+            for g in sent["groups"]]}
+    client = FakeClient(payload)
+    ai_ready.setattr(aihelper, "ai_client", lambda cfg: client)
+
+    aihelper._run_ai("sender", keys={"noreply@dhl.example"})
+    senders = mailops.STATE["groups"]["sender"]
+    assert senders["noreply@dhl.example"]["ai"] is not None
+    assert senders["alice@friends.example"]["ai"] is None
+    assert senders["news@shop.example"]["ai"] is None
+    # only the one group's worth of groups was ever sent to the model
+    assert len(client.calls) == 1
+    sent_keys = {g["key"] for g in
+                json.loads(client.calls[0]["messages"][0]["content"])["groups"]}
+    assert sent_keys == {"noreply@dhl.example"}
+
+
 def test_ai_group_rates_and_caches(ai_ready):
     def payload(sent):
         items = [{"uid": m["uid"], "folder_i": m["folder_i"],
