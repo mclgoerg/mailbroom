@@ -1,5 +1,5 @@
 import { ArrowLeft } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { api, fmtSize, mailKey } from "../api";
 import type { Mail, MessageDetail } from "../types";
 import { t } from "../i18n";
@@ -51,33 +51,50 @@ export function MailRows({ mails, sel, onToggle, onOpen }: {
   onOpen: (m: Mail) => void;
 }) {
   const [cap, setCap] = useState(RENDER_CAP);
+  // Sender/folder only earn a spot on the meta line when they actually
+  // vary across the visible mails - a single-sender group (the common
+  // case) stays as uncluttered as a plain date/size line.
+  const multiSender = useMemo(
+    () => new Set(mails.map((m) => m.addr)).size > 1, [mails]);
+  const multiFolder = useMemo(
+    () => new Set(mails.map((m) => m.folder)).size > 1, [mails]);
   return (
     <>
-      {mails.slice(0, cap).map((m) => (
-        <div key={mailKey(m)}
-          className="flex flex-wrap items-baseline gap-2 border-b
-            border-line/60 px-1 py-2">
-          <input type="checkbox" checked={sel.has(mailKey(m))}
-            onChange={() => onToggle(mailKey(m))} />
-          <span className="text-xs whitespace-nowrap text-muted">
-            {(m.date || "").slice(0, 10)}
-          </span>
-          <button
-            className="min-w-0 flex-1 basis-full cursor-pointer truncate
-              text-left text-sm hover:underline sm:basis-0"
-            onClick={() => onOpen(m)}>
-            {!m.seen && (
-              <span title={t("unread")} className="mr-1.5 inline-block size-2
-                rounded-full bg-accent align-middle" />
-            )}
-            {m.subject || t("(no subject)")}
-          </button>
-          {m.ai && <AiTag ai={{ verdict: m.ai, reason: "" }} />}
-          <span className="text-xs whitespace-nowrap text-faint">
-            {fmtSize(m.size)}
-          </span>
-        </div>
-      ))}
+      {mails.slice(0, cap).map((m) => {
+        const meta = [(m.date || "").slice(0, 10)];
+        if (multiFolder) meta.push(m.folder);
+        if (multiSender) meta.push(m.addr);
+        meta.push(fmtSize(m.size));
+        return (
+          <div key={mailKey(m)}
+            className="flex gap-3 border-b border-line/60 px-1 py-2.5">
+            <input type="checkbox" className="mt-1 shrink-0"
+              checked={sel.has(mailKey(m))}
+              onChange={() => onToggle(mailKey(m))} />
+            <div className="min-w-0 flex-1">
+              <button
+                className="flex w-full min-w-0 cursor-pointer items-center
+                  gap-1.5 text-left text-sm hover:underline"
+                onClick={() => onOpen(m)}>
+                {!m.seen && (
+                  <span title={t("unread")} className="inline-block size-2
+                    shrink-0 rounded-full bg-accent" />
+                )}
+                <span className={`truncate ${!m.seen ? "font-semibold" : ""}`}>
+                  {m.subject || t("(no subject)")}
+                </span>
+              </button>
+              <div className="mt-0.5 flex items-center gap-1.5 text-xs
+                text-faint">
+                <span className="min-w-0 flex-1 truncate">
+                  {meta.join(" · ")}
+                </span>
+                {m.ai && <AiTag ai={{ verdict: m.ai, reason: "" }} />}
+              </div>
+            </div>
+          </div>
+        );
+      })}
       {mails.length > cap && (
         <div className="py-3 text-center">
           <Button variant="ghost" onClick={() => setCap(cap + RENDER_CAP)}>
