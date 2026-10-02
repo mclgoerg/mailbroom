@@ -110,6 +110,22 @@ presets.
   capped at 500 mails, skips protected senders, and uses the normal
   Trash/undo pipeline - the scheduler is a background loop inside the
   container, no cron needed.
+- **Saved filter presets** - save the current filter query under a name
+  and recall it with one tap from an outlined chip next to the built-in
+  quick-select ones; edit a saved preset's query later with the same
+  filter builder, or delete it. Account-scoped like everything else.
+- **New-sender review** - a sender new to the mailbox since your last few
+  scans gets a 🆕 badge and shows up under a one-tap `is:new` chip, so it
+  doesn't get lost among a thousand others - block, protect or
+  unsubscribe right from there. Purely a read-only signal (first scan
+  seeds silently, nothing is ever auto-actioned); the window it stays
+  flagged for (default 7 days) is configurable in settings.
+- **Activity digest email** - an optional daily/weekly summary per
+  account (actions taken, mails/bytes freed, rule previews still
+  awaiting review, unsubscribe outcomes), sent as a branded HTML +
+  plain-text mail at a time of day you pick; skipped entirely when
+  nothing happened, with a "send test digest" button to preview it
+  first and every send itself audit-logged.
 - **"Never replied" signal** - each scan also reads the To/Cc headers of
   your Sent folder (headers only, cached across scans): groups you have
   written to get a ↩ replied tag, filter with `is:replied` /
