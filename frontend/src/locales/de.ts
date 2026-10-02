@@ -575,7 +575,7 @@ export const DE: Record<string, string> = {
   "digest.off": "Aus",
   "digest.recipient": "Empfänger",
   "digest.recipient_placeholder": "eigene Adresse dieses Kontos",
-  "digest.time": "Uhrzeit",
+  "digest.time": "Uhrzeit (24h, lokale Zeit des Servers)",
   "digest.help":
     "Eine Zusammenfassung dessen, was Mailbroom für dieses Konto seit "
     + "der letzten Übersicht getan hat - durchgeführte Aktionen, "

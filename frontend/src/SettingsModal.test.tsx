@@ -219,7 +219,7 @@ test("digest schedule + recipient + time are included in Save", () => {
     { target: { value: "weekly" } });
   fireEvent.change(screen.getByLabelText("Recipient"),
     { target: { value: "me@elsewhere.example" } });
-  fireEvent.change(screen.getByLabelText("Time"),
+  fireEvent.change(screen.getByLabelText(/^Time/),
     { target: { value: "20:30" } });
   fireEvent.click(screen.getByText("Save"));
   expect(saveCalls[0].imap.digest).toEqual(
@@ -230,10 +230,10 @@ test("digest schedule + recipient + time are included in Save", () => {
 test("the time field only appears once a schedule is picked", () => {
   render(<SettingsModal cfg={cfg} account="default" onClose={() => {}}
     onSaved={() => {}} onAccountsChanged={() => {}} />);
-  expect(screen.queryByLabelText("Time")).toBeNull();
+  expect(screen.queryByLabelText(/^Time/)).toBeNull();
   fireEvent.change(screen.getByLabelText("Schedule"),
     { target: { value: "daily" } });
-  expect(screen.getByLabelText("Time")).toBeTruthy();
+  expect(screen.getByLabelText(/^Time/)).toBeTruthy();
 });
 
 test("switching the edited account reloads its own digest settings", () => {
@@ -255,7 +255,7 @@ test("switching the edited account reloads its own digest settings", () => {
     .toBe("daily");
   expect((screen.getByLabelText("Recipient") as HTMLInputElement).value)
     .toBe("icloud@elsewhere.example");
-  expect((screen.getByLabelText("Time") as HTMLInputElement).value)
+  expect((screen.getByLabelText(/^Time/) as HTMLInputElement).value)
     .toBe("20:15");
 });
 

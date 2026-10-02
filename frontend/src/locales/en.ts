@@ -135,7 +135,7 @@ export const EN: Record<string, string> = {
   "digest.off": "Off",
   "digest.recipient": "Recipient",
   "digest.recipient_placeholder": "this account's own address",
-  "digest.time": "Time",
+  "digest.time": "Time (24h, server's local time)",
   "digest.help":
     "A summary of what Mailbroom did for this account since the last "
     + "digest - actions taken, mails/bytes freed, rule previews (matches "
