@@ -25,6 +25,7 @@ from . import auth as authmod
 from . import config as cfgmod
 from . import mailops
 from . import oauthflow
+from . import presets as presetsmod
 from . import rules as rulesmod
 from . import stats as statsmod
 from . import tenants
@@ -58,6 +59,7 @@ async def _lifespan(app: FastAPI):
             for name in accountsmod.names():
                 mailops.load_snapshot(accountsmod.get(name))
     rulesmod.start_scheduler()
+    presetsmod.publish()
     yield
 
 app = FastAPI(title="mailbroom", docs_url=None, redoc_url=None,
@@ -696,6 +698,34 @@ def post_rule_run(rule_id: str):
         raise HTTPException(409, str(exc))
 
 
+class PresetBody(BaseModel):
+    name: str = ""
+    query: str = ""
+
+
+@app.get("/api/presets")
+def get_presets():
+    return {"presets": presetsmod.load_presets()}
+
+
+@app.post("/api/presets")
+def post_presets(body: PresetBody, account: str | None = Query(None)):
+    try:
+        return presetsmod.create_preset(
+            {"name": body.name, "query": body.query, "account": account})
+    except ValueError as exc:
+        raise HTTPException(400, str(exc))
+
+
+@app.delete("/api/presets/{preset_id}")
+def delete_preset(preset_id: str):
+    try:
+        presetsmod.delete_preset(preset_id)
+    except KeyError:
+        raise HTTPException(404, "unknown preset")
+    return {"ok": True}
+
+
 class BlockBody(BaseModel):
     grouping: str                  # sender | domain
     key: str
@@ -1074,6 +1104,7 @@ def post_config(body: dict):
         accountsmod.drop(str(body["delete_account"]))
         mailops.drop_snapshot(str(body["delete_account"]))
         unsubstore.drop_account(str(body["delete_account"]))
+        presetsmod.drop_account(str(body["delete_account"]))
     if isinstance(body.get("rename_account"), dict):
         # The config rename succeeded - carry every per-account artifact
         # (runtime state, verdicts, unsubscribes, replied cache, stats,
@@ -1088,10 +1119,12 @@ def post_config(body: dict):
             mailops.rename_replied_account(old, new)
             statsmod.rename_account(old, new)
             rulesmod.rename_account(old, new)
+            presetsmod.rename_account(old, new)
             auditlog.rename_account(old, new)
             logging.getLogger("pmc.mail").info(
                 "account renamed: %r -> %r (state, verdicts, unsubscribes, "
-                "replied, stats, rules, audit log migrated)", old, new)
+                "replied, stats, rules, presets, audit log migrated)",
+                old, new)
     return cfgmod.masked_config(cfg)
 
 

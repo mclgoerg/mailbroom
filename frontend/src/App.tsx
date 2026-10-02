@@ -1,6 +1,7 @@
-import { ArrowDown, BarChart3, ChevronDown, ClipboardList, Copy, Download,
-  Moon, MoreHorizontal, Paperclip, Plus, Power, ScrollText, Search,
-  Settings as SettingsIcon, Sparkles, Star, Sun, Trash2, User, Wand2, X }
+import { ArrowDown, BarChart3, BookmarkPlus, ChevronDown, ClipboardList,
+  Copy, Download, Moon, MoreHorizontal, Paperclip, Plus, Power, ScrollText,
+  Search, Settings as SettingsIcon, Sparkles, Star, Sun, Trash2, User,
+  Wand2, X }
   from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api, downloadFile, setAccount as apiSetAccount, withAccount }
@@ -425,6 +426,30 @@ export default function App() {
     setSelected(next);
   };
 
+  // Saved filter presets: unlike selectPreset() above (which ADDS to the
+  // selection), tapping one REPLACES the filter query - they are one-tap
+  // recall for a named search, not a selection shortcut.
+  const saveFilterPreset = async () => {
+    const name = prompt(t("saved_filter.name_prompt"))?.trim();
+    if (!name) return;
+    try {
+      await api.createPreset(name, filter);
+      refresh();
+    } catch (e: any) {
+      setToast(`Error: ${e.message ?? e}`);
+    }
+  };
+
+  const deleteFilterPreset = async (id: string, name: string) => {
+    if (!confirm(t("saved_filter.confirm_delete", { name }))) return;
+    try {
+      await api.deletePreset(id);
+      refresh();
+    } catch (e: any) {
+      setToast(`Error: ${e.message ?? e}`);
+    }
+  };
+
   // Returns whether the action actually proceeded (false = the user
   // declined the confirmation, or every selected group turned out
   // protected) - callers that need to react afterward (e.g. closing a
@@ -808,6 +833,12 @@ export default function App() {
             onChange={(e) => setFilter(e.target.value)}
           />
           <QueryBuilder value={filter} onChange={setFilter} />
+          <Button variant="ghost" className="!px-2 sm:!px-3"
+            title={t("saved_filter.save_tip")}
+            disabled={!filter.trim()}
+            onClick={saveFilterPreset}>
+            <BookmarkPlus size={17} />
+          </Button>
         </div>
         {/* One wrap unit; tighter padding on phones so the strip fits next
             to Scan on one line. */}
@@ -865,6 +896,31 @@ export default function App() {
             onClick={() => selectPreset(p.key)}>
             {t(p.label)}
           </button>
+        ))}
+        {/* Saved filter presets: user-defined, visually distinct (outlined
+            accent vs. the built-ins' filled muted look above) - tapping one
+            REPLACES the filter query instead of adding to the selection.
+            The small x deletes it right from the chip, no separate manage
+            mode (there's nothing else to configure per preset). */}
+        {(state?.presets ?? []).map((p) => (
+          <span key={p.id}
+            className="inline-flex shrink-0 items-center gap-1 rounded-full
+              border border-accent/50 bg-transparent px-3 py-1.5 text-xs
+              whitespace-nowrap text-accent hover:bg-chip">
+            <button onClick={() => setFilter(p.query)} title={p.query}>
+              {p.name}
+            </button>
+            <button
+              className="opacity-60 hover:opacity-100"
+              title={t("Delete")}
+              aria-label={t("Delete")}
+              onClick={(e) => {
+                e.stopPropagation();
+                deleteFilterPreset(p.id, p.name);
+              }}>
+              <X size={12} />
+            </button>
+          </span>
         ))}
         {/* Sort: field select + direction toggle as one segmented
             control; the arrow rotates instead of swapping glyphs. No

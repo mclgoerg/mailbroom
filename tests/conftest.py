@@ -15,6 +15,7 @@ from backend import auditlog as auditlogmod   # noqa: E402
 from backend import auth as authmod            # noqa: E402
 from backend import config as cfgmod          # noqa: E402
 from backend import mailops                   # noqa: E402
+from backend import presets as presetsmod     # noqa: E402
 from backend import rules as rulesmod         # noqa: E402
 from backend import stats as statsmod         # noqa: E402
 from backend import tenants as tenantsmod     # noqa: E402
@@ -41,6 +42,7 @@ def isolate(tmp_path, monkeypatch):
                         tmp_path / "session_secret")
     monkeypatch.setattr(authmod, "_secret_cache", None)
     monkeypatch.setattr(rulesmod, "RULES_PATH", tmp_path / "rules.json")
+    monkeypatch.setattr(presetsmod, "PRESETS_PATH", tmp_path / "presets.json")
     monkeypatch.setattr(statsmod, "HISTORY_PATH",
                         tmp_path / "stats_history.json")
     monkeypatch.setattr(auditlogmod, "AUDIT_PATH",
