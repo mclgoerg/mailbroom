@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.5.1](https://github.com/mclgoerg/mailbroom/compare/v1.5.0...v1.5.1) (2026-10-02)
+
+
+### Bug Fixes
+
+* make the new-sender window configurable from Settings ([#62](https://github.com/mclgoerg/mailbroom/issues/62)) ([fa264a5](https://github.com/mclgoerg/mailbroom/commit/fa264a5b54fd6ec87cbf94ed9ced0e2876fb75ef))
+* use a dark background for the PWA home-screen icon ([#64](https://github.com/mclgoerg/mailbroom/issues/64)) ([07457fe](https://github.com/mclgoerg/mailbroom/commit/07457fe848afb5bdfbc14a99a9d5ccc7aa3d4e34))
+
 ## [1.5.0](https://github.com/mclgoerg/mailbroom/compare/v1.4.0...v1.5.0) (2026-10-02)
 
 
