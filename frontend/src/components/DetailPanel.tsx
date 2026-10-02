@@ -313,8 +313,8 @@ export function DetailPanel({ grouping, group, aiEnabled, protectedNow,
             <div className="flex flex-wrap items-center gap-2">
               <Select value={sortBy} className="w-auto shrink-0"
                 onChange={(e) => setSortBy(e.target.value as "date" | "size")}>
-                <option value="date">{t("Date")}</option>
-                <option value="size">{t("Size")}</option>
+                <option value="date">{t("Sort: date")}</option>
+                <option value="size">{t("Sort: size")}</option>
               </Select>
               <Select value="" className="w-auto shrink-0"
                 onChange={(e) => selectPreset(e.target.value)}>
