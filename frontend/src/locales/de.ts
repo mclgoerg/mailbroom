@@ -265,7 +265,7 @@ export const DE: Record<string, string> = {
   "saved_filter.save_tip": "Aktuellen Filter als Vorlage speichern",
   "saved_filter.name_prompt": "Name für diese Vorlage",
   "saved_filter.edit_tip": "Filter dieser Vorlage bearbeiten",
-  "saved_filter.edit_query_prompt": "Filter bearbeiten",
+  "saved_filter.editing": '„{name}“ wird bearbeitet',
   "saved_filter.confirm_delete": 'Vorlage "{name}" löschen?',
   "Clear filter": "Filter leeren",
   "Edit": "Bearbeiten",

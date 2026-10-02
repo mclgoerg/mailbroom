@@ -174,10 +174,9 @@ test("declining the save name prompt never calls api.createPreset",
     promptSpy.mockRestore();
   });
 
-test("editing a preset prompts prefilled with ITS OWN query (not " +
-  "whatever's in the filter box) and keeps its name", async () => {
-  const promptSpy = vi.spyOn(window, "prompt")
-    .mockReturnValue("from:dhl age:>2y");
+test("editing a preset opens an inline editor prefilled with ITS OWN " +
+  "query (not whatever's in the filter box); Save updates it, keeping " +
+  "its name", async () => {
   localStorage.setItem("pmc_account", "proton");
   state = { ...baseState, presets: [
     { id: "p1", name: "Old DHL", query: "from:dhl age:>1y",
@@ -191,16 +190,22 @@ test("editing a preset prompts prefilled with ITS OWN query (not " +
   fireEvent.change(filterInput, { target: { value: "something unrelated" } });
 
   fireEvent.click(screen.getByLabelText("Edit"));
-  expect(promptSpy).toHaveBeenCalledWith(
-    expect.any(String), "from:dhl age:>1y");
+  const editInput =
+    screen.getByDisplayValue("from:dhl age:>1y") as HTMLInputElement;
+  expect(editInput).not.toBe(filterInput);
+
+  fireEvent.change(editInput, { target: { value: "from:dhl age:>2y" } });
+  fireEvent.click(screen.getByText("Save"));
   await waitFor(() => expect(updatePreset).toHaveBeenCalledWith(
     "p1", "Old DHL", "from:dhl age:>2y"));
-  promptSpy.mockRestore();
+  // the editor closes itself once the save lands
+  await waitFor(() => expect(screen.queryByText("Save")).toBeNull());
+  // the main filter box is still exactly what the user typed into it
+  expect(filterInput.value).toBe("something unrelated");
 });
 
-test("declining the edit query prompt never calls api.updatePreset",
+test("Cancel closes the inline editor without calling api.updatePreset",
   async () => {
-    const promptSpy = vi.spyOn(window, "prompt").mockReturnValue(null);
     localStorage.setItem("pmc_account", "proton");
     state = { ...baseState, presets: [
       { id: "p1", name: "Old DHL", query: "from:dhl age:>1y",
@@ -208,8 +213,11 @@ test("declining the edit query prompt never calls api.updatePreset",
     render(<App />);
     await waitFor(() => expect(screen.getByText("Old DHL")).toBeTruthy());
     fireEvent.click(screen.getByLabelText("Edit"));
+    expect(screen.getByDisplayValue("from:dhl age:>1y")).toBeTruthy();
+
+    fireEvent.click(screen.getByText("Cancel"));
+    expect(screen.queryByText("Save")).toBeNull();
     expect(updatePreset).not.toHaveBeenCalled();
-    promptSpy.mockRestore();
   });
 
 test("a clear button appears once the filter has text and empties it",

@@ -251,7 +251,7 @@ export const EN: Record<string, string> = {
   "saved_filter.save_tip": "Save current filter as a preset",
   "saved_filter.name_prompt": "Name this preset",
   "saved_filter.edit_tip": "Edit this preset's filter",
-  "saved_filter.edit_query_prompt": "Edit filter",
+  "saved_filter.editing": 'Editing "{name}"',
   "saved_filter.confirm_delete": 'Delete preset "{name}"?',
   "notice.atts_cancelled": "Attachment analysis cancelled.",
   "notice.unsub_cancelled": "Unsubscribe cancelled.",

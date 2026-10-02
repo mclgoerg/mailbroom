@@ -83,6 +83,12 @@ export default function App() {
   }, [sortK, sortDir]);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [detail, setDetail] = useState<Group | null>(null);
+  // Editing a saved filter preset: a dedicated query (NOT the main filter
+  // box - that was confusing, see the chip row below) edited with the
+  // same Input+QueryBuilder pairing the filter box itself uses.
+  const [editingPreset, setEditingPreset] = useState<FilterPreset | null>(
+    null);
+  const [editQuery, setEditQuery] = useState("");
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [rulesOpen, setRulesOpen] = useState(false);
@@ -450,15 +456,12 @@ export default function App() {
     }
   };
 
-  // Edits the preset's own stored query directly (prefilled in the
-  // prompt) - NOT whatever happens to be in the filter box right now,
-  // which read as "silently overwrites" rather than "edit". The name is
-  // left as-is; renaming isn't this action's job.
-  const editFilterPreset = async (preset: FilterPreset) => {
-    const query = prompt(t("saved_filter.edit_query_prompt"), preset.query);
-    if (query == null) return;
+  const saveEditedPreset = async () => {
+    if (!editingPreset) return;
     try {
-      await api.updatePreset(preset.id, preset.name, query.trim());
+      await api.updatePreset(editingPreset.id, editingPreset.name,
+        editQuery.trim());
+      setEditingPreset(null);
       refresh();
     } catch (e: any) {
       setToast(`Error: ${e.message ?? e}`);
@@ -927,10 +930,10 @@ export default function App() {
         {/* Saved filter presets: user-defined, visually distinct (outlined
             accent vs. the built-ins' filled muted look above) - tapping one
             REPLACES the filter query instead of adding to the selection.
-            The pencil edits the preset's OWN stored query directly (via a
-            prompt prefilled with it), not whatever's in the filter box;
-            the x deletes it - no separate manage mode, nothing else to
-            configure per preset. */}
+            The pencil opens an inline editor (below, same Input +
+            QueryBuilder pairing the filter box itself uses) on the
+            preset's OWN stored query - not whatever's in the filter box;
+            the x deletes it. */}
         {(state?.presets ?? []).map((p) => (
           <span key={p.id}
             className="inline-flex shrink-0 items-center gap-1 rounded-full
@@ -945,7 +948,8 @@ export default function App() {
               aria-label={t("Edit")}
               onClick={(e) => {
                 e.stopPropagation();
-                editFilterPreset(p);
+                setEditingPreset(p);
+                setEditQuery(p.query);
               }}>
               <Pencil size={12} />
             </button>
@@ -992,6 +996,29 @@ export default function App() {
           </button>
         </div>
       </div>
+
+      {/* Inline preset editor: appears only while editing one (Pencil
+          above) - a Cancel is always reachable, per the rule of never
+          leaving a swapped-in control with no way back. */}
+      {editingPreset && (
+        <div className="relative mb-3 flex flex-wrap items-center gap-2
+          rounded-lg border border-accent/50 bg-panel2 p-2">
+          <span className="shrink-0 text-xs text-muted">
+            {t("saved_filter.editing", { name: editingPreset.name })}
+          </span>
+          <Input className="min-w-0 flex-1" value={editQuery}
+            onChange={(e) => setEditQuery(e.target.value)} />
+          <QueryBuilder value={editQuery} onChange={setEditQuery} />
+          <Button className="!min-h-8 !px-3 !text-xs"
+            onClick={saveEditedPreset}>
+            {t("Save")}
+          </Button>
+          <Button variant="ghost" className="!min-h-8 !px-3 !text-xs"
+            onClick={() => setEditingPreset(null)}>
+            {t("Cancel")}
+          </Button>
+        </div>
+      )}
 
       {/* Contextual bulk-action bar: the ONLY bulk-action chrome in the
           app - it does not exist at all until something is selected.
