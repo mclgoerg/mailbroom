@@ -327,9 +327,13 @@ def start_group_review(grouping: str, acc=None,
 
 
 def ai_group(grouping: str, key: str, offset: int = 0,
-             limit: int = 200, acc=None) -> dict:
+             limit: int = 200, acc=None,
+             only: set[tuple[str, int]] | None = None) -> dict:
     """Rate one batch of a group's UNRATED mails (cached verdicts skipped).
-    The client calls repeatedly until `remaining` is 0, showing progress."""
+    The client calls repeatedly until `remaining` is 0, showing progress.
+    `only`, when given, restricts both the unrated pool and `total`/
+    `remaining` to those (folder, uid) mails - the detail panel's "rate
+    only what I selected" mode instead of the whole group."""
     acc = acc or accounts.get()
     cfg = cfgmod.load_config()
     ai_eff, ai_source = cfgmod.effective_ai(cfg)
@@ -340,6 +344,8 @@ def ai_group(grouping: str, key: str, offset: int = 0,
     all_mails = mailops.group_mails(grouping, key, with_msgid=True, acc=acc)
     if not all_mails:
         raise RuntimeError("unknown or empty group")
+    if only is not None:
+        all_mails = [m for m in all_mails if (m["folder"], m["uid"]) in only]
     label = mailops.group_label(grouping, key, acc)
     unrated = [m for m in all_mails if not m["ai"] and m["msgid"]]
     mails = unrated[:max(1, min(limit, AI_GROUP_MAX))]

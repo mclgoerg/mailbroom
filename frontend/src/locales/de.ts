@@ -102,6 +102,7 @@ export const DE: Record<string, string> = {
   "All / none": "Alle / keine",
   "Clear selection": "Auswahl aufheben",
   "Sort: mails": "Sortierung: Mails",
+  "Sort: date": "Sortierung: Datum",
   "Sort: size": "Sortierung: Größe",
   "Sort: last activity": "Sortierung: Aktivität",
   "Sort: unread %": "Sortierung: Ungelesen %",
@@ -598,4 +599,5 @@ export const DE: Record<string, string> = {
   "bar.selected": "{n} Gruppen ausgewählt · {mails} Mails",
   "bar.limit_to": "Beschränken auf:",
   "Cancel": "Abbrechen",
+  "detail.n_selected": "{n} ausgewählt",
 };

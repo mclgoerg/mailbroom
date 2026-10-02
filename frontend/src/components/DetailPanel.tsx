@@ -1,4 +1,4 @@
-import { Shield } from "lucide-react";
+import { MoreHorizontal, Shield, Wand2, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { api } from "../api";
 import { t } from "../i18n";
@@ -6,8 +6,18 @@ import { fmtSize, fmtUsd, mailKey, olderThan, sieveSnippet,
   type SieveAction } from "../lib";
 import type { AppState, Group, Grouping, GroupUnsub, Mail } from "../types";
 import { MailRows, MessageView } from "./MailList";
-import { Button, ensureAiAck, Input, Loading, Modal, PanelHeader,
-  ProtectButton, Select, Spinner, Toolbar } from "./ui";
+import { Button, ensureAiAck, Input, Loading, Menu, MenuItem, Modal,
+  PanelHeader, ProtectButton, Select, Spinner } from "./ui";
+
+// Rating filter chips: same green/yellow/red/unrated buckets as the
+// select they replace, now an exclusive pill row (like the overview's
+// quick-select chips) instead of a dropdown.
+const RATING_FILTERS: { key: string; label: string }[] = [
+  { key: "delete_safe", label: "🟢 " + t("v.delete_safe") },
+  { key: "review", label: "🟡 " + t("v.review") },
+  { key: "keep", label: "🔴 " + t("v.keep") },
+  { key: "unrated", label: t("v.unrated") },
+];
 
 export function DetailPanel({ grouping, group, aiEnabled, protectedNow,
   unsubscribedNow, onTrash, onProtect, onBlock, onUnblock, blocked, folders,
@@ -53,6 +63,12 @@ export function DetailPanel({ grouping, group, aiEnabled, protectedNow,
     return () => { alive = false; };
   }, [grouping, group.key]);
 
+  // The folder picker must never be a dead end (same lesson as the
+  // overview's bulk-action bar): clearing the selection also resets it.
+  useEffect(() => {
+    if (!sel.size) setMoveDest("");
+  }, [sel.size]);
+
   const shown = useMemo(() => {
     if (!mails) return null;
     const filtered = vFilter === "all" ? mails
@@ -94,12 +110,19 @@ export function DetailPanel({ grouping, group, aiEnabled, protectedNow,
     if (!mails || !ensureAiAck()) return;
     setBusy(true);
     cancelAi.current = false;
+    // With an active selection, rate ONLY those mails (and afterward narrow
+    // the selection down to the safe ones within it) rather than the whole
+    // group - picking "AI rate mails" shouldn't silently replace a
+    // selection the user already built by hand.
+    const scope = sel.size > 0 ? new Set(sel) : null;
+    const pool = (ms: Mail[]) =>
+      scope ? ms.filter((m) => scope.has(mailKey(m))) : ms;
     // Rate unrated mails in batches: verdicts land on the rows as they
     // arrive (and are cached server-side by Message-ID), progress is live,
     // and the run can be cancelled between batches.
     let current = mails;
-    let done = current.filter((m) => m.ai).length;
-    const total = current.length;
+    let done = pool(current).filter((m) => m.ai).length;
+    const total = pool(current).length;
     let cost = 0;
     let lastNote = "";
     setNote(t("note.ai_progress", { done, total }));
@@ -109,11 +132,17 @@ export function DetailPanel({ grouping, group, aiEnabled, protectedNow,
       // cached server-side, so a failed run resumes where it stopped.
       for (;;) {
         if (cancelAi.current) break;
+        const uids = scope
+          ? pool(current).filter((m) => !m.ai)
+              .map((m) => [m.folder, m.uid] as [string, number])
+          : undefined;
+        if (scope && uids!.length === 0) break;
         let r;
         try {
-          r = await api.aiGroup(grouping, group.key, 0, 50);
+          r = await api.aiGroup(grouping, group.key, 0, 50, uids);
         } catch {
-          r = await api.aiGroup(grouping, group.key, 0, 25);  // retry smaller
+          // retry smaller
+          r = await api.aiGroup(grouping, group.key, 0, 25, uids);
         }
         if (r.reviewed === 0) break;
         const map = new Map<string, Mail["ai"]>(r.verdicts.map(
@@ -127,7 +156,7 @@ export function DetailPanel({ grouping, group, aiEnabled, protectedNow,
         setNote(t("note.ai_progress", { done, total }));
         if (r.remaining === 0) break;
       }
-      const safe = current.filter((m) => m.ai === "delete_safe");
+      const safe = pool(current).filter((m) => m.ai === "delete_safe");
       setSel(new Set(safe.map(mailKey)));
       setNote(t("note.ai_selected",
           { note: lastNote, n: safe.length, of: done })
@@ -202,6 +231,7 @@ export function DetailPanel({ grouping, group, aiEnabled, protectedNow,
 
   const onAction = (v: string) => {
     if (v === "move") setMoveDest("?");   // reveal the folder picker
+    else if (v === "ai_review") aiSelect();
     else if (v) act(v);
   };
 
@@ -250,103 +280,108 @@ export function DetailPanel({ grouping, group, aiEnabled, protectedNow,
         <MessageView mail={view} onBack={() => setView(null)} />
       ) : (
         <>
-          <Toolbar>
-            <Select value=""
-              onChange={(e) => selectPreset(e.target.value)}>
-              <option value="" disabled>{t("Select…")}</option>
-              <option value="all">{t("All / none")}</option>
-              <option value="older6">{t("Older than 6 months")}</option>
-              <option value="older12">{t("Older than 1 year")}</option>
-              <option value="older24">{t("Older than 2 years")}</option>
-              <option value="none">{t("Clear selection")}</option>
-            </Select>
-            <Select value={sortBy}
-              onChange={(e) => setSortBy(e.target.value as "date" | "size")}>
-              <option value="date">{t("Date")}</option>
-              <option value="size">{t("Size")}</option>
-            </Select>
-            <Select value={vFilter}
-              onChange={(e) => {
-                setVFilter(e.target.value);
-                setSel(new Set());   // never keep hidden mails selected
-              }}>
-              <option value="all">{t("filter.all")}</option>
-              <option value="delete_safe">
-                🟢 {t("v.delete_safe")} ({vCounts.delete_safe})
-              </option>
-              <option value="review">
-                🟡 {t("v.review")} ({vCounts.review})
-              </option>
-              <option value="keep">🔴 {t("v.keep")} ({vCounts.keep})</option>
-              <option value="unrated">
-                {t("v.unrated")} ({vCounts.unrated})
-              </option>
-            </Select>
-            {aiEnabled && (busy ? (
-              <Button variant="ghost"
-                onClick={() => { cancelAi.current = true; }}>
-                <Spinner /> {t("cancel")}
-              </Button>
-            ) : (
-              <Button variant="ghost" onClick={aiSelect}>
-                {t("ai.rate")}
-              </Button>
-            ))}
-            {group.unsub && (
-              unsubscribedNow?.status === "done" ? (
-                <span className="rounded bg-chip px-2 py-1 text-xs
-                  text-chiptext">
-                  ✓ {t("Unsubscribed")}
-                </span>
-              ) : unsubscribedNow?.status === "link" ? (
-                <>
-                  <Button variant="ghost" disabled={busy} onClick={() =>
-                    window.open(unsubscribedNow.link, "_blank", "noopener")}>
-                    {t("unsub.open_link")}
-                  </Button>
-                  <Button variant="ghost" onClick={ackUnsubscribe}
-                    disabled={busy}>
-                    {t("unsub.mark_done")}
-                  </Button>
-                </>
-              ) : (
-                <Button variant="ghost" onClick={unsubscribe} disabled={busy}>
-                  {unsubscribedNow?.status === "failed"
-                    ? t("unsub.retry") : t("Unsubscribe")}
-                </Button>
-              )
-            )}
-            {sieve && grouping !== "subject" && (
-              <Button variant="ghost" onClick={() => setSieveOpen(!sieveOpen)}>
-                {t("sieve.button")}
-              </Button>
-            )}
-            {moveDest === "?" ? (
-              <Select value=""
-                onChange={(e) => { setMoveDest(""); act("move", e.target.value); }}>
-                <option value="" disabled>{t("Move to folder…")}</option>
-                {folders.map((f) => <option key={f} value={f}>{f}</option>)}
+          <div className="flex flex-col gap-2 border-b border-line px-4 py-2">
+            {/* Row 1: rating filter chips (exclusive, like a segmented
+                control) - its own row since it already wraps onto 2 lines
+                at phone width; anything sharing the row with `ml-auto`
+                ended up stranded alone on a 2nd line, flush right with a
+                big empty gap to its left. */}
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                className={`shrink-0 rounded-full border px-3 py-1.5 text-xs
+                  whitespace-nowrap ${vFilter === "all"
+                    ? "border-accent bg-accent text-white"
+                    : "border-line bg-panel2 text-muted hover:bg-chip hover:text-body"}`}
+                onClick={() => { setVFilter("all"); setSel(new Set()); }}>
+                {t("filter.all")} ({mails ? mails.length : group.count})
+              </button>
+              {RATING_FILTERS.filter((f) =>
+                vCounts[f.key as keyof typeof vCounts] > 0).map((f) => (
+                <button key={f.key}
+                  className={`shrink-0 rounded-full border px-3 py-1.5 text-xs
+                    whitespace-nowrap ${vFilter === f.key
+                      ? "border-accent bg-accent text-white"
+                      : "border-line bg-panel2 text-muted hover:bg-chip hover:text-body"}`}
+                  onClick={() => { setVFilter(f.key); setSel(new Set()); }}>
+                  {f.label} ({vCounts[f.key as keyof typeof vCounts]})
+                </button>
+              ))}
+            </div>
+
+            {/* Row 2: sort + build-a-selection + per-group secondary
+                actions, grouped together as one "list controls" row. */}
+            <div className="flex flex-wrap items-center gap-2">
+              <Select value={sortBy} className="w-auto shrink-0"
+                onChange={(e) => setSortBy(e.target.value as "date" | "size")}>
+                <option value="date">{t("Sort: date")}</option>
+                <option value="size">{t("Sort: size")}</option>
               </Select>
-            ) : (
-              <Select value=""
-                disabled={sel.size === 0}
-                onChange={(e) => { onAction(e.target.value); }}>
-                <option value="" disabled>{t("Action…")}</option>
-                <option value="archive">{t("Archive")}</option>
-                <option value="move">{t("Move to folder…")}</option>
-                <option value="mark_read">{t("Mark read")}</option>
+              <Select value="" className="w-auto shrink-0"
+                onChange={(e) => selectPreset(e.target.value)}>
+                <option value="" disabled>{t("Select…")}</option>
+                <option value="all">{t("All / none")}</option>
+                <option value="older6">{t("Older than 6 months")}</option>
+                <option value="older12">{t("Older than 1 year")}</option>
+                <option value="older24">{t("Older than 2 years")}</option>
+                <option value="none">{t("Clear selection")}</option>
               </Select>
-            )}
-            <Button variant="danger" onClick={() => act("trash")}
-              disabled={busy || sel.size === 0}>
-              {t("Trash selected")}{sel.size > 0 && ` (${sel.size})`}
-            </Button>
-            {note && (
-              <div className="w-full text-xs text-muted">{note}</div>
-            )}
+              {group.unsub && (
+                unsubscribedNow?.status === "done" ? (
+                  <span className="rounded bg-chip px-2 py-1 text-xs
+                    text-chiptext">
+                    ✓ {t("Unsubscribed")}
+                  </span>
+                ) : unsubscribedNow?.status === "link" ? (
+                  <>
+                    <Button variant="ghost" disabled={busy} onClick={() =>
+                      window.open(unsubscribedNow.link, "_blank", "noopener")}>
+                      {t("unsub.open_link")}
+                    </Button>
+                    <Button variant="ghost" onClick={ackUnsubscribe}
+                      disabled={busy}>
+                      {t("unsub.mark_done")}
+                    </Button>
+                  </>
+                ) : (
+                  <Button variant="ghost" onClick={unsubscribe} disabled={busy}>
+                    {unsubscribedNow?.status === "failed"
+                      ? t("unsub.retry") : t("Unsubscribe")}
+                  </Button>
+                )
+              )}
+              <Menu label={t("menu.more")} trigger={<MoreHorizontal size={17} />}>
+                {/* AI rate mails only lives here while nothing is selected
+                    (rate the whole group - secondary/occasional, like the
+                    overview's own overflow entry). Once something IS
+                    selected it promotes to the Action… select below instead
+                    of staying in two places at once - Cancel stays
+                    reachable here regardless, since a scoped run can still
+                    be mid-flight while selected. */}
+                {aiEnabled && busy && (
+                  <MenuItem onClick={() => { cancelAi.current = true; }}>
+                    <Spinner className="mr-1 inline align-text-bottom" />{" "}
+                    {t("cancel")}
+                  </MenuItem>
+                )}
+                {aiEnabled && !busy && sel.size === 0 && (
+                  <MenuItem onClick={aiSelect}>
+                    <Wand2 size={15} className="mr-1 inline align-text-bottom" />
+                    {t("ai.rate")}
+                  </MenuItem>
+                )}
+                {sieve && grouping !== "subject" && (
+                  <MenuItem onClick={() => setSieveOpen(!sieveOpen)}>
+                    {t("sieve.button")}
+                  </MenuItem>
+                )}
+              </Menu>
+              {note && (
+                <div className="w-full text-xs text-muted">{note}</div>
+              )}
+            </div>
+
             {sieve && sieveOpen && grouping !== "subject" && (
-              <div className="w-full rounded-md border border-line
-                bg-panel2 p-3">
+              <div className="rounded-md border border-line bg-panel2 p-3">
                 <div className="mb-2 flex flex-wrap items-center gap-2">
                   <span className="text-xs text-muted">{t("sieve.intro")}</span>
                   <Select value={sieveAction}
@@ -378,8 +413,9 @@ export function DetailPanel({ grouping, group, aiEnabled, protectedNow,
                 </pre>
               </div>
             )}
-          </Toolbar>
-          <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-4">
+          </div>
+
+          <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-2">
             {error && <div className="p-4 text-sm text-rose-400">{error}</div>}
             {!shown && !error && <Loading />}
             {shown && (
@@ -387,6 +423,63 @@ export function DetailPanel({ grouping, group, aiEnabled, protectedNow,
                 onOpen={setView} />
             )}
           </div>
+
+          {/* Contextual bulk-action bar: the ONLY bulk-action chrome for the
+              mail list, matching the overview's convention - it does not
+              exist at all until something is selected. The panel is
+              already a bounded flex column (Modal), so this sits as a
+              normal flex child at the bottom rather than needing `fixed`. */}
+          {sel.size > 0 && (
+            <div className="border-t border-line bg-panel2 px-4 py-2"
+              style={{ paddingBottom:
+                "calc(env(safe-area-inset-bottom) + 0.5rem)" }}>
+              <div className="mb-2 flex items-center gap-2 text-xs text-muted">
+                <span>{t("detail.n_selected", { n: sel.size })}</span>
+                <button className="underline hover:text-body"
+                  onClick={() => setSel(new Set())}>
+                  {t("Clear selection")}
+                </button>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                {/* The Action… select stays mounted even once "Move to
+                    folder…" is picked (matching the overview's bulk bar) -
+                    swapping it out for the folder-picker in place made the
+                    native iOS option list occasionally show the wrong
+                    (stale) options, since both selects shared one DOM
+                    node. The folder picker is a separate, additional
+                    control instead. */}
+                <Select value="" className="min-w-0 flex-1" disabled={busy}
+                  onChange={(e) => onAction(e.target.value)}>
+                  <option value="" disabled>{t("Action…")}</option>
+                  <option value="archive">{t("Archive")}</option>
+                  <option value="move">{t("Move to folder…")}</option>
+                  <option value="mark_read">{t("Mark read")}</option>
+                  {aiEnabled && <option value="ai_review">{t("ai.rate")}</option>}
+                </Select>
+                {moveDest === "?" && (
+                  <>
+                    <Select value="" className="min-w-0 flex-1"
+                      onChange={(e) => {
+                        if (e.target.value) act("move", e.target.value);
+                        setMoveDest("");
+                      }}>
+                      <option value="" disabled>{t("Move to folder…")}</option>
+                      {folders.map((f) => <option key={f} value={f}>{f}</option>)}
+                    </Select>
+                    <Button variant="ghost" className="!px-2 shrink-0"
+                      title={t("Cancel")} onClick={() => setMoveDest("")}>
+                      <X size={15} />
+                    </Button>
+                  </>
+                )}
+                <Button variant="danger" disabled={busy}
+                  className="ml-auto shrink-0"
+                  onClick={() => act("trash")}>
+                  {t("Trash selected")} ({sel.size})
+                </Button>
+              </div>
+            </div>
+          )}
         </>
       )}
     </Modal>

@@ -443,4 +443,5 @@ export const EN: Record<string, string> = {
   "bar.selected": "{n} groups selected · {mails} mails",
   "bar.limit_to": "Limit to:",
   "Cancel": "Cancel",
+  "detail.n_selected": "{n} selected",
 };
