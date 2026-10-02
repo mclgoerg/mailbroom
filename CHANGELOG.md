@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.6.0](https://github.com/mclgoerg/mailbroom/compare/v1.5.1...v1.6.0) (2026-10-02)
+
+
+### Features
+
+* configurable auto-scan schedule per account ([#68](https://github.com/mclgoerg/mailbroom/issues/68)) ([44249c2](https://github.com/mclgoerg/mailbroom/commit/44249c2b59154a73d84c4b4190fa837b643837dd))
+* incremental scanning - fetch only new/changed mail ([#66](https://github.com/mclgoerg/mailbroom/issues/66)) ([7c901d8](https://github.com/mclgoerg/mailbroom/commit/7c901d840c0d7d6e079e733188448d1a0c8d15da))
+
 ## [1.5.1](https://github.com/mclgoerg/mailbroom/compare/v1.5.0...v1.5.1) (2026-10-02)
 
 
