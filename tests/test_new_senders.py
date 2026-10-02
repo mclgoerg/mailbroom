@@ -103,6 +103,49 @@ def test_new_since_respects_a_custom_window():
     assert new == {"b@x.example"}
 
 
+# ----------------------------------------------------- configurable window
+
+def test_window_defaults_to_the_env_var():
+    from backend import config as cfgmod
+    assert cfgmod.load_config()["new_sender_window_days"] == \
+        knownsenders.NEW_SENDER_WINDOW_DAYS
+
+
+def test_window_is_configurable_through_the_config_api():
+    r = client.post("/api/config", json={"new_sender_window_days": 1})
+    assert r.status_code == 200
+    assert r.json()["new_sender_window_days"] == 1
+
+    r = client.post("/api/config", json={"new_sender_window_days": 30})
+    assert r.json()["new_sender_window_days"] == 30
+
+
+def test_window_is_clamped_to_a_sane_range():
+    r = client.post("/api/config", json={"new_sender_window_days": -5})
+    assert r.json()["new_sender_window_days"] == 0
+    r = client.post("/api/config", json={"new_sender_window_days": 9999})
+    assert r.json()["new_sender_window_days"] == 365
+    # garbage is silently rejected, not stored as 0
+    client.post("/api/config", json={"new_sender_window_days": 10})
+    r = client.post("/api/config", json={"new_sender_window_days": "nope"})
+    assert r.json()["new_sender_window_days"] == 10
+
+
+def test_public_state_honours_the_configured_window(bridge):
+    client.post("/api/config", json={"new_sender_window_days": 1})
+    mailops.run_scan()
+    _add_new_sender(bridge)
+    mailops.run_scan()
+    assert mailops.public_state()["groups"]["sender"][NEW_ADDR]["new"]
+
+    # age the entry past the now-shortened 1-day window
+    data = json.loads(knownsenders.KNOWN_SENDERS_PATH.read_text())
+    data["accounts"]["default"]["addrs"][NEW_ADDR] = \
+        int(time.time()) - 2 * 86400
+    knownsenders.KNOWN_SENDERS_PATH.write_text(json.dumps(data))
+    assert not mailops.public_state()["groups"]["sender"][NEW_ADDR]["new"]
+
+
 # -------------------------------------------------------- read-side tolerance
 
 def test_tolerates_missing_or_corrupt_file(tmp_path, monkeypatch):

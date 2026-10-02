@@ -846,10 +846,11 @@ def public_state(acc=None) -> dict:
     UID lists, plus each group's per-mail rating summary."""
     acc = acc or accounts.get()
     mail_verdicts = verdictstore.load_mails()
-    plist = cfgmod.normalize_protected(
-        cfgmod.load_config().get("protected"))
+    cfg = cfgmod.load_config()
+    plist = cfgmod.normalize_protected(cfg.get("protected"))
     unsub_entries = unsubstore.load_account(acc.name)
-    new_addrs = knownsenders.new_since(acc.name)
+    new_addrs = knownsenders.new_since(acc.name, cfg.get(
+        "new_sender_window_days", knownsenders.NEW_SENDER_WINDOW_DAYS))
     with acc.lock:
         paddrs = _protected_addrs(plist, acc)
         out = {k: v for k, v in acc.state.items() if k != "groups"}

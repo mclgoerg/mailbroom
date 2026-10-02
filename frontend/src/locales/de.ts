@@ -369,6 +369,10 @@ export const DE: Record<string, string> = {
     + "travel, dev/cloud) ersetzt deren Stichwörter; eine leere Liste "
     + "deaktiviert sie; neue Namen ergänzen Kategorien. Gilt ab dem "
     + "nächsten Scan.",
+  "new_sender.window_label": "„Neu“-Fenster für Absender (Tage)",
+  "new_sender.window_help":
+    "Wie viele Tage ein Absender als „Neu“ markiert bleibt (is:new, das "
+    + "Neu-Abzeichen), nachdem er erstmals in einem Scan gesehen wurde.",
   "Export": "Exportieren",
   "Import…": "Importieren…",
   "export.tip":

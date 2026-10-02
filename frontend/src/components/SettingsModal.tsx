@@ -119,6 +119,7 @@ export function SettingsModal({ cfg, account, onClose, onSaved,
     sharedKey: "",
     sharedBudget: cfg.shared_ai?.default_tenant_budget_usd
       ? String(cfg.shared_ai.default_tenant_budget_usd) : "",
+    newSenderWindowDays: String(cfg.new_sender_window_days ?? 7),
   });
   const [protectedText, setProtectedText] =
     useState((cfg.protected ?? []).join("\n"));
@@ -244,6 +245,7 @@ export function SettingsModal({ cfg, account, onClose, onSaved,
         protected: protectedText.split("\n")
           .map((s) => s.trim()).filter(Boolean),
         categories: parseCategories(),
+        new_sender_window_days: +f.newSenderWindowDays || 7,
         ai: { provider: f.provider, model: f.model,
           foundry_endpoint: f.endpoint,
           price_in: +f.priceIn || 0, price_out: +f.priceOut || 0,
@@ -271,6 +273,7 @@ export function SettingsModal({ cfg, account, onClose, onSaved,
       onSaved(next);
       setF({ ...f, apiKey: "", authPassword: "", oidcSecret: "",
         sharedKey: "", authMode: next.auth.mode,
+        newSenderWindowDays: String(next.new_sender_window_days),
         ...imapFields(next, editAcct) });
       setProtectedText((next.protected ?? []).join("\n"));
       setCategoriesText(catText(next.categories));
@@ -782,6 +785,17 @@ export function SettingsModal({ cfg, account, onClose, onSaved,
             />
           </Field>
           <p className="mt-1 text-xs text-muted">{t("categories.help")}</p>
+        </div>
+
+        <div className="sm:col-span-2">
+          <Field label={t("new_sender.window_label")}>
+            <Input className="w-full" type="number" min={0} max={365}
+              value={f.newSenderWindowDays}
+              onChange={set("newSenderWindowDays")} />
+          </Field>
+          <p className="mt-1 text-xs text-muted">
+            {t("new_sender.window_help")}
+          </p>
         </div>
         </>)}
 
