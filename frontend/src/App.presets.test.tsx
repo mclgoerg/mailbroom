@@ -11,6 +11,8 @@ let state: any;
 
 const createPreset = vi.fn().mockResolvedValue(
   { id: "p1", name: "Old DHL", query: "from:dhl age:>1y", account: "proton" });
+const updatePreset = vi.fn().mockResolvedValue(
+  { id: "p1", name: "Old DHL", query: "from:dhl age:>1y", account: "proton" });
 const deletePreset = vi.fn().mockResolvedValue(undefined);
 
 vi.mock("./api", () => ({
@@ -20,6 +22,7 @@ vi.mock("./api", () => ({
     state: () => Promise.resolve(state),
     version: () => Promise.resolve({ build: "v1" }),
     createPreset: (...args: unknown[]) => createPreset(...args),
+    updatePreset: (...args: unknown[]) => updatePreset(...args),
     deletePreset: (...args: unknown[]) => deletePreset(...args),
   },
   downloadFile: () => Promise.resolve(),
@@ -73,6 +76,7 @@ afterEach(() => {
   cleanup();
   localStorage.clear();
   createPreset.mockClear();
+  updatePreset.mockClear();
   deletePreset.mockClear();
 });
 
@@ -168,4 +172,59 @@ test("declining the save name prompt never calls api.createPreset",
     fireEvent.click(screen.getByTitle("Save current filter as a preset"));
     expect(createPreset).not.toHaveBeenCalled();
     promptSpy.mockRestore();
+  });
+
+test("editing a preset prompts prefilled with its name and updates it " +
+  "to the current filter box content", async () => {
+  const promptSpy = vi.spyOn(window, "prompt").mockReturnValue("Old DHL v2");
+  localStorage.setItem("pmc_account", "proton");
+  state = { ...baseState, presets: [
+    { id: "p1", name: "Old DHL", query: "from:dhl age:>1y",
+      account: "proton" }] };
+  render(<App />);
+  await waitFor(() => expect(screen.getByText("Old DHL")).toBeTruthy());
+
+  const filterInput = screen.getByPlaceholderText(
+    "filter groups…") as HTMLInputElement;
+  fireEvent.change(filterInput, { target: { value: "from:dhl age:>2y" } });
+
+  fireEvent.click(screen.getByLabelText("Edit"));
+  expect(promptSpy).toHaveBeenCalledWith(
+    expect.any(String), "Old DHL");
+  await waitFor(() => expect(updatePreset).toHaveBeenCalledWith(
+    "p1", "Old DHL v2", "from:dhl age:>2y"));
+  promptSpy.mockRestore();
+});
+
+test("declining the edit name prompt never calls api.updatePreset",
+  async () => {
+    const promptSpy = vi.spyOn(window, "prompt").mockReturnValue(null);
+    localStorage.setItem("pmc_account", "proton");
+    state = { ...baseState, presets: [
+      { id: "p1", name: "Old DHL", query: "from:dhl age:>1y",
+        account: "proton" }] };
+    render(<App />);
+    await waitFor(() => expect(screen.getByText("Old DHL")).toBeTruthy());
+    fireEvent.click(screen.getByLabelText("Edit"));
+    expect(updatePreset).not.toHaveBeenCalled();
+    promptSpy.mockRestore();
+  });
+
+test("a clear button appears once the filter has text and empties it",
+  async () => {
+    localStorage.setItem("pmc_account", "proton");
+    state = { ...baseState };
+    render(<App />);
+    await waitFor(() => expect(screen.getByPlaceholderText("filter groups…"))
+      .toBeTruthy());
+    expect(screen.queryByLabelText("Clear filter")).toBeNull();
+
+    const filterInput = screen.getByPlaceholderText(
+      "filter groups…") as HTMLInputElement;
+    fireEvent.change(filterInput, { target: { value: "from:dhl age:>1y" } });
+    const clearBtn = screen.getByLabelText("Clear filter");
+
+    fireEvent.click(clearBtn);
+    expect(filterInput.value).toBe("");
+    expect(screen.queryByLabelText("Clear filter")).toBeNull();
   });

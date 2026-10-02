@@ -1,7 +1,7 @@
 import { ArrowDown, BarChart3, BookmarkPlus, ChevronDown, ClipboardList,
-  Copy, Download, Moon, MoreHorizontal, Paperclip, Plus, Power, ScrollText,
-  Search, Settings as SettingsIcon, Sparkles, Star, Sun, Trash2, User,
-  Wand2, X }
+  Copy, Download, Moon, MoreHorizontal, Paperclip, Pencil, Plus, Power,
+  ScrollText, Search, Settings as SettingsIcon, Sparkles, Star, Sun,
+  Trash2, User, Wand2, X }
   from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api, downloadFile, setAccount as apiSetAccount, withAccount }
@@ -23,8 +23,8 @@ import { AccountAvatar, applyTheme, Button, currentTheme, ensureAiAck, Input,
 import { t } from "./i18n";
 import { applyStatus, fmtAgo, fmtSize, fmtUsd, matchGroup, parseFilter,
   retainedMailKeys } from "./lib";
-import type { AppState, AuthProbe, Config, Group, Grouping, StatusMsg }
-  from "./types";
+import type { AppState, AuthProbe, Config, FilterPreset, Group, Grouping,
+  StatusMsg } from "./types";
 
 const GROUPING_LABEL: Record<Grouping, string> = {
   sender: "Sender", domain: "Domain", subject: "Subject",
@@ -450,6 +450,20 @@ export default function App() {
     }
   };
 
+  // Updates a preset to the CURRENT filter box content under a (possibly
+  // renamed) name - the usual flow is: tap the chip to load it, tweak the
+  // filter, then edit the same chip instead of saving a near-duplicate.
+  const editFilterPreset = async (preset: FilterPreset) => {
+    const name = prompt(t("saved_filter.name_prompt"), preset.name)?.trim();
+    if (!name) return;
+    try {
+      await api.updatePreset(preset.id, name, filter);
+      refresh();
+    } catch (e: any) {
+      setToast(`Error: ${e.message ?? e}`);
+    }
+  };
+
   // Returns whether the action actually proceeded (false = the user
   // declined the confirmation, or every selected group turned out
   // protected) - callers that need to react afterward (e.g. closing a
@@ -824,14 +838,26 @@ export default function App() {
             panel (w-full) wraps to its own line directly underneath. */}
         <div className="relative order-last flex w-full flex-wrap
           items-center gap-2 sm:order-none sm:w-auto sm:min-w-24 sm:flex-1">
-          <Input
-            ref={filterRef}
-            className="min-w-0 flex-1"
-            placeholder={t("filter groups…")}
-            title="Combinable: tag:shipping ai:safe age:>1y unread:>80 is:unsub text"
-            value={filter}
-            onChange={(e) => setFilter(e.target.value)}
-          />
+          <div className="relative min-w-0 flex-1">
+            <Input
+              ref={filterRef}
+              className="w-full pr-8"
+              placeholder={t("filter groups…")}
+              title="Combinable: tag:shipping ai:safe age:>1y unread:>80 is:unsub text"
+              value={filter}
+              onChange={(e) => setFilter(e.target.value)}
+            />
+            {!!filter && (
+              <button
+                className="absolute right-2 top-1/2 -translate-y-1/2
+                  text-muted hover:text-body"
+                title={t("Clear filter")}
+                aria-label={t("Clear filter")}
+                onClick={() => { setFilter(""); filterRef.current?.focus(); }}>
+                <X size={14} />
+              </button>
+            )}
+          </div>
           <QueryBuilder value={filter} onChange={setFilter} />
           <Button variant="ghost" className="!px-2 sm:!px-3"
             title={t("saved_filter.save_tip")}
@@ -900,8 +926,10 @@ export default function App() {
         {/* Saved filter presets: user-defined, visually distinct (outlined
             accent vs. the built-ins' filled muted look above) - tapping one
             REPLACES the filter query instead of adding to the selection.
-            The small x deletes it right from the chip, no separate manage
-            mode (there's nothing else to configure per preset). */}
+            The pencil updates it to the current filter box content (edit
+            an existing preset instead of saving a near-duplicate); the x
+            deletes it - no separate manage mode, nothing else to
+            configure per preset. */}
         {(state?.presets ?? []).map((p) => (
           <span key={p.id}
             className="inline-flex shrink-0 items-center gap-1 rounded-full
@@ -909,6 +937,16 @@ export default function App() {
               whitespace-nowrap text-accent hover:bg-chip">
             <button onClick={() => setFilter(p.query)} title={p.query}>
               {p.name}
+            </button>
+            <button
+              className="opacity-60 hover:opacity-100"
+              title={t("saved_filter.edit_tip")}
+              aria-label={t("Edit")}
+              onClick={(e) => {
+                e.stopPropagation();
+                editFilterPreset(p);
+              }}>
+              <Pencil size={12} />
             </button>
             <button
               className="opacity-60 hover:opacity-100"

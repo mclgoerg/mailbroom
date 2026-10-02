@@ -717,6 +717,17 @@ def post_presets(body: PresetBody, account: str | None = Query(None)):
         raise HTTPException(400, str(exc))
 
 
+@app.post("/api/presets/{preset_id}")
+def post_preset_update(preset_id: str, body: PresetBody):
+    try:
+        return presetsmod.update_preset(
+            preset_id, {"name": body.name, "query": body.query})
+    except KeyError:
+        raise HTTPException(404, "unknown preset")
+    except ValueError as exc:
+        raise HTTPException(400, str(exc))
+
+
 @app.delete("/api/presets/{preset_id}")
 def delete_preset(preset_id: str):
     try:

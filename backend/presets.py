@@ -111,6 +111,24 @@ def create_preset(body: dict) -> dict:
     return preset
 
 
+def update_preset(preset_id: str, body: dict) -> dict:
+    """Full replace of name+query (account stays put - editing never
+    moves a preset to another account)."""
+    name = str(body.get("name", "")).strip()[:NAME_MAX]
+    if not name:
+        raise ValueError("preset needs a name")
+    query = str(body.get("query", "")).strip()[:QUERY_MAX]
+    with _LOCK:
+        presets = load_presets()
+        preset = next((p for p in presets if p["id"] == preset_id), None)
+        if not preset:
+            raise KeyError(preset_id)
+        preset["name"] = name
+        preset["query"] = query
+        _save(presets)
+    return preset
+
+
 def delete_preset(preset_id: str) -> None:
     with _LOCK:
         presets = load_presets()

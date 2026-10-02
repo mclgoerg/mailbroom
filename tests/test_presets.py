@@ -1,5 +1,6 @@
-"""Saved filter presets: CRUD, per-account scoping, tenant separation,
-rename-follows, cap enforcement, atomic write, corrupt-file tolerance."""
+"""Saved filter presets: CRUD (incl. edit/update), per-account scoping,
+tenant separation, rename-follows, cap enforcement, atomic write,
+corrupt-file tolerance."""
 
 import json
 
@@ -26,6 +27,43 @@ def test_crud():
     assert client.delete(f"/api/presets/{preset['id']}").json() == {"ok": True}
     assert client.delete(f"/api/presets/{preset['id']}").status_code == 404
     assert client.get("/api/presets").json() == {"presets": []}
+
+
+def test_update_edits_name_and_query_but_not_account(monkeypatch):
+    from conftest import FakeIMAP
+    from backend import mailops
+    cfgmod.CONFIG_PATH.write_text(json.dumps({"accounts": {
+        "one": {"host": "host-one", "user": "u1", "password": "pw"},
+        "two": {"host": "host-two", "user": "u2", "password": "pw"},
+    }}))
+    monkeypatch.setattr(mailops, "connect",
+                        lambda im, name=None: FakeIMAP({"INBOX": []}))
+    r = client.post("/api/presets?account=one",
+                    json={"name": "Old shipping", "query": "tag:shipping"})
+    preset_id = r.json()["id"]
+
+    r = client.post(f"/api/presets/{preset_id}",
+                    json={"name": "  Renamed  ", "query": "tag:shipping2"})
+    assert r.status_code == 200
+    updated = r.json()
+    assert updated["name"] == "Renamed"
+    assert updated["query"] == "tag:shipping2"
+    assert updated["account"] == "one"          # untouched by editing
+
+    presets = presetsmod.load_presets()
+    assert len(presets) == 1
+    assert presets[0]["name"] == "Renamed"
+
+
+def test_update_unknown_404_and_blank_name_400():
+    assert client.post("/api/presets/nope",
+                       json={"name": "x", "query": "x"}).status_code == 404
+    r = client.post("/api/presets", json={"name": "a", "query": "x"})
+    preset_id = r.json()["id"]
+    assert client.post(f"/api/presets/{preset_id}",
+                       json={"name": "  ", "query": "x"}).status_code == 400
+    # rejected update must not have touched the stored preset
+    assert presetsmod.load_presets()[0]["name"] == "a"
 
 
 def test_name_is_trimmed_and_capped_and_required():

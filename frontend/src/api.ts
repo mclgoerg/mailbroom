@@ -124,6 +124,8 @@ export const api = {
   runRule: (id: string) => req<RuleRun>(`/api/rules/${id}/run`, {}),
   createPreset: (name: string, query: string) =>
     req<FilterPreset>("/api/presets", { name, query }),
+  updatePreset: (id: string, name: string, query: string) =>
+    req<FilterPreset>(`/api/presets/${id}`, { name, query }),
   deletePreset: async (id: string): Promise<void> => {
     const res = await fetch(`/api/presets/${id}`, { method: "DELETE" });
     if (!res.ok) throw new Error(await res.text());
