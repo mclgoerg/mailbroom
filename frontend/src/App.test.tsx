@@ -415,6 +415,26 @@ test("a quick-select chip first narrows the filter box, then (tapped " +
     const el = screen.getByPlaceholderText("filter groups…");
     expect((el as HTMLInputElement).value).toBe("");
   });
+
+  // Regression: a second full cycle must behave identically, not
+  // collapse into a 2-state filter<->clear toggle just because the
+  // matches are STILL selected from the first cycle (selection is
+  // deliberately left alone by tap 3, see selectPreset).
+  // Tap 4: filters again.
+  fireEvent.click(chip);
+  expect((screen.getByPlaceholderText("filter groups…") as HTMLInputElement)
+    .value).toBe("age:>6m");
+  // Tap 5: must NOT jump straight back to clearing just because the
+  // (still-selected) matches already satisfy "everything selected".
+  fireEvent.click(chip);
+  expect((screen.getByPlaceholderText("filter groups…") as HTMLInputElement)
+    .value).toBe("age:>6m");
+  // Tap 6: now it clears.
+  fireEvent.click(chip);
+  await waitFor(() => {
+    const el = screen.getByPlaceholderText("filter groups…");
+    expect((el as HTMLInputElement).value).toBe("");
+  });
 });
 
 test("the overflow menu exposes CSV export without requiring a selection",

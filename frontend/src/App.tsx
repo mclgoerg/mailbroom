@@ -83,6 +83,15 @@ export default function App() {
     localStorage.setItem("pmc_sort_dir", String(sortDir));
   }, [sortK, sortDir]);
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  // Which quick-select chip's 3-tap cycle (filter -> select -> clear,
+  // see selectPreset) is mid-way through, and at which step - tracked
+  // explicitly rather than derived from whether the matches HAPPEN to
+  // already be selected, which breaks the cycle the second time around
+  // (a prior activation - or an unrelated manual selection - can already
+  // satisfy "everything matching is selected", skipping straight to
+  // clearing without a true select step in between).
+  const [activeChip, setActiveChip] =
+    useState<{ key: string; step: "filtered" | "selected" } | null>(null);
   const [detail, setDetail] = useState<Group | null>(null);
   // Editing a saved filter preset: a dedicated query (NOT the main filter
   // box - that was confusing, see the chip row below) edited with the
@@ -444,24 +453,30 @@ export default function App() {
   //      to the full, unfiltered list (selection is left alone - use
   //      "Clear selection" separately if you want that gone too)
   const selectPreset = (preset: string) => {
-    if (preset === "none") { setSelected(new Set()); return; }
+    if (preset === "none") { setSelected(new Set()); setActiveChip(null);
+      return; }
     const query = presetFilterQuery(preset);
-    if (filter !== query) {
+    // Only trust a remembered step for THIS chip if the filter box still
+    // shows what that step left it in - a manual edit, a different chip,
+    // or an account/mode switch all fall back to step 1 automatically.
+    const isActive = activeChip?.key === preset && filter === query;
+    if (!isActive) {
       setFilter(query);
+      setActiveChip({ key: preset, step: "filtered" });
       return;
     }
-    const f = parseFilter(query);
-    const matchingKeys = allGroups
-      .filter((g) => matchGroup(g, f) && !g.protected).map((g) => g.key);
-    const allSelected = matchingKeys.length > 0
-      && matchingKeys.every((k) => selected.has(k));
-    if (allSelected) {
-      setFilter("");
-    } else {
+    if (activeChip.step === "filtered") {
+      const f = parseFilter(query);
+      const matchingKeys = allGroups
+        .filter((g) => matchGroup(g, f) && !g.protected).map((g) => g.key);
       const next = new Set(selected);
       matchingKeys.forEach((k) => next.add(k));
       setSelected(next);
+      setActiveChip({ key: preset, step: "selected" });
+      return;
     }
+    setFilter("");
+    setActiveChip(null);
   };
 
   // Saved filter presets: unlike selectPreset() above (which ADDS to the
