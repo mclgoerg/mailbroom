@@ -115,4 +115,14 @@ test("the New chip shows a live count and tapping it selects only the " +
   // group's mail count (5) - the protected and not-flagged groups are
   // excluded, same as every other quick-select preset.
   await waitFor(() => expect(screen.getByText("Trash 5")).toBeTruthy());
+
+  // The filter box also narrows to is:new, so the selected handful
+  // isn't left scattered across a long unfiltered list: both flagged
+  // groups stay visible (one checked, one not - protection only
+  // affects selection, not visibility), the unflagged one disappears.
+  expect((screen.getByPlaceholderText("filter groups…") as HTMLInputElement)
+    .value).toBe("is:new");
+  expect(screen.queryAllByText("Sender A").length).toBeGreaterThan(0);
+  expect(screen.queryAllByText("Sender B").length).toBeGreaterThan(0);
+  expect(screen.queryAllByText("Sender C").length).toBe(0);
 });

@@ -392,12 +392,15 @@ test("selecting a group reveals the bulk-action bar; Clear selection " +
   await waitFor(() => expect(screen.queryByText(/^Trash \d+$/)).toBeNull());
 });
 
-test("a quick-select chip adds matching groups to the selection", async () => {
+test("a quick-select chip adds matching groups to the selection AND " +
+  "narrows the filter box to the same condition", async () => {
   renderWithOneSenderGroup();
   await waitFor(() => expect(screen.getAllByText("DHL Paket").length)
     .toBeGreaterThan(0));
   fireEvent.click(screen.getByText("Inactive > 6 months"));
   await waitFor(() => expect(screen.getByText(/^Trash \d+$/)).toBeTruthy());
+  expect((screen.getByPlaceholderText("filter groups…") as HTMLInputElement)
+    .value).toBe("age:>6m");
 });
 
 test("the overflow menu exposes CSV export without requiring a selection",

@@ -38,9 +38,10 @@ const SORT_OPTIONS: { k: SortKey; label: string }[] = [
   { k: "label", label: "Sort: name" },
 ];
 
-// Quick-select presets, rendered as one-tap chips (same selectPreset()
-// logic as before - each chip ADDS matching groups to the selection,
-// it is not a toggle/filter).
+// Quick-select presets, rendered as one-tap chips: each ADDS matching
+// groups to the selection (it is not a toggle) AND narrows the filter
+// box to the same condition, so the selected handful isn't left
+// scattered across a long unfiltered list.
 const PRESET_CHIPS: { key: string; label: string }[] = [
   { key: "aisafe", label: "AI-safe groups" },
   { key: "older6", label: "Inactive > 6 months" },
@@ -410,8 +411,27 @@ export default function App() {
     catch (e: any) { setToast(`Error: ${e.message ?? e}`); }
   };
 
+  // The filter-box equivalent of each quick-select preset below - applied
+  // alongside the selection itself (see selectPreset) so tapping one also
+  // narrows a long list down to just what got selected, instead of
+  // leaving a handful of checked rows scattered across a thousand
+  // unfiltered ones.
+  const presetFilterQuery = (preset: string): string => {
+    if (preset === "aisafe") return "ai:safe";
+    if (preset.startsWith("older")) {
+      const months = Number(preset.slice(5));
+      return `age:>${months % 12 === 0 ? `${months / 12}y` : `${months}m`}`;
+    }
+    if (preset === "unsub_pending") return "is:unsub is:not-unsubscribed";
+    if (preset === "new") return "is:new";
+    return "";
+  };
+
   // Selection presets never pick up protected groups - protecting a sender
-  // means "keep it out of every bulk sweep".
+  // means "keep it out of every bulk sweep". (Protected groups matching
+  // the same condition still show up in the now-filtered list, just
+  // unchecked - the filter can't single out "and not protected" the way
+  // the selection logic below does.)
   const selectPreset = (preset: string) => {
     const next = new Set(selected);
     if (preset === "none") next.clear();
@@ -432,6 +452,7 @@ export default function App() {
       groups.filter((g) => g.new && !g.protected)
         .forEach((g) => next.add(g.key));
     }
+    setFilter(presetFilterQuery(preset));
     setSelected(next);
   };
 
