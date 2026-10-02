@@ -1,6 +1,7 @@
-import { ArrowDown, BarChart3, ChevronDown, ClipboardList, Copy, Download,
-  Moon, MoreHorizontal, Paperclip, Plus, Power, ScrollText, Search,
-  Settings as SettingsIcon, Sparkles, Star, Sun, Trash2, User, Wand2, X }
+import { ArrowDown, BarChart3, BookmarkPlus, ChevronDown, ClipboardList,
+  Copy, Download, Moon, MoreHorizontal, Paperclip, Pencil, Plus, Power,
+  ScrollText, Search, Settings as SettingsIcon, Sparkles, Star, Sun,
+  Trash2, User, Wand2, X }
   from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api, downloadFile, setAccount as apiSetAccount, withAccount }
@@ -22,8 +23,8 @@ import { AccountAvatar, applyTheme, Button, currentTheme, ensureAiAck, Input,
 import { t } from "./i18n";
 import { applyStatus, fmtAgo, fmtSize, fmtUsd, matchGroup, parseFilter,
   retainedMailKeys } from "./lib";
-import type { AppState, AuthProbe, Config, Group, Grouping, StatusMsg }
-  from "./types";
+import type { AppState, AuthProbe, Config, FilterPreset, Group, Grouping,
+  StatusMsg } from "./types";
 
 const GROUPING_LABEL: Record<Grouping, string> = {
   sender: "Sender", domain: "Domain", subject: "Subject",
@@ -82,6 +83,12 @@ export default function App() {
   }, [sortK, sortDir]);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [detail, setDetail] = useState<Group | null>(null);
+  // Editing a saved filter preset: a dedicated query (NOT the main filter
+  // box - that was confusing, see the chip row below) edited with the
+  // same Input+QueryBuilder pairing the filter box itself uses.
+  const [editingPreset, setEditingPreset] = useState<FilterPreset | null>(
+    null);
+  const [editQuery, setEditQuery] = useState("");
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [rulesOpen, setRulesOpen] = useState(false);
@@ -423,6 +430,42 @@ export default function App() {
         .forEach((g) => next.add(g.key));
     }
     setSelected(next);
+  };
+
+  // Saved filter presets: unlike selectPreset() above (which ADDS to the
+  // selection), tapping one REPLACES the filter query - they are one-tap
+  // recall for a named search, not a selection shortcut.
+  const saveFilterPreset = async () => {
+    const name = prompt(t("saved_filter.name_prompt"))?.trim();
+    if (!name) return;
+    try {
+      await api.createPreset(name, filter);
+      refresh();
+    } catch (e: any) {
+      setToast(`Error: ${e.message ?? e}`);
+    }
+  };
+
+  const deleteFilterPreset = async (id: string, name: string) => {
+    if (!confirm(t("saved_filter.confirm_delete", { name }))) return;
+    try {
+      await api.deletePreset(id);
+      refresh();
+    } catch (e: any) {
+      setToast(`Error: ${e.message ?? e}`);
+    }
+  };
+
+  const saveEditedPreset = async () => {
+    if (!editingPreset) return;
+    try {
+      await api.updatePreset(editingPreset.id, editingPreset.name,
+        editQuery.trim());
+      setEditingPreset(null);
+      refresh();
+    } catch (e: any) {
+      setToast(`Error: ${e.message ?? e}`);
+    }
   };
 
   // Returns whether the action actually proceeded (false = the user
@@ -799,15 +842,33 @@ export default function App() {
             panel (w-full) wraps to its own line directly underneath. */}
         <div className="relative order-last flex w-full flex-wrap
           items-center gap-2 sm:order-none sm:w-auto sm:min-w-24 sm:flex-1">
-          <Input
-            ref={filterRef}
-            className="min-w-0 flex-1"
-            placeholder={t("filter groups…")}
-            title="Combinable: tag:shipping ai:safe age:>1y unread:>80 is:unsub text"
-            value={filter}
-            onChange={(e) => setFilter(e.target.value)}
-          />
+          <div className="relative min-w-0 flex-1">
+            <Input
+              ref={filterRef}
+              className="w-full pr-8"
+              placeholder={t("filter groups…")}
+              title="Combinable: tag:shipping ai:safe age:>1y unread:>80 is:unsub text"
+              value={filter}
+              onChange={(e) => setFilter(e.target.value)}
+            />
+            {!!filter && (
+              <button
+                className="absolute right-2 top-1/2 -translate-y-1/2
+                  text-muted hover:text-body"
+                title={t("Clear filter")}
+                aria-label={t("Clear filter")}
+                onClick={() => { setFilter(""); filterRef.current?.focus(); }}>
+                <X size={14} />
+              </button>
+            )}
+          </div>
           <QueryBuilder value={filter} onChange={setFilter} />
+          <Button variant="ghost" className="!px-2 sm:!px-3"
+            title={t("saved_filter.save_tip")}
+            disabled={!filter.trim()}
+            onClick={saveFilterPreset}>
+            <BookmarkPlus size={17} />
+          </Button>
         </div>
         {/* One wrap unit; tighter padding on phones so the strip fits next
             to Scan on one line. */}
@@ -866,6 +927,44 @@ export default function App() {
             {t(p.label)}
           </button>
         ))}
+        {/* Saved filter presets: user-defined, visually distinct (outlined
+            accent vs. the built-ins' filled muted look above) - tapping one
+            REPLACES the filter query instead of adding to the selection.
+            The pencil opens an inline editor (below, same Input +
+            QueryBuilder pairing the filter box itself uses) on the
+            preset's OWN stored query - not whatever's in the filter box;
+            the x deletes it. */}
+        {(state?.presets ?? []).map((p) => (
+          <span key={p.id}
+            className="inline-flex shrink-0 items-center gap-1 rounded-full
+              border border-accent/50 bg-transparent px-3 py-1.5 text-xs
+              whitespace-nowrap text-accent hover:bg-chip">
+            <button onClick={() => setFilter(p.query)} title={p.query}>
+              {p.name}
+            </button>
+            <button
+              className="opacity-60 hover:opacity-100"
+              title={t("saved_filter.edit_tip")}
+              aria-label={t("Edit")}
+              onClick={(e) => {
+                e.stopPropagation();
+                setEditingPreset(p);
+                setEditQuery(p.query);
+              }}>
+              <Pencil size={12} />
+            </button>
+            <button
+              className="opacity-60 hover:opacity-100"
+              title={t("Delete")}
+              aria-label={t("Delete")}
+              onClick={(e) => {
+                e.stopPropagation();
+                deleteFilterPreset(p.id, p.name);
+              }}>
+              <X size={12} />
+            </button>
+          </span>
+        ))}
         {/* Sort: field select + direction toggle as one segmented
             control; the arrow rotates instead of swapping glyphs. No
             ml-auto: that pushed it flush right whenever it wrapped onto
@@ -897,6 +996,29 @@ export default function App() {
           </button>
         </div>
       </div>
+
+      {/* Inline preset editor: appears only while editing one (Pencil
+          above) - a Cancel is always reachable, per the rule of never
+          leaving a swapped-in control with no way back. */}
+      {editingPreset && (
+        <div className="relative mb-3 flex flex-wrap items-center gap-2
+          rounded-lg border border-accent/50 bg-panel2 p-2">
+          <span className="shrink-0 text-xs text-muted">
+            {t("saved_filter.editing", { name: editingPreset.name })}
+          </span>
+          <Input className="min-w-0 flex-1" value={editQuery}
+            onChange={(e) => setEditQuery(e.target.value)} />
+          <QueryBuilder value={editQuery} onChange={setEditQuery} />
+          <Button className="!min-h-8 !px-3 !text-xs"
+            onClick={saveEditedPreset}>
+            {t("Save")}
+          </Button>
+          <Button variant="ghost" className="!min-h-8 !px-3 !text-xs"
+            onClick={() => setEditingPreset(null)}>
+            {t("Cancel")}
+          </Button>
+        </div>
+      )}
 
       {/* Contextual bulk-action bar: the ONLY bulk-action chrome in the
           app - it does not exist at all until something is selected.

@@ -1,7 +1,7 @@
 import type {
   AdminTenantStats, AiGroupResult, AppState, AttMail, AuditResp, AuthProbe,
-  Config, DupSet, FoldersResp, Grouping, Mail, MessageDetail, Rule, RuleRun,
-  StatsResp, TrashResp, UnsubBulkResult, UnsubResult,
+  Config, DupSet, FilterPreset, FoldersResp, Grouping, Mail, MessageDetail,
+  Rule, RuleRun, StatsResp, TrashResp, UnsubBulkResult, UnsubResult,
 } from "./types";
 
 /* Active account: every API call is scoped to exactly one account (strict
@@ -122,6 +122,14 @@ export const api = {
     if (!res.ok) throw new Error(await res.text());
   },
   runRule: (id: string) => req<RuleRun>(`/api/rules/${id}/run`, {}),
+  createPreset: (name: string, query: string) =>
+    req<FilterPreset>("/api/presets", { name, query }),
+  updatePreset: (id: string, name: string, query: string) =>
+    req<FilterPreset>(`/api/presets/${id}`, { name, query }),
+  deletePreset: async (id: string): Promise<void> => {
+    const res = await fetch(`/api/presets/${id}`, { method: "DELETE" });
+    if (!res.ok) throw new Error(await res.text());
+  },
   block: (grouping: Grouping, key: string, label = "",
           trashExisting = false) =>
     req<{ rule: Rule; trashed?: { queued: number; skipped: number };

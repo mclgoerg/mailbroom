@@ -188,6 +188,16 @@ export interface AppState {
   undo: { ts: number; label: string; count: number; action: string }[];
   folders_raw: string[];
   rules: Rule[];
+  presets: FilterPreset[];
+}
+
+/** A saved filter-box query, recallable as a one-tap chip (not to be
+ *  confused with `Preset` below, the IMAP provider preset). */
+export interface FilterPreset {
+  id: string;
+  name: string;
+  query: string;
+  account: string;
 }
 
 export interface FolderInfo {

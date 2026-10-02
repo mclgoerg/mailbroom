@@ -26,6 +26,7 @@ const baseState: AppState = {
   unsub: { status: "idle", progress: "", error: "", total: 0, done: 0,
     links: 0, failed: 0, skipped: 0 },
   trash_count: 0, notice: null, undo: [], folders_raw: [], rules: [],
+  presets: [],
 };
 
 const rule: Rule = {

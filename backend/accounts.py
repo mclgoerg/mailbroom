@@ -36,6 +36,7 @@ def _initial_state() -> dict:
         "undo": [],            # summaries of undoable move jobs (newest last)
         "folders_raw": [],     # raw IMAP folder names (targets for move-to)
         "rules": [],           # this account's rules (mirrored for SSE)
+        "presets": [],         # this account's saved filter presets (SSE)
     }
 
 

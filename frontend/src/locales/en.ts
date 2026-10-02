@@ -248,6 +248,11 @@ export const EN: Record<string, string> = {
     + "mail in the selected groups.",
   "retention.tag_keep_latest": "keep newest {n}",
   "retention.tag_older_than_days": "older than {n}d",
+  "saved_filter.save_tip": "Save current filter as a preset",
+  "saved_filter.name_prompt": "Name this preset",
+  "saved_filter.edit_tip": "Edit this preset's filter",
+  "saved_filter.editing": 'Editing "{name}"',
+  "saved_filter.confirm_delete": 'Delete preset "{name}"?',
   "notice.atts_cancelled": "Attachment analysis cancelled.",
   "notice.unsub_cancelled": "Unsubscribe cancelled.",
   "atts.hint":
