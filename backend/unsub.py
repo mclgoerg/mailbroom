@@ -21,9 +21,7 @@ import email.header
 import ipaddress
 import logging
 import re
-import smtplib
 import socket
-import ssl
 import threading
 import time
 import urllib.parse
@@ -33,6 +31,7 @@ from . import accounts
 from . import auditlog
 from . import config as cfgmod
 from . import mailops
+from . import smtpout
 from . import tenants
 from . import unsubstore
 
@@ -101,41 +100,7 @@ def _send_mailto(im: dict, uri: str, account_name: str | None = None) -> None:
     params = dict(urllib.parse.parse_qsl(parsed.query))
     subject = params.get("subject", "unsubscribe")
     body = params.get("body", "unsubscribe")
-    sender = im["user"]
-    msg = (f"From: {sender}\r\nTo: {to_addr}\r\nSubject: {subject}\r\n"
-           f"\r\n{body}\r\n")
-    ctx = ssl.create_default_context(cafile=im["cafile"] or None)
-    host = im.get("smtp_host") or im["host"]     # providers often split them
-    port = int(im.get("smtp_port") or 1025)
-    security = im.get("smtp_security") or "auto"
-    if security == "ssl":
-        smtp = smtplib.SMTP_SSL(host, port, timeout=30, context=ctx)
-    elif security == "starttls":
-        smtp = smtplib.SMTP(host, port, timeout=30)
-        smtp.starttls(context=ctx)
-    else:                                        # auto: SSL, then STARTTLS
-        try:
-            smtp = smtplib.SMTP_SSL(host, port, timeout=30, context=ctx)
-        except (ssl.SSLError, OSError):
-            smtp = smtplib.SMTP(host, port, timeout=30)
-            smtp.starttls(context=ctx)
-    try:
-        oauth = im.get("oauth")
-        if oauth and oauth.get("refresh_token"):
-            from . import oauthflow
-            fresh = oauthflow.ensure_fresh(oauth)
-            if fresh is not oauth and account_name:
-                cfgmod.save_oauth(account_name, fresh)
-            cb = oauthflow.smtp_auth_callback(sender, fresh["access_token"])
-            smtp.auth("XOAUTH2", cb, initial_response_ok=True)
-        else:
-            smtp.login(im["user"], im["password"])
-        smtp.sendmail(sender, [to_addr], msg.encode())
-    finally:
-        try:
-            smtp.quit()
-        except Exception:
-            pass
+    smtpout.send(im, to_addr, subject, body, account_name)
 
 
 def unsubscribe_addr(im: dict, addr: str, header: str, one_click: bool,

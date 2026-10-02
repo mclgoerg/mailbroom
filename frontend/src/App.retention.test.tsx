@@ -49,6 +49,7 @@ const acctCfg = {
   smtp_host: "", smtp_port: 587, smtp_security: "auto" as const,
   user: "", password: "", password_set: true,
   cafile: "", preset: "custom" as const, oauth: null,
+  digest: { schedule: "off" as const, recipient: "" },
 };
 
 const cfg: Config = {

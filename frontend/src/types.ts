@@ -260,6 +260,13 @@ export type SmtpSecurity = "auto" | "ssl" | "starttls";
 export type Preset = "proton" | "gmail" | "outlook" | "icloud" | "fastmail"
   | "gmx" | "mailbox" | "yahoo" | "custom";
 
+export type DigestSchedule = "off" | "daily" | "weekly";
+
+export interface DigestSettings {
+  schedule: DigestSchedule;
+  recipient: string;       // "" = the account's own address
+}
+
 export interface ImapAccount {
   excluded_folders: string[];
   host: string;
@@ -274,6 +281,7 @@ export interface ImapAccount {
   cafile: string;
   preset: Preset;
   oauth: ImapOauth | null;
+  digest: DigestSettings;
 }
 
 export type OauthProvider = "google" | "microsoft";

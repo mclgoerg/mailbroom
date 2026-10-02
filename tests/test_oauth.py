@@ -270,7 +270,7 @@ def test_oauth_device_start_and_poll(monkeypatch):
 
 
 def test_unsub_smtp_uses_xoauth2(monkeypatch):
-    from backend import unsub
+    from backend import smtpout, unsub
     import time
 
     seen = {}
@@ -292,7 +292,7 @@ def test_unsub_smtp_uses_xoauth2(monkeypatch):
         def quit(self):
             pass
 
-    monkeypatch.setattr(unsub.smtplib, "SMTP_SSL", FakeSMTP)
+    monkeypatch.setattr(smtpout.smtplib, "SMTP_SSL", FakeSMTP)
     unsub._send_mailto(
         {"host": "smtp.gmail.example", "smtp_security": "ssl",
          "user": "me@gmail.com", "password": "", "cafile": "",

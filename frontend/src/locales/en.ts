@@ -130,6 +130,21 @@ export const EN: Record<string, string> = {
   "folders.err_hint":
     "- folder discovery needs saved, working credentials for this "
     + "account; save them, then hit Discover.",
+  "digest.title": "Activity digest email",
+  "digest.schedule": "Schedule",
+  "digest.off": "Off",
+  "digest.recipient": "Recipient",
+  "digest.recipient_placeholder": "this account's own address",
+  "digest.help":
+    "A plain-text summary of what Mailbroom did for this account since "
+    + "the last digest - actions taken, mails/bytes freed, rule runs "
+    + "(incl. report-mode results awaiting review) and unsubscribe "
+    + "outcomes. Skipped entirely when nothing happened.",
+  "digest.send_test": "Send test digest",
+  "digest.test_sent": "Sent!",
+  "digest.test_nothing":
+    "Nothing to report since the last digest - try again after some "
+    + "activity.",
   "note.ai_selected": "{note} - selected {n}/{of}",
   "note.ai_truncated": " (first {n} mails only)",
   "note.background": "{verb} - running in the background…",

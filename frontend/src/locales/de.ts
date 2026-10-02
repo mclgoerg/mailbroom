@@ -570,6 +570,23 @@ export const DE: Record<string, string> = {
   "folders.err_hint":
     "- die Ordner-Erkennung braucht gespeicherte, funktionierende "
     + "Zugangsdaten für dieses Konto; erst speichern, dann Erkennen.",
+  "digest.title": "Aktivitäts-Übersicht per E-Mail",
+  "digest.schedule": "Zeitplan",
+  "digest.off": "Aus",
+  "digest.recipient": "Empfänger",
+  "digest.recipient_placeholder": "eigene Adresse dieses Kontos",
+  "digest.help":
+    "Eine reine Textzusammenfassung dessen, was Mailbroom für dieses "
+    + "Konto seit der letzten Übersicht getan hat - durchgeführte "
+    + "Aktionen, freigewordene Mails/Speicherplatz, Regelläufe "
+    + "(einschließlich Berichts-Ergebnissen, die noch zu prüfen sind) "
+    + "und Abbestell-Ergebnisse. Entfällt komplett, wenn nichts "
+    + "passiert ist.",
+  "digest.send_test": "Test-Übersicht senden",
+  "digest.test_sent": "Gesendet!",
+  "digest.test_nothing":
+    "Nichts zu berichten seit der letzten Übersicht - nach etwas "
+    + "Aktivität erneut versuchen.",
   "Audit Log": "Prüfprotokoll",
   "Previous": "Zurück",
   "Next": "Weiter",

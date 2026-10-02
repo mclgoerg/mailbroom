@@ -4,10 +4,10 @@ import { useEffect, useState } from "react";
 import { api, downloadFile, fmtUsd } from "../api";
 import { getLang, setLang, t, type Lang } from "../i18n";
 import { fmtAgo, fmtSize } from "../lib";
-import type { AdminTenantStats, AuthMode, Config, FoldersResp, OauthProvider,
-  Preset, Security, SmtpSecurity } from "../types";
+import type { AdminTenantStats, AuthMode, Config, DigestSchedule,
+  FoldersResp, OauthProvider, Preset, Security, SmtpSecurity } from "../types";
 import { Button, Field, Input, Loading, Modal, PanelHeader,
-  SectionLabel, Select, TextArea } from "./ui";
+  SectionLabel, Select, Spinner, TextArea } from "./ui";
 
 /* Provider presets only PREFILL the connection fields - everything stays
  * editable. "custom" prefills nothing. Hosts per provider docs; all of
@@ -86,6 +86,8 @@ export function SettingsModal({ cfg, account, onClose, onSaved,
       oauthClientSecret: "",
       oauthClientSecretSet: im.oauth?.client_secret_set ?? false,
       oauthConnected: im.oauth?.connected ?? false,
+      digestSchedule: (im.digest?.schedule ?? "off") as DigestSchedule,
+      digestRecipient: im.digest?.recipient ?? "",
     };
   };
   const [f, setF] = useState({
@@ -136,6 +138,19 @@ export function SettingsModal({ cfg, account, onClose, onSaved,
     return out;
   };
   const [msg, setMsg] = useState("");
+  const [digestTesting, setDigestTesting] = useState(false);
+  const [digestTestMsg, setDigestTestMsg] = useState("");
+  const sendTestDigest = async () => {
+    setDigestTesting(true);
+    setDigestTestMsg("");
+    try {
+      const r = await api.testDigest(editAcct);
+      setDigestTestMsg(t(r.sent ? "digest.test_sent" : "digest.test_nothing"));
+    } catch (e: any) {
+      setDigestTestMsg(`Error: ${e.message ?? e}`);
+    }
+    setDigestTesting(false);
+  };
   // Admin usage overview (Server tab): fetched once when the tab opens.
   const [tenantStats, setTenantStats] =
     useState<AdminTenantStats[] | null>(null);
@@ -214,6 +229,8 @@ export function SettingsModal({ cfg, account, onClose, onSaved,
           security: f.security, smtp_host: f.smtpHost,
           smtp_port: +f.smtpPort || 1025, smtp_security: f.smtpSecurity,
           cafile: f.cafile, preset: f.preset, user: f.user,
+          digest: { schedule: f.digestSchedule,
+            recipient: f.digestRecipient },
           ...(f.password ? { password: f.password } : {}),
           ...(oauthProvider ? { oauth: { provider: oauthProvider,
             client_id: f.oauthClientId,
@@ -265,6 +282,7 @@ export function SettingsModal({ cfg, account, onClose, onSaved,
   const switchEditAccount = (name: string) => {
     setEditAcct(name);                 // effect above re-discovers folders
     setF({ ...f, ...imapFields(cfg, name) });
+    setDigestTestMsg("");
   };
 
   const renameAccount = async () => {
@@ -697,6 +715,37 @@ export function SettingsModal({ cfg, account, onClose, onSaved,
               )}
             </div>
           )}
+        </div>
+
+        <div className="sm:col-span-2 rounded-md border border-line
+          bg-panel2 p-3">
+          <SectionLabel className="mb-2">{t("digest.title")}</SectionLabel>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Field label={t("digest.schedule")}>
+              <Select className="w-full" value={f.digestSchedule}
+                onChange={set("digestSchedule")}>
+                <option value="off">{t("digest.off")}</option>
+                <option value="daily">{t("sched.daily")}</option>
+                <option value="weekly">{t("sched.weekly")}</option>
+              </Select>
+            </Field>
+            <Field label={t("digest.recipient")}>
+              <Input className="w-full" value={f.digestRecipient}
+                placeholder={imapOf(cfg, editAcct).user
+                  || t("digest.recipient_placeholder")}
+                onChange={set("digestRecipient")} />
+            </Field>
+          </div>
+          <p className="mt-1 text-xs text-muted">{t("digest.help")}</p>
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <Button variant="ghost" className="!min-h-8 !px-3 !text-xs"
+              onClick={sendTestDigest} disabled={digestTesting}>
+              {digestTesting ? <Spinner /> : t("digest.send_test")}
+            </Button>
+            {digestTestMsg && (
+              <span className="text-xs text-muted">{digestTestMsg}</span>
+            )}
+          </div>
         </div>
         </>)}
 
