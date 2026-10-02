@@ -282,8 +282,10 @@ export function DetailPanel({ grouping, group, aiEnabled, protectedNow,
         <>
           <div className="flex flex-col gap-2 border-b border-line px-4 py-2">
             {/* Row 1: rating filter chips (exclusive, like a segmented
-                control) + sort - mirrors the overview's "chips + sort
-                share one line" layout. */}
+                control) - its own row since it already wraps onto 2 lines
+                at phone width; anything sharing the row with `ml-auto`
+                ended up stranded alone on a 2nd line, flush right with a
+                big empty gap to its left. */}
             <div className="flex flex-wrap items-center gap-2">
               <button
                 className={`shrink-0 rounded-full border px-3 py-1.5 text-xs
@@ -304,15 +306,16 @@ export function DetailPanel({ grouping, group, aiEnabled, protectedNow,
                   {f.label} ({vCounts[f.key as keyof typeof vCounts]})
                 </button>
               ))}
-              <Select value={sortBy} className="ml-auto w-auto shrink-0"
+            </div>
+
+            {/* Row 2: sort + build-a-selection + per-group secondary
+                actions, grouped together as one "list controls" row. */}
+            <div className="flex flex-wrap items-center gap-2">
+              <Select value={sortBy} className="w-auto shrink-0"
                 onChange={(e) => setSortBy(e.target.value as "date" | "size")}>
                 <option value="date">{t("Date")}</option>
                 <option value="size">{t("Size")}</option>
               </Select>
-            </div>
-
-            {/* Row 2: build-a-selection + per-group secondary actions. */}
-            <div className="flex flex-wrap items-center gap-2">
               <Select value="" className="w-auto shrink-0"
                 onChange={(e) => selectPreset(e.target.value)}>
                 <option value="" disabled>{t("Select…")}</option>
