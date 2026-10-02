@@ -10,7 +10,7 @@ const mk = (i: number): Group => ({
   count: i + 1, size: 1000 * (i + 1), unread: 0,
   first: "2024-01-01", last: "2025-01-01", tags: [], samples: [],
   bulk: false, unsub: false, ai: null, ratings: null, protected: false,
-  replied: false, att_size: 0, unsubscribed: null,
+  replied: false, att_size: 0, unsubscribed: null, new: false,
 });
 
 const groups = Array.from({ length: 120 }, (_, i) => mk(i));
@@ -126,6 +126,22 @@ describe("unsubscribe badge", () => {
   it("shows nothing when never attempted", () => {
     const { queryAllByText } = renderTable({ groups: withUnsub(null) });
     expect(queryAllByText(/[Uu]nsubscri/).length).toBe(0);
+  });
+});
+
+describe("new-sender badge", () => {
+  beforeEach(() => setLang("en"));
+  afterEach(cleanup);
+
+  it("shows no badge for a group that isn't flagged new", () => {
+    const { queryAllByText } = renderTable({ groups: [mk(0)] });
+    expect(queryAllByText("New").length).toBe(0);
+  });
+
+  it("shows a New badge for a flagged group (desktop + mobile)", () => {
+    const { getAllByText } = renderTable({
+      groups: [{ ...mk(0), new: true }] });
+    expect(getAllByText(/New/).length).toBe(2);
   });
 });
 

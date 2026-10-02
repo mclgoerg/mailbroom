@@ -71,6 +71,7 @@ const group: Group = {
   count: 12, size: 12000, unread: 2, first: "2024-01-01", last: "2025-01-01",
   tags: [], samples: [], bulk: false, unsub: false, ai: null, ratings: null,
   protected: false, replied: false, att_size: 0, unsubscribed: null,
+  new: false,
 };
 
 const baseState: AppState = {

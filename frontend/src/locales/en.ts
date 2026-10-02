@@ -112,10 +112,12 @@ export const EN: Record<string, string> = {
   "qb.att": "Attachments ≥",
   "qb.flags": "Only groups…",
   "qb.is_unsub": "with unsubscribe link",
+  "qb.is_unsubscribed": "fully unsubscribed",
   "qb.is_not_unsubscribed": "not yet unsubscribed",
   "qb.is_noreply": "never replied to",
   "qb.is_replied": "replied to",
   "qb.is_protected": "protected",
+  "qb.is_new": "new senders",
   "ai.shared_note":
     "No own key - AI runs on the server's shared key "
     + "(your monthly cap: {cap}).",
@@ -192,6 +194,10 @@ export const EN: Record<string, string> = {
   "replied": "replied",
   "replied.tip":
     "You have written to this sender before (found in your Sent folder)",
+  "new_sender.tip":
+    "First seen recently - a signal only, no action was taken "
+    + "automatically",
+  "chip.new_count": "New ({n})",
   "protected.help":
     "One entry per line: an address (user@example.com) or a domain "
     + "(@example.com). Protected senders are skipped by bulk deletions and "

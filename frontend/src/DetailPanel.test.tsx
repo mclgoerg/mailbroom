@@ -35,7 +35,8 @@ const mkGroup = (over: Partial<Group> = {}): Group => ({
   key: "s@x.example", label: "Sender", sub: "s@x.example",
   count: 2, size: 2000, unread: 0, first: "2025-01-01", last: "2025-01-02",
   tags: [], samples: [], bulk: false, unsub: false, ai: null, ratings: null,
-  protected: false, replied: false, att_size: 0, unsubscribed: null, ...over,
+  protected: false, replied: false, att_size: 0, unsubscribed: null,
+  new: false, ...over,
 });
 
 const noop = () => {};

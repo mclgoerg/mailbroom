@@ -9,7 +9,7 @@ const g = (over: Partial<Group> = {}): Group => ({
   last: "2024-06-01", tags: ["shipping", "newsletter"], samples: [],
   bulk: true, unsub: true, ai: { verdict: "delete_safe", reason: "x" },
   ratings: null, protected: false, replied: false, att_size: 0,
-  unsubscribed: null,
+  unsubscribed: null, new: false,
   ...over,
 });
 
@@ -89,6 +89,10 @@ describe("parseFilter", () => {
     expect(parseFilter("is:protected").protectedOnly).toBe(true);
     expect(parseFilter("dhl").protectedOnly).toBe(false);
   });
+  it("recognises is:new", () => {
+    expect(parseFilter("is:new").newOnly).toBe(true);
+    expect(parseFilter("dhl").newOnly).toBe(false);
+  });
   it("recognises is:replied / is:noreply-ever", () => {
     expect(parseFilter("is:replied").replied).toBe(true);
     expect(parseFilter("is:noreply-ever").replied).toBe(false);
@@ -151,6 +155,11 @@ describe("matchGroup", () => {
   it("is:protected matches only protected groups", () => {
     const f = parseFilter("is:protected");
     expect(matchGroup(g({ protected: true }), f, NOW)).toBe(true);
+    expect(matchGroup(g(), f, NOW)).toBe(false);
+  });
+  it("is:new matches only flagged-new groups", () => {
+    const f = parseFilter("is:new");
+    expect(matchGroup(g({ new: true }), f, NOW)).toBe(true);
     expect(matchGroup(g(), f, NOW)).toBe(false);
   });
   it("is:replied / is:noreply-ever split on the replied flag", () => {

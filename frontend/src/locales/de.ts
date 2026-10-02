@@ -48,6 +48,10 @@ export const DE: Record<string, string> = {
   "replied.tip":
     "Sie haben diesem Absender schon geschrieben (aus Ihrem "
     + "Gesendet-Ordner ermittelt)",
+  "new_sender.tip":
+    "Kürzlich erstmals gesehen - nur ein Hinweis, es wurde automatisch "
+    + "nichts unternommen",
+  "chip.new_count": "Neu ({n})",
   "confirm.trash_protected":
     "Die Gruppe „{label}“ ist geschützt. Mails trotzdem in den "
     + "Papierkorb verschieben?",
@@ -552,10 +556,12 @@ export const DE: Record<string, string> = {
   "qb.att": "Anhänge ≥",
   "qb.flags": "Nur Gruppen…",
   "qb.is_unsub": "mit Abmeldelink",
+  "qb.is_unsubscribed": "vollständig abbestellt",
   "qb.is_not_unsubscribed": "noch nicht abbestellt",
   "qb.is_noreply": "nie geantwortet",
   "qb.is_replied": "geantwortet",
   "qb.is_protected": "geschützt",
+  "qb.is_new": "neue Absender",
   "ai.shared_note":
     "Kein eigener Schlüssel - AI läuft über den gemeinsamen "
     + "Server-Schlüssel (dein Monatslimit: {cap}).",

@@ -61,6 +61,16 @@ def test_parse_filter_splits_qualifiers_and_text():
         "dhl.example"
     assert rulesmod.parse_filter("dhl")["domain"] is None
 
+    assert rulesmod.parse_filter("is:new")["new_only"] is True
+    assert rulesmod.parse_filter("dhl")["new_only"] is False
+
+
+def test_match_group_is_new():
+    f = rulesmod.parse_filter("is:new")
+    assert rulesmod.match_group(g(new=True), f, NOW)
+    assert not rulesmod.match_group(g(new=False), f, NOW)
+    assert not rulesmod.match_group(g(), f, NOW)   # missing key -> not new
+
 
 def test_match_group_from_and_domain_are_exact_not_substring():
     f = rulesmod.parse_filter("from:noreply@dhl.example")

@@ -59,7 +59,7 @@ def parse_filter(q: str) -> dict:
     out = {"text": [], "tags": [], "ai": None, "age_months": None,
            "unread_min": None, "unsub": False, "protected_only": False,
            "replied": None, "att_min": None, "unsubscribed": None,
-           "from_addr": None, "domain": None}
+           "from_addr": None, "domain": None, "new_only": False}
     for tok in (q or "").strip().lower().split():
         m = _QUAL_RE.match(tok)
         if not m:
@@ -91,6 +91,8 @@ def parse_filter(q: str) -> dict:
             out["unsubscribed"] = True
         elif kind == "is" and val == "not-unsubscribed":
             out["unsubscribed"] = False
+        elif kind == "is" and val == "new":
+            out["new_only"] = True
         elif kind == "att":
             a = _ATT_RE.match(val)
             if a:
@@ -124,6 +126,8 @@ def match_group(g: dict, f: dict, now: float | None = None) -> bool:
     if f["unsub"] and not g.get("unsub"):
         return False
     if f["protected_only"] and not g.get("protected"):
+        return False
+    if f["new_only"] and not g.get("new"):
         return False
     if f["replied"] is not None and bool(g.get("replied")) != f["replied"]:
         return False

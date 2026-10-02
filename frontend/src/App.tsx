@@ -38,9 +38,10 @@ const SORT_OPTIONS: { k: SortKey; label: string }[] = [
   { k: "label", label: "Sort: name" },
 ];
 
-// Quick-select presets, rendered as one-tap chips (same selectPreset()
-// logic as before - each chip ADDS matching groups to the selection,
-// it is not a toggle/filter).
+// Quick-select presets, rendered as one-tap chips: each ADDS matching
+// groups to the selection (it is not a toggle) AND narrows the filter
+// box to the same condition, so the selected handful isn't left
+// scattered across a long unfiltered list.
 const PRESET_CHIPS: { key: string; label: string }[] = [
   { key: "aisafe", label: "AI-safe groups" },
   { key: "older6", label: "Inactive > 6 months" },
@@ -82,6 +83,15 @@ export default function App() {
     localStorage.setItem("pmc_sort_dir", String(sortDir));
   }, [sortK, sortDir]);
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  // Which quick-select chip's 3-tap cycle (filter -> select -> clear,
+  // see selectPreset) is mid-way through, and at which step - tracked
+  // explicitly rather than derived from whether the matches HAPPEN to
+  // already be selected, which breaks the cycle the second time around
+  // (a prior activation - or an unrelated manual selection - can already
+  // satisfy "everything matching is selected", skipping straight to
+  // clearing without a true select step in between).
+  const [activeChip, setActiveChip] =
+    useState<{ key: string; step: "filtered" | "selected" } | null>(null);
   const [detail, setDetail] = useState<Group | null>(null);
   // Editing a saved filter preset: a dedicated query (NOT the main filter
   // box - that was confusing, see the chip row below) edited with the
@@ -266,16 +276,22 @@ export default function App() {
     return () => { cancelled = true; clearInterval(id); };
   }, [authOk]);
 
+  // Unfiltered: used by the quick-select chips below, which must always
+  // reflect the same full mailbox regardless of whatever filter is
+  // currently showing - otherwise filtering down to one chip's
+  // condition can make an UNRELATED chip disappear or change its count.
+  const allGroups = useMemo(() =>
+    Object.values(state?.groups?.[mode] ?? {}), [state, mode]);
+
   const groups = useMemo(() => {
-    const all = Object.values(state?.groups?.[mode] ?? {});
     const f = parseFilter(filter);
-    const filtered = all.filter((g) => matchGroup(g, f));
+    const filtered = allGroups.filter((g) => matchGroup(g, f));
     return filtered.sort((a, b) => {
       const va = sortValue(a, sortK), vb = sortValue(b, sortK);
       const cmp = va < vb ? -1 : va > vb ? 1 : 0;
       return cmp * sortDir || b.count - a.count;
     });
-  }, [state, mode, filter, sortK, sortDir]);
+  }, [allGroups, filter, sortK, sortDir]);
 
   // Block rules are visible, ordinary rules: a "block:<key>" query is
   // `from:<key>`/`domain:<key>` with origin "block" - derive which group
@@ -410,26 +426,63 @@ export default function App() {
     catch (e: any) { setToast(`Error: ${e.message ?? e}`); }
   };
 
-  // Selection presets never pick up protected groups - protecting a sender
-  // means "keep it out of every bulk sweep".
-  const selectPreset = (preset: string) => {
-    const next = new Set(selected);
-    if (preset === "none") next.clear();
-    else if (preset === "aisafe") {
-      groups.filter((g) => g.ai?.verdict === "delete_safe" && !g.protected)
-        .forEach((g) => next.add(g.key));
-    } else if (preset.startsWith("older")) {
+  // The filter-box DSL equivalent of each quick-select preset - the
+  // single source of truth for "what does this chip mean", used both to
+  // narrow the view (below) and, via matchGroup, to decide what counts
+  // as "matching" for selection. Keeps the two from drifting apart.
+  const presetFilterQuery = (preset: string): string => {
+    if (preset === "aisafe") return "ai:safe";
+    if (preset.startsWith("older")) {
       const months = Number(preset.slice(5));
-      const cutoff = new Date(Date.now() - months * 30.44 * 86400e3)
-        .toISOString().slice(0, 10);
-      groups.filter((g) => g.last && g.last < cutoff && !g.protected)
-        .forEach((g) => next.add(g.key));
-    } else if (preset === "unsub_pending") {
-      groups.filter((g) => g.unsub && g.unsubscribed?.status !== "done"
-          && !g.protected)
-        .forEach((g) => next.add(g.key));
+      return `age:>${months % 12 === 0 ? `${months / 12}y` : `${months}m`}`;
     }
-    setSelected(next);
+    if (preset === "unsub_pending") return "is:unsub is:not-unsubscribed";
+    if (preset === "new") return "is:new";
+    return "";
+  };
+
+  // Chips are NOT additive/combinable - each tap always reflects the
+  // full mailbox (allGroups), never "on top of" whatever another chip
+  // left behind. A combination needs a typed or saved filter instead.
+  // Each chip cycles through three VISUALLY DISTINCT taps:
+  //   1. not currently showing this chip's filter -> show it (view only,
+  //      selection untouched - lets you eyeball matches first)
+  //   2. showing it, but not everything matching is selected yet ->
+  //      select every match (except protected ones, same as always)
+  //   3. showing it AND everything matching already selected -> UN-select
+  //      exactly those matches and go back to the full, unfiltered list.
+  // Step 3 deliberately undoes step 2 (rather than leaving the selection
+  // as-is) so a second activation of the same chip starts from the same
+  // clean slate as the first - otherwise steps 1 and 2 look identical
+  // the second time around (the matches are already ticked from last
+  // time), and only step 3 produces a visible change.
+  const selectPreset = (preset: string) => {
+    if (preset === "none") { setSelected(new Set()); setActiveChip(null);
+      return; }
+    const query = presetFilterQuery(preset);
+    // Only trust a remembered step for THIS chip if the filter box still
+    // shows what that step left it in - a manual edit, a different chip,
+    // or an account/mode switch all fall back to step 1 automatically.
+    const isActive = activeChip?.key === preset && filter === query;
+    if (!isActive) {
+      setFilter(query);
+      setActiveChip({ key: preset, step: "filtered" });
+      return;
+    }
+    const f = parseFilter(query);
+    const matchingKeys = allGroups
+      .filter((g) => matchGroup(g, f) && !g.protected).map((g) => g.key);
+    const next = new Set(selected);
+    if (activeChip.step === "filtered") {
+      matchingKeys.forEach((k) => next.add(k));
+      setSelected(next);
+      setActiveChip({ key: preset, step: "selected" });
+    } else {
+      matchingKeys.forEach((k) => next.delete(k));
+      setSelected(next);
+      setFilter("");
+      setActiveChip(null);
+    }
   };
 
   // Saved filter presets: unlike selectPreset() above (which ADDS to the
@@ -920,13 +973,32 @@ export default function App() {
       <div className="mb-3 flex flex-wrap items-center gap-2">
         {PRESET_CHIPS.map((p) => (
           <button key={p.key}
-            className="shrink-0 rounded-full border border-line bg-panel2
-              px-3 py-1.5 text-xs whitespace-nowrap text-muted
-              hover:bg-chip hover:text-body"
+            className={`shrink-0 rounded-full border px-3 py-1.5 text-xs
+              whitespace-nowrap ${filter === presetFilterQuery(p.key)
+                ? "border-accent bg-accent text-white"
+                : "border-line bg-panel2 text-muted hover:bg-chip "
+                  + "hover:text-body"}`}
             onClick={() => selectPreset(p.key)}>
             {t(p.label)}
           </button>
         ))}
+        {/* New-sender review: only shown once there's something to review -
+            an always-visible "New (0)" chip would just be clutter. Count
+            and visibility come from the FULL mailbox (allGroups), not the
+            currently-filtered groups - otherwise another active chip's
+            filter could hide this one. */}
+        {allGroups.some((g) => g.new) && (
+          <button
+            className={`shrink-0 rounded-full border px-3 py-1.5 text-xs
+              whitespace-nowrap ${filter === "is:new"
+                ? "border-accent bg-accent text-white"
+                : "border-line bg-panel2 text-muted hover:bg-chip "
+                  + "hover:text-body"}`}
+            onClick={() => selectPreset("new")}>
+            {t("chip.new_count",
+              { n: allGroups.filter((g) => g.new).length })}
+          </button>
+        )}
         {/* Saved filter presets: user-defined, visually distinct (outlined
             accent vs. the built-ins' filled muted look above) - tapping one
             REPLACES the filter query instead of adding to the selection.

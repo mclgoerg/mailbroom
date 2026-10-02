@@ -24,6 +24,7 @@ from . import auditlog
 from . import auth as authmod
 from . import config as cfgmod
 from . import digest as digestmod
+from . import knownsenders
 from . import mailops
 from . import oauthflow
 from . import presets as presetsmod
@@ -1130,6 +1131,7 @@ def post_config(body: dict):
         unsubstore.drop_account(str(body["delete_account"]))
         presetsmod.drop_account(str(body["delete_account"]))
         digestmod.drop_account(str(body["delete_account"]))
+        knownsenders.drop_account(str(body["delete_account"]))
     if isinstance(body.get("rename_account"), dict):
         # The config rename succeeded - carry every per-account artifact
         # (runtime state, verdicts, unsubscribes, replied cache, stats,
@@ -1146,11 +1148,12 @@ def post_config(body: dict):
             rulesmod.rename_account(old, new)
             presetsmod.rename_account(old, new)
             digestmod.rename_account(old, new)
+            knownsenders.rename_account(old, new)
             auditlog.rename_account(old, new)
             logging.getLogger("pmc.mail").info(
                 "account renamed: %r -> %r (state, verdicts, unsubscribes, "
-                "replied, stats, rules, presets, digest, audit log "
-                "migrated)", old, new)
+                "replied, stats, rules, presets, digest, known senders, "
+                "audit log migrated)", old, new)
     return cfgmod.masked_config(cfg)
 
 
