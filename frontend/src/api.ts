@@ -169,6 +169,9 @@ export const api = {
   oauthDisconnect: (account: string) =>
     req<{ ok: boolean }>(
       `/api/oauth/imap/disconnect?account=${encodeURIComponent(account)}`, {}),
+  testDigest: (account: string) =>
+    req<{ sent: boolean; demo: boolean }>(
+      `/api/digest/test?account=${encodeURIComponent(account)}`, {}),
 };
 
 export { fmtSize, fmtUsd, mailKey } from "./lib";

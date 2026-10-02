@@ -7,6 +7,9 @@ import { afterEach, expect, test, vi } from "vitest";
 
 const foldersCalls: (string | undefined)[] = [];
 const saveCalls: any[] = [];
+const testDigestCalls: string[] = [];
+let testDigestResult: { sent: boolean; demo: boolean } =
+  { sent: true, demo: false };
 vi.mock("./api", () => ({
   api: {
     folders: (account?: string) => {
@@ -16,6 +19,10 @@ vi.mock("./api", () => ({
     saveConfig: (body: any) => {
       saveCalls.push(body);
       return new Promise(() => {});              // response irrelevant here
+    },
+    testDigest: (account: string) => {
+      testDigestCalls.push(account);
+      return Promise.resolve(testDigestResult);
     },
     adminStats: () => Promise.resolve({ tenants: [{
       id: "alice_x.example_ab12cd34", label: "", is_admin_workspace: false,
@@ -41,6 +48,7 @@ const acct = {
   user: "me@proton.example", password: "", password_set: true,
   cafile: "/certs/bridge-cert.pem", preset: "proton" as const,
   oauth: null,
+  digest: { schedule: "off" as const, recipient: "", hour: 8, minute: 0 },
 };
 const cfg: Config = {
   accounts: {
@@ -67,7 +75,11 @@ const cfg: Config = {
   ai_stats: { input_tokens: 0, output_tokens: 0, cost: 0, runs: 0 },
 };
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  testDigestCalls.length = 0;
+  testDigestResult = { sent: true, demo: false };
+});
 
 const presetSelect = () =>
   screen.getByLabelText(/Provider preset/) as HTMLSelectElement;
@@ -198,3 +210,68 @@ test("tab switches keep unsaved edits and Save persists every tab", () => {
   expect(saveCalls[0].imap.host).toBe("imap.new.example");
   expect(saveCalls[0].ai.model).toBe("claude-opus-5");
 });
+
+test("digest schedule + recipient + time are included in Save", () => {
+  saveCalls.length = 0;
+  render(<SettingsModal cfg={cfg} account="default" onClose={() => {}}
+    onSaved={() => {}} onAccountsChanged={() => {}} />);
+  fireEvent.change(screen.getByLabelText("Schedule"),
+    { target: { value: "weekly" } });
+  fireEvent.change(screen.getByLabelText("Recipient"),
+    { target: { value: "me@elsewhere.example" } });
+  fireEvent.change(screen.getByLabelText(/^Time/),
+    { target: { value: "20:30" } });
+  fireEvent.click(screen.getByText("Save"));
+  expect(saveCalls[0].imap.digest).toEqual(
+    { schedule: "weekly", recipient: "me@elsewhere.example",
+      hour: 20, minute: 30 });
+});
+
+test("the time field only appears once a schedule is picked", () => {
+  render(<SettingsModal cfg={cfg} account="default" onClose={() => {}}
+    onSaved={() => {}} onAccountsChanged={() => {}} />);
+  expect(screen.queryByLabelText(/^Time/)).toBeNull();
+  fireEvent.change(screen.getByLabelText("Schedule"),
+    { target: { value: "daily" } });
+  expect(screen.getByLabelText(/^Time/)).toBeTruthy();
+});
+
+test("switching the edited account reloads its own digest settings", () => {
+  render(<SettingsModal cfg={{
+    ...cfg,
+    accounts: { ...cfg.accounts,
+      icloud: { ...cfg.accounts.icloud,
+        digest: { schedule: "daily", recipient: "icloud@elsewhere.example",
+          hour: 20, minute: 15 } },
+    },
+  }} account="default" onClose={() => {}}
+    onSaved={() => {}} onAccountsChanged={() => {}} />);
+  expect((screen.getByLabelText("Schedule") as HTMLSelectElement).value)
+    .toBe("off");
+  fireEvent.change(
+    screen.getByLabelText(/Account to edit/) as HTMLSelectElement,
+    { target: { value: "icloud" } });
+  expect((screen.getByLabelText("Schedule") as HTMLSelectElement).value)
+    .toBe("daily");
+  expect((screen.getByLabelText("Recipient") as HTMLInputElement).value)
+    .toBe("icloud@elsewhere.example");
+  expect((screen.getByLabelText(/^Time/) as HTMLInputElement).value)
+    .toBe("20:15");
+});
+
+test("send test digest reports success", async () => {
+  render(<SettingsModal cfg={cfg} account="default" onClose={() => {}}
+    onSaved={() => {}} onAccountsChanged={() => {}} />);
+  fireEvent.click(screen.getByText("Send test digest"));
+  expect(testDigestCalls).toEqual(["default"]);
+  expect(await screen.findByText("Sent!")).toBeTruthy();
+});
+
+test("send test digest reports a demo send distinctly from a real one",
+  async () => {
+    testDigestResult = { sent: true, demo: true };
+    render(<SettingsModal cfg={cfg} account="default" onClose={() => {}}
+      onSaved={() => {}} onAccountsChanged={() => {}} />);
+    fireEvent.click(screen.getByText("Send test digest"));
+    expect(await screen.findByText(/preview with example data/)).toBeTruthy();
+  });

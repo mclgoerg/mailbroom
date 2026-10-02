@@ -23,6 +23,7 @@ from . import aihelper
 from . import auditlog
 from . import auth as authmod
 from . import config as cfgmod
+from . import digest as digestmod
 from . import mailops
 from . import oauthflow
 from . import presets as presetsmod
@@ -60,6 +61,7 @@ async def _lifespan(app: FastAPI):
                 mailops.load_snapshot(accountsmod.get(name))
     rulesmod.start_scheduler()
     presetsmod.publish()
+    digestmod.start_scheduler()
     yield
 
 app = FastAPI(title="mailbroom", docs_url=None, redoc_url=None,
@@ -642,6 +644,17 @@ def get_audit_export(account: str | None = Query(None)):
                  'attachment; filename="mailbroom-audit-log.csv"'})
 
 
+@app.post("/api/digest/test")
+def post_digest_test(account: str | None = Query(None)):
+    """'Send me one now' - verify the digest before enabling its
+    schedule. Never advances last_sent (see digest.send_digest)."""
+    acc = _acc(account)
+    try:
+        return digestmod.send_digest(acc.name, test=True)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc))
+
+
 class RuleBody(BaseModel):
     name: str = ""
     grouping: str = "sender"
@@ -1116,6 +1129,7 @@ def post_config(body: dict):
         mailops.drop_snapshot(str(body["delete_account"]))
         unsubstore.drop_account(str(body["delete_account"]))
         presetsmod.drop_account(str(body["delete_account"]))
+        digestmod.drop_account(str(body["delete_account"]))
     if isinstance(body.get("rename_account"), dict):
         # The config rename succeeded - carry every per-account artifact
         # (runtime state, verdicts, unsubscribes, replied cache, stats,
@@ -1131,11 +1145,12 @@ def post_config(body: dict):
             statsmod.rename_account(old, new)
             rulesmod.rename_account(old, new)
             presetsmod.rename_account(old, new)
+            digestmod.rename_account(old, new)
             auditlog.rename_account(old, new)
             logging.getLogger("pmc.mail").info(
                 "account renamed: %r -> %r (state, verdicts, unsubscribes, "
-                "replied, stats, rules, presets, audit log migrated)",
-                old, new)
+                "replied, stats, rules, presets, digest, audit log "
+                "migrated)", old, new)
     return cfgmod.masked_config(cfg)
 
 

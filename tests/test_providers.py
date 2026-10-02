@@ -5,7 +5,7 @@ STARTTLS connect and the separate SMTP host for unsubscribe mails."""
 from fastapi.testclient import TestClient
 
 from backend import config as cfgmod
-from backend import mailops, unsub
+from backend import mailops, smtpout, unsub
 from backend.main import app
 from conftest import FakeIMAP, make_msg, wait_delete_done
 
@@ -168,7 +168,7 @@ def test_unsub_smtp_host_override(monkeypatch):
         def quit(self):
             pass
 
-    monkeypatch.setattr(unsub.smtplib, "SMTP_SSL", FakeSMTP)
+    monkeypatch.setattr(smtpout.smtplib, "SMTP_SSL", FakeSMTP)
     unsub._send_mailto(
         {"host": "imap.gmail.example", "smtp_host": "smtp.gmail.example",
          "smtp_port": 465, "smtp_security": "ssl", "user": "u",
