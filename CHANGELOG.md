@@ -1,5 +1,25 @@
 # Changelog
 
+## [1.5.0](https://github.com/mclgoerg/mailbroom/compare/v1.4.0...v1.5.0) (2026-10-02)
+
+
+### Features
+
+* contextual bulk-action bar + quick-select chips, replacing the always-visible toolbar ([#53](https://github.com/mclgoerg/mailbroom/issues/53)) ([b87f340](https://github.com/mclgoerg/mailbroom/commit/b87f3401789acd5ae2e4b7d75b29aae9d6cfb29e))
+* daily or weekly activity digest email per account ([#60](https://github.com/mclgoerg/mailbroom/issues/60)) ([4695d4f](https://github.com/mclgoerg/mailbroom/commit/4695d4fe2e02f7d837f386b710f4a7b8f8a27d48))
+* flag first-time senders with an is:new filter and review chip ([#61](https://github.com/mclgoerg/mailbroom/issues/61)) ([faaf986](https://github.com/mclgoerg/mailbroom/commit/faaf98671e45b08cf38ad5acb6ba9800ef5ac012))
+* group rows drop inline Trash/Block/Protect for an avatar + tap-to-open-detail ([#52](https://github.com/mclgoerg/mailbroom/issues/52)) ([0fb70e9](https://github.com/mclgoerg/mailbroom/commit/0fb70e9fee77f62ba815e4927ff44dbb34e6fb8a))
+* redesign the group detail view's filter/selection toolbar ([#58](https://github.com/mclgoerg/mailbroom/issues/58)) ([762a5ed](https://github.com/mclgoerg/mailbroom/commit/762a5edb76d47a2ff6a1dd688a3ec8b0257e9797))
+* replace emoji icons with a lucide-react line-icon set ([#51](https://github.com/mclgoerg/mailbroom/issues/51)) ([4e4dd58](https://github.com/mclgoerg/mailbroom/commit/4e4dd5892865209c551f560a5f23284fc124fc72))
+* saved filter presets as one-tap chips ([#59](https://github.com/mclgoerg/mailbroom/issues/59)) ([4656b09](https://github.com/mclgoerg/mailbroom/commit/4656b09246cef98a791240e6c3324afb870029e9))
+* selection-scoped AI review and CSV export ([#54](https://github.com/mclgoerg/mailbroom/issues/54)) ([af6ae27](https://github.com/mclgoerg/mailbroom/commit/af6ae27f9ad0f216d3546b4cc257bf5786ffad6a))
+
+
+### Bug Fixes
+
+* disabled selects/inputs dim like disabled buttons ([#50](https://github.com/mclgoerg/mailbroom/issues/50)) ([a696247](https://github.com/mclgoerg/mailbroom/commit/a69624732dcc3b5ab33b612b226b4724803dbde1))
+* stop sort control from floating alone with a stray gap ([#57](https://github.com/mclgoerg/mailbroom/issues/57)) ([63c7ffa](https://github.com/mclgoerg/mailbroom/commit/63c7ffae9b5e5141715872e8d9481cd64638bc24))
+
 ## [1.4.0](https://github.com/mclgoerg/mailbroom/compare/v1.3.0...v1.4.0) (2026-10-01)
 
 
