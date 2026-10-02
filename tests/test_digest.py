@@ -39,17 +39,27 @@ def test_compose_aggregates_seeded_entries_and_respects_since_boundary():
     auditlog.record("rule_report", account="default", count=10)
     auditlog.record("rule_execute", account="default", count=3)
 
-    subject, body = digestmod.compose("default", 0)
+    subject, text, html = digestmod.compose("default", 0)
     assert "default" in subject
-    assert f"{digestmod.STRINGS['trash']}: 5" in body
-    assert f"{digestmod.STRINGS['archive']}: 2" in body
-    assert f"{digestmod.STRINGS['freed']}: 4.9 KB" in body
-    assert f"{digestmod.STRINGS['rule_report']}: 10" in body
-    assert f"{digestmod.STRINGS['rule_execute']}: 3" in body
-    assert f"{digestmod.STRINGS['unsubscribe_attempts']}: 3" in body
-    assert f"{digestmod.STRINGS['unsub_done']}: 1" in body
-    assert f"{digestmod.STRINGS['unsub_link']}: 1" in body
-    assert f"{digestmod.STRINGS['unsub_failed']}: 1" in body
+    for body in (text, html):
+        assert f"{digestmod.STRINGS['trash']}" in body and "5" in body
+        assert f"{digestmod.STRINGS['archive']}" in body
+        assert f"{digestmod.STRINGS['freed']}" in body and "4.9 KB" in body
+        assert f"{digestmod.STRINGS['rule_preview']}" in body
+        assert f"{digestmod.STRINGS['rule_applied']}" in body
+        assert f"{digestmod.STRINGS['unsubscribe_attempts']}" in body
+        assert "3" in body                   # unsub attempts count
+    assert f"{digestmod.STRINGS['trash']}: 5" in text
+    assert f"{digestmod.STRINGS['rule_preview']}: 10" in text
+    assert f"{digestmod.STRINGS['rule_applied']}: 3" in text
+    assert f"{digestmod.STRINGS['unsub_done']}: 1" in text
+    assert f"{digestmod.STRINGS['unsub_link']}: 1" in text
+    assert f"{digestmod.STRINGS['unsub_failed']}: 1" in text
+    # the HTML part is a real, non-trivial document (branded, no
+    # external assets) - not just the text thrown into a <pre>
+    assert "<!doctype html>" in html.lower()
+    assert "<img" not in html.lower() and "http://" not in html \
+        and "https://" not in html
 
 
 def test_compose_only_counts_entries_after_since_ts():
@@ -63,8 +73,8 @@ def test_compose_only_counts_entries_after_since_ts():
     entries[1]["ts"] = cutoff + 100         # new: after the cutoff
     auditlog._rewrite(auditlog._path(), [json.dumps(e) for e in entries])
 
-    subject, body = digestmod.compose("default", cutoff)
-    assert f"{digestmod.STRINGS['trash']}: 9" in body
+    subject, text, html = digestmod.compose("default", cutoff)
+    assert f"{digestmod.STRINGS['trash']}: 9" in text
 
 
 def test_compose_ignores_its_own_digest_sent_entries():
@@ -91,8 +101,8 @@ def test_send_digest_skips_when_nothing_happened(monkeypatch):
 def test_send_digest_sends_and_records_last_sent_and_audit(monkeypatch):
     calls = []
     monkeypatch.setattr(smtpout, "send",
-                        lambda im, to, subj, body, account_name=None:
-                        calls.append((to, subj, body)))
+                        lambda im, to, subj, text, html=None,
+                        account_name=None: calls.append((to, subj, text)))
     _configure_account(recipient="digest@elsewhere.example")
     auditlog.record("trash", account="default", count=1, size=100)
 
@@ -114,8 +124,8 @@ def test_send_digest_sends_and_records_last_sent_and_audit(monkeypatch):
 def test_send_digest_falls_back_to_the_accounts_own_address(monkeypatch):
     calls = []
     monkeypatch.setattr(smtpout, "send",
-                        lambda im, to, subj, body, account_name=None:
-                        calls.append(to))
+                        lambda im, to, subj, text, html=None,
+                        account_name=None: calls.append(to))
     _configure_account(user="me@x.example", recipient="")
     auditlog.record("trash", account="default", count=1, size=100)
     digestmod.send_digest("default")
@@ -211,8 +221,8 @@ def test_smtp_helper_is_shared_by_unsub_and_digest(monkeypatch):
     calls = []
     monkeypatch.setattr(
         smtpout, "send",
-        lambda im, to, subj, body, account_name=None:
-        calls.append((to, subj, body)))
+        lambda im, to, subj, text, html=None, account_name=None:
+        calls.append((to, subj, text, html)))
 
     im = {"user": "me@x.example", "host": "h", "smtp_host": "",
           "smtp_port": 465, "smtp_security": "ssl", "cafile": "",
@@ -220,12 +230,70 @@ def test_smtp_helper_is_shared_by_unsub_and_digest(monkeypatch):
     unsub._send_mailto(im, "mailto:unsub@shop.example?subject=stop&body=bye")
     assert calls[0][0] == "unsub@shop.example"
     assert calls[0][1] == "stop"
+    assert calls[0][3] is None               # unsub never sends HTML
     calls.clear()
 
     _configure_account(recipient="digest@elsewhere.example")
     auditlog.record("trash", account="default", count=1, size=100)
     digestmod.send_digest("default")
     assert calls[0][0] == "digest@elsewhere.example"
+
+
+def test_smtp_send_builds_multipart_alternative_when_html_given(monkeypatch):
+    import email
+
+    sent = {}
+
+    class FakeSMTP:
+        def __init__(self, *a, **k):
+            pass
+
+        def login(self, user, password):
+            pass
+
+        def sendmail(self, frm, to, msg):
+            sent["raw"] = msg
+
+        def quit(self):
+            pass
+
+    monkeypatch.setattr(smtpout.smtplib, "SMTP_SSL", FakeSMTP)
+    im = {"user": "me@x.example", "host": "h", "smtp_host": "",
+          "smtp_port": 465, "smtp_security": "ssl", "cafile": "",
+          "oauth": None, "password": "pw"}
+    smtpout.send(im, "you@x.example", "Subject line", "plain body",
+                 "<html><body>html body</body></html>")
+    parsed = email.message_from_bytes(sent["raw"])
+    assert parsed.is_multipart()
+    parts = {p.get_content_type(): p.get_payload(decode=True).decode()
+             for p in parsed.walk() if not p.is_multipart()}
+    assert parts["text/plain"].strip() == "plain body"
+    assert "html body" in parts["text/html"]
+
+
+def test_smtp_send_stays_plain_text_without_html(monkeypatch):
+    sent = {}
+
+    class FakeSMTP:
+        def __init__(self, *a, **k):
+            pass
+
+        def login(self, user, password):
+            pass
+
+        def sendmail(self, frm, to, msg):
+            sent["raw"] = msg
+
+        def quit(self):
+            pass
+
+    monkeypatch.setattr(smtpout.smtplib, "SMTP_SSL", FakeSMTP)
+    im = {"user": "me@x.example", "host": "h", "smtp_host": "",
+          "smtp_port": 465, "smtp_security": "ssl", "cafile": "",
+          "oauth": None, "password": "pw"}
+    smtpout.send(im, "you@x.example", "Subject line", "plain body")
+    assert b"plain body" in sent["raw"]
+    assert b"multipart" not in sent["raw"].lower()
 
 
 # --------------------------------------------------------- account lifecycle

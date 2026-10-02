@@ -9,6 +9,8 @@ from __future__ import annotations
 
 import smtplib
 import ssl
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
 
 from . import config as cfgmod
 
@@ -32,13 +34,26 @@ def _connect(im: dict) -> smtplib.SMTP:
         return smtp
 
 
-def send(im: dict, to_addr: str, subject: str, body: str,
+def send(im: dict, to_addr: str, subject: str, text_body: str,
+        html_body: str | None = None,
         account_name: str | None = None) -> None:
-    """Send one plain-text mail from the account's own address. Raises on
-    any failure (connect/auth/send) - callers decide how to report it."""
+    """Send one mail from the account's own address: plain text only, or
+    (when `html_body` is given) a multipart/alternative with both parts -
+    no external assets either way (images/fonts/tracking pixels would
+    leak to a third party on open). Raises on any failure (connect/auth/
+    send) - callers decide how to report it."""
     sender = im["user"]
-    msg = (f"From: {sender}\r\nTo: {to_addr}\r\nSubject: {subject}\r\n"
-           f"\r\n{body}\r\n")
+    if html_body is not None:
+        msg = MIMEMultipart("alternative")
+        msg["From"] = sender
+        msg["To"] = to_addr
+        msg["Subject"] = subject
+        msg.attach(MIMEText(text_body, "plain"))
+        msg.attach(MIMEText(html_body, "html"))
+        raw = msg.as_bytes()
+    else:
+        raw = (f"From: {sender}\r\nTo: {to_addr}\r\nSubject: {subject}\r\n"
+               f"\r\n{text_body}\r\n").encode()
     smtp = _connect(im)
     try:
         oauth = im.get("oauth")
@@ -51,7 +66,7 @@ def send(im: dict, to_addr: str, subject: str, body: str,
             smtp.auth("XOAUTH2", cb, initial_response_ok=True)
         else:
             smtp.login(im["user"], im["password"])
-        smtp.sendmail(sender, [to_addr], msg.encode())
+        smtp.sendmail(sender, [to_addr], raw)
     finally:
         try:
             smtp.quit()

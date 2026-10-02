@@ -100,7 +100,7 @@ def _send_mailto(im: dict, uri: str, account_name: str | None = None) -> None:
     params = dict(urllib.parse.parse_qsl(parsed.query))
     subject = params.get("subject", "unsubscribe")
     body = params.get("body", "unsubscribe")
-    smtpout.send(im, to_addr, subject, body, account_name)
+    smtpout.send(im, to_addr, subject, body, account_name=account_name)
 
 
 def unsubscribe_addr(im: dict, addr: str, header: str, one_click: bool,

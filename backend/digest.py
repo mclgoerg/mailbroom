@@ -1,10 +1,12 @@
 """Per-account daily/weekly activity digest email.
 
-A plain-text summary of what Mailbroom did for one account since its
-last digest: actions taken (from the audit log), mails/bytes freed,
-rule runs (incl. report-mode results awaiting review), and unsubscribe
-outcomes. Schedule + recipient live in the account's own config block
-(see config.DIGEST_SCHEDULES); `last_sent` is a small per-tenant file,
+A summary of what Mailbroom did for one account since its last digest:
+actions taken (from the audit log), mails/bytes freed, rule runs (incl.
+report-mode previews not yet applied), and unsubscribe outcomes. Sent
+as multipart/alternative (plain text + a lightly branded HTML part, no
+external assets - see smtpout.send) so it reads well in any client.
+Schedule + recipient live in the account's own config block (see
+config.DIGEST_SCHEDULES); `last_sent` is a small per-tenant file,
 following the same pattern as mailops.py's replied.json (per-account,
 atomic write).
 
@@ -43,30 +45,34 @@ _LOCK = threading.Lock()
 
 STRINGS = {
     "subject": "Mailbroom activity digest ({account})",
-    "since_header": "Activity for {account} since {since}:",
+    "heading": "Activity digest",
+    "since": "Since {since}",
     "since_ever": "the beginning",
     "trash": "Moved to Trash",
     "archive": "Archived",
     "move": "Moved to a folder",
     "mark_read": "Marked as read",
     "unsubscribe_attempts": "Unsubscribe attempts",
-    "rule_report": "Rule reports awaiting review",
-    "rule_execute": "Rule executions",
+    "rule_preview": "Rule previews (not yet applied)",
+    "rule_preview_note":
+        "\"Rule previews\" are mails a REPORT-mode rule matched - nothing "
+        "was moved. Open Rules in the app to review it and switch it to "
+        "Execute if it looks right.",
+    "rule_applied": "Rule actions (applied automatically)",
     "freed": "Space freed",
-    "unsub_header": "Unsubscribe outcomes:",
+    "unsub_header": "Unsubscribe outcomes",
     "unsub_done": "done",
     "unsub_link": "needs manual confirmation",
     "unsub_failed": "failed",
-    "footer": "-- \nSent by Mailbroom.",
+    "footer": "Sent by Mailbroom.",
 }
 
-# action -> (STRINGS key, whether to show the mail COUNT vs. just the
-# number of audit entries). trash/archive/move/mark_read/unsubscribe
-# entries carry a mail count; rule_report/rule_execute entries carry the
-# number of MAILS MATCHED by that run (see rules._record_run).
-_ACTION_ORDER = ("trash", "archive", "move", "mark_read",
-                 "rule_report", "rule_execute")
-
+# audit-log action -> STRINGS key, in the order they're shown.
+_ACTION_LABELS = (
+    ("trash", "trash"), ("archive", "archive"), ("move", "move"),
+    ("mark_read", "mark_read"), ("rule_report", "rule_preview"),
+    ("rule_execute", "rule_applied"),
+)
 
 def _fmt_bytes(n: int) -> str:
     size = float(n)
@@ -135,23 +141,17 @@ def due(account: str, schedule: str, now: float | None = None) -> bool:
     return (now or time.time()) - last_sent(account) >= period
 
 
-def compose(account: str, since_ts: int) -> tuple[str, str] | None:
-    """-> (subject, body), or None if nothing happened since `since_ts`
-    (callers must not send a mail in that case)."""
-    # auditlog's own digest-send records never count as "activity" - a
-    # digest send recording itself as activity would never run dry.
-    entries = [e for e in auditlog._load_all(account)
-               if e["ts"] > since_ts and e["action"] != "digest_sent"]
-    if not entries:
-        return None
-
+def _aggregate(entries: list[dict]) -> tuple[dict[str, int], int, int,
+                                             dict[str, int]]:
+    """-> (mail_counts by action, bytes freed, unsubscribe attempts,
+    unsubscribe outcomes by status)."""
     mail_counts: dict[str, int] = {}
     freed = 0
     unsub_outcomes = {"done": 0, "link": 0, "failed": 0}
     unsub_attempts = 0
     for e in entries:
         a = e["action"]
-        if a in _ACTION_ORDER:
+        if any(a == action for action, _ in _ACTION_LABELS):
             mail_counts[a] = mail_counts.get(a, 0) + e.get("count", 0)
         if a == "trash":
             freed += e.get("bytes", 0)
@@ -159,30 +159,171 @@ def compose(account: str, since_ts: int) -> tuple[str, str] | None:
             unsub_attempts += 1
             if e.get("outcome") in unsub_outcomes:
                 unsub_outcomes[e["outcome"]] += 1
+    return mail_counts, freed, unsub_attempts, unsub_outcomes
 
-    since_str = (time.strftime("%Y-%m-%d %H:%M", time.localtime(since_ts))
-                 if since_ts else STRINGS["since_ever"])
-    lines = [STRINGS["since_header"].format(account=account, since=since_str),
-             ""]
-    for action in _ACTION_ORDER:
-        if mail_counts.get(action):
-            lines.append(f"{STRINGS[action]}: {mail_counts[action]}")
+
+def _rows(mail_counts: dict[str, int], freed: int) -> list[tuple[str, str]]:
+    """-> [(label, value)] for every metric that actually happened."""
+    rows = [(STRINGS[label], str(mail_counts[action]))
+            for action, label in _ACTION_LABELS if mail_counts.get(action)]
     if freed:
-        lines.append(f"{STRINGS['freed']}: {_fmt_bytes(freed)}")
+        rows.append((STRINGS["freed"], _fmt_bytes(freed)))
+    return rows
+
+
+def _compose_text(account: str, since_str: str, rows: list[tuple[str, str]],
+                  mail_counts: dict[str, int], unsub_attempts: int,
+                  unsub_outcomes: dict[str, int]) -> str:
+    lines = [STRINGS["heading"], STRINGS["since"].format(since=since_str), ""]
+    for label, value in rows:
+        lines.append(f"{label}: {value}")
     if unsub_attempts:
-        lines.append(
-            f"{STRINGS['unsubscribe_attempts']}: {unsub_attempts}")
+        lines.append(f"{STRINGS['unsubscribe_attempts']}: {unsub_attempts}")
         lines.append("")
-        lines.append(STRINGS["unsub_header"])
+        lines.append(f"{STRINGS['unsub_header']}:")
         for status in ("done", "link", "failed"):
             if unsub_outcomes[status]:
                 lines.append(
                     f"  {STRINGS[f'unsub_{status}']}: {unsub_outcomes[status]}")
+    if mail_counts.get("rule_report"):
+        lines.append("")
+        lines.append(STRINGS["rule_preview_note"])
     lines.append("")
-    lines.append(STRINGS["footer"])
-    body = "\n".join(lines) + "\n"
+    lines.append(f"-- \n{STRINGS['footer']}")
+    return "\n".join(lines) + "\n"
+
+
+# Brand palette (frontend/src/index.css @theme, light then dark variant) -
+# email clients mostly default to light, so inline styles use the light
+# tokens; the <style> block's prefers-color-scheme swaps them for the
+# minority of clients that honour it. No external assets (images/fonts/
+# tracking pixels) either way.
+_LIGHT = {"surface": "#eee5d0", "panel": "#faf5e9", "panel2": "#f2ead7",
+          "line": "#dccfb2", "accent": "#96570a", "muted": "#6e5e45",
+          "body": "#2c2115"}
+_DARK = {"surface": "#171310", "panel": "#1f1913", "panel2": "#272017",
+         "line": "#372c1e", "accent": "#a16207", "muted": "#b5a68d",
+         "body": "#f0e8d8"}
+
+
+def _compose_html(account: str, since_str: str, rows: list[tuple[str, str]],
+                  mail_counts: dict[str, int], unsub_attempts: int,
+                  unsub_outcomes: dict[str, int]) -> str:
+    import html as htmlmod
+    esc = htmlmod.escape
+    row_html = "".join(
+        f'<tr class="mb-row" style="border-bottom:1px solid '
+        f'{_LIGHT["line"]};">'
+        f'<td class="mb-row-label" style="padding:6px 0;font-size:14px;'
+        f'color:{_LIGHT["muted"]};">{esc(label)}</td>'
+        f'<td class="mb-row-value" style="padding:6px 0;font-size:14px;'
+        f'font-weight:600;color:{_LIGHT["body"]};text-align:right;">'
+        f'{esc(value)}</td></tr>'
+        for label, value in rows)
+    unsub_html = ""
+    if unsub_attempts:
+        outcome_items = "".join(
+            f'<li>{esc(STRINGS[f"unsub_{status}"])}: {unsub_outcomes[status]}'
+            f'</li>'
+            for status in ("done", "link", "failed") if unsub_outcomes[status])
+        unsub_html = f"""
+        <p class="mb-sub-strong" style="margin:16px 0 4px;font-size:14px;
+          color:{_LIGHT["body"]};">
+          <strong>{esc(STRINGS["unsubscribe_attempts"])}:</strong>
+          {unsub_attempts}
+        </p>
+        <ul class="mb-sub-list" style="margin:4px 0 0;padding-left:20px;
+          font-size:13px;color:{_LIGHT["muted"]};">{outcome_items}</ul>"""
+    note_html = ""
+    if mail_counts.get("rule_report"):
+        note_html = (f'<p class="mb-note" style="margin:16px 0 0;'
+                     f'font-size:12px;color:{_LIGHT["muted"]};">'
+                     f'{esc(STRINGS["rule_preview_note"])}</p>')
+    return f"""<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  @media (prefers-color-scheme: dark) {{
+    .mb-page {{ background:{_DARK["surface"]} !important; }}
+    .mb-card {{ background:{_DARK["panel"]} !important;
+      border-color:{_DARK["line"]} !important; }}
+    .mb-header {{ border-color:{_DARK["line"]} !important; }}
+    .mb-footer {{ background:{_DARK["panel2"]} !important;
+      color:{_DARK["muted"]} !important; }}
+    .mb-eyebrow, .mb-since {{ color:{_DARK["muted"]} !important; }}
+    .mb-title {{ color:{_DARK["body"]} !important; }}
+    .mb-row-label, .mb-note, .mb-sub-list {{
+      color:{_DARK["muted"]} !important; }}
+    .mb-row-value, .mb-sub-strong {{ color:{_DARK["body"]} !important; }}
+    .mb-row {{ border-color:{_DARK["line"]} !important; }}
+  }}
+</style>
+</head>
+<body class="mb-page" style="margin:0;padding:0;background:{_LIGHT["surface"]};
+  font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,
+  Arial,sans-serif;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+    <tr><td align="center" style="padding:24px 12px;">
+      <table role="presentation" width="480" cellpadding="0" cellspacing="0"
+        class="mb-card" style="width:480px;max-width:100%;
+        background:{_LIGHT["panel"]};border:1px solid {_LIGHT["line"]};
+        border-radius:12px;overflow:hidden;">
+        <tr><td class="mb-header" style="padding:20px 24px;
+          border-bottom:1px solid {_LIGHT["line"]};">
+          <div class="mb-eyebrow" style="font-size:12px;letter-spacing:.04em;
+            text-transform:uppercase;color:{_LIGHT["muted"]};">
+            Mailbroom &middot; {esc(account)}
+          </div>
+          <div class="mb-title" style="font-size:18px;font-weight:600;
+            color:{_LIGHT["body"]};margin-top:2px;">
+            {esc(STRINGS["heading"])}
+          </div>
+          <div class="mb-since" style="font-size:13px;color:{_LIGHT["muted"]};
+            margin-top:2px;">
+            {esc(STRINGS["since"].format(since=since_str))}
+          </div>
+        </td></tr>
+        <tr><td style="padding:8px 24px 20px;">
+          <table role="presentation" width="100%" cellpadding="0"
+            cellspacing="0">{row_html}</table>
+          {unsub_html}
+          {note_html}
+        </td></tr>
+        <tr><td class="mb-footer" style="padding:14px 24px;
+          background:{_LIGHT["panel2"]};font-size:12px;
+          color:{_LIGHT["muted"]};">
+          {esc(STRINGS["footer"])}
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>
+"""
+
+
+def compose(account: str, since_ts: int) -> tuple[str, str, str] | None:
+    """-> (subject, text_body, html_body), or None if nothing happened
+    since `since_ts` (callers must not send a mail in that case)."""
+    # auditlog's own digest-send records never count as "activity" - a
+    # digest send recording itself as activity would never run dry.
+    entries = [e for e in auditlog._load_all(account)
+               if e["ts"] > since_ts and e["action"] != "digest_sent"]
+    if not entries:
+        return None
+
+    mail_counts, freed, unsub_attempts, unsub_outcomes = _aggregate(entries)
+    rows = _rows(mail_counts, freed)
+    since_str = (time.strftime("%Y-%m-%d %H:%M", time.localtime(since_ts))
+                 if since_ts else STRINGS["since_ever"])
     subject = STRINGS["subject"].format(account=account)
-    return subject, body
+    text = _compose_text(account, since_str, rows, mail_counts,
+                         unsub_attempts, unsub_outcomes)
+    html = _compose_html(account, since_str, rows, mail_counts,
+                        unsub_attempts, unsub_outcomes)
+    return subject, text, html
 
 
 def send_digest(account: str, test: bool = False) -> dict:
@@ -204,8 +345,9 @@ def send_digest(account: str, test: bool = False) -> dict:
     composed = compose(account, last_sent(account))
     if composed is None:
         return {"sent": False}
-    subject, body = composed
-    smtpout.send(block, recipient, subject, body, account)
+    subject, text, html = composed
+    smtpout.send(block, recipient, subject, text, html,
+                account_name=account)
     now = int(time.time())
     if not test:
         _record_sent(account, now)

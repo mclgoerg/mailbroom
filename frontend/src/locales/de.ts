@@ -576,12 +576,12 @@ export const DE: Record<string, string> = {
   "digest.recipient": "Empfänger",
   "digest.recipient_placeholder": "eigene Adresse dieses Kontos",
   "digest.help":
-    "Eine reine Textzusammenfassung dessen, was Mailbroom für dieses "
-    + "Konto seit der letzten Übersicht getan hat - durchgeführte "
-    + "Aktionen, freigewordene Mails/Speicherplatz, Regelläufe "
-    + "(einschließlich Berichts-Ergebnissen, die noch zu prüfen sind) "
-    + "und Abbestell-Ergebnisse. Entfällt komplett, wenn nichts "
-    + "passiert ist.",
+    "Eine Zusammenfassung dessen, was Mailbroom für dieses Konto seit "
+    + "der letzten Übersicht getan hat - durchgeführte Aktionen, "
+    + "freigewordene Mails/Speicherplatz, Regel-Vorschauen (Treffer von "
+    + "Regeln, die noch im Berichtsmodus laufen, also noch nicht "
+    + "angewendet wurden) und Abbestell-Ergebnisse. Entfällt komplett, "
+    + "wenn nichts passiert ist.",
   "digest.send_test": "Test-Übersicht senden",
   "digest.test_sent": "Gesendet!",
   "digest.test_nothing":
