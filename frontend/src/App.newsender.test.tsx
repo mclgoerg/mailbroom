@@ -35,6 +35,8 @@ const acct = {
   user: "", password: "", password_set: true,
   cafile: "", preset: "custom" as const, oauth: null,
   digest: { schedule: "off" as const, recipient: "", hour: 8, minute: 0 },
+  auto_scan: { enabled: false, unit: "hours" as const, value: 6,
+    align_minute: 0 },
 };
 
 const cfg: Config = {

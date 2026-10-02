@@ -4,8 +4,9 @@ import { useEffect, useState } from "react";
 import { api, downloadFile, fmtUsd } from "../api";
 import { getLang, setLang, t, type Lang } from "../i18n";
 import { fmtAgo, fmtSize } from "../lib";
-import type { AdminTenantStats, AuthMode, Config, DigestSchedule,
-  FoldersResp, OauthProvider, Preset, Security, SmtpSecurity } from "../types";
+import type { AdminTenantStats, AuthMode, AutoScanUnit, Config,
+  DigestSchedule, FoldersResp, OauthProvider, Preset, Security,
+  SmtpSecurity } from "../types";
 import { Button, Field, Input, Loading, Modal, PanelHeader,
   SectionLabel, Select, Spinner, TextArea } from "./ui";
 
@@ -90,6 +91,10 @@ export function SettingsModal({ cfg, account, onClose, onSaved,
       digestRecipient: im.digest?.recipient ?? "",
       digestTime: `${String(im.digest?.hour ?? 8).padStart(2, "0")}:`
         + `${String(im.digest?.minute ?? 0).padStart(2, "0")}`,
+      autoScanEnabled: im.auto_scan?.enabled ?? false,
+      autoScanUnit: (im.auto_scan?.unit ?? "hours") as AutoScanUnit,
+      autoScanValue: String(im.auto_scan?.value ?? 6),
+      autoScanAlign: String(im.auto_scan?.align_minute ?? 0),
     };
   };
   const [f, setF] = useState({
@@ -236,6 +241,9 @@ export function SettingsModal({ cfg, account, onClose, onSaved,
           digest: { schedule: f.digestSchedule,
             recipient: f.digestRecipient,
             hour: digestHour || 0, minute: digestMinute || 0 },
+          auto_scan: { enabled: f.autoScanEnabled, unit: f.autoScanUnit,
+            value: +f.autoScanValue || 1,
+            align_minute: +f.autoScanAlign || 0 },
           ...(f.password ? { password: f.password } : {}),
           ...(oauthProvider ? { oauth: { provider: oauthProvider,
             client_id: f.oauthClientId,
@@ -759,6 +767,43 @@ export function SettingsModal({ cfg, account, onClose, onSaved,
               <span className="text-xs text-muted">{digestTestMsg}</span>
             )}
           </div>
+        </div>
+
+        <div className="sm:col-span-2 rounded-md border border-line
+          bg-panel2 p-3">
+          <SectionLabel className="mb-2">{t("auto_scan.title")}</SectionLabel>
+          <div className="grid gap-3 sm:grid-cols-3">
+            <Field label={t("auto_scan.enabled")}>
+              <Select className="w-full"
+                value={f.autoScanEnabled ? "on" : "off"}
+                onChange={(e) => setF({ ...f,
+                  autoScanEnabled: e.target.value === "on" })}>
+                <option value="off">{t("digest.off")}</option>
+                <option value="on">{t("auto_scan.on")}</option>
+              </Select>
+            </Field>
+            {f.autoScanEnabled && (<>
+              <Field label={t("auto_scan.every")}>
+                <div className="flex gap-2">
+                  <Input className="w-full" type="number" min={1}
+                    max={f.autoScanUnit === "hours" ? 24 : 1440}
+                    value={f.autoScanValue} onChange={set("autoScanValue")} />
+                  <Select value={f.autoScanUnit}
+                    onChange={set("autoScanUnit")}>
+                    <option value="minutes">
+                      {t("auto_scan.unit_minutes")}
+                    </option>
+                    <option value="hours">{t("auto_scan.unit_hours")}</option>
+                  </Select>
+                </div>
+              </Field>
+              <Field label={t("auto_scan.align")}>
+                <Input className="w-full" type="number" min={0} max={59}
+                  value={f.autoScanAlign} onChange={set("autoScanAlign")} />
+              </Field>
+            </>)}
+          </div>
+          <p className="mt-1 text-xs text-muted">{t("auto_scan.help")}</p>
         </div>
         </>)}
 

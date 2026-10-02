@@ -148,6 +148,21 @@ export const EN: Record<string, string> = {
   "digest.test_sent_demo":
     "Sent a preview with example data (there's nothing real to report "
     + "yet) - it won't count as a real digest.",
+  "auto_scan.title": "Automatic scanning",
+  "auto_scan.enabled": "Enabled",
+  "auto_scan.on": "On",
+  "auto_scan.every": "Every",
+  "auto_scan.unit_minutes": "minutes",
+  "auto_scan.unit_hours": "hours",
+  "auto_scan.align": "Start at minute (0-59)",
+  "auto_scan.help":
+    "Rescans this account on a timer, independent of any rule schedule - "
+    + "keeps the New-sender flag and the activity digest fresh without "
+    + "needing the app open. \"Start at minute\" aligns the cadence to a "
+    + "clock boundary (e.g. every 3 hours at minute 10 fires at 00:10, "
+    + "03:10, 06:10, ...) instead of drifting from whenever this was saved. "
+    + "Skipped automatically while the account is busy with something "
+    + "else; it just retries on the next tick.",
   "note.ai_selected": "{note} - selected {n}/{of}",
   "note.ai_truncated": " (first {n} mails only)",
   "note.background": "{verb} - running in the background…",

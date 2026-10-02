@@ -13,6 +13,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from backend import accounts as accountsmod   # noqa: E402
 from backend import auditlog as auditlogmod   # noqa: E402
 from backend import auth as authmod            # noqa: E402
+from backend import autoscan as autoscanmod   # noqa: E402
 from backend import config as cfgmod          # noqa: E402
 from backend import digest as digestmod       # noqa: E402
 from backend import knownsenders              # noqa: E402
@@ -50,6 +51,8 @@ def isolate(tmp_path, monkeypatch):
     monkeypatch.setattr(auditlogmod, "AUDIT_PATH",
                         tmp_path / "audit_log.jsonl")
     monkeypatch.setattr(digestmod, "DIGEST_PATH", tmp_path / "digest.json")
+    monkeypatch.setattr(autoscanmod, "AUTOSCAN_PATH",
+                        tmp_path / "autoscan.json")
     monkeypatch.setattr(knownsenders, "KNOWN_SENDERS_PATH",
                         tmp_path / "known_senders.json")
     verdictstore._mails_cache.clear()
