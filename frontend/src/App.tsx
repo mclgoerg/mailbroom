@@ -450,14 +450,15 @@ export default function App() {
     }
   };
 
-  // Updates a preset to the CURRENT filter box content under a (possibly
-  // renamed) name - the usual flow is: tap the chip to load it, tweak the
-  // filter, then edit the same chip instead of saving a near-duplicate.
+  // Edits the preset's own stored query directly (prefilled in the
+  // prompt) - NOT whatever happens to be in the filter box right now,
+  // which read as "silently overwrites" rather than "edit". The name is
+  // left as-is; renaming isn't this action's job.
   const editFilterPreset = async (preset: FilterPreset) => {
-    const name = prompt(t("saved_filter.name_prompt"), preset.name)?.trim();
-    if (!name) return;
+    const query = prompt(t("saved_filter.edit_query_prompt"), preset.query);
+    if (query == null) return;
     try {
-      await api.updatePreset(preset.id, name, filter);
+      await api.updatePreset(preset.id, preset.name, query.trim());
       refresh();
     } catch (e: any) {
       setToast(`Error: ${e.message ?? e}`);
@@ -926,9 +927,9 @@ export default function App() {
         {/* Saved filter presets: user-defined, visually distinct (outlined
             accent vs. the built-ins' filled muted look above) - tapping one
             REPLACES the filter query instead of adding to the selection.
-            The pencil updates it to the current filter box content (edit
-            an existing preset instead of saving a near-duplicate); the x
-            deletes it - no separate manage mode, nothing else to
+            The pencil edits the preset's OWN stored query directly (via a
+            prompt prefilled with it), not whatever's in the filter box;
+            the x deletes it - no separate manage mode, nothing else to
             configure per preset. */}
         {(state?.presets ?? []).map((p) => (
           <span key={p.id}

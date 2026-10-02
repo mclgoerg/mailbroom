@@ -174,9 +174,10 @@ test("declining the save name prompt never calls api.createPreset",
     promptSpy.mockRestore();
   });
 
-test("editing a preset prompts prefilled with its name and updates it " +
-  "to the current filter box content", async () => {
-  const promptSpy = vi.spyOn(window, "prompt").mockReturnValue("Old DHL v2");
+test("editing a preset prompts prefilled with ITS OWN query (not " +
+  "whatever's in the filter box) and keeps its name", async () => {
+  const promptSpy = vi.spyOn(window, "prompt")
+    .mockReturnValue("from:dhl age:>2y");
   localStorage.setItem("pmc_account", "proton");
   state = { ...baseState, presets: [
     { id: "p1", name: "Old DHL", query: "from:dhl age:>1y",
@@ -184,19 +185,20 @@ test("editing a preset prompts prefilled with its name and updates it " +
   render(<App />);
   await waitFor(() => expect(screen.getByText("Old DHL")).toBeTruthy());
 
+  // Unrelated text sitting in the filter box must NOT leak into the edit.
   const filterInput = screen.getByPlaceholderText(
     "filter groups…") as HTMLInputElement;
-  fireEvent.change(filterInput, { target: { value: "from:dhl age:>2y" } });
+  fireEvent.change(filterInput, { target: { value: "something unrelated" } });
 
   fireEvent.click(screen.getByLabelText("Edit"));
   expect(promptSpy).toHaveBeenCalledWith(
-    expect.any(String), "Old DHL");
+    expect.any(String), "from:dhl age:>1y");
   await waitFor(() => expect(updatePreset).toHaveBeenCalledWith(
-    "p1", "Old DHL v2", "from:dhl age:>2y"));
+    "p1", "Old DHL", "from:dhl age:>2y"));
   promptSpy.mockRestore();
 });
 
-test("declining the edit name prompt never calls api.updatePreset",
+test("declining the edit query prompt never calls api.updatePreset",
   async () => {
     const promptSpy = vi.spyOn(window, "prompt").mockReturnValue(null);
     localStorage.setItem("pmc_account", "proton");
