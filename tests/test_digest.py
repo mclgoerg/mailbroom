@@ -1,8 +1,10 @@
 """Activity digest email: composition from seeded audit entries, period
-boundary via last_sent, empty-period skip, the /test endpoint, scheduler
-due-logic, the shared SMTP helper (used by both digest and unsubscribe),
+boundary via last_sent, empty-period skip, the /test endpoint (incl. its
+demo-data fallback), scheduler due-logic (incl. the configurable time of
+day), the shared SMTP helper (used by both digest and unsubscribe),
 tenant/account separation, and config persistence."""
 
+import datetime
 import json
 import time
 
@@ -11,6 +13,7 @@ from fastapi.testclient import TestClient
 from backend import auditlog
 from backend import config as cfgmod
 from backend import digest as digestmod
+from backend import rules as rulesmod
 from backend import smtpout
 from backend import tenants
 from backend import unsub
@@ -28,6 +31,7 @@ def _configure_account(user="me@x.example", schedule="off", recipient=""):
 # -------------------------------------------------------------- composition
 
 def test_compose_aggregates_seeded_entries_and_respects_since_boundary():
+    rule = rulesmod.create_rule({"name": "r", "query": "x"})
     auditlog.record("trash", account="default", count=5, size=5000)
     auditlog.record("archive", account="default", count=2)
     auditlog.record("unsubscribe", account="default", count=1,
@@ -36,8 +40,10 @@ def test_compose_aggregates_seeded_entries_and_respects_since_boundary():
                     label="b@x.example", outcome="link")
     auditlog.record("unsubscribe", account="default", count=1,
                     label="c@x.example", outcome="failed")
-    auditlog.record("rule_report", account="default", count=10)
-    auditlog.record("rule_execute", account="default", count=3)
+    auditlog.record("rule_report", actor=f"rule:{rule['id']}",
+                    account="default", count=10)
+    auditlog.record("rule_execute", actor=f"rule:{rule['id']}",
+                    account="default", count=3)
 
     subject, text, html = digestmod.compose("default", 0)
     assert "default" in subject
@@ -60,6 +66,27 @@ def test_compose_aggregates_seeded_entries_and_respects_since_boundary():
     assert "<!doctype html>" in html.lower()
     assert "<img" not in html.lower() and "http://" not in html \
         and "https://" not in html
+
+
+def test_compose_ignores_runs_of_a_since_deleted_rule():
+    """A deleted rule's past report/execute runs stay in the (append-
+    only) audit log, but the digest's "open Rules and review it" isn't
+    actionable for a rule that's gone - those entries must not show up
+    or count towards anything."""
+    rule = rulesmod.create_rule({"name": "temp", "query": "x"})
+    auditlog.record("rule_report", actor=f"rule:{rule['id']}",
+                    account="default", count=7)
+    rulesmod.delete_rule(rule["id"])
+    # that was the ONLY activity in the period -> nothing to send
+    assert digestmod.compose("default", 0) is None
+
+    # mixed with real activity: the phantom rule line is dropped, the
+    # rest of the digest still goes out normally
+    auditlog.record("trash", account="default", count=2, size=200)
+    subject, text, html = digestmod.compose("default", 0)
+    assert digestmod.STRINGS["rule_preview"] not in text
+    assert digestmod.STRINGS["rule_preview_note"] not in text
+    assert f"{digestmod.STRINGS['trash']}: 2" in text
 
 
 def test_compose_only_counts_entries_after_since_ts():
@@ -94,7 +121,7 @@ def test_send_digest_skips_when_nothing_happened(monkeypatch):
     monkeypatch.setattr(smtpout, "send",
                         lambda *a, **k: calls.append((a, k)))
     _configure_account()
-    assert digestmod.send_digest("default") == {"sent": False}
+    assert digestmod.send_digest("default") == {"sent": False, "demo": False}
     assert not calls
 
 
@@ -108,7 +135,7 @@ def test_send_digest_sends_and_records_last_sent_and_audit(monkeypatch):
 
     before = int(time.time())
     result = digestmod.send_digest("default")
-    assert result == {"sent": True}
+    assert result == {"sent": True, "demo": False}
     assert calls[0][0] == "digest@elsewhere.example"
     assert digestmod.last_sent("default") >= before
 
@@ -148,30 +175,34 @@ def test_test_send_never_advances_last_sent(monkeypatch):
     _configure_account(recipient="digest@elsewhere.example")
     auditlog.record("trash", account="default", count=1, size=100)
 
-    assert digestmod.send_digest("default", test=True) == {"sent": True}
+    assert digestmod.send_digest("default", test=True) == \
+        {"sent": True, "demo": False}
     assert digestmod.last_sent("default") == 0     # untouched
 
     # a REAL digest afterwards still sees the same (full) period
-    assert digestmod.send_digest("default") == {"sent": True}
+    assert digestmod.send_digest("default") == {"sent": True, "demo": False}
     assert digestmod.last_sent("default") > 0
 
 
 # --------------------------------------------------------------- /api/test
 
-def test_api_digest_test_endpoint(monkeypatch):
+def test_api_digest_test_endpoint_sends_a_demo_when_nothing_real_happened(
+        monkeypatch):
     calls = []
     monkeypatch.setattr(smtpout, "send",
                         lambda *a, **k: calls.append(a))
     _configure_account(recipient="digest@elsewhere.example")
     r = client.post("/api/digest/test")
     assert r.status_code == 200
-    assert r.json() == {"sent": False}        # nothing happened yet
-    assert not calls
+    assert r.json() == {"sent": True, "demo": True}
+    assert calls
+    assert digestmod.last_sent("default") == 0      # demo never counts
 
     auditlog.record("trash", account="default", count=1, size=100)
+    calls.clear()
     r = client.post("/api/digest/test")
     assert r.status_code == 200
-    assert r.json() == {"sent": True}
+    assert r.json() == {"sent": True, "demo": False}
     assert calls
 
 
@@ -181,16 +212,35 @@ def test_api_digest_test_unknown_account_404():
 
 # ------------------------------------------------------------ due logic
 
+def _ts(*dt_args) -> int:
+    return int(datetime.datetime(*dt_args).timestamp())
+
+
 def test_due_logic():
-    now = time.time()
-    assert not digestmod.due("acct", "off", now)
-    # due() reads last_sent() from disk - seed it directly.
-    digestmod._record_sent("acct", int(now) - 25 * 3600)
-    assert digestmod.due("acct", "daily", now)
-    assert not digestmod.due("acct", "weekly", now)
-    digestmod._record_sent("acct", int(now) - 8 * 86400)
-    assert digestmod.due("acct", "weekly", now)
-    assert digestmod.due("new-acct", "daily", now)   # never sent -> due
+    # due() reads last_sent() from disk - seed it directly. All times
+    # below are deterministic (no dependency on the real wall clock).
+    assert not digestmod.due("acct", "off", now=_ts(2026, 1, 2, 8, 0))
+    assert digestmod.due("new-acct", "daily", now=_ts(2026, 1, 1, 0, 0))
+
+    digestmod._record_sent("acct", _ts(2026, 1, 1, 8, 0))
+    # daily at the default 08:00: due once Jan 2 08:00 arrives, not before
+    assert not digestmod.due("acct", "daily", now=_ts(2026, 1, 2, 7, 59))
+    assert digestmod.due("acct", "daily", now=_ts(2026, 1, 2, 8, 0))
+    # the same last_sent is nowhere near due weekly yet
+    assert not digestmod.due("acct", "weekly", now=_ts(2026, 1, 2, 8, 0))
+    assert digestmod.due("acct", "weekly", now=_ts(2026, 1, 8, 8, 0))
+
+
+def test_due_logic_respects_a_configured_time_of_day():
+    digestmod._record_sent("acct", _ts(2026, 1, 1, 8, 0))
+    # configured for 20:30: still not due earlier the same next day...
+    assert not digestmod.due("acct", "daily", hour=20, minute=30,
+                             now=_ts(2026, 1, 2, 20, 0))
+    # ...but is right at (and after) that time
+    assert digestmod.due("acct", "daily", hour=20, minute=30,
+                         now=_ts(2026, 1, 2, 20, 30))
+    assert digestmod.due("acct", "daily", hour=20, minute=30,
+                         now=_ts(2026, 1, 2, 23, 0))
 
 
 def test_tick_sends_due_digests_and_skips_busy_accounts(monkeypatch):
@@ -206,8 +256,10 @@ def test_tick_sends_due_digests_and_skips_busy_accounts(monkeypatch):
     calls.clear()
     from backend import accounts as accountsmod
     auditlog.record("trash", account="default", count=1, size=100)
-    # force it due again, then mark the account busy
-    digestmod._record_sent("default", int(time.time()) - 25 * 3600)
+    # force it due again (0 = "never sent", always due regardless of
+    # the configured time of day - keeps this deterministic), then mark
+    # the account busy
+    digestmod._record_sent("default", 0)
     acc = accountsmod.get("default")
     with acc.lock:
         acc.state["status"] = "scanning"
@@ -321,10 +373,13 @@ def test_delete_account_drops_its_last_sent(monkeypatch):
 def test_digest_settings_persist_through_config_api():
     r = client.post("/api/config", json={"account": "default", "imap": {
         "host": "h", "digest": {"schedule": "weekly",
-                                "recipient": "me@elsewhere.example"}}})
+                                "recipient": "me@elsewhere.example",
+                                "hour": 20, "minute": 30}}})
     assert r.status_code == 200
     saved = r.json()["accounts"]["default"]["digest"]
-    assert saved == {"schedule": "weekly", "recipient": "me@elsewhere.example"}
+    assert saved == {"schedule": "weekly",
+                     "recipient": "me@elsewhere.example",
+                     "hour": 20, "minute": 30}
 
     # invalid schedule is silently rejected, not stored
     r = client.post("/api/config", json={"account": "default", "imap": {
@@ -332,12 +387,24 @@ def test_digest_settings_persist_through_config_api():
     assert r.json()["accounts"]["default"]["digest"]["schedule"] == "weekly"
 
 
+def test_digest_hour_and_minute_are_clamped_to_valid_ranges():
+    r = client.post("/api/config", json={"account": "default", "imap": {
+        "digest": {"hour": 99, "minute": -5}}})
+    saved = r.json()["accounts"]["default"]["digest"]
+    assert saved["hour"] == 23 and saved["minute"] == 0
+
+    r = client.post("/api/config", json={"account": "default", "imap": {
+        "digest": {"hour": "nope", "minute": "nope"}}})
+    saved = r.json()["accounts"]["default"]["digest"]
+    assert saved["hour"] == 23 and saved["minute"] == 0   # unchanged, not 0
+
+
 def test_digest_defaults_to_off_for_a_pre_digest_saved_config():
     cfgmod.CONFIG_PATH.write_text(json.dumps({"accounts": {
         "default": {"host": "h", "user": "u", "password": "pw"}}}))
     cfg = cfgmod.load_config()
     assert cfg["accounts"]["default"]["digest"] == \
-        {"schedule": "off", "recipient": ""}
+        {"schedule": "off", "recipient": "", "hour": 8, "minute": 0}
 
 
 # ------------------------------------------------------------ tenant isolation

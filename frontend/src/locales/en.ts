@@ -135,6 +135,7 @@ export const EN: Record<string, string> = {
   "digest.off": "Off",
   "digest.recipient": "Recipient",
   "digest.recipient_placeholder": "this account's own address",
+  "digest.time": "Time",
   "digest.help":
     "A summary of what Mailbroom did for this account since the last "
     + "digest - actions taken, mails/bytes freed, rule previews (matches "
@@ -142,9 +143,9 @@ export const EN: Record<string, string> = {
     + "unsubscribe outcomes. Skipped entirely when nothing happened.",
   "digest.send_test": "Send test digest",
   "digest.test_sent": "Sent!",
-  "digest.test_nothing":
-    "Nothing to report since the last digest - try again after some "
-    + "activity.",
+  "digest.test_sent_demo":
+    "Sent a preview with example data (there's nothing real to report "
+    + "yet) - it won't count as a real digest.",
   "note.ai_selected": "{note} - selected {n}/{of}",
   "note.ai_truncated": " (first {n} mails only)",
   "note.background": "{verb} - running in the background…",

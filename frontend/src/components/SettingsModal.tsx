@@ -88,6 +88,8 @@ export function SettingsModal({ cfg, account, onClose, onSaved,
       oauthConnected: im.oauth?.connected ?? false,
       digestSchedule: (im.digest?.schedule ?? "off") as DigestSchedule,
       digestRecipient: im.digest?.recipient ?? "",
+      digestTime: `${String(im.digest?.hour ?? 8).padStart(2, "0")}:`
+        + `${String(im.digest?.minute ?? 0).padStart(2, "0")}`,
     };
   };
   const [f, setF] = useState({
@@ -145,7 +147,7 @@ export function SettingsModal({ cfg, account, onClose, onSaved,
     setDigestTestMsg("");
     try {
       const r = await api.testDigest(editAcct);
-      setDigestTestMsg(t(r.sent ? "digest.test_sent" : "digest.test_nothing"));
+      setDigestTestMsg(t(r.demo ? "digest.test_sent_demo" : "digest.test_sent"));
     } catch (e: any) {
       setDigestTestMsg(`Error: ${e.message ?? e}`);
     }
@@ -223,6 +225,7 @@ export function SettingsModal({ cfg, account, onClose, onSaved,
   const save = async (extra: Record<string, unknown> = {}) => {
     try {
       const excluded = excludedList();
+      const [digestHour, digestMinute] = f.digestTime.split(":").map(Number);
       const body: Record<string, unknown> = {
         account: editAcct,
         imap: { host: f.host, port: +f.port || 1143,
@@ -230,7 +233,8 @@ export function SettingsModal({ cfg, account, onClose, onSaved,
           smtp_port: +f.smtpPort || 1025, smtp_security: f.smtpSecurity,
           cafile: f.cafile, preset: f.preset, user: f.user,
           digest: { schedule: f.digestSchedule,
-            recipient: f.digestRecipient },
+            recipient: f.digestRecipient,
+            hour: digestHour || 0, minute: digestMinute || 0 },
           ...(f.password ? { password: f.password } : {}),
           ...(oauthProvider ? { oauth: { provider: oauthProvider,
             client_id: f.oauthClientId,
@@ -735,6 +739,12 @@ export function SettingsModal({ cfg, account, onClose, onSaved,
                   || t("digest.recipient_placeholder")}
                 onChange={set("digestRecipient")} />
             </Field>
+            {f.digestSchedule !== "off" && (
+              <Field label={t("digest.time")}>
+                <Input className="w-full" type="time" value={f.digestTime}
+                  onChange={set("digestTime")} />
+              </Field>
+            )}
           </div>
           <p className="mt-1 text-xs text-muted">{t("digest.help")}</p>
           <div className="mt-3 flex flex-wrap items-center gap-2">

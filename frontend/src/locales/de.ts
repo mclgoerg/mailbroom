@@ -575,6 +575,7 @@ export const DE: Record<string, string> = {
   "digest.off": "Aus",
   "digest.recipient": "Empfänger",
   "digest.recipient_placeholder": "eigene Adresse dieses Kontos",
+  "digest.time": "Uhrzeit",
   "digest.help":
     "Eine Zusammenfassung dessen, was Mailbroom für dieses Konto seit "
     + "der letzten Übersicht getan hat - durchgeführte Aktionen, "
@@ -584,9 +585,9 @@ export const DE: Record<string, string> = {
     + "wenn nichts passiert ist.",
   "digest.send_test": "Test-Übersicht senden",
   "digest.test_sent": "Gesendet!",
-  "digest.test_nothing":
-    "Nichts zu berichten seit der letzten Übersicht - nach etwas "
-    + "Aktivität erneut versuchen.",
+  "digest.test_sent_demo":
+    "Vorschau mit Beispieldaten gesendet (es gibt noch nichts echtes zu "
+    + "berichten) - zählt nicht als echte Übersicht.",
   "Audit Log": "Prüfprotokoll",
   "Previous": "Zurück",
   "Next": "Weiter",

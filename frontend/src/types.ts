@@ -265,6 +265,8 @@ export type DigestSchedule = "off" | "daily" | "weekly";
 export interface DigestSettings {
   schedule: DigestSchedule;
   recipient: string;       // "" = the account's own address
+  hour: number;            // local server time, 24h
+  minute: number;
 }
 
 export interface ImapAccount {

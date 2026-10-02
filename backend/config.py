@@ -55,8 +55,9 @@ ENV_IMAP = {
     "oauth": None,
     # Activity digest mail (off by default everywhere): schedule is one
     # of DIGEST_SCHEDULES; empty recipient means "this account's own
-    # address" (resolved at send time, not stored here).
-    "digest": {"schedule": "off", "recipient": ""},
+    # address" (resolved at send time, not stored here); hour/minute
+    # (local server time, 24h) is when a due daily/weekly digest fires.
+    "digest": {"schedule": "off", "recipient": "", "hour": 8, "minute": 0},
 }
 
 # Blank slate for ADDITIONAL accounts - env values (e.g. the Bridge
@@ -66,7 +67,7 @@ NEUTRAL_IMAP = {
     "smtp_host": "", "smtp_port": 465, "smtp_security": "auto",
     "user": "", "password": "", "cafile": "", "preset": "custom",
     "oauth": None,
-    "digest": {"schedule": "off", "recipient": ""},
+    "digest": {"schedule": "off", "recipient": "", "hour": 8, "minute": 0},
 }
 
 _ENV_AUTH_CACHE: dict | None = None
@@ -318,14 +319,15 @@ def _load_accounts(saved: dict, env_first: bool = True) -> dict[str, dict]:
         out[name] = {**base, **block}
         if not isinstance(out[name].get("excluded_folders"), list):
             out[name]["excluded_folders"] = list(DEFAULT_EXCLUDED)
-        # tolerate a pre-digest config (missing key) or a partial saved
-        # block (e.g. an old backup import missing "recipient")
+        # tolerate a pre-digest config (missing key), a pre-hour/minute
+        # one, or a partial saved block (e.g. an old backup import
+        # missing "recipient")
         digest = out[name].get("digest")
+        digest = digest if isinstance(digest, dict) else {}
         out[name]["digest"] = {
-            "schedule": digest.get("schedule", "off")
-            if isinstance(digest, dict) else "off",
-            "recipient": digest.get("recipient", "")
-            if isinstance(digest, dict) else ""}
+            "schedule": digest.get("schedule", "off"),
+            "recipient": digest.get("recipient", ""),
+            "hour": digest.get("hour", 8), "minute": digest.get("minute", 0)}
     return out
 
 
@@ -438,11 +440,18 @@ def _apply_imap(block: dict, imap_in: dict) -> None:
     if isinstance(imap_in.get("digest"), dict):
         d = imap_in["digest"]
         digest = dict(block.get("digest")
-                      or {"schedule": "off", "recipient": ""})
+                      or {"schedule": "off", "recipient": "",
+                          "hour": 8, "minute": 0})
         if d.get("schedule") in DIGEST_SCHEDULES:
             digest["schedule"] = d["schedule"]
         if "recipient" in d:
             digest["recipient"] = str(d["recipient"]).strip()[:200]
+        for field, lo, hi in (("hour", 0, 23), ("minute", 0, 59)):
+            if field in d:
+                try:
+                    digest[field] = max(lo, min(hi, int(d[field])))
+                except (TypeError, ValueError):
+                    pass
         block["digest"] = digest
 
 
