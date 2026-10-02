@@ -110,6 +110,15 @@ presets.
   capped at 500 mails, skips protected senders, and uses the normal
   Trash/undo pipeline - the scheduler is a background loop inside the
   container, no cron needed.
+- **Retention actions** - restrict a bulk action or a rule to "keep the
+  newest N mails" or "only mails older than N days" per group instead of
+  the whole group - mutually exclusive, computed against the real mail
+  list rather than just the group count.
+- **Block a sender/domain in one click** - from a group's detail view,
+  instantly creates a standing daily auto-trash rule for that sender or
+  domain (optionally trashing what's already there too). Reversible any
+  time by unblocking, which just deletes the rule; protected senders
+  can't be blocked.
 - **Saved filter presets** - save the current filter query under a name
   and recall it with one tap from an outlined chip next to the built-in
   quick-select ones; edit a saved preset's query later with the same
@@ -131,11 +140,12 @@ presets.
   written to get a ↩ replied tag, filter with `is:replied` /
   `is:noreply-ever`, and the AI leans towards keeping senders you actually
   correspond with.
-- **Protected senders** - mark addresses or whole domains (🛡️ in the group
-  row, or a list in settings) as never-bulk-delete: selection presets and
-  bulk trash skip them (trashing one explicitly asks first), and the AI is
-  told - and forced - to never rate their mails "safe to delete". Filter
-  them with `is:protected`.
+- **Protected senders** - mark addresses or whole domains (a shield
+  toggle in a group's detail view, or a list in settings) as
+  never-bulk-delete: selection presets and bulk trash skip them
+  (trashing one explicitly asks first), and the AI is told - and
+  forced - to never rate their mails "safe to delete". Filter them with
+  `is:protected`.
 - **One-click unsubscribe** - RFC 8058 one-click POST or unsubscribe mail
   via Bridge SMTP, straight from a group's detail view - or in bulk:
   select any number of groups and unsubscribe from every one of their
@@ -150,16 +160,29 @@ presets.
 - **Undo** - restore the last deletions from Trash (matched by Message-ID).
 - **Trash browser** - inspect the live Trash (also mail deleted outside
   the app), search it, and restore selected mails to any folder.
+- **Persistent audit log** - every mailbox action (trash/archive/move/
+  mark-read, incl. rule-triggered ones, rule runs, unsubscribes, undo,
+  empty-trash) is recorded with a timestamp, actor, outcome and bytes
+  freed - browsable in-app and exportable as CSV.
+- **Contextual bulk-action bar** - appears only once something is
+  selected: Archive/Move/Mark read/Unsubscribe/AI review/Trash collapse
+  into one "Action…" picker, with the retention limiter above it.
+  One-tap quick-select chips (AI-safe, inactive >6 months/1 year/2 years,
+  not-yet-unsubscribed, new senders) narrow the list down to their own
+  matches and select them - chips never combine, and each cycles through
+  filter → select → un-select-and-clear on repeated taps. AI review and
+  CSV export scope to the current selection here; their "⋯" overflow-menu
+  versions (nothing selected) act on everything, as before.
 - **Bulk workflows** - background deletion queue with live progress and
-  cancel, "select inactive since…" presets, global mail search, CSV export,
-  Empty-Trash button, cancellable scans and AI runs.
+  cancel, global mail search, Empty-Trash button, cancellable scans and
+  AI runs.
 - **Multiple accounts** - connect several providers at once (e.g. Proton
   Bridge + Gmail). Every account is strictly separate: its own scans,
-  groups, rules, statistics, folder exclusions and replied/verdict
-  caches - nothing is ever mixed or aggregated. A header toggle switches
-  the whole view between accounts; accounts can be added, renamed
-  (all their data follows) and removed in settings, and each has its
-  own folder-discovery picker.
+  groups, rules, saved presets, digest settings, statistics, folder
+  exclusions and replied/verdict/known-senders caches - nothing is ever
+  mixed or aggregated. A header toggle switches the whole view between
+  accounts; accounts can be added, renamed (all their data follows) and
+  removed in settings, and each has its own folder-discovery picker.
 - **Fast to open** - each account's last scan is cached on disk and shown
   instantly after a restart or account switch (with its age); a rescan
   refreshes it. Live updates stream only small status deltas - the full
