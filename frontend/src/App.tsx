@@ -867,10 +867,12 @@ export default function App() {
           </button>
         ))}
         {/* Sort: field select + direction toggle as one segmented
-            control; the arrow rotates instead of swapping glyphs.
-            ml-auto: shares the chips' line when there's room, otherwise
-            wraps to its own. */}
-        <div className="ml-auto flex shrink-0 items-stretch overflow-hidden
+            control; the arrow rotates instead of swapping glyphs. No
+            ml-auto: that pushed it flush right whenever it wrapped onto
+            its own line (chips don't reliably fill the row), stranding it
+            with a big empty gap in front - it just flows after the last
+            chip now, like any other item in this row. */}
+        <div className="flex shrink-0 items-stretch overflow-hidden
           rounded-md border border-line">
           <Select className="min-w-0 flex-1 !rounded-none !border-0"
             value={sortK}
