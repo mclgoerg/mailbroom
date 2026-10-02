@@ -65,7 +65,7 @@ const cfg: Config = {
       redirect_base: "", allowed: [] },
   },
   protected: [],
-  categories: {},
+  categories: {}, new_sender_window_days: 7,
   ai: {
     provider: "anthropic", model: "claude-sonnet-5", foundry_endpoint: "",
     price_in: 0, price_out: 0, budget_usd: 0, month_cost: 0,
@@ -235,6 +235,20 @@ test("the time field only appears once a schedule is picked", () => {
     { target: { value: "daily" } });
   expect(screen.getByLabelText(/^Time/)).toBeTruthy();
 });
+
+test("the new-sender window defaults from config and is included in Save",
+  () => {
+    saveCalls.length = 0;
+    render(<SettingsModal cfg={cfg} account="default" onClose={() => {}}
+      onSaved={() => {}} onAccountsChanged={() => {}} />);
+    fireEvent.click(screen.getByRole("tab", { name: "General" }));
+    const field = screen.getByLabelText(/"New" sender window/) as
+      HTMLInputElement;
+    expect(field.value).toBe("7");
+    fireEvent.change(field, { target: { value: "3" } });
+    fireEvent.click(screen.getByText("Save"));
+    expect(saveCalls[0].new_sender_window_days).toBe(3);
+  });
 
 test("switching the edited account reloads its own digest settings", () => {
   render(<SettingsModal cfg={{

@@ -358,6 +358,10 @@ export const EN: Record<string, string> = {
     + "a built-in category (shipping, finance, shopping, social, travel, "
     + "dev/cloud) replaces its keywords; an empty keyword list disables "
     + "it; new names add categories. Applies on the next scan.",
+  "new_sender.window_label": "\"New\" sender window (days)",
+  "new_sender.window_help":
+    "How many days a sender stays flagged \"New\" (is:new, the New badge) "
+    + "after it's first seen in a scan.",
   "export.tip":
     "Download settings, rules, AI verdicts and the replied cache "
     + "(passwords and API keys are never exported)",

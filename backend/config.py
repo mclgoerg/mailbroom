@@ -14,6 +14,7 @@ import os
 import threading
 from pathlib import Path
 
+from . import knownsenders
 from . import secretbox
 from . import tenants
 
@@ -204,6 +205,11 @@ DEFAULT_CONFIG = {
     # category replaces its keyword list (empty list disables it); other
     # names become new categories. Applied at scan time.
     "categories": {},
+    # How many days a sender stays flagged "new" (is:new, the New badge)
+    # after its first-ever scan. Bootstraps from the NEW_SENDER_WINDOW_DAYS
+    # env var so an unconfigured tenant keeps today's default; editable
+    # per tenant from Settings from then on.
+    "new_sender_window_days": knownsenders.NEW_SENDER_WINDOW_DAYS,
     "ai": {
         # anthropic | foundry | openai | ollama (any OpenAI-compatible
         # endpoint works via "ollama" + base URL, e.g. LM Studio, vLLM).
@@ -351,6 +357,8 @@ def load_config() -> dict:
             cfg["protected"] = normalize_protected(saved["protected"])
         if isinstance(saved.get("categories"), dict):
             cfg["categories"] = saved["categories"]
+        if isinstance(saved.get("new_sender_window_days"), (int, float)):
+            cfg["new_sender_window_days"] = saved["new_sender_window_days"]
     except (OSError, json.JSONDecodeError):
         pass
     for block in cfg["accounts"].values():
@@ -547,6 +555,12 @@ def update_config(body: dict) -> dict:
                                          for p in v if str(p).strip()]
                 for k, v in body["categories"].items()
                 if str(k).strip() and isinstance(v, list)}
+        if "new_sender_window_days" in body:
+            try:
+                days = float(body["new_sender_window_days"])
+                cfg["new_sender_window_days"] = max(0.0, min(365.0, days))
+            except (TypeError, ValueError):
+                pass
         auth_in = body.get("auth") or {}
         shared_in = body.get("shared_ai") or {}
         if (auth_in or shared_in) and not is_admin():
@@ -659,6 +673,8 @@ def masked_config(cfg: dict) -> dict:
         "oauth_ms_device_available": oauthflow.has_shared_microsoft_client(),
         "protected": normalize_protected(cfg.get("protected")),
         "categories": cfg.get("categories") or {},
+        "new_sender_window_days": cfg.get("new_sender_window_days",
+                                          knownsenders.NEW_SENDER_WINDOW_DAYS),
         # Non-admins get the mode (their UI needs it) but none of the
         # server-side login details - the allow-list alone would leak
         # every other tenant's address.

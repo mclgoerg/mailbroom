@@ -366,6 +366,7 @@ export interface Config {
   auth: AuthCfg;
   protected: string[];
   categories: Record<string, string[]>;
+  new_sender_window_days: number;
   ai: {
     provider: "anthropic" | "foundry" | "openai" | "ollama";
     model: string;

@@ -55,7 +55,7 @@ const acctCfg = {
 const cfg: Config = {
   oauth_providers: [], oauth_ms_device_available: false,
   auth: { mode: "none", is_admin: false },
-  protected: [], categories: {},
+  protected: [], categories: {}, new_sender_window_days: 7,
   ai: { provider: "anthropic", model: "claude-sonnet-5",
     foundry_endpoint: "", price_in: 0, price_out: 0, budget_usd: 0,
     month_cost: 0, prices_effective: [2, 10], api_key: "",
