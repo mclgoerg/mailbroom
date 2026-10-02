@@ -409,32 +409,35 @@ test("a quick-select chip first narrows the filter box, then (tapped " +
   fireEvent.click(chip);
   await waitFor(() => expect(screen.getByText(/^Trash \d+$/)).toBeTruthy());
 
-  // Tap 3: everything matching already selected -> back to unfiltered.
+  // Tap 3: un-selects exactly what tap 2 selected (not just a no-op
+  // "leave it alone") AND clears the filter - so the bulk bar disappears
+  // too, not just the filter text.
   fireEvent.click(chip);
   await waitFor(() => {
     const el = screen.getByPlaceholderText("filter groups…");
     expect((el as HTMLInputElement).value).toBe("");
   });
+  expect(screen.queryByText(/^Trash \d+$/)).toBeNull();
 
-  // Regression: a second full cycle must behave identically, not
-  // collapse into a 2-state filter<->clear toggle just because the
-  // matches are STILL selected from the first cycle (selection is
-  // deliberately left alone by tap 3, see selectPreset).
-  // Tap 4: filters again.
+  // Regression: a second full cycle must look IDENTICAL to the first -
+  // each tap produces a visible change - not collapse into "tap 1 and 2
+  // both look like nothing happened" just because the matches were
+  // still selected from the first cycle (tap 3 must have undone that).
+  // Tap 4: filters again, still nothing selected.
   fireEvent.click(chip);
   expect((screen.getByPlaceholderText("filter groups…") as HTMLInputElement)
     .value).toBe("age:>6m");
-  // Tap 5: must NOT jump straight back to clearing just because the
-  // (still-selected) matches already satisfy "everything selected".
+  expect(screen.queryByText(/^Trash \d+$/)).toBeNull();
+  // Tap 5: selects again - the bulk bar must (re)appear.
   fireEvent.click(chip);
-  expect((screen.getByPlaceholderText("filter groups…") as HTMLInputElement)
-    .value).toBe("age:>6m");
-  // Tap 6: now it clears.
+  await waitFor(() => expect(screen.getByText(/^Trash \d+$/)).toBeTruthy());
+  // Tap 6: clears again, bulk bar gone again.
   fireEvent.click(chip);
   await waitFor(() => {
     const el = screen.getByPlaceholderText("filter groups…");
     expect((el as HTMLInputElement).value).toBe("");
   });
+  expect(screen.queryByText(/^Trash \d+$/)).toBeNull();
 });
 
 test("the overflow menu exposes CSV export without requiring a selection",

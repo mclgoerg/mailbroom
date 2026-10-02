@@ -444,14 +444,18 @@ export default function App() {
   // Chips are NOT additive/combinable - each tap always reflects the
   // full mailbox (allGroups), never "on top of" whatever another chip
   // left behind. A combination needs a typed or saved filter instead.
-  // Each chip cycles through three taps:
+  // Each chip cycles through three VISUALLY DISTINCT taps:
   //   1. not currently showing this chip's filter -> show it (view only,
   //      selection untouched - lets you eyeball matches first)
   //   2. showing it, but not everything matching is selected yet ->
   //      select every match (except protected ones, same as always)
-  //   3. showing it AND everything matching already selected -> go back
-  //      to the full, unfiltered list (selection is left alone - use
-  //      "Clear selection" separately if you want that gone too)
+  //   3. showing it AND everything matching already selected -> UN-select
+  //      exactly those matches and go back to the full, unfiltered list.
+  // Step 3 deliberately undoes step 2 (rather than leaving the selection
+  // as-is) so a second activation of the same chip starts from the same
+  // clean slate as the first - otherwise steps 1 and 2 look identical
+  // the second time around (the matches are already ticked from last
+  // time), and only step 3 produces a visible change.
   const selectPreset = (preset: string) => {
     if (preset === "none") { setSelected(new Set()); setActiveChip(null);
       return; }
@@ -465,18 +469,20 @@ export default function App() {
       setActiveChip({ key: preset, step: "filtered" });
       return;
     }
+    const f = parseFilter(query);
+    const matchingKeys = allGroups
+      .filter((g) => matchGroup(g, f) && !g.protected).map((g) => g.key);
+    const next = new Set(selected);
     if (activeChip.step === "filtered") {
-      const f = parseFilter(query);
-      const matchingKeys = allGroups
-        .filter((g) => matchGroup(g, f) && !g.protected).map((g) => g.key);
-      const next = new Set(selected);
       matchingKeys.forEach((k) => next.add(k));
       setSelected(next);
       setActiveChip({ key: preset, step: "selected" });
-      return;
+    } else {
+      matchingKeys.forEach((k) => next.delete(k));
+      setSelected(next);
+      setFilter("");
+      setActiveChip(null);
     }
-    setFilter("");
-    setActiveChip(null);
   };
 
   // Saved filter presets: unlike selectPreset() above (which ADDS to the

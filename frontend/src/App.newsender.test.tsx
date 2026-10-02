@@ -131,12 +131,21 @@ test("the New chip shows a live count; tap 1 filters, tap 2 selects " +
   fireEvent.click(chip);
   await waitFor(() => expect(screen.getByText("Trash 5")).toBeTruthy());
 
-  // Tap 3: everything matching already selected -> back to unfiltered
-  // (Sender C reappears).
+  // Tap 3: un-selects what tap 2 selected AND clears the filter (Sender
+  // C reappears, the bulk bar disappears).
   fireEvent.click(chip);
   await waitFor(() => {
     const el = screen.getByPlaceholderText("filter groups…");
     expect((el as HTMLInputElement).value).toBe("");
   });
   expect(screen.queryAllByText("Sender C").length).toBeGreaterThan(0);
+  expect(screen.queryByText(/^Trash \d+$/)).toBeNull();
+
+  // Regression: a second cycle must look identical to the first - tap 2
+  // must visibly reselect (not silently no-op because tap 3 left the
+  // matches selected).
+  fireEvent.click(chip);                                  // tap 4: filter
+  expect(screen.queryByText(/^Trash \d+$/)).toBeNull();
+  fireEvent.click(chip);                                   // tap 5: select
+  await waitFor(() => expect(screen.getByText("Trash 5")).toBeTruthy());
 });
