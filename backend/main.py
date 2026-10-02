@@ -22,6 +22,7 @@ from . import accounts as accountsmod
 from . import aihelper
 from . import auditlog
 from . import auth as authmod
+from . import autoscan as autoscanmod
 from . import config as cfgmod
 from . import digest as digestmod
 from . import knownsenders
@@ -63,6 +64,7 @@ async def _lifespan(app: FastAPI):
     rulesmod.start_scheduler()
     presetsmod.publish()
     digestmod.start_scheduler()
+    autoscanmod.start_scheduler()
     yield
 
 app = FastAPI(title="mailbroom", docs_url=None, redoc_url=None,
@@ -1132,6 +1134,7 @@ def post_config(body: dict):
         presetsmod.drop_account(str(body["delete_account"]))
         digestmod.drop_account(str(body["delete_account"]))
         knownsenders.drop_account(str(body["delete_account"]))
+        autoscanmod.drop_account(str(body["delete_account"]))
     if isinstance(body.get("rename_account"), dict):
         # The config rename succeeded - carry every per-account artifact
         # (runtime state, verdicts, unsubscribes, replied cache, stats,
@@ -1149,11 +1152,12 @@ def post_config(body: dict):
             presetsmod.rename_account(old, new)
             digestmod.rename_account(old, new)
             knownsenders.rename_account(old, new)
+            autoscanmod.rename_account(old, new)
             auditlog.rename_account(old, new)
             logging.getLogger("pmc.mail").info(
                 "account renamed: %r -> %r (state, verdicts, unsubscribes, "
                 "replied, stats, rules, presets, digest, known senders, "
-                "audit log migrated)", old, new)
+                "auto-scan, audit log migrated)", old, new)
     return cfgmod.masked_config(cfg)
 
 

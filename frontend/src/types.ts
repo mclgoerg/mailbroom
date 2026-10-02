@@ -270,6 +270,15 @@ export interface DigestSettings {
   minute: number;
 }
 
+export type AutoScanUnit = "minutes" | "hours";
+
+export interface AutoScanSettings {
+  enabled: boolean;
+  unit: AutoScanUnit;
+  value: number;           // the N in "every N <unit>"
+  align_minute: number;    // 0-59, minute-of-hour phase
+}
+
 export interface ImapAccount {
   excluded_folders: string[];
   host: string;
@@ -285,6 +294,7 @@ export interface ImapAccount {
   preset: Preset;
   oauth: ImapOauth | null;
   digest: DigestSettings;
+  auto_scan: AutoScanSettings;
 }
 
 export type OauthProvider = "google" | "microsoft";

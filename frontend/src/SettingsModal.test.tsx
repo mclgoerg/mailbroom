@@ -49,6 +49,8 @@ const acct = {
   cafile: "/certs/bridge-cert.pem", preset: "proton" as const,
   oauth: null,
   digest: { schedule: "off" as const, recipient: "", hour: 8, minute: 0 },
+  auto_scan: { enabled: false, unit: "hours" as const, value: 6,
+    align_minute: 0 },
 };
 const cfg: Config = {
   accounts: {
@@ -271,6 +273,28 @@ test("switching the edited account reloads its own digest settings", () => {
     .toBe("icloud@elsewhere.example");
   expect((screen.getByLabelText(/^Time/) as HTMLInputElement).value)
     .toBe("20:15");
+});
+
+test("auto-scan fields only show cadence/alignment once enabled, and " +
+    "save in the shape the backend expects", () => {
+  render(<SettingsModal cfg={cfg} account="default" onClose={() => {}}
+    onSaved={() => {}} onAccountsChanged={() => {}} />);
+  expect(screen.queryByLabelText(/Every/)).toBeNull();
+  expect(screen.queryByLabelText(/Start at minute/)).toBeNull();
+
+  fireEvent.change(screen.getByLabelText("Enabled") as HTMLSelectElement,
+    { target: { value: "on" } });
+  const every = screen.getByLabelText(/Every/) as HTMLInputElement;
+  const align = screen.getByLabelText(/Start at minute/) as HTMLInputElement;
+  expect(every.value).toBe("6");
+  expect(align.value).toBe("0");
+
+  fireEvent.change(every, { target: { value: "15" } });
+  fireEvent.change(align, { target: { value: "10" } });
+  saveCalls.length = 0;
+  fireEvent.click(screen.getByText("Save"));
+  expect(saveCalls[0].imap.auto_scan).toEqual(
+    { enabled: true, unit: "hours", value: 15, align_minute: 10 });
 });
 
 test("send test digest reports success", async () => {

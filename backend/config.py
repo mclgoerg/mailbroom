@@ -59,6 +59,12 @@ ENV_IMAP = {
     # address" (resolved at send time, not stored here); hour/minute
     # (local server time, 24h) is when a due daily/weekly digest fires.
     "digest": {"schedule": "off", "recipient": "", "hour": 8, "minute": 0},
+    # Automatic background scanning (off by default everywhere): fires
+    # every `value` `unit` ("minutes" | "hours"), aligned to align_minute
+    # (0-59, minute-of-hour phase - e.g. every 3h at align_minute=10 fires
+    # at 00:10, 03:10, 06:10, ...). See backend/autoscan.py.
+    "auto_scan": {"enabled": False, "unit": "hours", "value": 6,
+                 "align_minute": 0},
 }
 
 # Blank slate for ADDITIONAL accounts - env values (e.g. the Bridge
@@ -69,6 +75,8 @@ NEUTRAL_IMAP = {
     "user": "", "password": "", "cafile": "", "preset": "custom",
     "oauth": None,
     "digest": {"schedule": "off", "recipient": "", "hour": 8, "minute": 0},
+    "auto_scan": {"enabled": False, "unit": "hours", "value": 6,
+                 "align_minute": 0},
 }
 
 _ENV_AUTH_CACHE: dict | None = None
@@ -334,6 +342,14 @@ def _load_accounts(saved: dict, env_first: bool = True) -> dict[str, dict]:
             "schedule": digest.get("schedule", "off"),
             "recipient": digest.get("recipient", ""),
             "hour": digest.get("hour", 8), "minute": digest.get("minute", 0)}
+        auto_scan = out[name].get("auto_scan")
+        auto_scan = auto_scan if isinstance(auto_scan, dict) else {}
+        out[name]["auto_scan"] = {
+            "enabled": bool(auto_scan.get("enabled", False)),
+            "unit": auto_scan.get("unit") if auto_scan.get("unit") in
+                ("minutes", "hours") else "hours",
+            "value": auto_scan.get("value", 6),
+            "align_minute": auto_scan.get("align_minute", 0)}
     return out
 
 
@@ -461,6 +477,30 @@ def _apply_imap(block: dict, imap_in: dict) -> None:
                 except (TypeError, ValueError):
                     pass
         block["digest"] = digest
+    if isinstance(imap_in.get("auto_scan"), dict):
+        a = imap_in["auto_scan"]
+        auto_scan = dict(block.get("auto_scan")
+                        or {"enabled": False, "unit": "hours", "value": 6,
+                            "align_minute": 0})
+        if "enabled" in a:
+            auto_scan["enabled"] = bool(a["enabled"])
+        if a.get("unit") in ("minutes", "hours"):
+            auto_scan["unit"] = a["unit"]
+        if "value" in a:
+            try:
+                v = int(a["value"])
+                lo, hi = ((5, 1440) if auto_scan["unit"] == "minutes"
+                          else (1, 24))
+                auto_scan["value"] = max(lo, min(hi, v))
+            except (TypeError, ValueError):
+                pass
+        if "align_minute" in a:
+            try:
+                auto_scan["align_minute"] = max(
+                    0, min(59, int(a["align_minute"])))
+            except (TypeError, ValueError):
+                pass
+        block["auto_scan"] = auto_scan
 
 
 def save_oauth(account: str, oauth: dict) -> None:

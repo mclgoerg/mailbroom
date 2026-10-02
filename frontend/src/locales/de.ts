@@ -598,6 +598,22 @@ export const DE: Record<string, string> = {
   "digest.test_sent_demo":
     "Vorschau mit Beispieldaten gesendet (es gibt noch nichts echtes zu "
     + "berichten) - zählt nicht als echte Übersicht.",
+  "auto_scan.title": "Automatisches Scannen",
+  "auto_scan.enabled": "Aktiviert",
+  "auto_scan.on": "An",
+  "auto_scan.every": "Alle",
+  "auto_scan.unit_minutes": "Minuten",
+  "auto_scan.unit_hours": "Stunden",
+  "auto_scan.align": "Startminute (0-59)",
+  "auto_scan.help":
+    "Scannt dieses Konto in festen Abständen neu, unabhängig von "
+    + "Regel-Zeitplänen - hält die „Neu“-Markierung und die "
+    + "Aktivitäts-Übersicht aktuell, ohne dass die App geöffnet sein muss. "
+    + "Die „Startminute“ richtet den Takt an einer festen Uhrzeit aus "
+    + "(z. B. alle 3 Stunden zur Minute 10 -> 00:10, 03:10, 06:10, ...) "
+    + "statt ab dem Speicherzeitpunkt zu driften. Wird automatisch "
+    + "übersprungen, solange das Konto mit etwas anderem beschäftigt ist, "
+    + "und beim nächsten Takt einfach erneut versucht.",
   "Audit Log": "Prüfprotokoll",
   "Previous": "Zurück",
   "Next": "Weiter",
