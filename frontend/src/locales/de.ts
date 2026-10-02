@@ -556,10 +556,12 @@ export const DE: Record<string, string> = {
   "qb.att": "Anhänge ≥",
   "qb.flags": "Nur Gruppen…",
   "qb.is_unsub": "mit Abmeldelink",
+  "qb.is_unsubscribed": "vollständig abbestellt",
   "qb.is_not_unsubscribed": "noch nicht abbestellt",
   "qb.is_noreply": "nie geantwortet",
   "qb.is_replied": "geantwortet",
   "qb.is_protected": "geschützt",
+  "qb.is_new": "neue Absender",
   "ai.shared_note":
     "Kein eigener Schlüssel - AI läuft über den gemeinsamen "
     + "Server-Schlüssel (dein Monatslimit: {cap}).",

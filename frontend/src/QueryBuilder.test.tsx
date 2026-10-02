@@ -47,6 +47,20 @@ test("not-yet-unsubscribed chip emits the DSL token", () => {
   expect(parseFilter(s.get()).unsubscribed).toBe(false);
 });
 
+test("fully-unsubscribed chip emits the DSL token", () => {
+  const s = setup();
+  fireEvent.click(screen.getByText("fully unsubscribed"));
+  expect(s.get()).toBe("is:unsubscribed");
+  expect(parseFilter(s.get()).unsubscribed).toBe(true);
+});
+
+test("new-senders chip emits the is:new DSL token", () => {
+  const s = setup();
+  fireEvent.click(screen.getByText("new senders"));
+  expect(s.get()).toBe("is:new");
+  expect(parseFilter(s.get()).newOnly).toBe(true);
+});
+
 test("tokens are never added twice", () => {
   const s = setup("is:unsub");
   fireEvent.click(screen.getByText("with unsubscribe link"));
