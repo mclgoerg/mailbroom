@@ -550,75 +550,145 @@ _SIZE_RE = re.compile(rb"RFC822\.SIZE (\d+)")
 _FLAGS_RE = re.compile(rb"FLAGS \(([^)]*)\)")
 
 
+def _fetch_full_chunk(conn, folder: str, chunk: list[bytes],
+                      messages: list, acc) -> int:
+    """Full header+flags FETCH for one chunk of `chunk` (new UIDs, or a
+    UIDVALIDITY-stale folder); appends to `messages`. Returns count of
+    unparseable messages skipped."""
+    skipped = 0
+    status, data = conn.uid(
+        "FETCH", b",".join(chunk).decode(),
+        "(UID FLAGS RFC822.SIZE INTERNALDATE "
+        "BODY.PEEK[HEADER.FIELDS (FROM SUBJECT MESSAGE-ID "
+        "LIST-UNSUBSCRIBE LIST-UNSUBSCRIBE-POST)])")
+    if status != "OK":
+        return skipped
+    for item in data or []:
+        if not isinstance(item, tuple) or len(item) < 2:
+            continue
+        meta = item[0]
+        m = _UID_RE.search(meta)
+        if not m:
+            continue
+        try:
+            sm = _SIZE_RE.search(meta)
+            fm = _FLAGS_RE.search(meta)
+            ts = 0
+            tt = imaplib.Internaldate2tuple(meta)
+            if tt:
+                ts = int(time.mktime(tt))
+            msg = email.message_from_bytes(item[1])
+            name, addr = parseaddr(msg.get("From", ""))
+            addr = addr.strip().lower() or "(unparseable sender)"
+            messages.append({
+                "uid": int(m.group(1)), "folder": folder, "addr": addr,
+                "name": decode_mime(name) if name else "",
+                "subject": decode_mime(msg.get("Subject", ""))[:150],
+                "bulk": bool(msg.get("List-Unsubscribe")),
+                "unsub": (msg.get("List-Unsubscribe") or "")[:1000],
+                "unsub_post": "one-click" in
+                              (msg.get("List-Unsubscribe-Post")
+                               or "").lower(),
+                "msgid": (msg.get("Message-ID") or "").strip()[:300],
+                "size": int(sm.group(1)) if sm else 0,
+                "seen": bool(fm and b"\\Seen" in fm.group(1)),
+                "ts": ts,
+                "date": time.strftime("%Y-%m-%d %H:%M",
+                                      time.localtime(ts)) if ts else "",
+            })
+        except Exception:
+            skipped += 1
+            log.warning("[%s] skipping unparseable message uid %s in %r",
+                        acc.name, m.group(1).decode(), folder,
+                        exc_info=True)
+    return skipped
+
+
+def _refresh_flags_chunk(conn, folder: str, chunk: list[bytes],
+                         cached: dict, messages: list) -> None:
+    """Cheap FLAGS-only FETCH for one chunk of UIDs already cached from a
+    prior scan (same UIDVALIDITY generation) - picks up \\Seen changes
+    made by another client without re-fetching headers/bodies."""
+    status, data = conn.uid("FETCH", b",".join(chunk).decode(),
+                            "(UID FLAGS)")
+    if status != "OK":
+        # Can't confirm flags right now - keep the cached copy as-is
+        # rather than silently dropping these messages from `messages`.
+        for u in chunk:
+            old = cached.get(int(u))
+            if old is not None:
+                messages.append(old)
+        return
+    seen_by_uid: dict[int, bool] = {}
+    for item in data or []:
+        if not isinstance(item, (bytes, bytearray)):
+            continue
+        m = _UID_RE.search(item)
+        if not m:
+            continue
+        fm = _FLAGS_RE.search(item)
+        seen_by_uid[int(m.group(1))] = bool(
+            fm and b"\\Seen" in fm.group(1))
+    for u in chunk:
+        uid_int = int(u)
+        old = cached.get(uid_int)
+        if old is None:
+            continue
+        if uid_int in seen_by_uid:
+            old = {**old, "seen": seen_by_uid[uid_int]}
+        messages.append(old)
+
+
 def scan_folder(conn, folder: str, messages: list, progress_cb,
                 acc=None) -> int:
     """Scan one folder into `messages`; returns how many messages had to
     be SKIPPED because their metadata could not be parsed (real-world
     mail contains arbitrarily broken headers - one bad message must
-    never abort a scan)."""
+    never abort a scan).
+
+    Incremental: UIDs already cached from a previous scan of this exact
+    UIDVALIDITY generation only get a cheap flags-only refresh; only
+    genuinely new UIDs get a full header fetch. A UIDVALIDITY change (or
+    no prior cache) falls back to fetching everything, same as before."""
     acc = acc or accounts.get()
-    skipped = 0
     status, _ = conn.select(quote_folder(folder), readonly=True)
     if status != "OK":
-        return skipped
-    # Cached UIDs are only meaningful for this UIDVALIDITY generation;
-    # deletes re-check it (servers reset it on resync/re-login).
-    acc.folder_uv[folder] = uidvalidity(conn)
+        return 0
+    new_uv = uidvalidity(conn)
+    old_uv = acc.folder_uv.get(folder)
+    stale = old_uv in (None, 0) or new_uv != old_uv
+    acc.folder_uv[folder] = new_uv
     status, data = conn.uid("SEARCH", None, "ALL")
     if status != "OK" or not data or not data[0]:
-        return skipped
+        return 0
     uids = data[0].split()
     total = len(uids)
-    for start in range(0, total, FETCH_CHUNK):
+    if stale:
+        new_uids, existing_uids, cached = uids, [], {}
+    else:
+        cached = {}
+        for u in uids:
+            rec = acc.index.get(ikey(folder, int(u)))
+            if rec is not None:
+                cached[int(u)] = rec
+        new_uids = [u for u in uids if int(u) not in cached]
+        existing_uids = [u for u in uids if int(u) in cached]
+    skipped = 0
+    done = 0
+    for start in range(0, len(new_uids), FETCH_CHUNK):
         if cancel_requested("scan", acc):
             raise Cancelled()
-        chunk = uids[start:start + FETCH_CHUNK]
-        progress_cb(folder, min(start + FETCH_CHUNK, total), total)
-        status, data = conn.uid(
-            "FETCH", b",".join(chunk).decode(),
-            "(UID FLAGS RFC822.SIZE INTERNALDATE "
-            "BODY.PEEK[HEADER.FIELDS (FROM SUBJECT MESSAGE-ID "
-            "LIST-UNSUBSCRIBE LIST-UNSUBSCRIBE-POST)])")
-        if status != "OK":
-            continue
-        for item in data or []:
-            if not isinstance(item, tuple) or len(item) < 2:
-                continue
-            meta = item[0]
-            m = _UID_RE.search(meta)
-            if not m:
-                continue
-            try:
-                sm = _SIZE_RE.search(meta)
-                fm = _FLAGS_RE.search(meta)
-                ts = 0
-                tt = imaplib.Internaldate2tuple(meta)
-                if tt:
-                    ts = int(time.mktime(tt))
-                msg = email.message_from_bytes(item[1])
-                name, addr = parseaddr(msg.get("From", ""))
-                addr = addr.strip().lower() or "(unparseable sender)"
-                messages.append({
-                    "uid": int(m.group(1)), "folder": folder, "addr": addr,
-                    "name": decode_mime(name) if name else "",
-                    "subject": decode_mime(msg.get("Subject", ""))[:150],
-                    "bulk": bool(msg.get("List-Unsubscribe")),
-                    "unsub": (msg.get("List-Unsubscribe") or "")[:1000],
-                    "unsub_post": "one-click" in
-                                  (msg.get("List-Unsubscribe-Post")
-                                   or "").lower(),
-                    "msgid": (msg.get("Message-ID") or "").strip()[:300],
-                    "size": int(sm.group(1)) if sm else 0,
-                    "seen": bool(fm and b"\\Seen" in fm.group(1)),
-                    "ts": ts,
-                    "date": time.strftime("%Y-%m-%d %H:%M",
-                                          time.localtime(ts)) if ts else "",
-                })
-            except Exception:
-                skipped += 1
-                log.warning("[%s] skipping unparseable message uid %s in %r",
-                            acc.name, m.group(1).decode(), folder,
-                            exc_info=True)
+        chunk = new_uids[start:start + FETCH_CHUNK]
+        skipped += _fetch_full_chunk(conn, folder, chunk, messages, acc)
+        done += len(chunk)
+        progress_cb(folder, done, total)
+    for start in range(0, len(existing_uids), FETCH_CHUNK):
+        if cancel_requested("scan", acc):
+            raise Cancelled()
+        chunk = existing_uids[start:start + FETCH_CHUNK]
+        _refresh_flags_chunk(conn, folder, chunk, cached, messages)
+        done += len(chunk)
+        progress_cb(folder, done, total)
     return skipped
 
 
@@ -984,9 +1054,12 @@ def start_scan(acc=None) -> None:
                 or acc.state["atts"]["status"] == "running" \
                 or acc.state["unsub"]["status"] == "running":
             raise RuntimeError("busy")
+        # `groups` is left as-is (not reset to {}) so the UI keeps showing
+        # the last-known-good table instead of flashing empty - important
+        # now that scans can also fire unattended on a schedule. `status`
+        # stays the authoritative "a scan is running" signal.
         acc.state.update(status="scanning", progress="connecting…", error="",
-                     notice=None, groups={g: {} for g in GROUPINGS},
-                     scanned_ts=None)
+                     notice=None, scanned_ts=None)
         acc.state["groups_rev"] += 1
         acc.state["delete"] = {"status": "idle", "progress": "", "error": "",
                            "moved": 0}
@@ -998,8 +1071,8 @@ def start_scan(acc=None) -> None:
         # Attachment analysis is per-scan; a new scan invalidates it.
         acc.state["atts"] = {"status": "idle", "progress": "", "error": "",
                          "mails": 0, "size": 0}
-        acc.index.clear()
-        acc.folder_uv.clear()
+        # acc.index / acc.folder_uv deliberately survive into the new scan -
+        # scan_folder() diffs against them to fetch only what's new/changed.
         acc.folder_roles.clear()
         acc.cancel["scan"] = False
     threading.Thread(target=tenants.call_in, args=(acc.tenant, run_scan, acc),

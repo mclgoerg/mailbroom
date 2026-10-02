@@ -188,6 +188,17 @@ class FakeIMAP:
                         return "OK", [(f"{i+1} (UID {m['uid']} BODY[] "
                                        f"{{{len(body)}}}".encode(), body), b")"]
                 return "OK", [None]
+            if args[1] == "(UID FLAGS)":
+                # No literal attached (flags-only) - imaplib hands back a
+                # plain bytes line per message, not a (meta, literal) tuple.
+                data = []
+                for i, m in enumerate(msgs):
+                    if m["uid"] not in wanted:
+                        continue
+                    flags = "\\Seen" if m["seen"] else ""
+                    data.append(f"{i+1} (UID {m['uid']} "
+                                f"FLAGS ({flags}))".encode())
+                return "OK", data
             data = []
             for i, m in enumerate(msgs):
                 if m["uid"] not in wanted:
@@ -287,6 +298,19 @@ def bridge(monkeypatch):
     })
     monkeypatch.setattr(mailops, "connect", lambda cfg, name=None: fake)
     return fake
+
+
+def wait_scan_done(timeout=5.0):
+    """A `start_scan()`-dispatched scan runs in a worker thread; wait for
+    it to leave "scanning"."""
+    import time
+    end = time.time() + timeout
+    while time.time() < end:
+        with mailops.STATE_LOCK:
+            if mailops.STATE["status"] != "scanning":
+                return mailops.STATE
+        time.sleep(0.01)
+    return mailops.STATE
 
 
 def wait_delete_done(timeout=5.0):
