@@ -39,6 +39,7 @@ export interface Group {
   replied: boolean;
   att_size: number;
   unsubscribed: GroupUnsub | null;
+  new: boolean;
 }
 
 export interface AiUsage {

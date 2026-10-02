@@ -428,6 +428,9 @@ export default function App() {
       groups.filter((g) => g.unsub && g.unsubscribed?.status !== "done"
           && !g.protected)
         .forEach((g) => next.add(g.key));
+    } else if (preset === "new") {
+      groups.filter((g) => g.new && !g.protected)
+        .forEach((g) => next.add(g.key));
     }
     setSelected(next);
   };
@@ -927,6 +930,17 @@ export default function App() {
             {t(p.label)}
           </button>
         ))}
+        {/* New-sender review: only shown once there's something to review -
+            an always-visible "New (0)" chip would just be clutter. */}
+        {groups.some((g) => g.new) && (
+          <button
+            className="shrink-0 rounded-full border border-line bg-panel2
+              px-3 py-1.5 text-xs whitespace-nowrap text-muted
+              hover:bg-chip hover:text-body"
+            onClick={() => selectPreset("new")}>
+            {t("chip.new_count", { n: groups.filter((g) => g.new).length })}
+          </button>
+        )}
         {/* Saved filter presets: user-defined, visually distinct (outlined
             accent vs. the built-ins' filled muted look above) - tapping one
             REPLACES the filter query instead of adding to the selection.

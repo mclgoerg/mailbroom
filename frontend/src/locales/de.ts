@@ -48,6 +48,10 @@ export const DE: Record<string, string> = {
   "replied.tip":
     "Sie haben diesem Absender schon geschrieben (aus Ihrem "
     + "Gesendet-Ordner ermittelt)",
+  "new_sender.tip":
+    "Kürzlich erstmals gesehen - nur ein Hinweis, es wurde automatisch "
+    + "nichts unternommen",
+  "chip.new_count": "Neu ({n})",
   "confirm.trash_protected":
     "Die Gruppe „{label}“ ist geschützt. Mails trotzdem in den "
     + "Papierkorb verschieben?",

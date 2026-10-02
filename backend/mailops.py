@@ -29,6 +29,7 @@ imaplib._MAXLINE = 10_000_000  # bulk FETCH responses exceed the default 1MB
 from . import accounts
 from . import auditlog
 from . import config as cfgmod
+from . import knownsenders
 from . import stats as statsmod
 from . import tenants
 from . import unsubstore
@@ -780,6 +781,22 @@ def _group_protected(rec: dict, paddrs: set[str], acc) -> bool:
     return False
 
 
+def _group_new(rec: dict, new_addrs: set[str], acc) -> bool:
+    """True if any mail in this group comes from a sender first seen
+    within the new-sender window (lock held) - same CONTAINS traversal
+    as _group_protected, so a domain/subject group is flagged as soon
+    as any of its senders is new. Read-only signal: never affects which
+    actions are available, only a badge/filter."""
+    if not new_addrs:
+        return False
+    for folder, uids in rec["folders"].items():
+        for uid in uids:
+            m = acc.index.get(ikey(folder, uid))
+            if m and m["addr"] in new_addrs:
+                return True
+    return False
+
+
 def group_unsub_senders(rec: dict, acc) -> dict[str, tuple[str, bool]]:
     """{sender addr: (List-Unsubscribe header, one_click)} for the senders
     of this group that offer an unsubscribe - the NEWEST mail per sender
@@ -832,6 +849,7 @@ def public_state(acc=None) -> dict:
     plist = cfgmod.normalize_protected(
         cfgmod.load_config().get("protected"))
     unsub_entries = unsubstore.load_account(acc.name)
+    new_addrs = knownsenders.new_since(acc.name)
     with acc.lock:
         paddrs = _protected_addrs(plist, acc)
         out = {k: v for k, v in acc.state.items() if k != "groups"}
@@ -840,7 +858,8 @@ def public_state(acc=None) -> dict:
             g: {k: {**{kk: vv for kk, vv in rec.items() if kk != "folders"},
                     "ratings": _rating_counts(rec, mail_verdicts, acc),
                     "protected": _group_protected(rec, paddrs, acc),
-                    "unsubscribed": _group_unsub(rec, unsub_entries, acc)}
+                    "unsubscribed": _group_unsub(rec, unsub_entries, acc),
+                    "new": _group_new(rec, new_addrs, acc)}
                 for k, rec in recs.items()}
             for g, recs in acc.state["groups"].items()}
         return out
@@ -894,6 +913,7 @@ def run_scan(acc=None) -> None:
             if new_replied - replied:
                 replied |= new_replied
                 save_replied(acc)
+            knownsenders.update_scan(acc.name, {m["addr"] for m in messages})
             groups = build_groups(messages, replied,
                                   effective_categories(cfg.get("categories")))
             cached = verdictstore.apply_to_groups(groups, acc.name)

@@ -192,6 +192,10 @@ export const EN: Record<string, string> = {
   "replied": "replied",
   "replied.tip":
     "You have written to this sender before (found in your Sent folder)",
+  "new_sender.tip":
+    "First seen recently - a signal only, no action was taken "
+    + "automatically",
+  "chip.new_count": "New ({n})",
   "protected.help":
     "One entry per line: an address (user@example.com) or a domain "
     + "(@example.com). Protected senders are skipped by bulk deletions and "
