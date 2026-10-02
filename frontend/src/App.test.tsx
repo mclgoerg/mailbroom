@@ -392,15 +392,29 @@ test("selecting a group reveals the bulk-action bar; Clear selection " +
   await waitFor(() => expect(screen.queryByText(/^Trash \d+$/)).toBeNull());
 });
 
-test("a quick-select chip adds matching groups to the selection AND " +
-  "narrows the filter box to the same condition", async () => {
+test("a quick-select chip first narrows the filter box, then (tapped " +
+  "again) adds the matches to the selection", async () => {
   renderWithOneSenderGroup();
   await waitFor(() => expect(screen.getAllByText("DHL Paket").length)
     .toBeGreaterThan(0));
-  fireEvent.click(screen.getByText("Inactive > 6 months"));
-  await waitFor(() => expect(screen.getByText(/^Trash \d+$/)).toBeTruthy());
+  const chip = screen.getByText("Inactive > 6 months");
+
+  // Tap 1: filters only, selection untouched.
+  fireEvent.click(chip);
   expect((screen.getByPlaceholderText("filter groups…") as HTMLInputElement)
     .value).toBe("age:>6m");
+  expect(screen.queryByText(/^Trash \d+$/)).toBeNull();
+
+  // Tap 2: same filter already showing -> selects every match.
+  fireEvent.click(chip);
+  await waitFor(() => expect(screen.getByText(/^Trash \d+$/)).toBeTruthy());
+
+  // Tap 3: everything matching already selected -> back to unfiltered.
+  fireEvent.click(chip);
+  await waitFor(() => {
+    const el = screen.getByPlaceholderText("filter groups…");
+    expect((el as HTMLInputElement).value).toBe("");
+  });
 });
 
 test("the overflow menu exposes CSV export without requiring a selection",

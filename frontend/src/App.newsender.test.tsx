@@ -89,8 +89,9 @@ test("no New chip renders when nothing is flagged", async () => {
   expect(screen.queryByText(/^New \(/)).toBeNull();
 });
 
-test("the New chip shows a live count and tapping it selects only the " +
-  "flagged, non-protected groups", async () => {
+test("the New chip shows a live count; tap 1 filters, tap 2 selects " +
+  "only the flagged, non-protected groups, tap 3 clears the filter",
+  async () => {
   localStorage.setItem("pmc_account", "proton");
   const flagged = mkGroup({
     key: "a@x.example", label: "Sender A", count: 5, new: true });
@@ -109,20 +110,33 @@ test("the New chip shows a live count and tapping it selects only the " +
   // The chip's count is every flagged group (2) - protection only
   // affects which ones selectPreset actually adds to the selection.
   const chip = await screen.findByText("New (2)");
+
+  // Tap 1: filters to is:new, selection untouched. Both flagged groups
+  // stay visible (protection only affects selection, not visibility),
+  // the unflagged one disappears.
   fireEvent.click(chip);
-
-  // The bulk-action bar appears, scoped to exactly the qualifying
-  // group's mail count (5) - the protected and not-flagged groups are
-  // excluded, same as every other quick-select preset.
-  await waitFor(() => expect(screen.getByText("Trash 5")).toBeTruthy());
-
-  // The filter box also narrows to is:new, so the selected handful
-  // isn't left scattered across a long unfiltered list: both flagged
-  // groups stay visible (one checked, one not - protection only
-  // affects selection, not visibility), the unflagged one disappears.
   expect((screen.getByPlaceholderText("filter groups…") as HTMLInputElement)
     .value).toBe("is:new");
   expect(screen.queryAllByText("Sender A").length).toBeGreaterThan(0);
   expect(screen.queryAllByText("Sender B").length).toBeGreaterThan(0);
   expect(screen.queryAllByText("Sender C").length).toBe(0);
+  expect(screen.queryByText(/^Trash \d+$/)).toBeNull();
+  // The chip itself must survive its OWN filter being active (regression
+  // check: its count/visibility come from the full mailbox, not the
+  // now-filtered list).
+  expect(screen.getByText("New (2)")).toBeTruthy();
+
+  // Tap 2: already showing is:new -> selects every match except the
+  // protected one (bar scoped to exactly Sender A's 5 mails).
+  fireEvent.click(chip);
+  await waitFor(() => expect(screen.getByText("Trash 5")).toBeTruthy());
+
+  // Tap 3: everything matching already selected -> back to unfiltered
+  // (Sender C reappears).
+  fireEvent.click(chip);
+  await waitFor(() => {
+    const el = screen.getByPlaceholderText("filter groups…");
+    expect((el as HTMLInputElement).value).toBe("");
+  });
+  expect(screen.queryAllByText("Sender C").length).toBeGreaterThan(0);
 });
