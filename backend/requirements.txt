@@ -1,5 +1,5 @@
 fastapi>=0.141.1
 uvicorn[standard]>=0.53.0
-anthropic>=1.8
+anthropic>=1.11.0
 cryptography>=50.0.2
 openai>=3.19.2
