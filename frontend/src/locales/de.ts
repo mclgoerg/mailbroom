@@ -64,6 +64,24 @@ export const DE: Record<string, string> = {
     "{n} Mail(s) ohne Message-ID konnten nicht geschützt werden.",
   "confirm.unpin_group":
     "Den Schutz aller {n} geschützten Mail(s) dieser Gruppe aufheben?",
+  "Sort: engagement": "Sortierung: Interaktion",
+  "Eng.": "Inter.",
+  "eng.col_tip":
+    "Interaktion: wie viel du von diesem Absender wirklich liest und "
+    + "beantwortest",
+  "eng.popover_title": "Interaktions-Wert {score}/100 · {tier}",
+  "eng.tip": "Interaktion {score}/100 ({tier}): {parts}",
+  "eng.low": "niedrig",
+  "eng.medium": "mittel",
+  "eng.high": "hoch",
+  "eng.read": "{n}% gelesen",
+  "eng.replied": "geantwortet",
+  "eng.never_replied": "nie geantwortet",
+  "eng.bulk": "Newsletter/Massenmail",
+  "eng.last": "letzte Mail {year}",
+  "qb.eng_low": "kaum Interaktion",
+  "qb.eng_medium": "teils Interaktion",
+  "qb.eng_high": "oft Interaktion",
   "bar.all_pinned": "alles geschützt - nichts zu verschieben",
   "toast.all_pinned":
     "Alle ausgewählten Mails sind geschützt - nichts wurde geändert.",

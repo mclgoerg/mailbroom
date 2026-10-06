@@ -75,6 +75,7 @@ const group: Group = {
   protected: false, replied: false, att_size: 0, unsubscribed: null,
   new: false,
   pinned: 0,
+  engagement: 50,
 };
 
 const baseState: AppState = {

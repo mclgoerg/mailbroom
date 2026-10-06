@@ -3,9 +3,10 @@ import { useEffect, useState } from "react";
 import { fmtSize } from "../api";
 import type { Group } from "../types";
 import { t } from "../i18n";
-import { AiTag, Avatar, Button, PinBadge, RatingChips, Tag, Select } from "./ui";
+import { AiTag, Avatar, Button, EngagementMeter, PinBadge, RatingChips, Tag, Select } from "./ui";
 
-export type SortKey = "count" | "size" | "label" | "last" | "unreadPct";
+export type SortKey = "count" | "size" | "label" | "last" | "unreadPct"
+  | "engagement";
 
 const PAGE_SIZES = [25, 50, 100, 200];
 const ALL = 1_000_000;
@@ -132,6 +133,10 @@ function DesktopTable({ slice, baseIdx, selected, focusedKey, onToggle,
           </th>
           <th className={`${th} hidden w-44 lg:table-cell`}>{t("Type")}</th>
           <th className={`${th} w-24`}>{t("AI")}</th>
+          <th className={`${sortableTh} w-14`} aria-sort={ariaSort("engagement")}
+            title={t("eng.col_tip")} onClick={() => onSort("engagement")}>
+            {t("Eng.")}{arrow("engagement")}
+          </th>
           <th className={`${sortableTh} w-16 text-right`}
             aria-sort={ariaSort("count")}
             onClick={() => onSort("count")}>
@@ -210,6 +215,9 @@ function DesktopTable({ slice, baseIdx, selected, focusedKey, onToggle,
                 {g.ratings && <RatingChips ratings={g.ratings} />}
               </div>
             </td>
+            <td className="px-2 py-2 align-top">
+              <EngagementMeter g={g} />
+            </td>
             <td className="px-2 py-2 text-right align-top tabular-nums">
               {g.count}
             </td>
@@ -262,6 +270,7 @@ function MobileCards({ slice, baseIdx, selected, focusedKey, onToggle,
                 {t("unread")} · {g.last}
               </div>
               <div className="mt-1 flex flex-wrap items-center gap-1">
+                <EngagementMeter g={g} />
                 {g.new && (
                   <Tag className="!bg-blue-950 !text-blue-300">
                     <span title={t("new_sender.tip")}>🆕 {t("New")}</span>

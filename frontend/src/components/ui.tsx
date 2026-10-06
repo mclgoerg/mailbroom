@@ -2,6 +2,7 @@ import { Pin, Shield, X } from "lucide-react";
 import { useEffect, useLayoutEffect, useRef, useState,
   type ComponentProps, type ReactNode } from "react";
 import { t } from "../i18n";
+import { engagementTier } from "../lib";
 import type { GroupAi } from "../types";
 
 /** One-time consent: what metadata the AI features transmit. */
@@ -88,6 +89,87 @@ export function PinButton({ on, onClick, className = "" }: {
           : "opacity-40 hover:opacity-80"} ${className}`}>
       <Pin size={15} fill={on ? "currentColor" : "none"} />
     </button>
+  );
+}
+
+/** Compact 3-step engagement meter: one lit bar per tier (low/medium/
+ *  high). It is a button: a tap (or click) opens a small popover that names
+ *  the score and spells out what it is made of - touch screens have no
+ *  hover, and the bars alone don't say what they are. The title tooltip
+ *  stays for desktop hover. Neutral accent tint on purpose - the emerald/
+ *  amber/rose hues mean delete-safe/review/keep elsewhere. */
+export function EngagementMeter({ g }: {
+  g: { engagement: number; count: number; unread: number; replied: boolean;
+       bulk: boolean; last: string };
+}) {
+  const [open, setOpen] = useState(false);
+  const [alignRight, setAlignRight] = useState(false);
+  const ref = useRef<HTMLSpanElement>(null);
+  const pop = useRef<HTMLDivElement>(null);
+  const tier = engagementTier(g.engagement);
+  const lit = { low: 1, medium: 2, high: 3 }[tier];
+  const readPct = g.count ? Math.round(100 * (1 - g.unread / g.count)) : 0;
+  const parts = [
+    t("eng.read", { n: readPct }),
+    t(g.replied ? "eng.replied" : "eng.never_replied"),
+    ...(g.bulk ? [t("eng.bulk")] : []),
+    ...(g.last ? [t("eng.last", { year: g.last.slice(0, 4) })] : []),
+  ];
+  const tierName = t(`eng.${tier}`);
+  const tip = t("eng.tip", { score: g.engagement, tier: tierName,
+    parts: parts.join(", ") });
+  // Opens left-aligned under the meter; flips if that runs off the right
+  // edge of the screen.
+  useLayoutEffect(() => {
+    if (!open) { setAlignRight(false); return; }
+    const r = pop.current?.getBoundingClientRect();
+    if (r && r.width > 0 && r.right > window.innerWidth - 8) {
+      setAlignRight(true);
+    }
+  }, [open]);
+  useEffect(() => {
+    if (!open) return;
+    const onDoc = (e: Event) => {
+      if (!ref.current?.contains(e.target as Node)) setOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setOpen(false);
+    };
+    document.addEventListener("pointerdown", onDoc);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("pointerdown", onDoc);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
+  return (
+    <span ref={ref} className="relative inline-block">
+      <button type="button" title={tip} aria-label={tip} aria-expanded={open}
+        data-eng={tier}
+        // Rows are tap targets themselves (open the detail view) - this
+        // one only explains the score.
+        onClick={(e) => { e.stopPropagation(); setOpen(!open); }}
+        className="inline-flex min-h-6 min-w-6 cursor-pointer items-end
+          gap-0.5 rounded px-0.5 pb-1 hover:bg-chip">
+        {[1, 2, 3].map((i) => (
+          <span key={i} data-lit={i <= lit ? "true" : "false"}
+            style={{ height: `${4 + i * 3}px` }}
+            className={`w-1 rounded-sm ${i <= lit ? "bg-accent" : "bg-chip"}`} />
+        ))}
+      </button>
+      {open && (
+        <div ref={pop} role="dialog" onClick={(e) => e.stopPropagation()}
+          className={`absolute top-full z-20 mt-1 w-max
+            max-w-[min(18rem,calc(100vw-1rem))] rounded-lg border
+            border-line bg-panel p-2.5 text-left text-xs font-normal
+            shadow-lg ${alignRight ? "right-0" : "left-0"}`}>
+          <div className="font-semibold text-body">
+            {t("eng.popover_title", { score: g.engagement, tier: tierName })}
+          </div>
+          <div className="mt-0.5 text-muted">{parts.join(" · ")}</div>
+        </div>
+      )}
+    </span>
   );
 }
 

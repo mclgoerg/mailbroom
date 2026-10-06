@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { applyStatus, fmtAgo, fmtSize, fmtUsd, mailKey, matchGroup,
-  olderThan, parseFilter, retainedMailKeys, sieveSnippet } from "./lib";
+import { applyStatus, ENGAGEMENT_HIGH_MIN, ENGAGEMENT_LOW_MAX,
+  engagementTier, fmtAgo, fmtSize, fmtUsd, mailKey, matchGroup, olderThan,
+  parseFilter, retainedMailKeys, sieveSnippet } from "./lib";
 import type { Group } from "./types";
 
 const g = (over: Partial<Group> = {}): Group => ({
@@ -9,7 +10,7 @@ const g = (over: Partial<Group> = {}): Group => ({
   last: "2024-06-01", tags: ["shipping", "newsletter"], samples: [],
   bulk: true, unsub: true, ai: { verdict: "delete_safe", reason: "x" },
   ratings: null, protected: false, replied: false, att_size: 0,
-  unsubscribed: null, new: false, pinned: 0,
+  unsubscribed: null, new: false, pinned: 0, engagement: 50,
   ...over,
 });
 
@@ -162,6 +163,51 @@ describe("sieveSnippet", () => {
     expect(s).toContain('require ["imap4flags"];');
     expect(s).toContain('addflag "\\\\Seen";');
     expect(s).toContain('"a\\"b@x.example"');
+  });
+});
+
+// Mirrors backend/mailops.py ENGAGEMENT_* / engagement_tier and the cases in
+// tests/test_engagement.py::test_eng_filter_parses_and_matches_tiers.
+describe("engagement tiers", () => {
+  it("thresholds mirror the backend constants", () => {
+    expect(ENGAGEMENT_LOW_MAX).toBe(33);
+    expect(ENGAGEMENT_HIGH_MIN).toBe(67);
+  });
+  it("maps scores to tiers at every boundary", () => {
+    expect([0, 33].map(engagementTier)).toEqual(["low", "low"]);
+    expect([34, 50, 66].map(engagementTier)).toEqual(["medium", "medium",
+      "medium"]);
+    expect([67, 100].map(engagementTier)).toEqual(["high", "high"]);
+  });
+  it("eng:* parses like backend/rules.py", () => {
+    for (const tier of ["low", "medium", "high"] as const) {
+      expect(parseFilter(`eng:${tier}`).eng).toBe(tier);
+    }
+    expect(parseFilter("").eng).toBeNull();
+    expect(parseFilter("ENG:Low").eng).toBe("low");     // case-folded
+    const bogus = parseFilter("eng:extreme");
+    expect(bogus.eng).toBeNull();
+    expect(bogus.text).toEqual(["eng:extreme"]);
+  });
+  it("matches exactly the tier asked for", () => {
+    const cases: [number, string][] = [[0, "low"], [33, "low"],
+      [34, "medium"], [66, "medium"], [67, "high"], [100, "high"]];
+    for (const [score, tier] of cases) {
+      for (const other of ["low", "medium", "high"]) {
+        expect(matchGroup(g({ engagement: score }),
+          parseFilter(`eng:${other}`))).toBe(other === tier);
+      }
+    }
+  });
+  it("combines with other qualifiers, e.g. the cleanup query", () => {
+    const f = parseFilter("eng:low age:>1y");
+    const NOW = new Date("2026-01-01").getTime();
+    expect(matchGroup(g({ engagement: 5, last: "2020-01-01" }), f, NOW))
+      .toBe(true);
+    expect(matchGroup(g({ engagement: 5, last: "2025-12-01" }), f, NOW))
+      .toBe(false);
+    expect(matchGroup(g({ engagement: 90, last: "2020-01-01" }), f, NOW))
+      .toBe(false);
   });
 });
 

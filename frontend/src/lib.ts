@@ -65,6 +65,17 @@ export function retainedMailKeys(
   return out;
 }
 
+/* Engagement tiers of a group's 0-100 score (backend/mailops.py
+ * engagement()). Thresholds mirror ENGAGEMENT_LOW_MAX / ENGAGEMENT_HIGH_MIN
+ * there - parity-tested. */
+export const ENGAGEMENT_LOW_MAX = 33;
+export const ENGAGEMENT_HIGH_MIN = 67;
+export type EngagementTier = "low" | "medium" | "high";
+
+export const engagementTier = (score: number): EngagementTier =>
+  score <= ENGAGEMENT_LOW_MAX ? "low"
+  : score >= ENGAGEMENT_HIGH_MIN ? "high" : "medium";
+
 /* Proton Sieve snippet for a sender/domain, pasteable into
  * Settings → Filters → Add sieve filter. Pure template, no server state. */
 export type SieveAction = "discard" | "fileinto" | "markread";
@@ -100,6 +111,7 @@ export function sieveSnippet(kind: "sender" | "domain", value: string,
  *   is:noreply-ever     the user has never written to any of its senders
  *   is:new              sender first seen within the new-sender window
  *   has:pinned          group contains at least one pinned mail
+ *   eng:low|medium|high engagement tier (<=33 / 34-66 / >=67)
  *   att:>10m att:>500k  attachment size above N (needs attachment analysis)
  *   from:<addr>         exact sender address (sender grouping only)
  *   domain:<domain>     exact domain (domain grouping only)
@@ -121,6 +133,7 @@ export interface ParsedFilter {
   domain: string | null;
   newOnly: boolean;
   pinnedOnly: boolean;
+  eng: EngagementTier | null;
 }
 
 const SIZE_UNIT: Record<string, number> = { k: 1024, m: 1048576, g: 1073741824 };
@@ -129,9 +142,9 @@ export function parseFilter(q: string): ParsedFilter {
   const out: ParsedFilter = { text: [], tags: [], ai: null,
     ageMonths: null, unreadMin: null, unsub: false, protectedOnly: false,
     replied: null, attMin: null, unsubscribed: null, fromAddr: null,
-    domain: null, newOnly: false, pinnedOnly: false };
+    domain: null, newOnly: false, pinnedOnly: false, eng: null };
   for (const tok of q.trim().toLowerCase().split(/\s+/).filter(Boolean)) {
-    const m = tok.match(/^(tag|ai|age|unread|is|has|att|from|domain):(.*)$/);
+    const m = tok.match(/^(tag|ai|age|unread|is|has|eng|att|from|domain):(.*)$/);
     if (!m) {
       out.text.push(tok);
       continue;
@@ -156,6 +169,8 @@ export function parseFilter(q: string): ParsedFilter {
     }
     else if (kind === "is" && val === "new") out.newOnly = true;
     else if (kind === "has" && val === "pinned") out.pinnedOnly = true;
+    else if (kind === "eng" && (val === "low" || val === "medium"
+        || val === "high")) out.eng = val;
     else if (kind === "att") {
       const a = val.match(/^>?(\d+)(k|m|g)?$/);
       if (a) out.attMin = Number(a[1]) * (SIZE_UNIT[a[2]] ?? 1);
@@ -181,6 +196,9 @@ export function matchGroup(g: Group, f: ParsedFilter, now = Date.now()): boolean
   if (f.protectedOnly && !g.protected) return false;
   if (f.newOnly && !g.new) return false;
   if (f.pinnedOnly && !g.pinned) return false;
+  if (f.eng !== null && engagementTier(g.engagement ?? 0) !== f.eng) {
+    return false;
+  }
   if (f.replied !== null && g.replied !== f.replied) return false;
   if (f.unsubscribed !== null) {
     const done = g.unsubscribed?.status === "done";

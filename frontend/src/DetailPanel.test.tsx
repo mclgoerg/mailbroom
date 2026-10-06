@@ -40,7 +40,7 @@ const mkGroup = (over: Partial<Group> = {}): Group => ({
   count: 2, size: 2000, unread: 0, first: "2025-01-01", last: "2025-01-02",
   tags: [], samples: [], bulk: false, unsub: false, ai: null, ratings: null,
   protected: false, replied: false, att_size: 0, unsubscribed: null,
-  new: false, pinned: 0, ...over,
+  new: false, pinned: 0, engagement: 50, ...over,
 });
 
 const noop = () => {};

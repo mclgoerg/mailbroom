@@ -35,6 +35,7 @@ const SORT_OPTIONS: { k: SortKey; label: string }[] = [
   { k: "size", label: "Sort: size" },
   { k: "last", label: "Sort: last activity" },
   { k: "unreadPct", label: "Sort: unread %" },
+  { k: "engagement", label: "Sort: engagement" },
   { k: "label", label: "Sort: name" },
 ];
 

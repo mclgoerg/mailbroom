@@ -79,3 +79,14 @@ test("protected-mails chip emits the has:pinned DSL token", () => {
   expect(s.get()).toBe("has:pinned");
   expect(parseFilter(s.get()).pinnedOnly).toBe(true);
 });
+
+test.each([
+  ["rarely engaged with", "eng:low"],
+  ["sometimes engaged with", "eng:medium"],
+  ["often engaged with", "eng:high"],
+])("engagement chip '%s' emits the %s DSL token", (label, token) => {
+  const s = setup();
+  fireEvent.click(screen.getByText(label));
+  expect(s.get()).toBe(token);
+  expect(parseFilter(s.get()).eng).toBe(token.slice(4));
+});

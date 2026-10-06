@@ -11,6 +11,7 @@ const mk = (i: number): Group => ({
   first: "2024-01-01", last: "2025-01-01", tags: [], samples: [],
   bulk: false, unsub: false, ai: null, ratings: null, protected: false,
   replied: false, att_size: 0, unsubscribed: null, new: false, pinned: 0,
+  engagement: 50,
 });
 
 const groups = Array.from({ length: 120 }, (_, i) => mk(i));
@@ -206,5 +207,111 @@ describe("row opens detail (avatar/chevron/label are all part of one tap target)
     // mobile cards.
     expect(container.querySelectorAll("tbody td span")[0]?.textContent)
       .toBe("S");
+  });
+});
+
+describe("engagement indicator", () => {
+  beforeEach(() => setLang("en"));
+  afterEach(cleanup);
+
+  const eng = (score: number, over: Partial<Group> = {}): Group => ({
+    ...mk(0), engagement: score, ...over });
+
+  it.each([[10, "low", 1], [34, "medium", 2], [66, "medium", 2],
+    [67, "high", 3], [100, "high", 3]])(
+    "score %i renders the %s tier with %i lit bar(s)",
+    (score, tier, lit) => {
+      const { container } = renderTable({ groups: [eng(score)] });
+      const meter = container.querySelector("tbody [data-eng]")!;
+      expect(meter.getAttribute("data-eng")).toBe(tier);
+      expect(meter.querySelectorAll('[data-lit="true"]').length).toBe(lit);
+      expect(meter.querySelectorAll('[data-lit="false"]').length)
+        .toBe(3 - lit);
+    });
+
+  it("the tooltip spells out what the score is made of", () => {
+    const { container } = renderTable({ groups: [eng(12, {
+      count: 100, unread: 88, replied: false, bulk: true,
+      last: "2023-05-01" })] });
+    expect(container.querySelector("tbody [data-eng]")!
+      .getAttribute("title")).toBe(
+      "Engagement 12/100 (low): 12% read, never replied, "
+      + "newsletter/bulk, last mail 2023");
+  });
+
+  it("the tooltip names a replied sender and omits the bulk part", () => {
+    const { container } = renderTable({ groups: [eng(90, {
+      count: 4, unread: 0, replied: true, bulk: false,
+      last: "2026-09-01" })] });
+    expect(container.querySelector("tbody [data-eng]")!
+      .getAttribute("title")).toBe(
+      "Engagement 90/100 (high): 100% read, replied, last mail 2026");
+  });
+
+  it("tapping the meter opens a popover naming the score and its parts "
+    + "(touch screens have no hover)", () => {
+    const { container, getByRole, queryByRole } = renderTable({
+      groups: [eng(12, { count: 100, unread: 88, bulk: true,
+        last: "2023-05-01" })] });
+    expect(queryByRole("dialog")).toBeNull();
+    fireEvent.click(container.querySelector("tbody [data-eng]")!);
+    const pop = getByRole("dialog");
+    expect(pop.textContent).toContain("Engagement score 12/100 · low");
+    expect(pop.textContent).toContain(
+      "12% read · never replied · newsletter/bulk · last mail 2023");
+    // toggles closed again
+    fireEvent.click(container.querySelector("tbody [data-eng]")!);
+    expect(queryByRole("dialog")).toBeNull();
+  });
+
+  it("the popover closes on outside tap and on Escape", () => {
+    const { container, queryByRole } = renderTable({ groups: [eng(50)] });
+    const meter = () => container.querySelector("tbody [data-eng]")!;
+    fireEvent.click(meter());
+    expect(queryByRole("dialog")).not.toBeNull();
+    fireEvent.pointerDown(document.body);
+    expect(queryByRole("dialog")).toBeNull();
+    fireEvent.click(meter());
+    fireEvent.keyDown(document, { key: "Escape" });
+    expect(queryByRole("dialog")).toBeNull();
+  });
+
+  it("tapping the meter on a mobile card does not open the group", () => {
+    const onOpen = vi.fn();
+    const { container } = renderTable({ groups: [eng(50)], onOpen });
+    const cardMeter = container.querySelector(".sm\\:hidden [data-eng]")!;
+    fireEvent.click(cardMeter);
+    expect(onOpen).not.toHaveBeenCalled();
+  });
+
+  it("the popover flips to the right edge when it would overflow", () => {
+    const rect = vi.spyOn(Element.prototype, "getBoundingClientRect");
+    rect.mockReturnValue({ left: 300, right: window.innerWidth + 40,
+      width: 240, height: 60, top: 0, bottom: 60, x: 300, y: 0,
+      toJSON: () => ({}) });
+    const { container, getByRole } = renderTable({ groups: [eng(50)] });
+    fireEvent.click(container.querySelector("tbody [data-eng]")!);
+    expect(getByRole("dialog").className).toContain("right-0");
+    rect.mockRestore();
+  });
+
+  it("is also shown on the mobile cards", () => {
+    const { container } = renderTable({ groups: [eng(80)] });
+    expect(container.querySelectorAll("[data-eng='high']").length).toBe(2);
+  });
+
+  it("the column header sorts by engagement", () => {
+    const onSort = vi.fn();
+    const { getByText } = renderTable({ onSort });
+    fireEvent.click(getByText("Eng."));
+    expect(onSort).toHaveBeenCalledWith("engagement");
+  });
+
+  it("is translated in German", () => {
+    setLang("de");
+    const { container, getByText } = renderTable({ groups: [eng(10)] });
+    expect(container.querySelector("[data-eng]")!.getAttribute("title"))
+      .toContain("Interaktion 10/100 (niedrig)");
+    getByText("Inter.");
   });
 });
