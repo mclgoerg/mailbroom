@@ -443,7 +443,7 @@ export function DetailPanel({ grouping, group, aiEnabled, protectedNow,
                     {t("pin.group_off")}
                   </MenuItem>
                 )}
-                {sieve && grouping !== "subject" && (
+                {sieve && (grouping === "sender" || grouping === "domain") && (
                   <MenuItem onClick={() => setSieveOpen(!sieveOpen)}>
                     {t("sieve.button")}
                   </MenuItem>
@@ -454,7 +454,7 @@ export function DetailPanel({ grouping, group, aiEnabled, protectedNow,
               )}
             </div>
 
-            {sieve && sieveOpen && grouping !== "subject" && (
+            {sieve && sieveOpen && (grouping === "sender" || grouping === "domain") && (
               <div className="rounded-md border border-line bg-panel2 p-3">
                 <div className="mb-2 flex flex-wrap items-center gap-2">
                   <span className="text-xs text-muted">{t("sieve.intro")}</span>

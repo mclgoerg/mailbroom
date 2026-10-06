@@ -143,6 +143,7 @@ export const DE: Record<string, string> = {
   "Sender": "Absender",
   "Domain": "Domain",
   "Subject": "Betreff",
+  "Thread": "Konversation",
   "AI review": "KI-Prüfung",
   "Select…": "Auswählen…",
   "AI-safe groups": "KI: sicher löschbar",

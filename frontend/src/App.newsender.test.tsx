@@ -64,7 +64,7 @@ const mkGroup = (over: Partial<Group> = {}): Group => ({
 const baseState: AppState = {
   account: "proton", status: "done", scanned_ts: 1, groups_rev: 1,
   progress: "", error: "", folders: [],
-  groups: { sender: {}, domain: {}, subject: {} },
+  groups: { sender: {}, domain: {}, subject: {}, thread: {} },
   ai: { status: "idle", grouping: "sender", progress: "", error: "",
     usage: null },
   delete: { status: "idle", progress: "", error: "", moved: 0 },
@@ -84,7 +84,7 @@ test("no New chip renders when nothing is flagged", async () => {
   localStorage.setItem("pmc_account", "proton");
   const a = mkGroup();
   state = { ...baseState,
-    groups: { sender: { [a.key]: a }, domain: {}, subject: {} } };
+    groups: { sender: { [a.key]: a }, domain: {}, subject: {}, thread: {} } };
   render(<App />);
   await waitFor(() => expect(screen.getAllByText("Sender A").length)
     .toBeGreaterThan(0));
@@ -104,7 +104,7 @@ test("the New chip shows a live count; tap 1 filters, tap 2 selects " +
     key: "c@x.example", label: "Sender C", count: 3, new: false });
   state = { ...baseState, groups: { sender: {
     [flagged.key]: flagged, [flaggedProtected.key]: flaggedProtected,
-    [notFlagged.key]: notFlagged }, domain: {}, subject: {} } };
+    [notFlagged.key]: notFlagged }, domain: {}, subject: {}, thread: {} } };
   render(<App />);
   await waitFor(() => expect(screen.getAllByText("Sender A").length)
     .toBeGreaterThan(0));

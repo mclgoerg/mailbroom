@@ -29,7 +29,11 @@ import type { AppState, AuthProbe, Config, FilterPreset, Group, Grouping,
 
 const GROUPING_LABEL: Record<Grouping, string> = {
   sender: "Sender", domain: "Domain", subject: "Subject",
+  thread: "Thread",
 };
+// Groupings keyed by something that is neither an address nor a domain:
+// no protect/block/Sieve shortcuts (those need a sender or a domain).
+const KEYED_BY_MAIL = (g: Grouping) => g === "subject" || g === "thread";
 
 const SORT_OPTIONS: { k: SortKey; label: string }[] = [
   { k: "count", label: "Sort: mails" },
@@ -308,7 +312,7 @@ export default function App() {
   // so rows/detail can show a badge+Unblock button and hide the Block one.
   const blockedRules = useMemo(() => {
     const map = new Map<string, string>();
-    if (mode === "subject") return map;
+    if (KEYED_BY_MAIL(mode)) return map;
     const prefix = mode === "sender" ? "from:" : "domain:";
     for (const r of state?.rules ?? []) {
       if (r.origin === "block" && r.grouping === mode
@@ -618,7 +622,7 @@ export default function App() {
 
   // Sender mode protects the exact address, domain mode the whole domain.
   // Subject groups have no stable sender, so they get no protect toggle.
-  const toggleProtect = mode === "subject" ? undefined : async (g: Group) => {
+  const toggleProtect = KEYED_BY_MAIL(mode) ? undefined : async (g: Group) => {
     const entry = mode === "domain" ? `@${g.key}` : g.key;
     try {
       const r = await api.protect(entry, !g.protected);
@@ -631,7 +635,7 @@ export default function App() {
 
   // Sender/domain only (same restriction as protect - subject groups have
   // no stable sender to build a from:/domain: rule from).
-  const blockGroup = mode === "subject" ? undefined : async (g: Group) => {
+  const blockGroup = KEYED_BY_MAIL(mode) ? undefined : async (g: Group) => {
     if (!confirm(t("confirm.block", { label: g.label }))) return;
     const trashExisting = g.count > 0
       && confirm(t("confirm.block_trash_existing", { n: g.count }));
@@ -647,7 +651,7 @@ export default function App() {
   // Unblock = delete the standing rule the Block action created (same
   // reversible path as deleting any other rule in the Rules modal, just
   // reachable with one click from the group itself).
-  const unblockGroup = mode === "subject" ? undefined : async (g: Group) => {
+  const unblockGroup = KEYED_BY_MAIL(mode) ? undefined : async (g: Group) => {
     const ruleId = blockedRules.get(g.key);
     if (!ruleId) return;
     if (!confirm(t("confirm.unblock", { label: g.label }))) return;
@@ -914,7 +918,7 @@ export default function App() {
                 setFlat(false); setMode(g); setSelected(new Set());
                 setFocusIdx(-1);
               }}
-              className={`flex-1 px-3 py-1.5 text-sm sm:flex-none ${
+              className={`flex-1 whitespace-nowrap px-2 py-1.5 text-sm sm:flex-none sm:px-3 ${
                 !flat && mode === g
                   ? "bg-accent text-white"
                   : "bg-panel2 text-body hover:bg-chip"}`}>
@@ -925,7 +929,7 @@ export default function App() {
             onClick={() => {
               setFlat(true); setSelected(new Set()); setFocusIdx(-1);
             }}
-            className={`flex-1 px-3 py-1.5 text-sm sm:flex-none ${flat
+            className={`flex-1 whitespace-nowrap px-2 py-1.5 text-sm sm:flex-none sm:px-3 ${flat
               ? "bg-accent text-white"
               : "bg-panel2 text-body hover:bg-chip"}`}>
             {t("view.all_mails")}

@@ -81,7 +81,7 @@ const group: Group = {
 const baseState: AppState = {
   account: "proton", status: "done", scanned_ts: 1, groups_rev: 1,
   progress: "", error: "", folders: ["Archive"],
-  groups: { sender: { [group.key]: group }, domain: {}, subject: {} },
+  groups: { sender: { [group.key]: group }, domain: {}, subject: {}, thread: {} },
   ai: { status: "idle", grouping: "sender", progress: "", error: "",
     usage: null },
   delete: { status: "idle", progress: "", error: "", moved: 0 },

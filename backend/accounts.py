@@ -13,7 +13,7 @@ import threading
 from . import config as cfgmod
 from . import tenants
 
-GROUPINGS = ("sender", "domain", "subject")
+GROUPINGS = ("sender", "domain", "subject", "thread")
 
 
 def _initial_state() -> dict:

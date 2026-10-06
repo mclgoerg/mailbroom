@@ -155,7 +155,8 @@ export function RulesModal({ state, onClose, onChanged }: {
             <div className="flex flex-wrap items-center gap-2">
               <span className="font-medium">{rule.name}</span>
               <Tag>{t(rule.grouping === "sender" ? "Sender"
-                : rule.grouping === "domain" ? "Domain" : "Subject")}</Tag>
+                : rule.grouping === "domain" ? "Domain"
+                : rule.grouping === "thread" ? "Thread" : "Subject")}</Tag>
               <Tag>{t(`action.${rule.action}`)}
                 {rule.dest ? ` → ${rule.dest}` : ""}</Tag>
               <Tag>{t(`sched.${rule.schedule}`)}</Tag>
@@ -215,6 +216,7 @@ export function RulesModal({ state, onClose, onChanged }: {
               <option value="sender">{t("Sender")}</option>
               <option value="domain">{t("Domain")}</option>
               <option value="subject">{t("Subject")}</option>
+              <option value="thread">{t("Thread")}</option>
             </Select>
             <div className="sm:col-span-2">
               <div className="relative flex flex-wrap items-center gap-2">
