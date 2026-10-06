@@ -44,25 +44,34 @@ export function MessageView({ mail, onBack }: {
   );
 }
 
-export function MailRows({ mails, sel, onToggle, onOpen, onPin }: {
+export function MailRows({ mails, sel, onToggle, onOpen, onPin, detailed,
+  paged }: {
   mails: Mail[];
   sel: Set<string>;
   onToggle: (k: string) => void;
   onOpen: (m: Mail) => void;
   // Pin toggle per row; absent = no pin control (search results etc.).
   onPin?: (m: Mail) => void;
+  // Always show folder and sender on the meta line (the flat all-mails
+  // list), instead of only when they vary across the visible mails.
+  detailed?: boolean;
+  // The caller pages the list itself: no client-side render cap / "show
+  // more" (it would sit next to the caller's own load-more button).
+  paged?: boolean;
 }) {
   const [cap, setCap] = useState(RENDER_CAP);
   // Sender/folder only earn a spot on the meta line when they actually
   // vary across the visible mails - a single-sender group (the common
   // case) stays as uncluttered as a plain date/size line.
-  const multiSender = useMemo(
+  const variesSender = useMemo(
     () => new Set(mails.map((m) => m.addr)).size > 1, [mails]);
-  const multiFolder = useMemo(
+  const variesFolder = useMemo(
     () => new Set(mails.map((m) => m.folder)).size > 1, [mails]);
+  const multiSender = !!detailed || variesSender;
+  const multiFolder = !!detailed || variesFolder;
   return (
     <>
-      {mails.slice(0, cap).map((m) => {
+      {(paged ? mails : mails.slice(0, cap)).map((m) => {
         const meta = [(m.date || "").slice(0, 10)];
         if (multiFolder) meta.push(m.folder);
         if (multiSender) meta.push(m.addr);
@@ -105,7 +114,7 @@ export function MailRows({ mails, sel, onToggle, onOpen, onPin }: {
           </div>
         );
       })}
-      {mails.length > cap && (
+      {!paged && mails.length > cap && (
         <div className="py-3 text-center">
           <Button variant="ghost" onClick={() => setCap(cap + RENDER_CAP)}>
             {t("show_more", { n: Math.min(RENDER_CAP, mails.length - cap),

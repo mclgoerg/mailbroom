@@ -2350,6 +2350,120 @@ def search_body(query: str, limit: int = 500, acc=None,
     return {"mails": mails[:limit], "notes": notes}
 
 
+# ------------------------------------------------------------- flat mail list
+
+MAIL_SORTS = ("date", "size", "sender")
+_MQ_RE = re.compile(r"^(age|size|att|from|domain|folder|is|has|"
+                    r"tag|ai|unread|eng):(.*)$")
+_MQ_AGE_RE = re.compile(r"^>?(\d+)(d|m|y)$")
+_MQ_SIZE_RE = re.compile(r"^>?(\d+)(k|m|g)?$")
+_MQ_UNIT = {"k": 1024, "m": 1048576, "g": 1073741824, "": 1}
+
+
+def parse_mail_query(q: str) -> dict:
+    """Per-mail filter for the flat "All mails" view. Plain words must ALL
+    appear in sender address, sender name or subject (like search_mails).
+    Per-mail qualifiers: `age:>6m|2y|30d` (older than), `size:>1m` (at
+    least), `att:>1m` (attachment bytes - only for mails the attachment
+    analysis has covered), `from:addr` (exact), `domain:example.com`,
+    `folder:text`, `is:unread|read`, `has:pinned`.
+    Group-level qualifiers (`tag:`, `ai:`, `unread:<pct>`, `eng:`,
+    `is:unsub|protected|replied|new|...`, `has:` other than pinned) have no
+    per-mail meaning here: they are NOT applied and are reported back in
+    `ignored` instead of silently matching nothing. (This is a separate,
+    smaller parser - the group-filter DSL in rules.py/lib.ts is untouched.)"""
+    out: dict = {"text": [], "age_days": None, "size_min": None,
+                 "att_min": None, "from_addr": None, "domain": None,
+                 "folder": None, "read": None, "pinned": False,
+                 "ignored": []}
+    for tok in (q or "").strip().lower().split():
+        m = _MQ_RE.match(tok)
+        if not m:
+            out["text"].append(tok)
+            continue
+        kind, val = m.groups()
+        a = None
+        if kind == "age" and (a := _MQ_AGE_RE.match(val)):
+            out["age_days"] = int(a.group(1)) * {"d": 1, "m": 30.44,
+                                                 "y": 365.25}[a.group(2)]
+        elif kind in ("size", "att") and (a := _MQ_SIZE_RE.match(val)):
+            out["size_min" if kind == "size" else "att_min"] = \
+                int(a.group(1)) * _MQ_UNIT[a.group(2) or ""]
+        elif kind == "from" and val:
+            out["from_addr"] = val
+        elif kind == "domain" and val:
+            out["domain"] = val.lstrip("@")
+        elif kind == "folder" and val:
+            out["folder"] = val
+        elif kind == "is" and val in ("unread", "read"):
+            out["read"] = val == "read"
+        elif kind == "has" and val == "pinned":
+            out["pinned"] = True
+        elif kind in ("tag", "ai", "unread", "eng", "is", "has"):
+            out["ignored"].append(tok)
+        else:                       # malformed age:/size:/att: value
+            out["text"].append(tok)
+    return out
+
+
+def list_mails(offset: int = 0, limit: int = 100, sort: str = "date",
+               direction: str | None = None, q: str = "", acc=None) -> dict:
+    """One page of the scanned index as a flat, sorted, filtered list - no
+    IMAP traffic. Only (folder, uid) handles the index already exposes;
+    `total` is the filtered count for "x of y"; `ignored` lists group-level
+    qualifiers from `q` that do not apply per mail (see parse_mail_query)."""
+    acc = acc or accounts.get()
+    if sort not in MAIL_SORTS:
+        raise ValueError(f"bad sort {sort!r}")
+    if direction is None:
+        direction = "asc" if sort == "sender" else "desc"
+    if direction not in ("asc", "desc"):
+        raise ValueError(f"bad direction {direction!r}")
+    offset, limit = max(0, offset), max(1, min(limit, 1000))
+    f = parse_mail_query(q)
+    cutoff = (time.time() - f["age_days"] * 86400
+              if f["age_days"] is not None else None)
+    pinned = pinstore.load_account(acc.name)
+    mail_verdicts = verdictstore.load_mails()
+    with acc.lock:
+        hits = []
+        for m in acc.index.values():
+            if f["from_addr"] is not None and m["addr"] != f["from_addr"]:
+                continue
+            if f["domain"] is not None \
+                    and not m["addr"].endswith("@" + f["domain"]):
+                continue
+            if f["folder"] is not None \
+                    and f["folder"] not in decode_mutf7(m["folder"]).lower():
+                continue
+            if f["read"] is not None and m["seen"] != f["read"]:
+                continue
+            if f["pinned"] and m["msgid"] not in pinned:
+                continue
+            if f["size_min"] is not None and m["size"] < f["size_min"]:
+                continue
+            if f["att_min"] is not None \
+                    and m.get("att_size", 0) < f["att_min"]:
+                continue
+            if cutoff is not None and not (m["ts"] and m["ts"] < cutoff):
+                continue
+            if f["text"]:
+                hay = f"{m['subject']}\n{m['addr']}\n{m['name']}".lower()
+                if not all(t in hay for t in f["text"]):
+                    continue
+            hits.append(m)
+        # (folder, uid) as the final tiebreak keeps paging stable.
+        hits.sort(key=lambda m: (m["folder"], m["uid"]))
+        keyfn = {"date": lambda m: m["ts"], "size": lambda m: m["size"],
+                 "sender": lambda m: (m["addr"], m["name"].lower())}[sort]
+        hits.sort(key=keyfn, reverse=direction == "desc")
+        page = hits[offset:offset + limit]
+        mails = [{**_search_row(m), "ai": mail_verdicts.get(m["msgid"]) or None,
+                  "pinned": m["msgid"] in pinned} for m in page]
+    return {"total": len(hits), "offset": offset, "mails": mails,
+            "ignored": f["ignored"]}
+
+
 # ---------------------------------------------------------------- drilldown
 
 def group_mails(grouping: str, key: str,

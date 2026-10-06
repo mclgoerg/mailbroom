@@ -229,6 +229,13 @@ export interface Mail {
   pinned?: boolean;   // absent in search/duplicate/attachment lists
 }
 
+export interface MailsResp {
+  total: number;           // after filtering, for "x of y"
+  offset: number;
+  mails: Mail[];
+  ignored: string[];       // group-level qualifiers from q that don't apply
+}
+
 export interface MessageDetail {
   from: string;
   to: string;

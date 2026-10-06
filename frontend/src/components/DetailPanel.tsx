@@ -2,6 +2,7 @@ import { MoreHorizontal, Pin, PinOff, Shield, Wand2, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { api } from "../api";
 import { t } from "../i18n";
+import { actionVerb, planMailAction } from "../mailActions";
 import { fmtSize, fmtUsd, mailKey, olderThan, sieveSnippet,
   type SieveAction } from "../lib";
 import type { AppState, Group, Grouping, GroupUnsub, Mail } from "../types";
@@ -246,35 +247,15 @@ export function DetailPanel({ grouping, group, aiEnabled, protectedNow,
 
   const act = async (action: string, dest = "") => {
     if (!mails || sel.size === 0) return;
-    const verb = { trash: t("Move to Trash"), archive: t("Archive"),
-      move: `${t("Move")} → ${dest}`,
-      mark_read: t("Mark as read") }[action] ?? action;
-    // Same shape as the overview's protected-group handling: ONE pinned
-    // mail acted on explicitly gets its own warning and is sent with
-    // `force`; pinned mails inside a larger selection are dropped from it
-    // (never silently moved). mark_read is non-destructive - exempt.
+    const verb = actionVerb(action, dest);
     const chosen = mails.filter((m) => sel.has(mailKey(m)));
-    let acting = chosen;
-    let force = false;
-    if (action !== "mark_read") {
-      const pinned = chosen.filter((m) => m.pinned);
-      if (chosen.length === 1 && pinned.length === 1) {
-        if (!confirm(t("confirm.act_pinned_mail", {
-          verb, subject: chosen[0].subject || t("(no subject)") }))) return;
-        force = true;
-      } else if (pinned.length) {
-        acting = chosen.filter((m) => !m.pinned);
-        if (!acting.length) {
-          setNote(t("toast.all_pinned"));
-          return;
-        }
-      }
+    const plan = planMailAction(chosen, action, verb);
+    if (plan.kind === "cancelled") return;
+    if (plan.kind === "all_pinned") {
+      setNote(t("toast.all_pinned"));
+      return;
     }
-    const skipNote = acting.length !== chosen.length
-      ? " " + t("confirm.pinned_skipped",
-          { n: chosen.length - acting.length }) : "";
-    if (!force && !confirm(
-      t("confirm.act_mails", { verb, n: acting.length }) + skipNote)) return;
+    const { acting, force } = plan;
     const actingKeys = new Set(acting.map(mailKey));
     const wholeGroup = acting.length === mails.length
       && action !== "mark_read";
