@@ -12,6 +12,7 @@ from __future__ import annotations
 import base64
 import email
 import email.header
+import hashlib
 import html as html_mod
 import json
 import logging
@@ -40,7 +41,7 @@ FETCH_CHUNK = 500
 MOVE_CHUNK = 500
 MAX_SAMPLES = 3
 BODY_CHAR_LIMIT = 50_000
-GROUPINGS = ("sender", "domain", "subject")
+GROUPINGS = accounts.GROUPINGS
 
 # Order matters: the first matching category becomes the primary tag.
 CATEGORY_RULES: list[tuple[str, list[str]]] = [
@@ -168,7 +169,10 @@ def save_replied(acc=None) -> None:
 # undo works by Message-ID.
 
 SNAPSHOT_DIR = Path(os.environ.get("SNAPSHOT_DIR", "/data"))
-_SNAP_VERSION = 1
+# v2: index records carry `irt`/`refs` (thread grouping). A v1 snapshot is
+# ignored on load, so the first scan after an upgrade refetches every
+# header in full - otherwise old cached mails would silently never thread.
+_SNAP_VERSION = 2
 
 
 def _snap_path(name: str, tenant=None) -> Path:
@@ -565,8 +569,8 @@ def _fetch_full_chunk(conn, folder: str, chunk: list[bytes],
     status, data = conn.uid(
         "FETCH", b",".join(chunk).decode(),
         "(UID FLAGS RFC822.SIZE INTERNALDATE "
-        "BODY.PEEK[HEADER.FIELDS (FROM SUBJECT MESSAGE-ID "
-        "LIST-UNSUBSCRIBE LIST-UNSUBSCRIBE-POST)])")
+        "BODY.PEEK[HEADER.FIELDS (FROM SUBJECT MESSAGE-ID IN-REPLY-TO "
+        "REFERENCES LIST-UNSUBSCRIBE LIST-UNSUBSCRIBE-POST)])")
     if status != "OK":
         return skipped
     for item in data or []:
@@ -596,6 +600,8 @@ def _fetch_full_chunk(conn, folder: str, chunk: list[bytes],
                               (msg.get("List-Unsubscribe-Post")
                                or "").lower(),
                 "msgid": (msg.get("Message-ID") or "").strip()[:300],
+                "irt": header_ids(msg.get("In-Reply-To"))[:1],
+                "refs": capped_refs(header_ids(msg.get("References"))),
                 "size": int(sm.group(1)) if sm else 0,
                 "seen": bool(fm and b"\\Seen" in fm.group(1)),
                 "ts": ts,
@@ -837,13 +843,117 @@ def group_engagement(rec: dict, now: float | None = None) -> int:
                       last_ts, now)
 
 
+# --------------------------------------------------------------- threading
+
+_MSGID_RE = re.compile(r"<[^<>\s]{1,300}>")
+_REPLY_PREFIX_RE = re.compile(r"^\s*((re|aw|antw|fwd?|wg|sv|vs)\s*:\s*)+",
+                              re.IGNORECASE)
+REFS_KEEP_TAIL = 10
+
+
+def header_ids(value) -> list[str]:
+    """`<message-id>` tokens of a Message-ID / In-Reply-To / References
+    header value (a Header OBJECT for malformed headers, hence str())."""
+    return _MSGID_RE.findall(str(value or ""))
+
+
+def capped_refs(ids: list[str]) -> list[str]:
+    """References can list hundreds of ids. Keep the first (the thread's
+    root - it anchors the thread key) and the last REFS_KEEP_TAIL (the
+    closest ancestors), order preserved."""
+    if len(ids) <= REFS_KEEP_TAIL + 1:
+        return ids
+    return [ids[0]] + ids[-REFS_KEEP_TAIL:]
+
+
+def _own_id(m: dict) -> str:
+    ids = header_ids(m.get("msgid"))
+    return ids[0] if ids else ""
+
+
+def assign_threads(messages: list) -> list[tuple[str, str]]:
+    """(thread key, label) per message, aligned with `messages`.
+
+    Conversations are the connected components of the graph that links a
+    mail's own Message-ID to every id in its In-Reply-To / References
+    (union-find; cycles and self-references collapse harmlessly, and a
+    reply whose parent is gone - or was never scanned - still joins its
+    siblings through the shared reference). Mails without any linkage are
+    singletons; subjects are NEVER used to merge (the subject grouping
+    already does that).
+
+    The key is a hash of the thread's root id: the smallest first
+    References entry in the component (the root is listed first by every
+    mail client; capped_refs keeps it), else the smallest id there is. A
+    new reply therefore keeps its thread's key across rescans - AI
+    verdicts and saved selections stay valid - and the raw Message-ID never
+    becomes a group key (it would otherwise reach the AI payload and URLs).
+    The label is the subject of the earliest mail, without Re:/Fwd:."""
+    parent: dict[str, str] = {}
+
+    def find(x: str) -> str:
+        parent.setdefault(x, x)
+        root = x
+        while parent[root] != root:
+            root = parent[root]
+        while parent[x] != root:                    # path compression
+            parent[x], x = root, parent[x]
+        return root
+
+    def union(a: str, b: str) -> None:
+        ra, rb = find(a), find(b)
+        if ra != rb:
+            parent[max(ra, rb)] = min(ra, rb)
+
+    linked: list[list[str]] = []
+    for m in messages:
+        ids = [i for i in [_own_id(m), *(m.get("irt") or []),
+                           *(m.get("refs") or [])] if i]
+        linked.append(ids)
+        for other in ids[1:]:
+            union(ids[0], other)
+
+    comp_of: list[str | None] = [find(ids[0]) if ids else None
+                                 for ids in linked]
+    roots: dict[str, set[str]] = {}       # component -> first-ref candidates
+    allids: dict[str, set[str]] = {}
+    earliest: dict[str, dict] = {}
+    for m, ids, comp in zip(messages, linked, comp_of):
+        if comp is None:
+            continue
+        allids.setdefault(comp, set()).update(ids)
+        if m.get("refs"):
+            roots.setdefault(comp, set()).add(m["refs"][0])
+        best = earliest.get(comp)
+        if best is None or (m["ts"] or 1 << 62, m["folder"], m["uid"]) \
+                < (best["ts"] or 1 << 62, best["folder"], best["uid"]):
+            earliest[comp] = m
+
+    def label_of(m: dict) -> str:
+        return _REPLY_PREFIX_RE.sub("", m["subject"]).strip() \
+            or "(no subject)"
+
+    out: list[tuple[str, str]] = []
+    for m, comp in zip(messages, comp_of):
+        if comp is None:                  # no ids at all: its own thread
+            seed = f"uid:{m['folder']}\0{m['uid']}"
+            out.append((hashlib.sha1(seed.encode()).hexdigest()[:16],
+                        label_of(m)))
+            continue
+        root = min(roots.get(comp) or allids[comp])
+        out.append((hashlib.sha1(root.encode()).hexdigest()[:16],
+                    label_of(earliest[comp])))
+    return out
+
+
 def build_groups(messages: list, replied_to: set[str] | None = None,
                  categories: list[tuple[str, list[str]]] | None = None,
                  ) -> dict:
     replied_to = replied_to or set()
     now = time.time()
     groups: dict = {g: {} for g in GROUPINGS}
-    for m in messages:
+    threads = assign_threads(messages)
+    for m, (tkey, tlabel) in zip(messages, threads):
         addr, name, subj = m["addr"], m["name"], m["subject"]
         domain = addr.rsplit("@", 1)[-1] if "@" in addr else addr
 
@@ -851,6 +961,7 @@ def build_groups(messages: list, replied_to: set[str] | None = None,
             ("sender", addr, name or addr),
             ("domain", domain, domain),
             ("subject", norm_subject(subj), subj or "(no subject)"),
+            ("thread", tkey, tlabel),
         )
         for grouping, key, label in targets:
             rec = _rec(groups, grouping, key, label)
@@ -863,7 +974,7 @@ def build_groups(messages: list, replied_to: set[str] | None = None,
             rec["bulk"] = rec["bulk"] or m["bulk"]
             rec["unsub"] = rec["unsub"] or bool(m["unsub"])
             rec["_senders"].add(addr)
-            sample = subj if grouping != "subject" else addr
+            sample = subj if grouping in ("sender", "domain") else addr
             if sample and sample not in rec["samples"] \
                     and len(rec["samples"]) < MAX_SAMPLES:
                 rec["samples"].append(sample)
@@ -891,6 +1002,11 @@ def build_groups(messages: list, replied_to: set[str] | None = None,
                 if names:
                     rec["label"] = max(names, key=names.get)
                 rec["sub"] = rec["key"] if rec["label"] != rec["key"] else ""
+            elif grouping == "thread":
+                rec["sub"] = (f"{rec['count']} mail"
+                              f"{'s' if rec['count'] != 1 else ''}, "
+                              f"{nsenders} sender"
+                              f"{'s' if nsenders != 1 else ''}")
             else:
                 rec["sub"] = f"{nsenders} sender{'s' if nsenders != 1 else ''}"
             rec["engagement"] = group_engagement(rec, now)

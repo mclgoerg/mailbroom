@@ -93,7 +93,7 @@ let cfg: Config = multiCfg;
 const baseState: AppState = {
   account: "proton", status: "idle", scanned_ts: null, groups_rev: 0,
   progress: "", error: "", folders: [],
-  groups: { sender: {}, domain: {}, subject: {} },
+  groups: { sender: {}, domain: {}, subject: {}, thread: {} },
   ai: { status: "idle", grouping: "sender", progress: "", error: "",
     usage: null },
   delete: { status: "idle", progress: "", error: "", moved: 0 },
@@ -261,7 +261,7 @@ const renderWithOneSenderGroup = () => {
   localStorage.setItem("pmc_account", "proton");
   state = { ...baseState, status: "done",
     groups: { sender: { [groupFixture.key]: groupFixture },
-              domain: {}, subject: {} } };
+              domain: {}, subject: {}, thread: {} } };
   return render(<App />);
 };
 
@@ -309,7 +309,7 @@ const renderWithOneBlockedSenderGroup = () => {
   localStorage.setItem("pmc_account", "proton");
   state = { ...baseState, status: "done",
     groups: { sender: { [groupFixture.key]: groupFixture },
-              domain: {}, subject: {} },
+              domain: {}, subject: {}, thread: {} },
     rules: [blockRuleFixture] };
   return render(<App />);
 };
@@ -498,7 +498,7 @@ test("the bar's Action… offers AI review (only when AI is enabled) and " +
   localStorage.setItem("pmc_ai_ack", "1");   // skip the metadata-sharing confirm
   state = { ...baseState, status: "done",
     groups: { sender: { [groupFixture.key]: groupFixture },
-              domain: {}, subject: {} } };
+              domain: {}, subject: {}, thread: {} } };
   render(<App />);
   await waitFor(() => expect(screen.getAllByText("DHL Paket").length)
     .toBeGreaterThan(0));

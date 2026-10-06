@@ -12,7 +12,7 @@ Mailbroom sweeps any IMAP mailbox - built with love for
 [Proton Mail Bridge](https://proton.me/mail/bridge).
 
 Declutter a mailbox: scan everything over IMAP, group mails **by
-sender, domain, or subject** with counts, sizes, and unread ratios, drill
+sender, domain, subject, or conversation thread** with counts, sizes, and unread ratios, drill
 into any group down to the full mail text (or browse everything in a flat,
 date-sorted "All mails" list), and move whole groups or single
 mails to Trash - with optional AI assistance (Anthropic API or Microsoft

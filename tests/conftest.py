@@ -81,8 +81,8 @@ def make_msg(uid, frm='"Shop News" <news@shop.example>',
              subject="Big Sale 42", unsub=None, unsub_post=False,
              msgid=None, size=1000, seen=False,
              date="26-Sep-2026 12:00:00 +0000", to=None, cc=None,
-             atts=None, body=None):
-    return {"uid": uid, "body": body, "from": frm, "subject": subject, "unsub": unsub,
+             atts=None, body=None, irt=None, refs=None):
+    return {"uid": uid, "body": body, "irt": irt, "refs": refs, "from": frm, "subject": subject, "unsub": unsub,
             "unsub_post": unsub_post,
             "msgid": msgid or f"<m{uid}@shop.example>",
             "size": size, "seen": seen, "date": date, "to": to, "cc": cc,
@@ -159,6 +159,12 @@ class FakeIMAP:
     def _header_blob(self, m) -> bytes:
         lines = [f"From: {m['from']}", f"Subject: {m['subject']}",
                  f"Message-ID: {m['msgid']}"]
+        if m.get("irt"):
+            lines.append(f"In-Reply-To: {m['irt']}")
+        if m.get("refs"):
+            refs = m["refs"]
+            lines.append("References: "
+                         + (refs if isinstance(refs, str) else " ".join(refs)))
         if m.get("to"):
             lines.append(f"To: {m['to']}")
         if m.get("cc"):

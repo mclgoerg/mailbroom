@@ -56,7 +56,7 @@ const cfg = {
 const baseState: AppState = {
   account: "proton", status: "done", scanned_ts: 1, groups_rev: 1,
   progress: "", error: "", folders: ["INBOX"],
-  groups: { sender: {}, domain: {}, subject: {} },
+  groups: { sender: {}, domain: {}, subject: {}, thread: {} },
   ai: { status: "idle", grouping: "sender", progress: "", error: "",
     usage: null },
   delete: { status: "idle", progress: "", error: "", moved: 0 },
@@ -99,4 +99,25 @@ test("the chosen view is restored on reload", async () => {
   render(<App />);
   await screen.findByText("Flat mail");
   await waitFor(() => expect(mails).toHaveBeenCalled());
+});
+
+test("Thread is a fourth grouping tab with its own groups", async () => {
+  const thread = {
+    key: "ab12cd34ef567890", label: "Project plan", sub: "3 mails, 2 senders",
+    count: 3, size: 6000, unread: 1, first: "2024-03-01", last: "2024-03-03",
+    tags: [], samples: ["boss@corp.example"], bulk: false, unsub: false,
+    ai: null, ratings: null, protected: false, replied: false, att_size: 0,
+    unsubscribed: null, new: false, pinned: 0, engagement: 50,
+  };
+  state = { ...baseState, groups: { ...baseState.groups,
+    thread: { [thread.key]: thread } } };
+  render(<App />);
+  await screen.findByPlaceholderText("filter groups…");
+  expect(screen.queryByText("Project plan")).toBeNull();     // sender tab
+
+  fireEvent.click(screen.getByRole("button", { name: "Thread" }));
+  await screen.findAllByText("Project plan");
+  expect(screen.getAllByText("3 mails, 2 senders").length).toBeGreaterThan(0);
+  // the table's first column is named after the grouping
+  expect(screen.getAllByText("Thread").length).toBeGreaterThan(1);
 });

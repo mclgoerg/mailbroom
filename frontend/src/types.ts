@@ -1,4 +1,4 @@
-export type Grouping = "sender" | "domain" | "subject";
+export type Grouping = "sender" | "domain" | "subject" | "thread";
 export type Verdict = "delete_safe" | "review" | "keep";
 
 export interface GroupAi {
