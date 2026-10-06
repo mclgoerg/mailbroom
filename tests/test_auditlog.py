@@ -13,7 +13,7 @@ from backend import tenants
 from backend import unsub
 from backend.main import app
 
-from conftest import wait_delete_done, wait_unsub_done
+from conftest import wait_delete_done, wait_scan_done, wait_unsub_done
 
 client = TestClient(app)
 
@@ -102,6 +102,7 @@ def test_undo_and_empty_trash_are_logged(bridge):
     mailops.delete_groups("sender", ["noreply@dhl.example"])
     wait_delete_done()
     mailops.undo_last()
+    wait_scan_done()                  # the undo's own refresh scan
     e = next(e for e in entries() if e["action"] == "undo")
     assert e["count"] == 3 and e["outcome"] == "ok"
 

@@ -53,7 +53,8 @@ export function TrashPanel({ state, onClose, onChanged }: {
       const uids = trash.mails.filter((m) => sel.has(mailKey(m)))
         .map((m) => m.uid);
       const r = await api.trashRestore(uids, dest, trash.uv);
-      setNote(t("trash.restored", { n: r.restored }));
+      setNote(t(r.rescan ? "trash.restored_refreshing" : "trash.restored",
+        { n: r.restored }));
       setTrash({ ...trash, total: trash.total - r.restored,
         mails: trash.mails.filter((m) => !sel.has(mailKey(m))) });
       setSel(new Set());

@@ -1101,7 +1101,7 @@ def run_scan(acc=None) -> None:
                 acc.state["progress"] = ""
                 acc.state["trash_count"] = trash_count
                 acc.state["folders_raw"] = folders
-                if cached:
+                if cached and not acc.state["notice"]:
                     acc.state["notice"] = {"key": "cached_verdicts",
                                        "params": {"n": cached}}
                 acc.state["ai"] = {"status": "idle", "grouping": "",
@@ -1149,7 +1149,10 @@ def folder_message_count(conn, target: str | None) -> int | None:
         return None
 
 
-def start_scan(acc=None) -> None:
+def start_scan(acc=None, notice: dict | None = None) -> None:
+    """Kick off a background scan. `notice` (key/params) is shown while it
+    runs and survives the scan's own notices - used by the restore paths
+    so their result isn't swallowed by the reset below."""
     acc = acc or accounts.get()
     with acc.lock:
         if acc.state["status"] == "scanning" \
@@ -1163,7 +1166,7 @@ def start_scan(acc=None) -> None:
         # now that scans can also fire unattended on a schedule. `status`
         # stays the authoritative "a scan is running" signal.
         acc.state.update(status="scanning", progress="connecting…", error="",
-                     notice=None, scanned_ts=None)
+                     notice=notice, scanned_ts=None)
         acc.state["groups_rev"] += 1
         acc.state["delete"] = {"status": "idle", "progress": "", "error": "",
                            "moved": 0}
@@ -2017,6 +2020,25 @@ def duplicates_list(limit: int = 200, acc=None) -> list[dict]:
 
 # ----------------------------------------------------------- undo & trash
 
+def _rescan_after_restore(acc, restored: int, key: str,
+                          params: dict) -> bool:
+    """Deleting patches the index live (_apply_removal); a restore can't,
+    because the mails come back under NEW uids. An incremental scan (only
+    the restored mails are new to it) makes them reappear instead. Sets
+    the restore notice - `key` when the scan started, `key`_rescan (which
+    tells the user to rescan) when it could not - and returns whether a
+    scan was started. Never raises: the restore itself already succeeded."""
+    if restored > 0:
+        try:
+            start_scan(acc, notice={"key": key, "params": params})
+            return True
+        except RuntimeError:      # busy with AI/delete/attachments/unsub
+            pass
+    with acc.lock:
+        acc.state["notice"] = {"key": f"{key}_rescan", "params": params}
+    return False
+
+
 def undo_last(index: int = -1, acc=None) -> dict:
     """Restore a recorded move job (found by Message-ID in its target)."""
     acc = acc or accounts.get()
@@ -2065,13 +2087,12 @@ def undo_last(index: int = -1, acc=None) -> dict:
     with acc.lock:
         if acc.state["trash_count"] is not None:
             acc.state["trash_count"] = max(0, acc.state["trash_count"] - restored)
-        acc.state["notice"] = {"key": "restored", "params": {
-            "restored": restored, "of": entry["count"],
-            "label": entry["label"]}}
     auditlog.record(
         "undo", account=acc.name, count=restored, label=entry["label"],
         outcome="ok" if restored == entry["count"] else "partial")
-    return {"restored": restored, "of": entry["count"]}
+    rescan = _rescan_after_restore(acc, restored, "restored", {
+        "restored": restored, "of": entry["count"], "label": entry["label"]})
+    return {"restored": restored, "of": entry["count"], "rescan": rescan}
 
 
 def trash_list(limit: int = 1000, acc=None) -> dict:
@@ -2140,9 +2161,9 @@ def trash_restore(uids: list[int], dest: str, uv: int = 0,
     with acc.lock:
         if acc.state["trash_count"] is not None:
             acc.state["trash_count"] = max(0, acc.state["trash_count"] - restored)
-        acc.state["notice"] = {"key": "trash_restored", "params": {
-            "n": restored, "dest": decode_mutf7(dest)}}
-    return {"restored": restored}
+    rescan = _rescan_after_restore(acc, restored, "trash_restored", {
+        "n": restored, "dest": decode_mutf7(dest)})
+    return {"restored": restored, "rescan": rescan}
 
 
 def empty_trash(acc=None) -> dict:
