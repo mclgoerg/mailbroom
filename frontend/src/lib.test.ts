@@ -9,7 +9,7 @@ const g = (over: Partial<Group> = {}): Group => ({
   last: "2024-06-01", tags: ["shipping", "newsletter"], samples: [],
   bulk: true, unsub: true, ai: { verdict: "delete_safe", reason: "x" },
   ratings: null, protected: false, replied: false, att_size: 0,
-  unsubscribed: null, new: false,
+  unsubscribed: null, new: false, pinned: 0,
   ...over,
 });
 
@@ -45,6 +45,22 @@ describe("retainedMailKeys", () => {
 
   it("no restriction exempts nothing", () => {
     expect(retainedMailKeys(mails, null, null)).toEqual(new Set());
+  });
+
+  it("pinned mails join the keep-set on top of the window, without "
+    + "using up a keep-latest slot (mirrors mailops.retained_mails)", () => {
+    const pinnedOld = mails.map((m) =>
+      m.uid === 10 ? { ...m, pinned: true } : m);
+    expect(retainedMailKeys(pinnedOld, 1, null, true))
+      .toEqual(new Set(["INBOX 1", "Archive 10"]));
+    expect(retainedMailKeys(pinnedOld, null, null, true))
+      .toEqual(new Set(["Archive 10"]));
+    // without skipPinned (mark_read) the pin is ignored
+    expect(retainedMailKeys(pinnedOld, 1, null, false))
+      .toEqual(new Set(["INBOX 1"]));
+    // a pin on an old mail also survives an older-than-days window
+    expect(retainedMailKeys(pinnedOld, null, 30, true))
+      .toEqual(new Set(["Archive 10"]));
   });
 
   it("keep_latest keeps the newest N, ties break by folder then uid", () => {
@@ -109,6 +125,15 @@ describe("parseFilter", () => {
     expect(parseFilter("att:5").attMin).toBe(5);
     expect(parseFilter("att:bogus").attMin).toBeNull();
   });
+  it("has:pinned parses like backend/rules.py; other has:* is plain text",
+    () => {
+    expect(parseFilter("has:pinned").pinnedOnly).toBe(true);
+    expect(parseFilter("has:pinned").text).toEqual([]);
+    expect(parseFilter("").pinnedOnly).toBe(false);
+    const other = parseFilter("has:other");
+    expect(other.pinnedOnly).toBe(false);
+    expect(other.text).toEqual(["has:other"]);
+  });
   it("recognises from:/domain: (block-sender exact qualifiers)", () => {
     expect(parseFilter("from:noreply@dhl.example").fromAddr)
       .toBe("noreply@dhl.example");
@@ -161,6 +186,13 @@ describe("matchGroup", () => {
     const f = parseFilter("is:new");
     expect(matchGroup(g({ new: true }), f, NOW)).toBe(true);
     expect(matchGroup(g(), f, NOW)).toBe(false);
+  });
+  it("has:pinned matches only groups containing a pinned mail", () => {
+    const f = parseFilter("has:pinned");
+    expect(f.pinnedOnly).toBe(true);
+    expect(matchGroup(g({ pinned: 2 }), f, NOW)).toBe(true);
+    expect(matchGroup(g({ pinned: 0 }), f, NOW)).toBe(false);
+    expect(matchGroup(g({ pinned: 1 }), parseFilter("dhl"), NOW)).toBe(true);
   });
   it("is:replied / is:noreply-ever split on the replied flag", () => {
     expect(matchGroup(g({ replied: true }), parseFilter("is:replied"), NOW))

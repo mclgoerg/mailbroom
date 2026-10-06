@@ -64,3 +64,39 @@ test("downloadFile raises on a non-OK response instead of saving nothing " +
   await expect(downloadFile("/api/export?grouping=sender"))
     .rejects.toThrow("not found");
 });
+
+test("pin and force-delete send the documented bodies", async () => {
+  const fetchMock = vi.fn().mockResolvedValue({
+    ok: true, json: () => Promise.resolve({ ok: true }) });
+  vi.stubGlobal("fetch", fetchMock);
+  setAccount("");
+  await api.pin("INBOX", 7, true);
+  expect(fetchMock.mock.calls[0][0]).toBe("/api/pin");
+  expect(JSON.parse(fetchMock.mock.calls[0][1].body))
+    .toEqual({ folder: "INBOX", uid: 7, pinned: true });
+  await api.deleteMessages([["INBOX", 7]], "trash", "", true);
+  expect(JSON.parse(fetchMock.mock.calls[1][1].body)).toEqual(
+    { items: [["INBOX", 7]], action: "trash", dest: "", force: true });
+  await api.deleteMessages([["INBOX", 7]]);
+  expect(JSON.parse(fetchMock.mock.calls[2][1].body).force).toBe(false);
+});
+
+test.each([
+  ["no_message_id", /no Message-ID/],
+  ["pinned_mails", /contains protected mails/],
+  ["all_pinned", /All selected mails are protected/],
+])("the backend's pin error code %s becomes translated text", async (
+  code, text) => {
+  vi.stubGlobal("fetch", vi.fn().mockResolvedValue({
+    ok: false, status: 400,
+    text: () => Promise.resolve(JSON.stringify({ detail: code })) }));
+  await expect(api.pin("INBOX", 1, true)).rejects.toThrow(text);
+});
+
+test("an unknown error detail still passes through untouched", async () => {
+  vi.stubGlobal("fetch", vi.fn().mockResolvedValue({
+    ok: false, status: 400,
+    text: () => Promise.resolve(JSON.stringify({ detail: "unknown message" }))
+  }));
+  await expect(api.pin("INBOX", 1, true)).rejects.toThrow("unknown message");
+});

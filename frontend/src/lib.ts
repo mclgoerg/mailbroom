@@ -40,11 +40,18 @@ export const olderThan = (m: { ts: number }, months: number): boolean =>
  * restriction EXEMPTS from an action (the keep-window), as mailKey()s.
  * Newest-first; ts == 0 sorts oldest; ties break by folder+uid - same
  * order the backend applies, so a client-side preview count matches what
- * the server will actually act on. */
+ * the server will actually act on. With `skipPinned`, pinned mails
+ * (`pinned: true`) are always part of the keep-set on top of the window -
+ * they never use up a keep-latest slot. */
 export function retainedMailKeys(
-    mails: { folder: string; uid: number; ts: number }[],
-    keepLatest: number | null, olderThanDays: number | null): Set<string> {
-  if (!keepLatest && !olderThanDays) return new Set();
+    mails: { folder: string; uid: number; ts: number; pinned?: boolean }[],
+    keepLatest: number | null, olderThanDays: number | null,
+    skipPinned = false): Set<string> {
+  const out = new Set<string>();
+  if (skipPinned) {
+    for (const m of mails) if (m.pinned) out.add(mailKey(m));
+  }
+  if (!keepLatest && !olderThanDays) return out;
   const items = [...mails].sort((a, b) =>
     b.ts - a.ts || a.folder.localeCompare(b.folder) || a.uid - b.uid);
   let keep: typeof items;
@@ -54,7 +61,8 @@ export function retainedMailKeys(
     const cutoff = Date.now() / 1000 - (olderThanDays as number) * 86400;
     keep = items.filter((m) => m.ts !== 0 && m.ts >= cutoff);
   }
-  return new Set(keep.map(mailKey));
+  for (const m of keep) out.add(mailKey(m));
+  return out;
 }
 
 /* Proton Sieve snippet for a sender/domain, pasteable into
@@ -91,6 +99,7 @@ export function sieveSnippet(kind: "sender" | "domain", value: string,
  *   is:replied          the user has written to this sender before
  *   is:noreply-ever     the user has never written to any of its senders
  *   is:new              sender first seen within the new-sender window
+ *   has:pinned          group contains at least one pinned mail
  *   att:>10m att:>500k  attachment size above N (needs attachment analysis)
  *   from:<addr>         exact sender address (sender grouping only)
  *   domain:<domain>     exact domain (domain grouping only)
@@ -111,6 +120,7 @@ export interface ParsedFilter {
   fromAddr: string | null;
   domain: string | null;
   newOnly: boolean;
+  pinnedOnly: boolean;
 }
 
 const SIZE_UNIT: Record<string, number> = { k: 1024, m: 1048576, g: 1073741824 };
@@ -119,9 +129,9 @@ export function parseFilter(q: string): ParsedFilter {
   const out: ParsedFilter = { text: [], tags: [], ai: null,
     ageMonths: null, unreadMin: null, unsub: false, protectedOnly: false,
     replied: null, attMin: null, unsubscribed: null, fromAddr: null,
-    domain: null, newOnly: false };
+    domain: null, newOnly: false, pinnedOnly: false };
   for (const tok of q.trim().toLowerCase().split(/\s+/).filter(Boolean)) {
-    const m = tok.match(/^(tag|ai|age|unread|is|att|from|domain):(.*)$/);
+    const m = tok.match(/^(tag|ai|age|unread|is|has|att|from|domain):(.*)$/);
     if (!m) {
       out.text.push(tok);
       continue;
@@ -145,6 +155,7 @@ export function parseFilter(q: string): ParsedFilter {
       out.unsubscribed = false;
     }
     else if (kind === "is" && val === "new") out.newOnly = true;
+    else if (kind === "has" && val === "pinned") out.pinnedOnly = true;
     else if (kind === "att") {
       const a = val.match(/^>?(\d+)(k|m|g)?$/);
       if (a) out.attMin = Number(a[1]) * (SIZE_UNIT[a[2]] ?? 1);
@@ -169,6 +180,7 @@ export function matchGroup(g: Group, f: ParsedFilter, now = Date.now()): boolean
   if (f.unsub && !g.unsub) return false;
   if (f.protectedOnly && !g.protected) return false;
   if (f.newOnly && !g.new) return false;
+  if (f.pinnedOnly && !g.pinned) return false;
   if (f.replied !== null && g.replied !== f.replied) return false;
   if (f.unsubscribed !== null) {
     const done = g.unsubscribed?.status === "done";

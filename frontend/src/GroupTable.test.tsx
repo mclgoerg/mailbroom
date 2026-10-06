@@ -10,7 +10,7 @@ const mk = (i: number): Group => ({
   count: i + 1, size: 1000 * (i + 1), unread: 0,
   first: "2024-01-01", last: "2025-01-01", tags: [], samples: [],
   bulk: false, unsub: false, ai: null, ratings: null, protected: false,
-  replied: false, att_size: 0, unsubscribed: null, new: false,
+  replied: false, att_size: 0, unsubscribed: null, new: false, pinned: 0,
 });
 
 const groups = Array.from({ length: 120 }, (_, i) => mk(i));
@@ -142,6 +142,24 @@ describe("new-sender badge", () => {
     const { getAllByText } = renderTable({
       groups: [{ ...mk(0), new: true }] });
     expect(getAllByText(/New/).length).toBe(2);
+  });
+});
+
+describe("pinned badge", () => {
+  beforeEach(() => setLang("en"));
+  afterEach(cleanup);
+
+  it("shows no pin indicator for a group without pinned mails", () => {
+    const { queryAllByTitle } = renderTable({ groups: [mk(0)] });
+    expect(queryAllByTitle(/protected from bulk actions/).length).toBe(0);
+  });
+
+  it("shows the pinned-mail count on the row (desktop + mobile)", () => {
+    const { getAllByTitle } = renderTable({
+      groups: [{ ...mk(4), pinned: 3 }] });
+    const badges = getAllByTitle("3 mail(s) protected from bulk actions");
+    expect(badges.length).toBe(2);
+    expect(badges[0].textContent).toContain("3");
   });
 });
 

@@ -64,3 +64,27 @@ test("AccountAvatar shows the first letter and a stable, distinct hue "
   const [a, b] = screen.getAllByText(/^[a-z]$/);
   expect(a.className).not.toBe(b.className);       // distinct hues
 });
+
+test("menu flips to left-aligned when right-aligned would run off the " +
+  "left screen edge (trigger wrapped to the start of a row)", () => {
+  const rect = vi.spyOn(Element.prototype, "getBoundingClientRect");
+  rect.mockReturnValue({ left: -60, right: 140, width: 200, height: 80,
+    top: 0, bottom: 80, x: -60, y: 0, toJSON: () => ({}) });
+  renderMenu(() => {});
+  fireEvent.click(screen.getByLabelText("Profile"));
+  const popover = screen.getByText("Do it").closest("div.absolute")!;
+  expect(popover.className).toContain("left-0");
+  expect(popover.className).not.toContain("right-0");
+  rect.mockRestore();
+});
+
+test("menu stays right-aligned when it fits", () => {
+  const rect = vi.spyOn(Element.prototype, "getBoundingClientRect");
+  rect.mockReturnValue({ left: 120, right: 320, width: 200, height: 80,
+    top: 0, bottom: 80, x: 120, y: 0, toJSON: () => ({}) });
+  renderMenu(() => {});
+  fireEvent.click(screen.getByLabelText("Profile"));
+  const popover = screen.getByText("Do it").closest("div.absolute")!;
+  expect(popover.className).toContain("right-0");
+  rect.mockRestore();
+});

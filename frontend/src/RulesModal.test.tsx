@@ -68,3 +68,33 @@ test("editing a rule prefills the retention selector and shows its tag",
       .toBeTruthy();
     expect(screen.getByDisplayValue("30")).toBeTruthy();
   });
+
+const grp = (key: string, count: number, pinned: number) => ({
+  key, label: key, sub: "", count, size: 0, unread: 0, first: "2024-01-01",
+  last: "2025-01-01", tags: [], samples: [], bulk: false, unsub: false,
+  ai: null, ratings: null, protected: false, replied: false, att_size: 0,
+  unsubscribed: null, new: false, pinned,
+});
+
+test("the live match count leaves pinned mails out (mark_read excepted)",
+  () => {
+  const state = { ...baseState, groups: { ...baseState.groups,
+    sender: { a: grp("a", 10, 3), b: grp("b", 5, 0) } } };
+  render(<RulesModal state={state} onClose={() => {}}
+    onChanged={() => {}} />);
+  expect(screen.getByText(/currently matches 2 groups · 12 mails/))
+    .toBeTruthy();
+  fireEvent.change(screen.getByDisplayValue("Move to Trash"),
+    { target: { value: "mark_read" } });
+  expect(screen.getByText(/currently matches 2 groups · 15 mails/))
+    .toBeTruthy();
+});
+
+test("a run summary names the protected mails it skipped", () => {
+  const ran: Rule = { ...rule, last_run: {
+    ts: 1, mode: "report", groups: 1, mails: 4, acted: 0, capped: 0,
+    skipped_protected: 0, skipped_pinned: 3, preview: [], error: "" } };
+  render(<RulesModal state={{ ...baseState, rules: [ran] }}
+    onClose={() => {}} onChanged={() => {}} />);
+  expect(screen.getByText(/3 protected mails skipped/)).toBeTruthy();
+});

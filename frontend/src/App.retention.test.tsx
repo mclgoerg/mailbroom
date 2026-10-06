@@ -74,6 +74,7 @@ const group: Group = {
   tags: [], samples: [], bulk: false, unsub: false, ai: null, ratings: null,
   protected: false, replied: false, att_size: 0, unsubscribed: null,
   new: false,
+  pinned: 0,
 };
 
 const baseState: AppState = {
@@ -238,4 +239,25 @@ test("older-than-days is sent through to the delete call", async () => {
   await waitFor(() => expect(deleteGroups).toHaveBeenCalledOnce());
   expect(deleteGroups).toHaveBeenCalledWith(
     "sender", [group.key], "trash", "", false, null, 30);
+});
+
+test("pinned mails are left out of the Trash count; a fully pinned " +
+  "selection says so in the bar and can't be clicked", async () => {
+  state = { ...baseState, groups: { ...baseState.groups,
+    sender: { [group.key]: { ...group, count: 12, pinned: 3 } } } };
+  mountReady();
+  render(<App />);
+  await selectFirstGroup();
+  expect(bulkTrashButton().textContent).toBe("Trash 9");
+  expect(bulkTrashButton().disabled).toBe(false);
+  expect(screen.queryByText(/all protected - nothing to move/)).toBeNull();
+  cleanup();
+
+  state = { ...baseState, groups: { ...baseState.groups,
+    sender: { [group.key]: { ...group, count: 3, pinned: 3 } } } };
+  render(<App />);
+  await selectFirstGroup();
+  await waitFor(() => expect(bulkTrashButton().textContent).toBe("Trash 0"));
+  expect(bulkTrashButton().disabled).toBe(true);
+  expect(screen.getByText(/all protected - nothing to move/)).toBeTruthy();
 });

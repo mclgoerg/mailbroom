@@ -72,3 +72,10 @@ test("clear empties the query", () => {
   fireEvent.click(screen.getByText("Clear"));
   expect(s.get()).toBe("");
 });
+
+test("protected-mails chip emits the has:pinned DSL token", () => {
+  const s = setup();
+  fireEvent.click(screen.getByText("with protected mails"));
+  expect(s.get()).toBe("has:pinned");
+  expect(parseFilter(s.get()).pinnedOnly).toBe(true);
+});

@@ -18,6 +18,7 @@ from backend import config as cfgmod          # noqa: E402
 from backend import digest as digestmod       # noqa: E402
 from backend import knownsenders              # noqa: E402
 from backend import mailops                   # noqa: E402
+from backend import pinstore                  # noqa: E402
 from backend import presets as presetsmod     # noqa: E402
 from backend import rules as rulesmod         # noqa: E402
 from backend import stats as statsmod         # noqa: E402
@@ -55,12 +56,15 @@ def isolate(tmp_path, monkeypatch):
                         tmp_path / "autoscan.json")
     monkeypatch.setattr(knownsenders, "KNOWN_SENDERS_PATH",
                         tmp_path / "known_senders.json")
+    monkeypatch.setattr(pinstore, "PINS_PATH", tmp_path / "pinned_mails.json")
     verdictstore._mails_cache.clear()
     unsubstore._cache.clear()
+    pinstore._cache.clear()
     accountsmod.reset()
     yield
     verdictstore._mails_cache.clear()
     unsubstore._cache.clear()
+    pinstore._cache.clear()
     accountsmod.reset()
 
 

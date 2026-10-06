@@ -1,5 +1,5 @@
-import { Shield, X } from "lucide-react";
-import { useEffect, useRef, useState,
+import { Pin, Shield, X } from "lucide-react";
+import { useEffect, useLayoutEffect, useRef, useState,
   type ComponentProps, type ReactNode } from "react";
 import { t } from "../i18n";
 import type { GroupAi } from "../types";
@@ -73,6 +73,36 @@ export function ProtectButton({ on, onClick, className = "" }: {
   );
 }
 
+/** Per-mail "Protect this mail" toggle (a pinned mail is skipped by every
+ *  bulk action, rule and AI pick). Unrelated to any PIN code/privacy
+ *  feature - the label says "protect", the icon is a drawing pin. */
+export function PinButton({ on, onClick, className = "" }: {
+  on: boolean; onClick: () => void; className?: string;
+}) {
+  const label = t(on ? "pin.unprotect_tip" : "pin.protect_tip");
+  return (
+    <button title={label} aria-label={label} aria-pressed={on}
+      onClick={onClick}
+      className={`flex min-h-7 shrink-0 items-center rounded px-1
+        transition-opacity ${on ? "text-accent"
+          : "opacity-40 hover:opacity-80"} ${className}`}>
+      <Pin size={15} fill={on ? "currentColor" : "none"} />
+    </button>
+  );
+}
+
+/** Group-row indicator: how many of a group's mails are pinned. */
+export function PinBadge({ n }: { n: number }) {
+  if (n <= 0) return null;
+  return (
+    <Tag className="!text-accent whitespace-nowrap">
+      <span title={t("pin.badge_tip", { n })}
+        className="inline-flex items-center gap-0.5">
+        <Pin size={11} fill="currentColor" /> {n}
+      </span>
+    </Tag>
+  );
+}
 
 /** The app-wide loading animation (see .pmc-spinner in index.css).
  *  Colored via currentColor - defaults to the accent; pass e.g.
@@ -217,7 +247,10 @@ export function SectionLabel({ children, className = "" }: {
 }
 
 /** Standard "nothing here" message for empty lists/results. */
-/** Dropdown menu: a trigger button plus a right-aligned popover. Closes
+/** Dropdown menu: a trigger button plus a popover - right-aligned by
+ * default, flipped to left-aligned when that would run off the left edge
+ * of the screen (a trigger that wrapped to the start of a row on a
+ * phone). Closes
  * on outside click, Escape, or after any click inside (items just run
  * their onClick). Sits BELOW modals (they are z-20). */
 export function Menu({ trigger, label, children }: {
@@ -226,7 +259,15 @@ export function Menu({ trigger, label, children }: {
   children: ReactNode;
 }) {
   const [open, setOpen] = useState(false);
+  const [alignLeft, setAlignLeft] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+  const pop = useRef<HTMLDivElement>(null);
+  // Measure right-aligned first, then flip if it overflows the viewport.
+  useLayoutEffect(() => {
+    if (!open) { setAlignLeft(false); return; }
+    const r = pop.current?.getBoundingClientRect();
+    if (r && r.width > 0 && r.left < 8) setAlignLeft(true);
+  }, [open]);
   useEffect(() => {
     if (!open) return;
     const onDoc = (e: MouseEvent) => {
@@ -251,8 +292,10 @@ export function Menu({ trigger, label, children }: {
         {trigger}
       </button>
       {open && (
-        <div className="absolute right-0 top-full z-10 mt-1 min-w-52
-          rounded-lg border border-line bg-panel p-1 shadow-lg"
+        <div ref={pop}
+          className={`absolute top-full z-10 mt-1 min-w-52
+            max-w-[calc(100vw-1rem)] rounded-lg border border-line bg-panel
+            p-1 shadow-lg ${alignLeft ? "left-0" : "right-0"}`}
           onClick={() => setOpen(false)}>
           {children}
         </div>

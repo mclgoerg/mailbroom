@@ -314,20 +314,24 @@ export default function App() {
   // no retention restriction applies, or (when one does) the real count
   // fetched per group and reduced by the same keep-window logic the
   // backend applies (lib.ts's retainedMailKeys mirrors mailops.py).
+  // Pinned mails never move (except for mark_read), so they are left out
+  // of the count too (`skipPinned`).
   const retentionAdjustedCount = async (keys: string[],
       keepLatest: number | null, olderThanDays: number | null,
-      ): Promise<number> => {
+      skipPinned = true): Promise<number> => {
     const all = state?.groups[mode] ?? {};
+    const naive = (k: string) =>
+      (all[k]?.count ?? 0) - (skipPinned ? all[k]?.pinned ?? 0 : 0);
     if (!keepLatest && !olderThanDays) {
-      return keys.reduce((n, k) => n + (all[k]?.count ?? 0), 0);
+      return keys.reduce((n, k) => n + naive(k), 0);
     }
     const counts = await Promise.all(keys.map(async (k) => {
       try {
         const mails = await api.group(mode, k);
-        return mails.length
-          - retainedMailKeys(mails, keepLatest, olderThanDays).size;
+        return mails.length - retainedMailKeys(
+          mails, keepLatest, olderThanDays, skipPinned).size;
       } catch {
-        return all[k]?.count ?? 0;      // fetch failed: fall back to "all"
+        return naive(k);                // fetch failed: fall back to "all"
       }
     }));
     return counts.reduce((a, b) => a + b, 0);
@@ -347,7 +351,8 @@ export default function App() {
     const keys = [...selected];
     const [keepLatest, olderThanDays] = retentionParams();
     if (!keys.length || (!keepLatest && !olderThanDays)) {
-      setSelCount(keys.reduce((n, k) => n + (all[k]?.count ?? 0), 0));
+      setSelCount(keys.reduce(
+        (n, k) => n + (all[k]?.count ?? 0) - (all[k]?.pinned ?? 0), 0));
       setSelCountPending(false);
       return;
     }
@@ -370,6 +375,13 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state?.groups_rev, state?.account, mode, selected, retention,
       retentionN]);
+
+  // Everything in the selection is pinned: nothing would move. Shown in
+  // the bar itself - the toast lives in the status line far above it,
+  // out of sight behind a long list.
+  const selAllPinned = !selCountPending && selected.size > 0 && selCount === 0
+    && !retentionParams().some(Boolean)
+    && [...selected].some((k) => (state?.groups[mode]?.[k]?.pinned ?? 0) > 0);
 
   const scanning = state?.status === "scanning";
   const aiRunning = state?.ai.status === "running";
@@ -547,11 +559,20 @@ export default function App() {
         }
       }
     }
-    const n = await retentionAdjustedCount(effective, keepLatest, olderThanDays);
+    const skipPinned = action !== "mark_read";
+    const pins = skipPinned
+      ? effective.reduce((n, k) => n + (all[k]?.pinned ?? 0), 0) : 0;
+    const n = await retentionAdjustedCount(
+      effective, keepLatest, olderThanDays, skipPinned);
+    if (n === 0 && pins > 0) {
+      setToast(t("toast.all_pinned"));
+      return false;
+    }
     const verb = actionVerb(action) + (dest ? ` → ${dest}` : "");
-    const skipNote = effective.length !== keys.length
+    const skipNote = (effective.length !== keys.length
       ? " " + t("confirm.protected_skipped",
-          { n: keys.length - effective.length }) : "";
+          { n: keys.length - effective.length }) : "")
+      + (pins ? " " + t("confirm.pinned_kept", { n: pins }) : "");
     if (!force && !confirm(
       t("confirm.act", { verb, n, k: effective.length }) + skipNote))
       return false;
@@ -1108,6 +1129,9 @@ export default function App() {
                 {selCountPending
                   ? <>{selected.size} {t("groups")} <Spinner /></>
                   : t("bar.selected", { n: selected.size, mails: selCount })}
+                {selAllPinned && (
+                  <span className="text-accent"> · {t("bar.all_pinned")}</span>
+                )}
               </span>
               <button className="underline hover:text-body"
                 onClick={() => setSelected(new Set())}>
@@ -1173,7 +1197,9 @@ export default function App() {
                   </Button>
                 </>
               )}
-              <Button variant="danger" disabled={selCountPending}
+              <Button variant="danger"
+                disabled={selCountPending || selAllPinned}
+                title={selAllPinned ? t("bar.all_pinned") : undefined}
                 className="ml-auto shrink-0"
                 onClick={() =>
                   act([...selected], "trash", "", ...retentionParams())}>
