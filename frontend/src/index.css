@@ -51,7 +51,11 @@ body {
      behavior: none is the actual fix for the reported blur - it disables
      iOS's rubber-band bounce at the top/bottom entirely, rather than
      trying to make that bounce look right. */
-  height: 100%;
+  /* Pinned to the viewport edges rather than `height: 100%` of html: a
+     percentage height is resolved against the initial containing block,
+     which an installed iOS PWA can keep at its pre-rotation size. */
+  position: fixed;
+  inset: 0;
   overflow: auto;
   overscroll-behavior: none;
   -webkit-overflow-scrolling: touch;
@@ -66,6 +70,17 @@ body {
      content flush against the system chrome. */
   padding: calc(env(safe-area-inset-top) + 8px) env(safe-area-inset-right)
     env(safe-area-inset-bottom) env(safe-area-inset-left);
+}
+
+/* iOS Safari zooms the page in when a text field with a font-size under
+   16px is focused, and (in the installed PWA) leaves it zoomed and
+   scrolled after the keyboard closes - taps then land away from where
+   things are drawn. 16px on touch devices stops the auto-zoom without
+   disabling pinch-zoom. Unlayered, so it beats Tailwind's text-* utilities. */
+@media (pointer: coarse) {
+  input, select, textarea {
+    font-size: 16px;
+  }
 }
 
 /* Shared loading animation: a "comet" ring in currentColor (defaults to
