@@ -51,7 +51,11 @@ body {
      behavior: none is the actual fix for the reported blur - it disables
      iOS's rubber-band bounce at the top/bottom entirely, rather than
      trying to make that bounce look right. */
-  height: 100%;
+  /* Pinned to the viewport edges rather than `height: 100%` of html: a
+     percentage height is resolved against the initial containing block,
+     which an installed iOS PWA can keep at its pre-rotation size. */
+  position: fixed;
+  inset: 0;
   overflow: auto;
   overscroll-behavior: none;
   -webkit-overflow-scrolling: touch;
