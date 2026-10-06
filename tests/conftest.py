@@ -3,6 +3,7 @@ fake in-memory IMAP server that speaks imaplib's response format."""
 
 from __future__ import annotations
 
+import imaplib
 import sys
 from pathlib import Path
 
@@ -80,8 +81,8 @@ def make_msg(uid, frm='"Shop News" <news@shop.example>',
              subject="Big Sale 42", unsub=None, unsub_post=False,
              msgid=None, size=1000, seen=False,
              date="26-Sep-2026 12:00:00 +0000", to=None, cc=None,
-             atts=None):
-    return {"uid": uid, "from": frm, "subject": subject, "unsub": unsub,
+             atts=None, body=None):
+    return {"uid": uid, "body": body, "from": frm, "subject": subject, "unsub": unsub,
             "unsub_post": unsub_post,
             "msgid": msgid or f"<m{uid}@shop.example>",
             "size": size, "seen": seen, "date": date, "to": to, "cc": cc,
@@ -105,6 +106,11 @@ class FakeIMAP:
         self.uv = {f: 1 for f in mailbox}
         self.selected: str | None = None
         self.logged_out = False
+        # imaplib's single-literal slot: UID SEARCH BODY sends its term here
+        self.literal: bytes | None = None
+        self.body_searches: list[tuple[tuple, str]] = []   # (args, term)
+        self.reject_charset = False          # BAD on CHARSET, like old servers
+        self.body_search_error: Exception | None = None   # e.g. TimeoutError
 
     # -- connection lifecycle -------------------------------------------
     def login(self, user, password):
@@ -177,6 +183,20 @@ class FakeIMAP:
 
     def uid(self, cmd, *args):
         msgs = self.mailbox[self.selected]
+        if cmd == "SEARCH" and args[-1] == "BODY":
+            term = (self.literal or b"").decode("utf-8", "replace")
+            self.body_searches.append((args, term))
+            if self.body_search_error:
+                raise self.body_search_error
+            has_charset = "CHARSET" in args
+            if has_charset and self.reject_charset:
+                raise imaplib.IMAP4.error("SEARCH BAD [BADCHARSET]")
+            if not has_charset and not term.isascii():
+                raise imaplib.IMAP4.error("SEARCH BAD 8-bit without CHARSET")
+            hits = [m for m in msgs if term.casefold()
+                    in (m.get("body") or "Hello mail body").casefold()]
+            return "OK", [b" ".join(str(m["uid"]).encode() for m in hits)]
+
         if cmd == "SEARCH":
             if args[-1] == "ALL":
                 hits = msgs

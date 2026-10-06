@@ -274,6 +274,19 @@ export interface DigestSettings {
   minute: number;
 }
 
+export type BodySearchMode = "disabled" | "server";
+
+// Translatable caveat of a mail-text search (key -> `search.note.<key>`).
+export interface SearchNote {
+  key: string;
+  params: Record<string, string | number>;
+}
+
+export interface SearchResp {
+  mails: Mail[];
+  notes: SearchNote[];
+}
+
 export type AutoScanUnit = "minutes" | "hours";
 
 export interface AutoScanSettings {
@@ -299,6 +312,7 @@ export interface ImapAccount {
   oauth: ImapOauth | null;
   digest: DigestSettings;
   auto_scan: AutoScanSettings;
+  body_search?: BodySearchMode;   // absent from older backends = "server"
 }
 
 export type OauthProvider = "google" | "microsoft";

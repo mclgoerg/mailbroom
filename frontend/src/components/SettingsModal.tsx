@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { api, downloadFile, fmtUsd } from "../api";
 import { getLang, setLang, t, type Lang } from "../i18n";
 import { fmtAgo, fmtSize } from "../lib";
-import type { AdminTenantStats, AuthMode, AutoScanUnit, Config,
+import type { AdminTenantStats, AuthMode, AutoScanUnit, BodySearchMode, Config,
   DigestSchedule, FoldersResp, OauthProvider, Preset, Security,
   SmtpSecurity } from "../types";
 import { Button, Field, Input, Loading, Modal, PanelHeader,
@@ -95,6 +95,7 @@ export function SettingsModal({ cfg, account, onClose, onSaved,
       autoScanUnit: (im.auto_scan?.unit ?? "hours") as AutoScanUnit,
       autoScanValue: String(im.auto_scan?.value ?? 6),
       autoScanAlign: String(im.auto_scan?.align_minute ?? 0),
+      bodySearch: (im.body_search ?? "server") as BodySearchMode,
     };
   };
   const [f, setF] = useState({
@@ -244,6 +245,7 @@ export function SettingsModal({ cfg, account, onClose, onSaved,
           auto_scan: { enabled: f.autoScanEnabled, unit: f.autoScanUnit,
             value: +f.autoScanValue || 1,
             align_minute: +f.autoScanAlign || 0 },
+          body_search: f.bodySearch,
           ...(f.password ? { password: f.password } : {}),
           ...(oauthProvider ? { oauth: { provider: oauthProvider,
             client_id: f.oauthClientId,
@@ -804,6 +806,19 @@ export function SettingsModal({ cfg, account, onClose, onSaved,
             </>)}
           </div>
           <p className="mt-1 text-xs text-muted">{t("auto_scan.help")}</p>
+        </div>
+
+        <div className="sm:col-span-2 rounded-md border border-line
+          bg-panel2 p-3">
+          <SectionLabel className="mb-2">{t("body_search.title")}</SectionLabel>
+          <Field label={t("body_search.label")}>
+            <Select className="w-full" value={f.bodySearch}
+              onChange={set("bodySearch")}>
+              <option value="server">{t("body_search.server")}</option>
+              <option value="disabled">{t("body_search.disabled")}</option>
+            </Select>
+          </Field>
+          <p className="mt-1 text-xs text-muted">{t("body_search.help")}</p>
         </div>
         </>)}
 

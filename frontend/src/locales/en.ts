@@ -156,6 +156,27 @@ export const EN: Record<string, string> = {
   "auto_scan.every": "Every",
   "auto_scan.unit_minutes": "minutes",
   "auto_scan.unit_hours": "hours",
+  "search.placeholder_body": "search subject, sender and mail text…",
+  "search.body_toggle": "Also search mail text",
+  "search.body_hint":
+    "Searching mail text asks your mail server and may take a moment.",
+  "search.note.partial":
+    "Not every folder was searched in time - results may be incomplete.",
+  "search.note.folder_failed":
+    "Could not search \"{folder}\" - skipped.",
+  "search.note.stale_folder":
+    "\"{folder}\" changed since the last scan - rescan to include it.",
+  "search.note.charset_fallback":
+    "This server does not support UTF-8 search - accented characters may "
+    + "not match.",
+  "body_search.title": "Mail text search",
+  "body_search.label": "Search inside mail text",
+  "body_search.server": "Ask the mail server",
+  "body_search.disabled": "Off (subject and sender only)",
+  "body_search.help":
+    "Mail-text search runs on your mail server for each query - Mailbroom "
+    + "stores nothing. It can be slow on remote providers; Proton Bridge "
+    + "answers locally. Turn it off to keep search to subject and sender.",
   "auto_scan.align": "Start at minute (0-59)",
   "auto_scan.help":
     "Rescans this account on a timer, independent of any rule schedule - "
