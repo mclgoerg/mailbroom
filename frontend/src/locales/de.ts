@@ -437,6 +437,22 @@ export const DE: Record<string, string> = {
     + "Antwortdaten zusammengeführt. Passwörter/API-Schlüssel werden nie "
     + "importiert.",
   "import.done": "Importiert: {rules} Regeln, {verdicts} Bewertungen.",
+  "view.all_mails": "Alle Mails",
+  "mails.sort_date": "Datum",
+  "mails.sort_size": "Größe",
+  "mails.sort_sender": "Absender",
+  "mails.filter": "Mails filtern…",
+  "mails.filter_tip":
+    "Einfache Wörter treffen Absender oder Betreff. Außerdem: "
+    + "from:adresse domain:example.com folder:name age:>1y size:>1m "
+    + "att:>1m is:unread is:read has:pinned",
+  "mails.count": "{n} von {total} Mails",
+  "mails.select_loaded": "Geladene auswählen ({n})",
+  "mails.ignored":
+    "Für einzelne Mails nicht angewendet: {list} (diese Filter gelten nur "
+    + "für Gruppen).",
+  "mails.load_more": "{n} weitere laden",
+  "mails.none": "Keine Mails passen zu diesem Filter.",
   "no.matches": "Keine Gruppen passen zu diesem Filter.",
   "onboard.title": "Willkommen - in drei Schritten zum sauberen Postfach",
   "onboard.step_bridge":

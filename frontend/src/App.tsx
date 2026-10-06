@@ -13,6 +13,7 @@ import { AttachmentsPanel } from "./components/AttachmentsPanel";
 import { DuplicatesPanel } from "./components/DuplicatesPanel";
 import { GroupTable, type SortKey } from "./components/GroupTable";
 import { RulesModal } from "./components/RulesModal";
+import { AllMailsView } from "./components/AllMailsView";
 import { SearchPanel } from "./components/SearchPanel";
 import { SettingsModal } from "./components/SettingsModal";
 import { StatsPanel } from "./components/StatsPanel";
@@ -69,6 +70,13 @@ export default function App() {
   const [account, setAccountState] = useState(
     () => localStorage.getItem("pmc_account") || "");
   const [mode, setMode] = useState<Grouping>("sender");
+  // The flat "All mails" view sits beside the grouping tabs; the choice
+  // survives reloads like the sort settings.
+  const [flat, setFlat] = useState(
+    () => localStorage.getItem("pmc_view") === "mails");
+  useEffect(() => {
+    localStorage.setItem("pmc_view", flat ? "mails" : "groups");
+  }, [flat]);
   const [filter, setFilter] = useState("");
   // Sort field + direction survive reloads; every field has a natural
   // default direction (name A→Z, everything else biggest/newest first)
@@ -686,7 +694,7 @@ export default function App() {
         filterRef.current?.focus();
         return;
       }
-      if (!groups.length) return;
+      if (flat || !groups.length) return;
       if (e.key === "j" || e.key === "ArrowDown") {
         e.preventDefault();
         setFocusIdx((i) => Math.min(i + 1, groups.length - 1));
@@ -903,18 +911,30 @@ export default function App() {
           {(Object.keys(GROUPING_LABEL) as Grouping[]).map((g) => (
             <button key={g}
               onClick={() => {
-                setMode(g); setSelected(new Set()); setFocusIdx(-1);
+                setFlat(false); setMode(g); setSelected(new Set());
+                setFocusIdx(-1);
               }}
-              className={`flex-1 px-3 py-1.5 text-sm sm:flex-none ${mode === g
-                ? "bg-accent text-white"
-                : "bg-panel2 text-body hover:bg-chip"}`}>
+              className={`flex-1 px-3 py-1.5 text-sm sm:flex-none ${
+                !flat && mode === g
+                  ? "bg-accent text-white"
+                  : "bg-panel2 text-body hover:bg-chip"}`}>
               {t(GROUPING_LABEL[g])}
             </button>
           ))}
+          <button
+            onClick={() => {
+              setFlat(true); setSelected(new Set()); setFocusIdx(-1);
+            }}
+            className={`flex-1 px-3 py-1.5 text-sm sm:flex-none ${flat
+              ? "bg-accent text-white"
+              : "bg-panel2 text-body hover:bg-chip"}`}>
+            {t("view.all_mails")}
+          </button>
         </div>
         {/* Filter + builder share one flex-wrap unit: the builder toggle
             sits right next to the input on every width, and the builder
             panel (w-full) wraps to its own line directly underneath. */}
+        {!flat && (
         <div className="relative order-last flex w-full flex-wrap
           items-center gap-2 sm:order-none sm:w-auto sm:min-w-24 sm:flex-1">
           <div className="relative min-w-0 flex-1">
@@ -945,9 +965,11 @@ export default function App() {
             <BookmarkPlus size={17} />
           </Button>
         </div>
+        )}
         {/* One wrap unit; tighter padding on phones so the strip fits next
             to Scan on one line. */}
-        <div className="ml-auto flex items-center gap-1.5 sm:ml-0 sm:gap-2">
+        <div className={`ml-auto flex items-center gap-1.5 sm:gap-2 ${
+          flat ? "" : "sm:ml-0"}`}>
           <Button variant="ghost" className="!px-2 sm:!px-3"
             title={t("Search all mails")}
             onClick={() => setSearchOpen(true)}><Search size={17} /></Button>
@@ -992,6 +1014,7 @@ export default function App() {
           scroll. No selection-dependent chrome here (that lives in the
           bottom bar below, which only renders once something is
           selected). */}
+      {!flat && (
       <div className="mb-3 flex flex-wrap items-center gap-2">
         {PRESET_CHIPS.map((p) => (
           <button key={p.key}
@@ -1090,11 +1113,12 @@ export default function App() {
           </button>
         </div>
       </div>
+      )}
 
       {/* Inline preset editor: appears only while editing one (Pencil
           above) - a Cancel is always reachable, per the rule of never
           leaving a swapped-in control with no way back. */}
-      {editingPreset && (
+      {!flat && editingPreset && (
         <div className="relative mb-3 flex flex-wrap items-center gap-2
           rounded-lg border border-accent/50 bg-panel2 p-2">
           <span className="shrink-0 text-xs text-muted">
@@ -1287,7 +1311,12 @@ export default function App() {
         </div>
       )}
 
-      {groups.length > 0 ? (
+      {flat ? (
+        state && (
+          <AllMailsView key={state.account} state={state}
+            onChanged={refresh} />
+        )
+      ) : groups.length > 0 ? (
         <GroupTable
           groups={groups}
           selected={selected}

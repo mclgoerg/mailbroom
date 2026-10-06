@@ -458,6 +458,20 @@ export const EN: Record<string, string> = {
     + "(back in report mode), verdicts and replied data are merged. "
     + "Passwords/API keys are never imported.",
   "import.done": "Imported: {rules} rules, {verdicts} verdicts.",
+  "view.all_mails": "All mails",
+  "mails.sort_date": "Date",
+  "mails.sort_size": "Size",
+  "mails.sort_sender": "Sender",
+  "mails.filter": "filter mails…",
+  "mails.filter_tip":
+    "Plain words match sender or subject. Also: from:addr domain:example.com "
+    + "folder:name age:>1y size:>1m att:>1m is:unread is:read has:pinned",
+  "mails.count": "{n} of {total} mails",
+  "mails.select_loaded": "Select loaded ({n})",
+  "mails.ignored":
+    "Not applied to single mails: {list} (these filters only work on groups).",
+  "mails.load_more": "Load {n} more",
+  "mails.none": "No mails match this filter.",
   "no.matches": "No groups match this filter.",
   "onboard.title": "Welcome - three steps to a tidy mailbox",
   "onboard.step_bridge":

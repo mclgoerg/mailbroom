@@ -1008,6 +1008,21 @@ def get_search(q: str = Query(...),
     return {"mails": mailops.search_mails(q, acc=acc), "notes": []}
 
 
+@app.get("/api/mails")
+def get_mails(offset: int = Query(0, ge=0),
+              limit: int = Query(100, ge=1, le=1000),
+              sort: Literal["date", "size", "sender"] = Query("date"),
+              dir: Literal["asc", "desc"] | None = Query(None),
+              q: str = Query(""),
+              account: str | None = Query(None)):
+    """Flat "All mails" view: one page of the scan index as
+    {total, offset, mails, ignored}. `q` takes plain words plus the
+    per-mail qualifiers age:/size:/att:/from:/domain:/folder:/is:unread|read/
+    has:pinned; group-level qualifiers (tag:, ai:, unread:<pct>, eng:, ...)
+    do not apply per mail and are echoed back in `ignored`. No IMAP traffic."""
+    return mailops.list_mails(offset, limit, sort, dir, q, _acc(account))
+
+
 @app.get("/api/export")
 def get_export(grouping: str = Query("sender"),
                keys: list[str] | None = Query(None),
