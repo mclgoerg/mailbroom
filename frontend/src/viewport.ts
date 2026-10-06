@@ -8,7 +8,7 @@
  * here (it is overflow: hidden), so putting it back at the origin is always
  * safe - body's scroll position is left alone. */
 
-const settleMs = 300;   // iOS reports the pre-rotation size for a moment
+const settleMs = 300;   // iOS reports the old size / keyboard for a moment
 
 /** Put the (non-scrolling) document back at the origin. Returns whether
  *  anything was actually off. */
@@ -27,8 +27,11 @@ export function resetViewportOffset(win: Window = window): boolean {
 }
 
 /** Re-center after every orientation change (also catches the resize that
- *  desktop browsers / Android fire instead of `orientationchange`).
- *  Returns an uninstall function. */
+ *  desktop browsers / Android fire instead of `orientationchange`) and
+ *  after a text field loses focus - the on-screen keyboard closing is the
+ *  other moment iOS leaves the layout viewport scrolled (the focus-scroll
+ *  that revealed the field is never undone). Returns an uninstall
+ *  function. */
 export function installViewportGuard(win: Window = window): () => void {
   let timer: ReturnType<typeof setTimeout> | undefined;
   let landscape = win.innerWidth > win.innerHeight;
@@ -46,9 +49,11 @@ export function installViewportGuard(win: Window = window): () => void {
   };
   win.addEventListener("orientationchange", settle);
   win.addEventListener("resize", onResize);
+  win.document.addEventListener("focusout", settle);
   return () => {
     clearTimeout(timer);
     win.removeEventListener("orientationchange", settle);
     win.removeEventListener("resize", onResize);
+    win.document.removeEventListener("focusout", settle);
   };
 }

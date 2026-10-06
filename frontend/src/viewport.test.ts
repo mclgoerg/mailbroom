@@ -74,3 +74,15 @@ test("orientationchange fires the guard even without a size flip", () => {
   expect(scrollTo).toHaveBeenCalledTimes(1);
   off();
 });
+
+test("closing the keyboard (focusout) re-centers a scrolled document", () => {
+  const scrollTo = vi.spyOn(window, "scrollTo").mockImplementation(() => {});
+  const off = installViewportGuard();
+  document.documentElement.scrollTop = 29;
+  document.dispatchEvent(new Event("focusout"));
+  expect(scrollTo).not.toHaveBeenCalled();
+  vi.advanceTimersByTime(300);
+  expect(document.documentElement.scrollTop).toBe(0);
+  expect(scrollTo).toHaveBeenCalledTimes(1);
+  off();
+});

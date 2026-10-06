@@ -72,6 +72,17 @@ body {
     env(safe-area-inset-bottom) env(safe-area-inset-left);
 }
 
+/* iOS Safari zooms the page in when a text field with a font-size under
+   16px is focused, and (in the installed PWA) leaves it zoomed and
+   scrolled after the keyboard closes - taps then land away from where
+   things are drawn. 16px on touch devices stops the auto-zoom without
+   disabling pinch-zoom. Unlayered, so it beats Tailwind's text-* utilities. */
+@media (pointer: coarse) {
+  input, select, textarea {
+    font-size: 16px;
+  }
+}
+
 /* Shared loading animation: a "comet" ring in currentColor (defaults to
    the accent via the Spinner component), used by every loading state. */
 @keyframes pmc-spin {
