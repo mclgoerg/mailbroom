@@ -1532,6 +1532,33 @@ def set_pin(folder: str, uid: int, pinned: bool, acc=None) -> dict:
     return {"ok": True, "pinned": pinned}
 
 
+def set_group_pin(grouping: str, key: str, pinned: bool, acc=None) -> dict:
+    """Pin/unpin every mail currently in one group ("this whole group is
+    important"). Only the mails present NOW are covered - mail arriving
+    later isn't (that's what the sender/domain shield is for). Mails
+    without a Message-ID can't be pinned and are counted in `skipped`."""
+    acc = acc or accounts.get()
+    with acc.lock:
+        rec = acc.state["groups"][grouping].get(key)
+        if not rec:
+            raise ValueError("unknown group")
+        msgids: set[str] = set()
+        skipped = 0
+        for folder, uids in rec["folders"].items():
+            for uid in uids:
+                m = acc.index.get(ikey(folder, uid))
+                if m and m["msgid"]:
+                    msgids.add(m["msgid"])
+                elif m:
+                    skipped += 1
+    changed = pinstore.set_many(msgids, pinned, acc.name)
+    if changed:
+        with acc.lock:
+            acc.state["groups_rev"] += 1
+    return {"ok": True, "pinned": pinned, "changed": changed,
+            "skipped": skipped}
+
+
 def delete_messages(items: list, action: str = "trash",
                     dest: str = "", acc=None, force: bool = False) -> dict:
     """Act on individual messages ([folder, uid] pairs). A pinned mail is

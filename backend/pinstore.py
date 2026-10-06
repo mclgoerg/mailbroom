@@ -88,6 +88,22 @@ def set_pinned(msgid: str, pinned: bool, account: str | None = None) -> None:
         _persist({**data, account: mine})
 
 
+def set_many(msgids: set[str], pinned: bool,
+             account: str | None = None) -> int:
+    """Pin or unpin many Message-IDs of one account with ONE write.
+    Returns how many actually changed."""
+    account = account or accounts.default_name()
+    with _LOCK:
+        data = _load()
+        mine = set(data.get(account, ()))
+        changed = (msgids - mine) if pinned else (msgids & mine)
+        if not changed:
+            return 0
+        _persist({**data, account: (mine | changed) if pinned
+                  else (mine - changed)})
+        return len(changed)
+
+
 def rename_account(old: str, new: str) -> None:
     """Move one account's pins to a new account name."""
     with _LOCK:

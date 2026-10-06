@@ -187,6 +187,12 @@ export const EN: Record<string, string> = {
   "confirm.protected_skipped": "({n} protected group(s) skipped.)",
   "toast.all_protected":
     "All selected groups are protected - nothing was deleted.",
+  "pin.group_on": "Protect all mails in this group",
+  "pin.group_off": "Remove protection from all mails",
+  "pin.group_skipped":
+    "{n} mail(s) without a Message-ID could not be protected.",
+  "confirm.unpin_group":
+    "Remove the protection from all {n} protected mail(s) of this group?",
   "bar.all_pinned": "all protected - nothing to move",
   "toast.all_pinned":
     "All selected mails are protected - nothing was changed.",

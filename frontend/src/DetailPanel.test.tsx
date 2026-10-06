@@ -9,6 +9,7 @@ const group_ = vi.fn();
 const deleteMessages = vi.fn().mockResolvedValue({});
 const aiGroup = vi.fn();
 const pin = vi.fn().mockResolvedValue({ ok: true, pinned: true });
+const pinGroup = vi.fn();
 
 vi.mock("./api", async (importOriginal) => {
   const actual = await importOriginal<typeof import("./api")>();
@@ -19,6 +20,7 @@ vi.mock("./api", async (importOriginal) => {
       deleteMessages: (...args: unknown[]) => deleteMessages(...args),
       aiGroup: (...args: unknown[]) => aiGroup(...args),
       pin: (...args: unknown[]) => pin(...args),
+      pinGroup: (...args: unknown[]) => pinGroup(...args),
       unsubscribe: vi.fn(),
       unsubscribeAck: vi.fn(),
     },
@@ -71,6 +73,7 @@ describe("DetailPanel", () => {
     deleteMessages.mockClear();
     aiGroup.mockReset();
     pin.mockClear();
+    pinGroup.mockReset();
     pin.mockResolvedValue({ ok: true, pinned: true });
     vi.spyOn(window, "confirm").mockReturnValue(true);
     localStorage.setItem("pmc_ai_ack", "1");   // skip the AI consent prompt
@@ -338,6 +341,56 @@ describe("DetailPanel", () => {
       await waitFor(() => expect(deleteMessages).toHaveBeenCalledWith(
         [["INBOX", 1]], "mark_read", "", false));
       expect(confirm.mock.calls[0][0]).not.toMatch(/protected/);
+    });
+
+    it("'Protect all mails in this group' pins the whole group and "
+      + "reloads its mails", async () => {
+      const onDeleted = vi.fn();
+      pinGroup.mockResolvedValue({ ok: true, pinned: true, changed: 2,
+        skipped: 1 });
+      renderPanel([mkMail(1), mkMail(2)], { onDeleted });
+      await waitFor(() => screen.getByText("Mail 1"));
+      group_.mockResolvedValue([mkMail(1, { pinned: true }),
+        mkMail(2, { pinned: true })]);
+      fireEvent.click(await screen.findByLabelText("More"));
+      expect(screen.queryByText("Remove protection from all mails")).toBeNull();
+      fireEvent.click(screen.getByText("Protect all mails in this group"));
+      await waitFor(() => expect(pinGroup).toHaveBeenCalledWith(
+        "sender", "s@x.example", true));
+      await waitFor(() =>
+        expect(document.querySelectorAll("[data-pinned]").length).toBe(2));
+      expect(screen.getByText(/1 mail\(s\) without a Message-ID/))
+        .toBeTruthy();
+      expect(onDeleted).toHaveBeenCalled();
+    });
+
+    it("removing the protection of the whole group asks first", async () => {
+      pinGroup.mockResolvedValue({ ok: true, pinned: false, changed: 1,
+        skipped: 0 });
+      const confirm = vi.spyOn(window, "confirm").mockReturnValue(false);
+      renderPanel([mkMail(1, { pinned: true }), mkMail(2)]);
+      await waitFor(() => screen.getByText("Mail 1"));
+      fireEvent.click(await screen.findByLabelText("More"));
+      // some mails are unpinned -> both entries are offered
+      expect(screen.getByText("Protect all mails in this group")).toBeTruthy();
+      fireEvent.click(screen.getByText("Remove protection from all mails"));
+      expect(confirm).toHaveBeenCalledTimes(1);
+      expect(pinGroup).not.toHaveBeenCalled();
+
+      confirm.mockReturnValue(true);
+      fireEvent.click(screen.getByLabelText("More"));
+      fireEvent.click(screen.getByText("Remove protection from all mails"));
+      await waitFor(() => expect(pinGroup).toHaveBeenCalledWith(
+        "sender", "s@x.example", false));
+    });
+
+    it("the whole-group entry is hidden once every mail is protected",
+      async () => {
+      renderPanel([mkMail(1, { pinned: true }), mkMail(2, { pinned: true })]);
+      await waitFor(() => screen.getByText("Mail 1"));
+      fireEvent.click(await screen.findByLabelText("More"));
+      expect(screen.queryByText("Protect all mails in this group")).toBeNull();
+      expect(screen.getByText("Remove protection from all mails")).toBeTruthy();
     });
   });
 });

@@ -197,6 +197,75 @@ def test_pin_endpoint_validates_account(bridge):
     assert pin("INBOX", 1, account="nope").status_code == 400
 
 
+# ------------------------------------------------------------- whole group
+
+def pin_group(key=DHL, pinned=True, grouping="sender", account=None):
+    q = f"?account={account}" if account else ""
+    return client.post(f"/api/pin_group{q}", json={
+        "grouping": grouping, "key": key, "pinned": pinned})
+
+
+def test_pin_group_pins_every_mail_in_it(bridge):
+    scan(bridge)
+    pin("INBOX", 1)                                    # already pinned
+    rev = mailops.STATE["groups_rev"]
+    r = pin_group()
+    assert r.status_code == 200
+    assert r.json() == {"ok": True, "pinned": True, "changed": 2,
+                        "skipped": 0}
+    assert pinstore.load_account(accountsmod.default_name()) == {
+        M1, M2, M10}
+    assert mailops.STATE["groups_rev"] > rev
+    st = client.get("/api/state").json()["groups"]
+    assert st["sender"][DHL]["pinned"] == 3
+    assert st["sender"]["alice@friends.example"]["pinned"] == 0
+    # nothing of it can be bulk-trashed any more
+    with pytest.raises(ValueError, match=mailops.ALL_PINNED):
+        mailops.delete_groups("sender", [DHL])
+
+    # idempotent, and reversible
+    assert pin_group().json()["changed"] == 0
+    assert pin_group(pinned=False).json()["changed"] == 3
+    assert pinstore.load_account(accountsmod.default_name()) == set()
+
+
+def test_pin_group_on_domain_grouping_and_other_groups_untouched(bridge):
+    scan(bridge)
+    assert pin_group("dhl.example", grouping="domain").json()["changed"] == 3
+    assert client.get("/api/state").json()["groups"]["sender"][
+        "news@shop.example"]["pinned"] == 0
+
+
+def test_pin_group_skips_mails_without_message_id(bridge):
+    scan(bridge)
+    acc = accountsmod.get()
+    acc.index[mailops.ikey("INBOX", 2)]["msgid"] = ""
+    r = pin_group().json()
+    assert r["changed"] == 2 and r["skipped"] == 1
+
+
+def test_pin_group_validates_input(bridge):
+    scan(bridge)
+    assert pin_group("nobody@x.example").status_code == 400
+    assert pin_group(grouping="bogus").status_code == 400
+    assert pin_group(account="nope").status_code == 400
+
+
+def test_pin_group_is_per_account(monkeypatch):
+    _two_accounts(monkeypatch)
+    assert pin_group("both@x.example", account="one").json()["changed"] == 1
+    assert pinstore.load_account("two") == set()
+
+
+def test_set_many_single_write_and_counts(tmp_path):
+    assert pinstore.set_many({"<a@x>", "<b@x>"}, True, "acc") == 2
+    assert pinstore.set_many({"<a@x>", "<c@x>"}, True, "acc") == 1
+    assert pinstore.set_many({"<a@x>", "<zz@x>"}, False, "acc") == 1
+    assert pinstore.set_many(set(), True, "acc") == 0
+    pinstore._cache.clear()
+    assert pinstore.load_account("acc") == {"<b@x>", "<c@x>"}
+
+
 # ------------------------------------------------------- group action sweeps
 
 @pytest.mark.parametrize("action,dest", [

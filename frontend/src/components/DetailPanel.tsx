@@ -1,4 +1,4 @@
-import { MoreHorizontal, Pin, Shield, Wand2, X } from "lucide-react";
+import { MoreHorizontal, Pin, PinOff, Shield, Wand2, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { api } from "../api";
 import { t } from "../i18n";
@@ -227,6 +227,23 @@ export function DetailPanel({ grouping, group, aiEnabled, protectedNow,
     }
   };
 
+  // Pin/unpin every mail currently in the group (the group's own shield
+  // covers future mail; this covers what is in it now).
+  const pinAll = async (pinned: boolean) => {
+    if (!pinned && !confirm(t("confirm.unpin_group",
+      { n: pinnedCount }))) return;
+    try {
+      const r = await api.pinGroup(grouping, group.key, pinned);
+      setMails(await api.group(grouping, group.key));
+      setSel(new Set());
+      setNote(r.skipped > 0
+        ? t("pin.group_skipped", { n: r.skipped }) : "");
+      onDeleted();
+    } catch (e: any) {
+      setNote(`${t("pin.error")}: ${e.message ?? e}`);
+    }
+  };
+
   const act = async (action: string, dest = "") => {
     if (!mails || sel.size === 0) return;
     const verb = { trash: t("Move to Trash"), archive: t("Archive"),
@@ -430,6 +447,19 @@ export function DetailPanel({ grouping, group, aiEnabled, protectedNow,
                   <MenuItem onClick={aiSelect}>
                     <Wand2 size={15} className="mr-1 inline align-text-bottom" />
                     {t("ai.rate")}
+                  </MenuItem>
+                )}
+                {mails && mails.length > 0 && pinnedCount < mails.length && (
+                  <MenuItem onClick={() => pinAll(true)}>
+                    <Pin size={15} className="mr-1 inline align-text-bottom" />
+                    {t("pin.group_on")}
+                  </MenuItem>
+                )}
+                {pinnedCount > 0 && (
+                  <MenuItem onClick={() => pinAll(false)}>
+                    <PinOff size={15}
+                      className="mr-1 inline align-text-bottom" />
+                    {t("pin.group_off")}
                   </MenuItem>
                 )}
                 {sieve && grouping !== "subject" && (

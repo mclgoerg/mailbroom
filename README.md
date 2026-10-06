@@ -152,7 +152,7 @@ presets.
   move), saved rules and retention actions (also in their report
   numbers), selection presets and AI picks (its AI rating is forced to
   "keep"). Marking read still works; acting on a protected mail yourself
-  asks first. It is remembered per account by Message-ID, so it survives
+  asks first. "Protect all mails in this group" (in the detail view's ⋯ menu) pins everything currently in a group - later mail isn't covered, that's what the shield is for. It is remembered per account by Message-ID, so it survives
   rescans and folder moves. Filter groups with `has:pinned`. (This is a
   protection against accidental cleanup, not a PIN code or privacy lock.)
 - **One-click unsubscribe** - RFC 8058 one-click POST or unsubscribe mail

@@ -541,6 +541,26 @@ def post_pin(body: PinBody, account: str | None = Query(None)):
         raise HTTPException(500, f"{type(exc).__name__}: {exc}")
 
 
+class PinGroupBody(BaseModel):
+    grouping: str
+    key: str
+    pinned: bool = True
+
+
+@app.post("/api/pin_group")
+def post_pin_group(body: PinGroupBody, account: str | None = Query(None)):
+    """Pin/unpin every mail currently in one group."""
+    _check_grouping(body.grouping)
+    acc = _acc(account)
+    try:
+        return mailops.set_group_pin(body.grouping, body.key, body.pinned,
+                                     acc)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc))
+    except Exception as exc:
+        raise HTTPException(500, f"{type(exc).__name__}: {exc}")
+
+
 @app.post("/api/ai")
 def post_ai(body: GroupingBody, account: str | None = Query(None)):
     _check_grouping(body.grouping)

@@ -95,6 +95,9 @@ export const api = {
   pin: (folder: string, uid: number, pinned: boolean) =>
     req<{ ok: boolean; pinned: boolean }>("/api/pin",
       { folder, uid, pinned }),
+  pinGroup: (grouping: Grouping, key: string, pinned: boolean) =>
+    req<{ ok: boolean; pinned: boolean; changed: number; skipped: number }>(
+      "/api/pin_group", { grouping, key, pinned }),
   aiReview: (grouping: Grouping, keys?: string[]) =>
     req<{ ok: boolean }>("/api/ai", { grouping, keys: keys ?? null }),
   aiGroup: (grouping: Grouping, key: string, offset = 0, limit = 200,
