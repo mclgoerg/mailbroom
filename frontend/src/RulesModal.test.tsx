@@ -73,7 +73,7 @@ const grp = (key: string, count: number, pinned: number) => ({
   key, label: key, sub: "", count, size: 0, unread: 0, first: "2024-01-01",
   last: "2025-01-01", tags: [], samples: [], bulk: false, unsub: false,
   ai: null, ratings: null, protected: false, replied: false, att_size: 0,
-  unsubscribed: null, new: false, pinned,
+  unsubscribed: null, new: false, pinned, engagement: 50,
 });
 
 test("the live match count leaves pinned mails out (mark_read excepted)",

@@ -129,6 +129,9 @@ export function QueryBuilder({ value, onChange, className = "" }: {
               {flag("is:protected", t("qb.is_protected"))}
               {flag("is:new", t("qb.is_new"))}
               {flag("has:pinned", t("qb.has_pinned"))}
+              {flag("eng:low", t("qb.eng_low"))}
+              {flag("eng:medium", t("qb.eng_medium"))}
+              {flag("eng:high", t("qb.eng_high"))}
             </div>
           </div>
         </div>

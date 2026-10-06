@@ -155,6 +155,15 @@ presets.
   asks first. "Protect all mails in this group" (in the detail view's ⋯ menu) pins everything currently in a group - later mail isn't covered, that's what the shield is for. It is remembered per account by Message-ID, so it survives
   rescans and folder moves. Filter groups with `has:pinned`. (This is a
   protection against accidental cleanup, not a PIN code or privacy lock.)
+- **Engagement score** - every group gets a 0-100 score for how much you
+  actually engage with it, computed locally from what a scan already
+  knows: the share of its mails you read (the backbone), a strong boost if
+  you have written to its senders, a damping factor for newsletters/bulk
+  mail, and a fade for senders that have been silent for months. It shows
+  as a small three-step meter on each row (hover for the breakdown), sorts
+  via "Sort: engagement", and filters with `eng:low` / `eng:medium` /
+  `eng:high` (tiers <=33 / 34-66 / >=67) - usable in rules and saved
+  presets, e.g. `eng:low age:>1y`. The score is never sent to the AI.
 - **One-click unsubscribe** - RFC 8058 one-click POST or unsubscribe mail
   via Bridge SMTP, straight from a group's detail view - or in bulk:
   select any number of groups and unsubscribe from every one of their

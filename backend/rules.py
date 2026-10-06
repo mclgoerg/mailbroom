@@ -49,7 +49,8 @@ _RUN_LOCK = threading.Lock()      # one rule run at a time
 
 # ------------------------------------------------- filter DSL (port of lib.ts)
 
-_QUAL_RE = re.compile(r"^(tag|ai|age|unread|is|has|att|from|domain):(.*)$")
+_QUAL_RE = re.compile(
+    r"^(tag|ai|age|unread|is|has|eng|att|from|domain):(.*)$")
 _AGE_RE = re.compile(r"^>?(\d+)(m|y)$")
 _UNREAD_RE = re.compile(r"^>?(\d+)$")
 _ATT_RE = re.compile(r"^>?(\d+)(k|m|g)?$")
@@ -61,7 +62,7 @@ def parse_filter(q: str) -> dict:
            "unread_min": None, "unsub": False, "protected_only": False,
            "replied": None, "att_min": None, "unsubscribed": None,
            "from_addr": None, "domain": None, "new_only": False,
-           "pinned_only": False}
+           "pinned_only": False, "eng": None}
     for tok in (q or "").strip().lower().split():
         m = _QUAL_RE.match(tok)
         if not m:
@@ -95,6 +96,8 @@ def parse_filter(q: str) -> dict:
             out["unsubscribed"] = False
         elif kind == "is" and val == "new":
             out["new_only"] = True
+        elif kind == "eng" and val in ("low", "medium", "high"):
+            out["eng"] = val
         elif kind == "has" and val == "pinned":
             out["pinned_only"] = True
         elif kind == "att":
@@ -134,6 +137,9 @@ def match_group(g: dict, f: dict, now: float | None = None) -> bool:
     if f["new_only"] and not g.get("new"):
         return False
     if f["pinned_only"] and not g.get("pinned"):
+        return False
+    if f["eng"] is not None and \
+            mailops.engagement_tier(g.get("engagement", 0)) != f["eng"]:
         return False
     if f["replied"] is not None and bool(g.get("replied")) != f["replied"]:
         return False

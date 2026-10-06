@@ -765,10 +765,83 @@ def _rec(groups: dict, grouping: str, key: str, label: str) -> dict:
         "_senders": set(), "_names": {}, "_hay": "", "_min": 0, "_max": 0})
 
 
+# Engagement tiers (keep in sync with ENGAGEMENT_LOW_MAX/HIGH_MIN in
+# frontend/src/lib.ts - parity-tested): low <= 33, medium 34-66, high >= 67.
+ENGAGEMENT_LOW_MAX = 33
+ENGAGEMENT_HIGH_MIN = 67
+ENGAGEMENT_BULK_DAMPEN = 0.7       # bulk/newsletter senders: x0.7
+ENGAGEMENT_REPLIED_BOOST = 0.6     # replied: close 60% of the gap to 100
+ENGAGEMENT_FRESH_DAYS = 30         # no recency penalty up to here...
+ENGAGEMENT_STALE_DAYS = 730        # ...fading linearly to the floor here
+ENGAGEMENT_RECENCY_FLOOR = 0.5     # factor for a sender idle >= 2 years
+
+
+def engagement(count: int, unread: int, replied: bool, bulk: bool,
+               last_ts: float | None, now: float | None = None) -> int:
+    """How much does the user actually engage with this group? 0-100.
+
+    Pure and deterministic; every input is an aggregate already on the
+    group record (nothing extra is fetched, nothing leaves the machine).
+
+    1. Backbone: the read ratio, 100 * (1 - unread / count). Nothing read
+       -> 0.
+    2. Bulk/newsletter flag dampens it: x ENGAGEMENT_BULK_DAMPEN.
+    3. A replied group (the user writes to these senders) gets a strong
+       boost: the score closes ENGAGEMENT_REPLIED_BOOST of its remaining
+       gap to 100 (so even a never-opened group you correspond with lands
+       at 60).
+    4. Recency multiplies the result: 1.0 until the last mail is
+       ENGAGEMENT_FRESH_DAYS old, then fading linearly to
+       ENGAGEMENT_RECENCY_FLOOR at ENGAGEMENT_STALE_DAYS and beyond. An
+       unknown last date (None/0) applies no penalty.
+
+    Each step is monotone, so more unread never raises the score, replied
+    never lowers it, and an older last mail never raises it. The result is
+    rounded and clamped to 0-100."""
+    if count <= 0:
+        return 0
+    score = 100.0 * (1 - min(max(unread, 0), count) / count)
+    if bulk:
+        score *= ENGAGEMENT_BULK_DAMPEN
+    if replied:
+        score += ENGAGEMENT_REPLIED_BOOST * (100.0 - score)
+    if last_ts:
+        age_days = ((now if now is not None else time.time()) - last_ts) \
+            / 86400
+        span = ENGAGEMENT_STALE_DAYS - ENGAGEMENT_FRESH_DAYS
+        fade = min(1.0, max(0.0, (age_days - ENGAGEMENT_FRESH_DAYS) / span))
+        score *= 1 - (1 - ENGAGEMENT_RECENCY_FLOOR) * fade
+    return max(0, min(100, round(score)))
+
+
+def engagement_tier(score: int) -> str:
+    """"low" (<= 33), "medium" (34-66) or "high" (>= 67)."""
+    if score <= ENGAGEMENT_LOW_MAX:
+        return "low"
+    return "high" if score >= ENGAGEMENT_HIGH_MIN else "medium"
+
+
+def group_engagement(rec: dict, now: float | None = None) -> int:
+    """engagement() of one group record. The last-mail date is read from
+    the record's day string (`last`), so snapshots saved before this
+    existed - and records whose counters moved since the scan (mark read,
+    removals) - score correctly too."""
+    last_ts = None
+    if rec.get("last"):
+        try:
+            last_ts = time.mktime(time.strptime(rec["last"], "%Y-%m-%d"))
+        except ValueError:
+            last_ts = None
+    return engagement(rec.get("count", 0), rec.get("unread", 0),
+                      bool(rec.get("replied")), bool(rec.get("bulk")),
+                      last_ts, now)
+
+
 def build_groups(messages: list, replied_to: set[str] | None = None,
                  categories: list[tuple[str, list[str]]] | None = None,
                  ) -> dict:
     replied_to = replied_to or set()
+    now = time.time()
     groups: dict = {g: {} for g in GROUPINGS}
     for m in messages:
         addr, name, subj = m["addr"], m["name"], m["subject"]
@@ -820,6 +893,7 @@ def build_groups(messages: list, replied_to: set[str] | None = None,
                 rec["sub"] = rec["key"] if rec["label"] != rec["key"] else ""
             else:
                 rec["sub"] = f"{nsenders} sender{'s' if nsenders != 1 else ''}"
+            rec["engagement"] = group_engagement(rec, now)
     return groups
 
 
@@ -943,6 +1017,7 @@ def public_state(acc=None) -> dict:
     new_addrs = knownsenders.new_since(acc.name, cfg.get(
         "new_sender_window_days", knownsenders.NEW_SENDER_WINDOW_DAYS))
     pinned = pinstore.load_account(acc.name)
+    now = time.time()
     with acc.lock:
         paddrs = _protected_addrs(plist, acc)
         out = {k: v for k, v in acc.state.items() if k != "groups"}
@@ -953,6 +1028,11 @@ def public_state(acc=None) -> dict:
                     "protected": _group_protected(rec, paddrs, acc),
                     "unsubscribed": _group_unsub(rec, unsub_entries, acc),
                     "new": _group_new(rec, new_addrs, acc),
+                    # Recomputed from the CURRENT aggregates: unread/count
+                    # move after a scan (mark read, removals) and recency
+                    # moves with the clock; the stored value is the
+                    # scan-time one (and absent in old snapshots).
+                    "engagement": group_engagement(rec, now),
                     "pinned": sum(len(u) for u in
                                   pinned_uids(rec, acc, pinned).values())}
                 for k, rec in recs.items()}

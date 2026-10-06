@@ -41,6 +41,7 @@ export interface Group {
   unsubscribed: GroupUnsub | null;
   new: boolean;
   pinned: number;   // mails of this group protected from bulk actions
+  engagement: number;   // 0-100, see lib.ts engagementTier()
 }
 
 export interface AiUsage {

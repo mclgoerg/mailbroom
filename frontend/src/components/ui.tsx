@@ -2,6 +2,7 @@ import { Pin, Shield, X } from "lucide-react";
 import { useEffect, useLayoutEffect, useRef, useState,
   type ComponentProps, type ReactNode } from "react";
 import { t } from "../i18n";
+import { engagementTier } from "../lib";
 import type { GroupAi } from "../types";
 
 /** One-time consent: what metadata the AI features transmit. */
@@ -88,6 +89,37 @@ export function PinButton({ on, onClick, className = "" }: {
           : "opacity-40 hover:opacity-80"} ${className}`}>
       <Pin size={15} fill={on ? "currentColor" : "none"} />
     </button>
+  );
+}
+
+/** Compact 3-step engagement meter: one lit bar per tier (low/medium/
+ *  high), tooltip spelling out what the score is made of. Neutral accent
+ *  tint on purpose - the emerald/amber/rose hues mean delete-safe/review/
+ *  keep elsewhere. */
+export function EngagementMeter({ g }: {
+  g: { engagement: number; count: number; unread: number; replied: boolean;
+       bulk: boolean; last: string };
+}) {
+  const tier = engagementTier(g.engagement);
+  const lit = { low: 1, medium: 2, high: 3 }[tier];
+  const readPct = g.count ? Math.round(100 * (1 - g.unread / g.count)) : 0;
+  const parts = [
+    t("eng.read", { n: readPct }),
+    t(g.replied ? "eng.replied" : "eng.never_replied"),
+    ...(g.bulk ? [t("eng.bulk")] : []),
+    ...(g.last ? [t("eng.last", { year: g.last.slice(0, 4) })] : []),
+  ];
+  const tip = t("eng.tip", { score: g.engagement, tier: t(`eng.${tier}`),
+    parts: parts.join(", ") });
+  return (
+    <span role="img" aria-label={tip} title={tip} data-eng={tier}
+      className="inline-flex items-end gap-0.5">
+      {[1, 2, 3].map((i) => (
+        <span key={i} data-lit={i <= lit ? "true" : "false"}
+          style={{ height: `${4 + i * 3}px` }}
+          className={`w-1 rounded-sm ${i <= lit ? "bg-accent" : "bg-chip"}`} />
+      ))}
+    </span>
   );
 }
 

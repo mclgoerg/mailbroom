@@ -193,6 +193,22 @@ export const EN: Record<string, string> = {
     "{n} mail(s) without a Message-ID could not be protected.",
   "confirm.unpin_group":
     "Remove the protection from all {n} protected mail(s) of this group?",
+  "Sort: engagement": "Sort: engagement",
+  "Eng.": "Eng.",
+  "eng.col_tip":
+    "Engagement: how much you actually read and answer this sender",
+  "eng.tip": "Engagement {score}/100 ({tier}): {parts}",
+  "eng.low": "low",
+  "eng.medium": "medium",
+  "eng.high": "high",
+  "eng.read": "{n}% read",
+  "eng.replied": "replied",
+  "eng.never_replied": "never replied",
+  "eng.bulk": "newsletter/bulk",
+  "eng.last": "last mail {year}",
+  "qb.eng_low": "rarely engaged with",
+  "qb.eng_medium": "sometimes engaged with",
+  "qb.eng_high": "often engaged with",
   "bar.all_pinned": "all protected - nothing to move",
   "toast.all_pinned":
     "All selected mails are protected - nothing was changed.",
