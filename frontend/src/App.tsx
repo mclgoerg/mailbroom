@@ -1344,6 +1344,7 @@ export default function App() {
       )}
       {searchOpen && (
         <SearchPanel
+          bodySearch={acct?.body_search !== "disabled"}
           onClose={() => { setSearchOpen(false); refresh(); }}
           onDeleted={refresh}
         />

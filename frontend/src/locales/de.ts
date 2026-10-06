@@ -657,6 +657,31 @@ export const DE: Record<string, string> = {
   "auto_scan.every": "Alle",
   "auto_scan.unit_minutes": "Minuten",
   "auto_scan.unit_hours": "Stunden",
+  "search.placeholder_body": "Betreff, Absender und Mailtext durchsuchen…",
+  "search.body_toggle": "Auch im Mailtext suchen",
+  "search.body_hint":
+    "Die Suche im Mailtext fragt Ihren Mailserver und kann einen "
+    + "Moment dauern.",
+  "search.note.partial":
+    "Nicht alle Ordner wurden rechtzeitig durchsucht - die Treffer sind "
+    + "evtl. unvollständig.",
+  "search.note.folder_failed":
+    "„{folder}“ konnte nicht durchsucht werden - übersprungen.",
+  "search.note.stale_folder":
+    "„{folder}“ hat sich seit dem letzten Scan geändert - zum Einbeziehen "
+    + "neu scannen.",
+  "search.note.charset_fallback":
+    "Dieser Server unterstützt keine UTF-8-Suche - Umlaute und andere "
+    + "Sonderzeichen werden evtl. nicht gefunden.",
+  "body_search.title": "Mailtext-Suche",
+  "body_search.label": "Im Mailtext suchen",
+  "body_search.server": "Mailserver fragen",
+  "body_search.disabled": "Aus (nur Betreff und Absender)",
+  "body_search.help":
+    "Die Mailtext-Suche läuft bei jeder Anfrage auf Ihrem Mailserver - "
+    + "Mailbroom speichert nichts. Bei entfernten Anbietern kann sie "
+    + "langsam sein; Proton Bridge antwortet lokal. Ausschalten, um nur "
+    + "nach Betreff und Absender zu suchen.",
   "auto_scan.align": "Startminute (0-59)",
   "auto_scan.help":
     "Scannt dieses Konto in festen Abständen neu, unabhängig von "

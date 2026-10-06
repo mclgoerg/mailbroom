@@ -2,7 +2,7 @@ import { t } from "./i18n";
 import type {
   AdminTenantStats, AiGroupResult, AppState, AttMail, AuditResp, AuthProbe,
   Config, DupSet, FilterPreset, FoldersResp, Grouping, Mail, MessageDetail,
-  Rule, RuleRun, StatsResp, TrashResp, UnsubBulkResult, UnsubResult,
+  Rule, RuleRun, SearchResp, StatsResp, TrashResp, UnsubBulkResult, UnsubResult,
 } from "./types";
 
 /* Active account: every API call is scoped to exactly one account (strict
@@ -120,8 +120,9 @@ export const api = {
   cancel: (target: "scan" | "ai" | "delete" | "atts" | "unsub") =>
     req<{ ok: boolean }>("/api/cancel", { target }),
   clearNotice: () => req<{ ok: boolean }>("/api/notice/clear", {}),
-  search: (q: string) =>
-    req<Mail[]>(`/api/search?q=${encodeURIComponent(q)}`),
+  search: (q: string, body = false) =>
+    req<SearchResp>(`/api/search?q=${encodeURIComponent(q)}`
+      + (body ? "&scope=body" : "")),
   folders: (account?: string) =>
     req<FoldersResp>(account
       ? `/api/folders?account=${encodeURIComponent(account)}`

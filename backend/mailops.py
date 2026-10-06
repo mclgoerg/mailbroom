@@ -2201,6 +2201,12 @@ def empty_trash(acc=None) -> dict:
     return {"deleted": count}
 
 
+def _search_row(m: dict) -> dict:
+    return {"uid": m["uid"], "folder": m["folder"], "date": m["date"],
+            "ts": m["ts"], "subject": m["subject"], "addr": m["addr"],
+            "size": m["size"], "seen": m["seen"]}
+
+
 def search_mails(query: str, limit: int = 500, acc=None) -> list[dict]:
     """Substring search over the scanned index (subject + sender)."""
     acc = acc or accounts.get()
@@ -2212,12 +2218,136 @@ def search_mails(query: str, limit: int = 500, acc=None) -> list[dict]:
         for m in acc.index.values():
             if q in m["subject"].lower() or q in m["addr"] \
                     or q in m["name"].lower():
-                out.append({"uid": m["uid"], "folder": m["folder"],
-                            "date": m["date"], "ts": m["ts"],
-                            "subject": m["subject"], "addr": m["addr"],
-                            "size": m["size"], "seen": m["seen"]})
+                out.append(_search_row(m))
     out.sort(key=lambda m: -m["ts"])
     return out[:limit]
+
+
+# Overall time budget of one body search (it is a live query against the
+# IMAP server, once per scanned folder); what is not done by then is
+# reported as partial instead of hanging the request.
+BODY_SEARCH_BUDGET_S = 30.0
+_TERM_RE = re.compile(r'"([^"]+)"|(\S+)')
+
+
+def body_search_terms(query: str) -> list[str]:
+    """Whitespace-separated words, or "quoted phrases" kept whole; ANDed."""
+    return [a or b for a, b in _TERM_RE.findall(query)][:6]
+
+
+def _uid_search_body(conn, term: str, charset: bool):
+    """One UID SEARCH BODY for `term`. The term goes out as an IMAP
+    literal (imaplib sends `conn.literal` after the arguments) - the only
+    form that is correct for quotes, backslashes, umlauts and emoji."""
+    args = ("CHARSET", "UTF-8", "BODY") if charset else ("BODY",)
+    conn.literal = term.encode("utf-8")
+    try:
+        return conn.uid("SEARCH", *args)
+    finally:
+        conn.literal = None
+
+
+def _search_term_uids(conn, term: str, st: dict) -> set[int]:
+    """UIDs (selected folder) whose body contains `term`. Tries
+    CHARSET UTF-8 first; a server that rejects it (BAD/NO) is retried
+    without, once, and then remembered in `st` for the remaining folders."""
+    typ = data = None
+    if st["charset"]:
+        try:
+            typ, data = _uid_search_body(conn, term, True)
+        except imaplib.IMAP4.abort:
+            raise
+        except imaplib.IMAP4.error:
+            typ = None
+        if typ != "OK":
+            st["charset"] = False
+    if typ != "OK":
+        typ, data = _uid_search_body(conn, term, False)
+        if typ != "OK":
+            raise imaplib.IMAP4.error(f"SEARCH failed: {typ}")
+        st["fallback"] = True
+    return {int(u) for u in (data[0] or b"").split()}
+
+
+def _set_timeout(conn, seconds: float) -> None:
+    sock = getattr(conn, "sock", None)
+    if sock is not None:
+        try:
+            sock.settimeout(max(1.0, seconds))
+        except OSError:
+            pass
+
+
+def search_body(query: str, limit: int = 500, acc=None,
+                budget: float | None = None) -> dict:
+    """Metadata hits plus mails whose BODY contains every term, evaluated
+    by the IMAP server in each scanned folder (nothing is stored). Only
+    mails Mailbroom knows (the index) are returned, and a folder whose
+    UIDVALIDITY changed since the scan is skipped - never stale UIDs.
+    `notes` carries translatable caveats: charset fallback, stale or
+    failing folders, and a partial result when the time budget ran out."""
+    acc = acc or accounts.get()
+    budget = BODY_SEARCH_BUDGET_S if budget is None else budget
+    found = {(m["folder"], m["uid"]): m
+             for m in search_mails(query, limit=10**9, acc=acc)}
+    terms = body_search_terms(query)
+    notes: list[dict] = []
+    with acc.lock:
+        folders = list(acc.state.get("folders_raw") or [])
+        folder_uv = dict(acc.folder_uv)
+    if len(query.strip()) >= 2 and terms and folders:
+        deadline = time.monotonic() + budget
+        st = {"charset": True, "fallback": False}
+        conn = connect(cfgmod.account_imap(acc.name), acc.name)
+        try:
+            for folder in folders:
+                left = deadline - time.monotonic()
+                name = decode_mutf7(folder)
+                if left <= 0:
+                    notes.append({"key": "partial", "params": {}})
+                    break
+                _set_timeout(conn, left)
+                try:
+                    status, _ = conn.select(quote_folder(folder),
+                                            readonly=True)
+                    if status != "OK":
+                        notes.append({"key": "folder_failed",
+                                      "params": {"folder": name}})
+                        continue
+                    uv = uidvalidity(conn)
+                    if not uv or uv != folder_uv.get(folder):
+                        notes.append({"key": "stale_folder",
+                                      "params": {"folder": name}})
+                        continue
+                    hits: set[int] | None = None
+                    for term in terms:
+                        got = _search_term_uids(conn, term, st)
+                        hits = got if hits is None else hits & got
+                        if not hits:
+                            break
+                except (TimeoutError, OSError, imaplib.IMAP4.abort):
+                    # The connection is mid-command and unusable.
+                    notes.append({"key": "partial", "params": {}})
+                    break
+                except imaplib.IMAP4.error:
+                    notes.append({"key": "folder_failed",
+                                  "params": {"folder": name}})
+                    continue
+                with acc.lock:
+                    for uid in hits or ():
+                        m = acc.index.get(ikey(folder, uid))
+                        if m:
+                            found.setdefault((folder, uid), m)
+        finally:
+            try:
+                conn.logout()
+            except Exception:
+                pass
+        if st["fallback"]:
+            notes.append({"key": "charset_fallback", "params": {}})
+    mails = sorted((_search_row(m) for m in found.values()),
+                   key=lambda m: -m["ts"])
+    return {"mails": mails[:limit], "notes": notes}
 
 
 # ---------------------------------------------------------------- drilldown

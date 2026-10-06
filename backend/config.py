@@ -65,6 +65,11 @@ ENV_IMAP = {
     # at 00:10, 03:10, 06:10, ...). See backend/autoscan.py.
     "auto_scan": {"enabled": False, "unit": "hours", "value": 6,
                  "align_minute": 0},
+    # Global mail search may also look INSIDE message bodies: "server"
+    # asks the IMAP server (UID SEARCH BODY - nothing is stored locally),
+    # "disabled" keeps search metadata-only. An enum so a later local-index
+    # mode can be added without a format change.
+    "body_search": "server",
 }
 
 # Blank slate for ADDITIONAL accounts - env values (e.g. the Bridge
@@ -77,6 +82,11 @@ NEUTRAL_IMAP = {
     "digest": {"schedule": "off", "recipient": "", "hour": 8, "minute": 0},
     "auto_scan": {"enabled": False, "unit": "hours", "value": 6,
                  "align_minute": 0},
+    # Global mail search may also look INSIDE message bodies: "server"
+    # asks the IMAP server (UID SEARCH BODY - nothing is stored locally),
+    # "disabled" keeps search metadata-only. An enum so a later local-index
+    # mode can be added without a format change.
+    "body_search": "server",
 }
 
 _ENV_AUTH_CACHE: dict | None = None
@@ -237,6 +247,7 @@ SMTP_SECURITY = ("auto", "ssl", "starttls")
 PRESETS = ("proton", "gmail", "outlook", "icloud", "fastmail", "gmx",
            "mailbox", "yahoo", "custom")
 DIGEST_SCHEDULES = ("off", "daily", "weekly")
+BODY_SEARCH_MODES = ("disabled", "server")
 
 
 def normalize_protected(entries) -> list[str]:
@@ -350,6 +361,9 @@ def _load_accounts(saved: dict, env_first: bool = True) -> dict[str, dict]:
                 ("minutes", "hours") else "hours",
             "value": auto_scan.get("value", 6),
             "align_minute": auto_scan.get("align_minute", 0)}
+        # tolerate a pre-body-search config (missing key) or a junk value
+        if out[name].get("body_search") not in BODY_SEARCH_MODES:
+            out[name]["body_search"] = "server"
     return out
 
 
@@ -477,6 +491,8 @@ def _apply_imap(block: dict, imap_in: dict) -> None:
                 except (TypeError, ValueError):
                     pass
         block["digest"] = digest
+    if imap_in.get("body_search") in BODY_SEARCH_MODES:
+        block["body_search"] = imap_in["body_search"]
     if isinstance(imap_in.get("auto_scan"), dict):
         a = imap_in["auto_scan"]
         auto_scan = dict(block.get("auto_scan")

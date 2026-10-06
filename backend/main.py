@@ -8,6 +8,7 @@ import hashlib
 import io
 import json
 from pathlib import Path
+from typing import Literal
 
 import logging
 import os
@@ -987,8 +988,24 @@ def get_folders(account: str | None = Query(None)):
 
 
 @app.get("/api/search")
-def get_search(q: str = Query(...), account: str | None = Query(None)):
-    return mailops.search_mails(q, acc=_acc(account))
+def get_search(q: str = Query(...),
+               scope: Literal["meta", "body"] = Query("meta"),
+               account: str | None = Query(None)):
+    """{"mails": [...], "notes": [{key, params}]}. scope=body additionally
+    asks the IMAP server to look inside message bodies (per-account
+    `body_search` setting)."""
+    acc = _acc(account)
+    if scope == "body":
+        if cfgmod.account_imap(acc.name).get("body_search") == "disabled":
+            raise HTTPException(
+                400, "body search is disabled for this account")
+        try:
+            return mailops.search_body(q, acc=acc)
+        except HTTPException:
+            raise
+        except Exception as exc:
+            raise HTTPException(500, f"{type(exc).__name__}: {exc}")
+    return {"mails": mailops.search_mails(q, acc=acc), "notes": []}
 
 
 @app.get("/api/export")

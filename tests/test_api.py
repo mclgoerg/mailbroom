@@ -87,7 +87,7 @@ def test_scan_group_delete_via_api(bridge):
     assert len(mails) == 3
 
     hits = client.get("/api/search", params={"q": "sale"}).json()
-    assert len(hits) == 1
+    assert len(hits["mails"]) == 1 and hits["notes"] == []
 
     csv_text = client.get("/api/export",
                           params={"grouping": "sender"}).text

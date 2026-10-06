@@ -2,11 +2,13 @@ import { X } from "lucide-react";
 import { useState } from "react";
 import { api, mailKey } from "../api";
 import { t } from "../i18n";
-import type { Mail } from "../types";
+import type { Mail, SearchNote } from "../types";
 import { MailRows, MessageView } from "./MailList";
 import { Button, EmptyState, Input, Modal, Spinner, Toolbar } from "./ui";
 
-export function SearchPanel({ onClose, onDeleted }: {
+export function SearchPanel({ bodySearch = false, onClose, onDeleted }: {
+  /** The account's body_search mode is "server": offer the mail-text toggle. */
+  bodySearch?: boolean;
   onClose: () => void;
   onDeleted: () => void;
 }) {
@@ -14,6 +16,8 @@ export function SearchPanel({ onClose, onDeleted }: {
   const [mails, setMails] = useState<Mail[] | null>(null);
   const [sel, setSel] = useState<Set<string>>(new Set());
   const [note, setNote] = useState("");
+  const [notes, setNotes] = useState<SearchNote[]>([]);
+  const [inBody, setInBody] = useState(false);
   const [busy, setBusy] = useState(false);
   const [view, setView] = useState<Mail | null>(null);
 
@@ -21,11 +25,14 @@ export function SearchPanel({ onClose, onDeleted }: {
     if (q.trim().length < 2) return;
     setBusy(true);
     setNote("");
+    setNotes([]);
     setSel(new Set());
     try {
-      const r = await api.search(q.trim());
-      setMails(r);
-      setNote(r.length === 500 ? t("Showing the newest 500 matches.") : "");
+      const r = await api.search(q.trim(), bodySearch && inBody);
+      setMails(r.mails);
+      setNotes(r.notes);
+      setNote(r.mails.length === 500
+        ? t("Showing the newest 500 matches.") : "");
     } catch (e: any) {
       setNote(`Error: ${e.message ?? e}`);
     }
@@ -60,7 +67,9 @@ export function SearchPanel({ onClose, onDeleted }: {
         <Input
           autoFocus
           className="flex-1"
-          placeholder={t("search all scanned mails (subject / sender)…")}
+          placeholder={bodySearch && inBody
+            ? t("search.placeholder_body")
+            : t("search all scanned mails (subject / sender)…")}
           value={q}
           onChange={(e) => setQ(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && run()}
@@ -87,10 +96,28 @@ export function SearchPanel({ onClose, onDeleted }: {
               disabled={sel.size === 0}>
               {t("Trash selected")}{sel.size > 0 && ` (${sel.size})`}
             </Button>
+            {bodySearch && (
+              <label className="flex items-center gap-1.5 text-xs text-muted">
+                <input type="checkbox" checked={inBody}
+                  onChange={(e) => setInBody(e.target.checked)} />
+                {t("search.body_toggle")}
+              </label>
+            )}
             <span className="text-xs text-muted">
               {mails !== null && `${mails.length} ${t("matches")}`} {note}
             </span>
           </Toolbar>
+          {bodySearch && inBody && (
+            <p className="px-4 pb-1 text-xs text-muted">
+              {t("search.body_hint")}
+            </p>
+          )}
+          {notes.map((n) => (
+            <p key={n.key + JSON.stringify(n.params)}
+              className="px-4 pb-1 text-xs text-muted">
+              {t(`search.note.${n.key}`, n.params)}
+            </p>
+          ))}
           <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-4">
             {mails === null && (
               <EmptyState>

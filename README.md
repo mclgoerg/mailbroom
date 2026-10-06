@@ -192,8 +192,9 @@ presets.
   CSV export scope to the current selection here; their "⋯" overflow-menu
   versions (nothing selected) act on everything, as before.
 - **Bulk workflows** - background deletion queue with live progress and
-  cancel, global mail search, Empty-Trash button, cancellable scans and
-  AI runs.
+  cancel, global mail search (optionally inside the message text - your
+  mail server does that search per query, nothing is stored locally; a
+  per-account setting), Empty-Trash button, cancellable scans and AI runs.
 - **Multiple accounts** - connect several providers at once (e.g. Proton
   Bridge + Gmail). Every account is strictly separate: its own scans,
   groups, rules, saved presets, digest settings, statistics, folder

@@ -313,3 +313,25 @@ test("send test digest reports a demo send distinctly from a real one",
     fireEvent.click(screen.getByText("Send test digest"));
     expect(await screen.findByText(/preview with example data/)).toBeTruthy();
   });
+
+test("mail-text search mode defaults to server and saves the chosen mode",
+  () => {
+    render(<SettingsModal cfg={cfg} account="default" onClose={() => {}}
+      onSaved={() => {}} onAccountsChanged={() => {}} />);
+    const mode = screen.getByLabelText("Search inside mail text") as
+      HTMLSelectElement;
+    expect(mode.value).toBe("server");
+    fireEvent.change(mode, { target: { value: "disabled" } });
+    saveCalls.length = 0;
+    fireEvent.click(screen.getByText("Save"));
+    expect(saveCalls[0].imap.body_search).toBe("disabled");
+  });
+
+test("mail-text search mode is read from the account being edited", () => {
+  const off: Config = { ...cfg, accounts: { ...cfg.accounts,
+    default: { ...acct, body_search: "disabled" } } };
+  render(<SettingsModal cfg={off} account="default" onClose={() => {}}
+    onSaved={() => {}} onAccountsChanged={() => {}} />);
+  expect((screen.getByLabelText("Search inside mail text") as
+    HTMLSelectElement).value).toBe("disabled");
+});
