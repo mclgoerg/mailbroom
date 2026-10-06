@@ -114,7 +114,8 @@ export const api = {
     req<{ status?: string; ok?: boolean }>("/api/unsubscribe/ack",
       { addr, done }),
   undo: (index = -1) =>
-    req<{ restored: number; of: number }>("/api/undo", { index }),
+    req<{ restored: number; of: number; rescan: boolean }>(
+      "/api/undo", { index }),
   emptyTrash: () => req<{ deleted: number }>("/api/empty_trash", {}),
   cancel: (target: "scan" | "ai" | "delete" | "atts" | "unsub") =>
     req<{ ok: boolean }>("/api/cancel", { target }),
@@ -161,7 +162,7 @@ export const api = {
   auditExportUrl: () => withAccount("/api/audit/export"),
   trash: () => req<TrashResp>("/api/trash"),
   trashRestore: (uids: number[], dest: string, uv: number) =>
-    req<{ restored: number }>("/api/trash/restore", { uids, dest, uv }),
+    req<{ restored: number; rescan: boolean }>("/api/trash/restore", { uids, dest, uv }),
   testConnection: () =>
     req<{ ok: boolean; folders: number }>("/api/test_connection", {}),
   authProbe: () => req<AuthProbe>("/api/auth"),

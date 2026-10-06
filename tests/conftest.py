@@ -62,6 +62,14 @@ def isolate(tmp_path, monkeypatch):
     pinstore._cache.clear()
     accountsmod.reset()
     yield
+    # Undo/restore kick off a background scan; let it land before the
+    # monkeypatched paths (snapshot dir, ...) are restored under it.
+    import time
+    end = time.time() + 5
+    while time.time() < end and any(
+            a.state["status"] == "scanning"
+            for a in accountsmod.all_instantiated()):
+        time.sleep(0.01)
     verdictstore._mails_cache.clear()
     unsubstore._cache.clear()
     pinstore._cache.clear()

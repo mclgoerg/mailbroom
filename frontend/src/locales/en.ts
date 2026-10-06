@@ -7,6 +7,8 @@ export const EN: Record<string, string> = {
   "notice.cached_verdicts":
     "{n} cached AI verdicts applied (AI review only evaluates new groups).",
   "notice.restored":
+    "Restored {restored} of {of} mails ({label}).",
+  "notice.restored_rescan":
     "Restored {restored} of {of} mails ({label}) - rescan to see them again.",
   "notice.emptied_trash": "Emptied Trash ({count} mails permanently deleted).",
   "notice.ai_all_cached":
@@ -400,11 +402,16 @@ export const EN: Record<string, string> = {
   "sieve.copied": "Sieve filter copied - paste it in Proton's filter settings.",
   "sieve.open_proton": "Proton filter settings ↗",
   "Copy": "Copy",
-  "notice.trash_restored": "Restored {n} mails from Trash to {dest}.",
+  "notice.trash_restored":
+    "Restored {n} mails from Trash to {dest}.",
+  "notice.trash_restored_rescan":
+    "Restored {n} mails from Trash to {dest} - rescan to see them again.",
   "trash.browse": "Browse Trash",
   "trash.search": "search subject / sender…",
   "trash.restore_to": "Restore to…",
   "trash.restored": "Restored {n} mails - rescan to see them in the views.",
+  "trash.restored_refreshing":
+    "Restored {n} mails - the views update automatically.",
   "trash.newest_shown": "newest {n} shown",
   "trash.empty": "Trash is empty.",
   "notice.ai_budget":

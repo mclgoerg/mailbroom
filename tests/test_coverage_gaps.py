@@ -13,7 +13,7 @@ from backend import mailops
 from backend import verdictstore
 from backend.main import app
 
-from conftest import wait_delete_done
+from conftest import wait_delete_done, wait_scan_done
 
 client = TestClient(app)
 
@@ -60,7 +60,11 @@ def test_undo_partial_restore(bridge):
     bridge.mailbox["Trash"] = [m for m in bridge.mailbox["Trash"]
                                if m["uid"] != 1]
     r = mailops.undo_last()
-    assert r["restored"] == 2 and r["of"] == 3
+    assert r["restored"] == 2 and r["of"] == 3 and r["rescan"]
+    wait_scan_done()
+    # A partial restore still refreshes: the 2 found mails are back.
+    assert mailops.STATE["groups"]["sender"]["noreply@dhl.example"]["count"] \
+        == 2
     notice = mailops.STATE["notice"]
     assert notice["key"] == "restored"
     assert notice["params"]["restored"] == 2

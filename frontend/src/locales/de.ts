@@ -7,6 +7,8 @@ export const DE: Record<string, string> = {
   "notice.cached_verdicts":
     "{n} zwischengespeicherte KI-Bewertungen übernommen (die KI-Prüfung bewertet nur neue Gruppen).",
   "notice.restored":
+    "{restored} von {of} Mails wiederhergestellt ({label}).",
+  "notice.restored_rescan":
     "{restored} von {of} Mails wiederhergestellt ({label}) - zum Anzeigen neu scannen.",
   "notice.emptied_trash":
     "Papierkorb geleert ({count} Mails endgültig gelöscht).",
@@ -396,11 +398,15 @@ export const DE: Record<string, string> = {
   "Copy": "Kopieren",
   "notice.trash_restored":
     "{n} Mails aus dem Papierkorb nach {dest} wiederhergestellt.",
+  "notice.trash_restored_rescan":
+    "{n} Mails aus dem Papierkorb nach {dest} wiederhergestellt - zum Anzeigen neu scannen.",
   "trash.browse": "Papierkorb durchsuchen",
   "trash.search": "Betreff / Absender suchen…",
   "trash.restore_to": "Wiederherstellen nach…",
   "trash.restored":
     "{n} Mails wiederhergestellt - zum Anzeigen neu scannen.",
+  "trash.restored_refreshing":
+    "{n} Mails wiederhergestellt - die Ansichten aktualisieren sich automatisch.",
   "trash.newest_shown": "neueste {n} angezeigt",
   "trash.empty": "Der Papierkorb ist leer.",
   "notice.ai_budget":

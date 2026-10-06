@@ -5,7 +5,7 @@ from fastapi.testclient import TestClient
 
 from backend import mailops
 from backend.main import app
-from conftest import make_msg
+from conftest import make_msg, wait_scan_done
 
 client = TestClient(app)
 
@@ -35,11 +35,43 @@ def test_trash_list_and_restore(trashed):
 
     res = client.post("/api/trash/restore", json={
         "uids": [30], "dest": "INBOX", "uv": r["uv"]})
-    assert res.json() == {"restored": 1}
+    assert res.json() == {"restored": 1, "rescan": True}
     assert len(trashed.mailbox["Trash"]) == 1
     assert any(m["uid"] == 30 for m in trashed.mailbox["INBOX"])
     assert mailops.STATE["trash_count"] == 1
     assert mailops.STATE["notice"]["key"] == "trash_restored"
+
+
+def test_trash_restore_refreshes_views(trashed):
+    mailops.run_scan()
+    assert ("INBOX", 30) not in {(m["folder"], m["uid"])
+                                 for m in mailops.INDEX.values()}
+    r = client.get("/api/trash").json()
+    res = client.post("/api/trash/restore", json={
+        "uids": [30, 31], "dest": "INBOX", "uv": r["uv"]})
+    assert res.json() == {"restored": 2, "rescan": True}
+    wait_scan_done()
+    assert mailops.STATE["status"] == "done", mailops.STATE["error"]
+    assert mailops.STATE["groups"]["sender"]["old@gone.example"]["count"] == 2
+    assert {m["uid"] for m in mailops.INDEX.values()
+            if m["addr"] == "old@gone.example"} == {30, 31}
+    # trash_count comes from the scan, notice survives it
+    assert mailops.STATE["trash_count"] == 0
+    assert mailops.STATE["notice"]["key"] == "trash_restored"
+
+
+def test_trash_restore_while_busy_keeps_rescan_notice(trashed):
+    mailops.run_scan()
+    mailops.STATE["unsub"]["status"] = "running"   # start_scan refuses
+    r = client.get("/api/trash").json()
+    res = client.post("/api/trash/restore", json={
+        "uids": [30], "dest": "INBOX", "uv": r["uv"]})
+    assert res.status_code == 200
+    assert res.json() == {"restored": 1, "rescan": False}
+    assert any(m["uid"] == 30 for m in trashed.mailbox["INBOX"])
+    assert mailops.STATE["status"] == "done"
+    assert "old@gone.example" not in mailops.STATE["groups"]["sender"]
+    assert mailops.STATE["notice"]["key"] == "trash_restored_rescan"
 
 
 def test_restore_guards(trashed):

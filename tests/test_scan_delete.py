@@ -64,13 +64,53 @@ def test_delete_group_and_undo(bridge):
     assert len(mailops.STATE["undo"]) == 1
 
     r = mailops.undo_last()
-    assert r == {"restored": 3, "of": 3}
+    assert r == {"restored": 3, "of": 3, "rescan": True}
+    wait_scan_done()
     assert len(bridge.mailbox["Trash"]) == 0
     assert len(bridge.mailbox["INBOX"]) == 4       # back where they were
     assert mailops.STATE["undo"] == []
+    # The refresh scan put them back into the groupings and the index,
+    # and the restore notice survived the scan's own notice reset.
+    assert mailops.STATE["status"] == "done", mailops.STATE["error"]
+    assert mailops.STATE["groups"]["sender"]["noreply@dhl.example"]["count"] \
+        == 3
+    assert mailops.STATE["groups"]["domain"]["dhl.example"]["count"] == 3
+    assert {m["uid"] for m in mailops.INDEX.values()
+            if m["addr"] == "noreply@dhl.example"} == {1, 2, 10}
     notice = mailops.STATE["notice"]
     assert notice["key"] == "restored"
     assert notice["params"]["restored"] == 3 and notice["params"]["of"] == 3
+
+
+def test_undo_while_busy_asks_for_manual_rescan(bridge):
+    scan(bridge)
+    mailops.delete_groups("sender", ["noreply@dhl.example"])
+    wait_delete_done()
+    mailops.STATE["ai"]["status"] = "running"      # start_scan refuses
+    r = mailops.undo_last()                        # ...but undo must not fail
+    assert r == {"restored": 3, "of": 3, "rescan": False}
+    assert len(bridge.mailbox["INBOX"]) == 4       # restored on the server
+    assert mailops.STATE["status"] == "done"       # no scan was started
+    assert "noreply@dhl.example" not in mailops.STATE["groups"]["sender"]
+    assert mailops.STATE["notice"]["key"] == "restored_rescan"
+    assert mailops.STATE["notice"]["params"]["restored"] == 3
+    mailops.STATE["ai"]["status"] = "idle"
+    mailops.start_scan()                           # the manual rescan works
+    wait_scan_done()
+    assert mailops.STATE["groups"]["sender"]["noreply@dhl.example"]["count"] \
+        == 3
+
+
+def test_undo_restoring_nothing_does_not_scan(bridge):
+    scan(bridge)
+    mailops.delete_groups("sender", ["noreply@dhl.example"])
+    wait_delete_done()
+    bridge.mailbox["Trash"] = []                   # emptied elsewhere
+    gen = mailops.STATE["groups_rev"]
+    r = mailops.undo_last()
+    assert r == {"restored": 0, "of": 3, "rescan": False}
+    assert mailops.STATE["groups_rev"] == gen      # no scan was started
+    assert mailops.STATE["notice"]["key"] == "restored_rescan"
 
 
 def test_delete_messages_and_queue_dedup(bridge):

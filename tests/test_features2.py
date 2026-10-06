@@ -10,7 +10,7 @@ from backend import config as cfgmod
 from backend import mailops
 from backend import verdictstore
 
-from conftest import wait_delete_done
+from conftest import wait_delete_done, wait_scan_done
 
 
 def scan(bridge):
@@ -65,6 +65,22 @@ def test_verdicts_persist_across_rescans(bridge, monkeypatch):
     aihelper._run_ai("sender")
     assert sum(len(json.loads(c["messages"][0]["content"])["groups"])
                for c in calls) == n_groups
+
+
+def test_undo_refresh_keeps_restore_notice_over_cached_verdicts(
+        bridge, monkeypatch):
+    cfgmod.update_config({"ai": {"api_key": "k"}})
+    _fake_client(monkeypatch)
+    scan(bridge)
+    aihelper._run_ai("sender")
+    mailops.delete_groups("sender", ["noreply@dhl.example"])
+    wait_delete_done()
+    mailops.undo_last()
+    wait_scan_done()
+    # the refresh scan re-applied cached verdicts but did not replace the
+    # restore notice with the "cached verdicts" one
+    assert mailops.STATE["groups"]["sender"]["noreply@dhl.example"]["ai"]
+    assert mailops.STATE["notice"]["key"] == "restored"
 
 
 # ----------------------------------------------------------------- actions
