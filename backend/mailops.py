@@ -937,11 +937,11 @@ def assign_threads(messages: list) -> list[tuple[str, str]]:
     for m, comp in zip(messages, comp_of):
         if comp is None:                  # no ids at all: its own thread
             seed = f"uid:{m['folder']}\0{m['uid']}"
-            out.append((hashlib.sha1(seed.encode()).hexdigest()[:16],
+            out.append((hashlib.sha256(seed.encode()).hexdigest()[:16],
                         label_of(m)))
             continue
         root = min(roots.get(comp) or allids[comp])
-        out.append((hashlib.sha1(root.encode()).hexdigest()[:16],
+        out.append((hashlib.sha256(root.encode()).hexdigest()[:16],
                     label_of(earliest[comp])))
     return out
 
