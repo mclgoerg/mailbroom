@@ -69,6 +69,7 @@ export const DE: Record<string, string> = {
   "eng.col_tip":
     "Interaktion: wie viel du von diesem Absender wirklich liest und "
     + "beantwortest",
+  "eng.popover_title": "Interaktions-Wert {score}/100 · {tier}",
   "eng.tip": "Interaktion {score}/100 ({tier}): {parts}",
   "eng.low": "niedrig",
   "eng.medium": "mittel",

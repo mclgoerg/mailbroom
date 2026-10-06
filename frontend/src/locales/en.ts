@@ -197,6 +197,7 @@ export const EN: Record<string, string> = {
   "Eng.": "Eng.",
   "eng.col_tip":
     "Engagement: how much you actually read and answer this sender",
+  "eng.popover_title": "Engagement score {score}/100 · {tier}",
   "eng.tip": "Engagement {score}/100 ({tier}): {parts}",
   "eng.low": "low",
   "eng.medium": "medium",

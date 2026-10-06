@@ -248,6 +248,53 @@ describe("engagement indicator", () => {
       "Engagement 90/100 (high): 100% read, replied, last mail 2026");
   });
 
+  it("tapping the meter opens a popover naming the score and its parts "
+    + "(touch screens have no hover)", () => {
+    const { container, getByRole, queryByRole } = renderTable({
+      groups: [eng(12, { count: 100, unread: 88, bulk: true,
+        last: "2023-05-01" })] });
+    expect(queryByRole("dialog")).toBeNull();
+    fireEvent.click(container.querySelector("tbody [data-eng]")!);
+    const pop = getByRole("dialog");
+    expect(pop.textContent).toContain("Engagement score 12/100 · low");
+    expect(pop.textContent).toContain(
+      "12% read · never replied · newsletter/bulk · last mail 2023");
+    // toggles closed again
+    fireEvent.click(container.querySelector("tbody [data-eng]")!);
+    expect(queryByRole("dialog")).toBeNull();
+  });
+
+  it("the popover closes on outside tap and on Escape", () => {
+    const { container, queryByRole } = renderTable({ groups: [eng(50)] });
+    const meter = () => container.querySelector("tbody [data-eng]")!;
+    fireEvent.click(meter());
+    expect(queryByRole("dialog")).not.toBeNull();
+    fireEvent.pointerDown(document.body);
+    expect(queryByRole("dialog")).toBeNull();
+    fireEvent.click(meter());
+    fireEvent.keyDown(document, { key: "Escape" });
+    expect(queryByRole("dialog")).toBeNull();
+  });
+
+  it("tapping the meter on a mobile card does not open the group", () => {
+    const onOpen = vi.fn();
+    const { container } = renderTable({ groups: [eng(50)], onOpen });
+    const cardMeter = container.querySelector(".sm\\:hidden [data-eng]")!;
+    fireEvent.click(cardMeter);
+    expect(onOpen).not.toHaveBeenCalled();
+  });
+
+  it("the popover flips to the right edge when it would overflow", () => {
+    const rect = vi.spyOn(Element.prototype, "getBoundingClientRect");
+    rect.mockReturnValue({ left: 300, right: window.innerWidth + 40,
+      width: 240, height: 60, top: 0, bottom: 60, x: 300, y: 0,
+      toJSON: () => ({}) });
+    const { container, getByRole } = renderTable({ groups: [eng(50)] });
+    fireEvent.click(container.querySelector("tbody [data-eng]")!);
+    expect(getByRole("dialog").className).toContain("right-0");
+    rect.mockRestore();
+  });
+
   it("is also shown on the mobile cards", () => {
     const { container } = renderTable({ groups: [eng(80)] });
     expect(container.querySelectorAll("[data-eng='high']").length).toBe(2);
