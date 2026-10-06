@@ -304,13 +304,6 @@ export function DetailPanel({ grouping, group, aiEnabled, protectedNow,
               {" "}· <Shield size={13} /> {t("protected")}
             </span>
           )}
-          {pinnedCount > 0 && (
-            <span className="inline-flex items-center gap-1"
-              title={t("pin.badge_tip", { n: pinnedCount })}>
-              {" "}· <Pin size={13} /> {t("pin.n_protected",
-                { n: pinnedCount })}
-            </span>
-          )}
           {blocked && <> · 🚫 {t("Blocked")}</>}
         </>}
         actions={<>
@@ -368,6 +361,14 @@ export function DetailPanel({ grouping, group, aiEnabled, protectedNow,
                   {f.label} ({vCounts[f.key as keyof typeof vCounts]})
                 </button>
               ))}
+              {/* Not in the header's sub line: that one is truncated to a
+                  few words on a phone, which hid the count entirely. */}
+              {pinnedCount > 0 && (
+                <span className="inline-flex items-center gap-1 text-xs
+                  text-muted" title={t("pin.badge_tip", { n: pinnedCount })}>
+                  <Pin size={13} /> {t("pin.n_protected", { n: pinnedCount })}
+                </span>
+              )}
             </div>
 
             {/* Row 2: sort + build-a-selection + per-group secondary

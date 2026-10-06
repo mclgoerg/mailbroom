@@ -376,6 +376,13 @@ export default function App() {
   }, [state?.groups_rev, state?.account, mode, selected, retention,
       retentionN]);
 
+  // Everything in the selection is pinned: nothing would move. Shown in
+  // the bar itself - the toast lives in the status line far above it,
+  // out of sight behind a long list.
+  const selAllPinned = !selCountPending && selected.size > 0 && selCount === 0
+    && !retentionParams().some(Boolean)
+    && [...selected].some((k) => (state?.groups[mode]?.[k]?.pinned ?? 0) > 0);
+
   const scanning = state?.status === "scanning";
   const aiRunning = state?.ai.status === "running";
   const deleting = state?.delete.status === "running";
@@ -1122,6 +1129,9 @@ export default function App() {
                 {selCountPending
                   ? <>{selected.size} {t("groups")} <Spinner /></>
                   : t("bar.selected", { n: selected.size, mails: selCount })}
+                {selAllPinned && (
+                  <span className="text-accent"> · {t("bar.all_pinned")}</span>
+                )}
               </span>
               <button className="underline hover:text-body"
                 onClick={() => setSelected(new Set())}>
@@ -1187,7 +1197,9 @@ export default function App() {
                   </Button>
                 </>
               )}
-              <Button variant="danger" disabled={selCountPending}
+              <Button variant="danger"
+                disabled={selCountPending || selAllPinned}
+                title={selAllPinned ? t("bar.all_pinned") : undefined}
                 className="ml-auto shrink-0"
                 onClick={() =>
                   act([...selected], "trash", "", ...retentionParams())}>
