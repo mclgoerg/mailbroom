@@ -1,4 +1,4 @@
-import { ClipboardList, Shield } from "lucide-react";
+import { ClipboardList, Pin, Shield } from "lucide-react";
 import { useMemo, useState } from "react";
 import { api } from "../api";
 import { t } from "../i18n";
@@ -30,6 +30,11 @@ function RunSummary({ rule }: { rule: Rule }) {
           {" "}· <Shield size={13} />
           {t("rule.protected_skipped", { n: r.skipped_protected })}
         </span>}
+      {r.skipped_pinned > 0 &&
+        <span className="inline-flex items-center gap-1">
+          {" "}· <Pin size={13} />
+          {t("rule.pinned_skipped", { n: r.skipped_pinned })}
+        </span>}
       {r.preview.length > 0 && (
         <span className="block text-faint">
           {r.preview.map((p) => `${p.label} (${p.count})`).join(" · ")}
@@ -58,9 +63,12 @@ export function RulesModal({ state, onClose, onChanged }: {
     if (!groups.length) return null;
     const f = parseFilter(form.query);
     const hits = groups.filter((g) => matchGroup(g, f) && !g.protected);
+    // Pinned mails never move (mark_read is non-destructive: exempt).
+    const pinned = (g: { pinned: number }) =>
+      form.action === "mark_read" ? 0 : g.pinned ?? 0;
     return { groups: hits.length,
-             mails: hits.reduce((n, g) => n + g.count, 0) };
-  }, [state, form.grouping, form.query]);
+             mails: hits.reduce((n, g) => n + g.count - pinned(g), 0) };
+  }, [state, form.grouping, form.query, form.action]);
 
   const set = (k: keyof typeof form) =>
     (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>

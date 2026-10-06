@@ -40,6 +40,7 @@ export interface Group {
   att_size: number;
   unsubscribed: GroupUnsub | null;
   new: boolean;
+  pinned: number;   // mails of this group protected from bulk actions
 }
 
 export interface AiUsage {
@@ -147,6 +148,7 @@ export interface RuleRun {
   acted: number;
   capped: number;
   skipped_protected: number;
+  skipped_pinned: number;
   preview: { key: string; label: string; count: number }[];
   error: string;
 }
@@ -223,6 +225,7 @@ export interface Mail {
   size: number;
   seen: boolean;
   ai: Verdict | null;
+  pinned?: boolean;   // absent in search/duplicate/attachment lists
 }
 
 export interface MessageDetail {

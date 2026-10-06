@@ -74,6 +74,7 @@ const group: Group = {
   tags: [], samples: [], bulk: false, unsub: false, ai: null, ratings: null,
   protected: false, replied: false, att_size: 0, unsubscribed: null,
   new: false,
+  pinned: 0,
 };
 
 const baseState: AppState = {

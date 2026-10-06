@@ -1,4 +1,4 @@
-import { Shield, X } from "lucide-react";
+import { Pin, Shield, X } from "lucide-react";
 import { useEffect, useRef, useState,
   type ComponentProps, type ReactNode } from "react";
 import { t } from "../i18n";
@@ -73,6 +73,36 @@ export function ProtectButton({ on, onClick, className = "" }: {
   );
 }
 
+/** Per-mail "Protect this mail" toggle (a pinned mail is skipped by every
+ *  bulk action, rule and AI pick). Unrelated to any PIN code/privacy
+ *  feature - the label says "protect", the icon is a drawing pin. */
+export function PinButton({ on, onClick, className = "" }: {
+  on: boolean; onClick: () => void; className?: string;
+}) {
+  const label = t(on ? "pin.unprotect_tip" : "pin.protect_tip");
+  return (
+    <button title={label} aria-label={label} aria-pressed={on}
+      onClick={onClick}
+      className={`flex min-h-7 shrink-0 items-center rounded px-1
+        transition-opacity ${on ? "text-accent"
+          : "opacity-40 hover:opacity-80"} ${className}`}>
+      <Pin size={15} fill={on ? "currentColor" : "none"} />
+    </button>
+  );
+}
+
+/** Group-row indicator: how many of a group's mails are pinned. */
+export function PinBadge({ n }: { n: number }) {
+  if (n <= 0) return null;
+  return (
+    <Tag className="!text-accent whitespace-nowrap">
+      <span title={t("pin.badge_tip", { n })}
+        className="inline-flex items-center gap-0.5">
+        <Pin size={11} fill="currentColor" /> {n}
+      </span>
+    </Tag>
+  );
+}
 
 /** The app-wide loading animation (see .pmc-spinner in index.css).
  *  Colored via currentColor - defaults to the accent; pass e.g.

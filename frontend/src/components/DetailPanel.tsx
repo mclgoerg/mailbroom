@@ -1,4 +1,4 @@
-import { MoreHorizontal, Shield, Wand2, X } from "lucide-react";
+import { MoreHorizontal, Pin, Shield, Wand2, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { api } from "../api";
 import { t } from "../i18n";
@@ -79,6 +79,14 @@ export function DetailPanel({ grouping, group, aiEnabled, protectedNow,
       : filtered;
   }, [mails, sortBy, vFilter]);
 
+  // Pinned mails are never part of a bulk selection (select-all, "older
+  // than", AI picks) - they can only be ticked by hand, and acting on them
+  // then needs its own confirmation (see act()).
+  const selectable = useMemo(
+    () => (shown ?? []).filter((m) => !m.pinned), [shown]);
+  const pinnedCount = useMemo(
+    () => (mails ?? []).filter((m) => m.pinned).length, [mails]);
+
   const vCounts = useMemo(() => {
     const c = { delete_safe: 0, review: 0, keep: 0, unrated: 0 };
     (mails ?? []).forEach((m) =>
@@ -96,13 +104,15 @@ export function DetailPanel({ grouping, group, aiEnabled, protectedNow,
   const selectPreset = (preset: string) => {
     if (!shown) return;
     if (preset === "all") {
-      setSel(sel.size === shown.length ? new Set()
-        : new Set(shown.map(mailKey)));
+      const allSel = selectable.length > 0
+        && selectable.every((m) => sel.has(mailKey(m)));
+      setSel(allSel ? new Set() : new Set(selectable.map(mailKey)));
     } else if (preset === "none") {
       setSel(new Set());
     } else if (preset.startsWith("older")) {
       const months = Number(preset.slice(5));
-      setSel(new Set(shown.filter((m) => olderThan(m, months)).map(mailKey)));
+      setSel(new Set(selectable.filter((m) => olderThan(m, months))
+        .map(mailKey)));
     }
   };
 
@@ -156,7 +166,8 @@ export function DetailPanel({ grouping, group, aiEnabled, protectedNow,
         setNote(t("note.ai_progress", { done, total }));
         if (r.remaining === 0) break;
       }
-      const safe = pool(current).filter((m) => m.ai === "delete_safe");
+      const safe = pool(current)
+        .filter((m) => m.ai === "delete_safe" && !m.pinned);
       setSel(new Set(safe.map(mailKey)));
       setNote(t("note.ai_selected",
           { note: lastNote, n: safe.length, of: done })
@@ -198,17 +209,61 @@ export function DetailPanel({ grouping, group, aiEnabled, protectedNow,
     setBusy(false);
   };
 
+  const togglePin = async (m: Mail) => {
+    try {
+      await api.pin(m.folder, m.uid, !m.pinned);
+      setMails((cur) => cur && cur.map((x) =>
+        mailKey(x) === mailKey(m) ? { ...x, pinned: !m.pinned } : x));
+      // A freshly pinned mail drops out of the selection: it must not stay
+      // ticked unnoticed.
+      if (!m.pinned && sel.has(mailKey(m))) {
+        const next = new Set(sel);
+        next.delete(mailKey(m));
+        setSel(next);
+      }
+      onDeleted();   // refresh App's state so the group row's pin count moves
+    } catch (e: any) {
+      setNote(`${t("pin.error")}: ${e.message ?? e}`);
+    }
+  };
+
   const act = async (action: string, dest = "") => {
     if (!mails || sel.size === 0) return;
     const verb = { trash: t("Move to Trash"), archive: t("Archive"),
       move: `${t("Move")} → ${dest}`,
       mark_read: t("Mark as read") }[action] ?? action;
-    if (!confirm(t("confirm.act_mails", { verb, n: sel.size }))) return;
-    const wholeGroup = sel.size === mails.length && action !== "mark_read";
+    // Same shape as the overview's protected-group handling: ONE pinned
+    // mail acted on explicitly gets its own warning and is sent with
+    // `force`; pinned mails inside a larger selection are dropped from it
+    // (never silently moved). mark_read is non-destructive - exempt.
+    const chosen = mails.filter((m) => sel.has(mailKey(m)));
+    let acting = chosen;
+    let force = false;
+    if (action !== "mark_read") {
+      const pinned = chosen.filter((m) => m.pinned);
+      if (chosen.length === 1 && pinned.length === 1) {
+        if (!confirm(t("confirm.act_pinned_mail", {
+          verb, subject: chosen[0].subject || t("(no subject)") }))) return;
+        force = true;
+      } else if (pinned.length) {
+        acting = chosen.filter((m) => !m.pinned);
+        if (!acting.length) {
+          setNote(t("toast.all_pinned"));
+          return;
+        }
+      }
+    }
+    const skipNote = acting.length !== chosen.length
+      ? " " + t("confirm.pinned_skipped",
+          { n: chosen.length - acting.length }) : "";
+    if (!force && !confirm(
+      t("confirm.act_mails", { verb, n: acting.length }) + skipNote)) return;
+    const actingKeys = new Set(acting.map(mailKey));
+    const wholeGroup = acting.length === mails.length
+      && action !== "mark_read";
     try {
-      const items = mails.filter((m) => sel.has(mailKey(m)))
-        .map((m) => [m.folder, m.uid] as [string, number]);
-      await api.deleteMessages(items, action, dest);  // background job
+      const items = acting.map((m) => [m.folder, m.uid] as [string, number]);
+      await api.deleteMessages(items, action, dest, force);  // background job
       if (wholeGroup) {
         // The group will be empty - go straight back to the overview.
         onDeleted();
@@ -216,10 +271,10 @@ export function DetailPanel({ grouping, group, aiEnabled, protectedNow,
         return;
       }
       if (action !== "mark_read") {
-        setMails(mails.filter((m) => !sel.has(mailKey(m))));
+        setMails(mails.filter((m) => !actingKeys.has(mailKey(m))));
       } else {
         setMails(mails.map((m) =>
-          sel.has(mailKey(m)) ? { ...m, seen: true } : m));
+          actingKeys.has(mailKey(m)) ? { ...m, seen: true } : m));
       }
       setSel(new Set());
       setNote(t("note.background", { verb }));
@@ -247,6 +302,13 @@ export function DetailPanel({ grouping, group, aiEnabled, protectedNow,
           {protectedNow && (
             <span className="inline-flex items-center gap-1">
               {" "}· <Shield size={13} /> {t("protected")}
+            </span>
+          )}
+          {pinnedCount > 0 && (
+            <span className="inline-flex items-center gap-1"
+              title={t("pin.badge_tip", { n: pinnedCount })}>
+              {" "}· <Pin size={13} /> {t("pin.n_protected",
+                { n: pinnedCount })}
             </span>
           )}
           {blocked && <> · 🚫 {t("Blocked")}</>}
@@ -420,7 +482,7 @@ export function DetailPanel({ grouping, group, aiEnabled, protectedNow,
             {!shown && !error && <Loading />}
             {shown && (
               <MailRows mails={shown} sel={sel} onToggle={toggle}
-                onOpen={setView} />
+                onOpen={setView} onPin={togglePin} />
             )}
           </div>
 

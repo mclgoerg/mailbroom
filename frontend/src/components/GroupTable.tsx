@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { fmtSize } from "../api";
 import type { Group } from "../types";
 import { t } from "../i18n";
-import { AiTag, Avatar, Button, RatingChips, Tag, Select } from "./ui";
+import { AiTag, Avatar, Button, PinBadge, RatingChips, Tag, Select } from "./ui";
 
 export type SortKey = "count" | "size" | "label" | "last" | "unreadPct";
 
@@ -194,6 +194,7 @@ function DesktopTable({ slice, baseIdx, selected, focusedKey, onToggle,
                     📎 {fmtSize(g.att_size)}
                   </Tag>
                 )}
+                <PinBadge n={g.pinned} />
                 <UnsubBadge g={g} onAck={onAckUnsub} />
                 {blockedKeys?.has(g.key) && (
                   <Tag className="!bg-rose-950 !text-rose-300">
@@ -276,6 +277,7 @@ function MobileCards({ slice, baseIdx, selected, focusedKey, onToggle,
                     📎 {fmtSize(g.att_size)}
                   </Tag>
                 )}
+                <PinBadge n={g.pinned} />
                 <UnsubBadge g={g} onAck={onAckUnsub} />
                 {blockedKeys?.has(g.key) && (
                   <Tag className="!bg-rose-950 !text-rose-300">

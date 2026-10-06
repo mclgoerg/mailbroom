@@ -28,6 +28,7 @@ from . import digest as digestmod
 from . import knownsenders
 from . import mailops
 from . import oauthflow
+from . import pinstore
 from . import presets as presetsmod
 from . import rules as rulesmod
 from . import stats as statsmod
@@ -417,6 +418,7 @@ class DeleteMessagesBody(BaseModel):
     items: list[tuple[str, int]] = Field(min_length=1)
     action: str = "trash"
     dest: str = ""
+    force: bool = False            # confirmed: act on pinned mails too
 
 
 class UndoBody(BaseModel):
@@ -510,11 +512,31 @@ def post_delete_messages(body: DeleteMessagesBody,
     acc = _acc(account)
     try:
         return mailops.delete_messages([list(i) for i in body.items],
-                                       body.action, body.dest, acc=acc)
+                                       body.action, body.dest, acc=acc,
+                                       force=body.force)
     except ValueError as exc:
         raise HTTPException(400, str(exc))
     except RuntimeError as exc:
         raise HTTPException(409, str(exc))
+    except Exception as exc:
+        raise HTTPException(500, f"{type(exc).__name__}: {exc}")
+
+
+class PinBody(BaseModel):
+    folder: str
+    uid: int
+    pinned: bool = True
+
+
+@app.post("/api/pin")
+def post_pin(body: PinBody, account: str | None = Query(None)):
+    """Pin/unpin ONE mail ("Protect this mail"): a pinned mail is skipped by
+    every bulk action, rule and AI pick. Stored per account by Message-ID."""
+    acc = _acc(account)
+    try:
+        return mailops.set_pin(body.folder, body.uid, body.pinned, acc)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc))
     except Exception as exc:
         raise HTTPException(500, f"{type(exc).__name__}: {exc}")
 
@@ -1134,6 +1156,7 @@ def post_config(body: dict):
         presetsmod.drop_account(str(body["delete_account"]))
         digestmod.drop_account(str(body["delete_account"]))
         knownsenders.drop_account(str(body["delete_account"]))
+        pinstore.drop_account(str(body["delete_account"]))
         autoscanmod.drop_account(str(body["delete_account"]))
     if isinstance(body.get("rename_account"), dict):
         # The config rename succeeded - carry every per-account artifact
@@ -1152,12 +1175,13 @@ def post_config(body: dict):
             presetsmod.rename_account(old, new)
             digestmod.rename_account(old, new)
             knownsenders.rename_account(old, new)
+            pinstore.rename_account(old, new)
             autoscanmod.rename_account(old, new)
             auditlog.rename_account(old, new)
             logging.getLogger("pmc.mail").info(
                 "account renamed: %r -> %r (state, verdicts, unsubscribes, "
                 "replied, stats, rules, presets, digest, known senders, "
-                "auto-scan, audit log migrated)", old, new)
+                "pins, auto-scan, audit log migrated)", old, new)
     return cfgmod.masked_config(cfg)
 
 

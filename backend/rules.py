@@ -27,6 +27,7 @@ from . import accounts
 from . import auditlog
 from . import config as cfgmod
 from . import mailops
+from . import pinstore
 from . import tenants
 
 log = logging.getLogger("pmc.rules")
@@ -48,7 +49,7 @@ _RUN_LOCK = threading.Lock()      # one rule run at a time
 
 # ------------------------------------------------- filter DSL (port of lib.ts)
 
-_QUAL_RE = re.compile(r"^(tag|ai|age|unread|is|att|from|domain):(.*)$")
+_QUAL_RE = re.compile(r"^(tag|ai|age|unread|is|has|att|from|domain):(.*)$")
 _AGE_RE = re.compile(r"^>?(\d+)(m|y)$")
 _UNREAD_RE = re.compile(r"^>?(\d+)$")
 _ATT_RE = re.compile(r"^>?(\d+)(k|m|g)?$")
@@ -59,7 +60,8 @@ def parse_filter(q: str) -> dict:
     out = {"text": [], "tags": [], "ai": None, "age_months": None,
            "unread_min": None, "unsub": False, "protected_only": False,
            "replied": None, "att_min": None, "unsubscribed": None,
-           "from_addr": None, "domain": None, "new_only": False}
+           "from_addr": None, "domain": None, "new_only": False,
+           "pinned_only": False}
     for tok in (q or "").strip().lower().split():
         m = _QUAL_RE.match(tok)
         if not m:
@@ -93,6 +95,8 @@ def parse_filter(q: str) -> dict:
             out["unsubscribed"] = False
         elif kind == "is" and val == "new":
             out["new_only"] = True
+        elif kind == "has" and val == "pinned":
+            out["pinned_only"] = True
         elif kind == "att":
             a = _ATT_RE.match(val)
             if a:
@@ -128,6 +132,8 @@ def match_group(g: dict, f: dict, now: float | None = None) -> bool:
     if f["protected_only"] and not g.get("protected"):
         return False
     if f["new_only"] and not g.get("new"):
+        return False
+    if f["pinned_only"] and not g.get("pinned"):
         return False
     if f["replied"] is not None and bool(g.get("replied")) != f["replied"]:
         return False
@@ -347,7 +353,8 @@ def run_rule(rule_id: str, rescan: bool = True) -> dict:
     try:
         result = {"ts": int(time.time()), "mode": rule["mode"],
                   "groups": 0, "mails": 0, "acted": 0, "capped": 0,
-                  "skipped_protected": 0, "preview": [], "error": ""}
+                  "skipped_protected": 0, "skipped_pinned": 0, "preview": [],
+                  "error": ""}
         with acc.lock:
             scan_ok = acc.state["status"] == "done"
         if rescan or not scan_ok:
@@ -370,12 +377,22 @@ def run_rule(rule_id: str, rescan: bool = True) -> dict:
         keep_latest = rule.get("keep_latest")
         older_than_days = rule.get("older_than_days")
         # Report counts must reflect the retention restriction: only mails
-        # that would ACTUALLY be acted on (i.e. beyond the keep-window).
+        # that would ACTUALLY be acted on (i.e. beyond the keep-window) -
+        # and pinned mails, which no rule may move (mark_read is
+        # non-destructive and therefore exempt, like in delete_groups).
+        pinned = (pinstore.load_account(acc.name)
+                  if rule["action"] != "mark_read" else set())
         with acc.lock:
             recs = acc.state["groups"][rule["grouping"]]
-            counts = {g["key"]: mailops.group_act_count(
-                          recs[g["key"]], acc, keep_latest, older_than_days)
-                      for g in acted_on if g["key"] in recs}
+            counts = {}
+            for g in acted_on:
+                if g["key"] in recs:
+                    rec = recs[g["key"]]
+                    counts[g["key"]] = mailops.group_act_count(
+                        rec, acc, keep_latest, older_than_days, pinned)
+                    result["skipped_pinned"] += mailops.group_act_count(
+                        rec, acc, keep_latest, older_than_days) \
+                        - counts[g["key"]]
         result["mails"] = sum(counts.values())
 
         # Cap: take groups (largest first) while they fit into RULE_CAP.
@@ -403,10 +420,10 @@ def run_rule(rule_id: str, rescan: bool = True) -> dict:
                 actor=f"rule:{rule_id}")
             result["acted"] = r["queued"]
         log.info("rule %s (%r, %s) ran: %d groups / %d mails matched, "
-                 "%d acted, %d capped, %d protected skipped",
+                 "%d acted, %d capped, %d protected / %d pinned skipped",
                  rule["id"], rule["name"], rule["mode"], result["groups"],
                  result["mails"], result["acted"], result["capped"],
-                 result["skipped_protected"])
+                 result["skipped_protected"], result["skipped_pinned"])
         with acc.lock:
             acc.state["notice"] = {
                 "key": "rule_executed" if rule["mode"] == "execute"

@@ -30,6 +30,7 @@ from . import accounts
 from . import auditlog
 from . import config as cfgmod
 from . import knownsenders
+from . import pinstore
 from . import stats as statsmod
 from . import tenants
 from . import unsubstore
@@ -70,6 +71,11 @@ AUTOMATED_RE = re.compile(
 log = logging.getLogger("pmc.mail")
 
 ACTIONS = ("trash", "archive", "move", "mark_read")
+# Stable error codes of the pin feature: the UI maps them to translated
+# texts (frontend/src/api.ts ERROR_CODES) instead of showing raw English.
+NO_MESSAGE_ID = "no_message_id"      # set_pin: nothing stable to key a pin on
+PINNED_MAILS = "pinned_mails"        # delete_messages: needs force
+ALL_PINNED = "all_pinned"            # delete_groups: nothing but pinned mails
 UNDO_MAX = 10
 
 # All mutable mail state lives in per-account AccountState objects (see
@@ -867,6 +873,21 @@ def _group_new(rec: dict, new_addrs: set[str], acc) -> bool:
     return False
 
 
+def pinned_uids(rec: dict, acc, pinned: set[str]) -> dict[str, set[int]]:
+    """{folder: {uid, …}} of the mails in `rec` whose Message-ID is pinned
+    (lock held). Pins key off the Message-ID, so a pinned mail is found
+    wherever it currently lives."""
+    out: dict[str, set[int]] = {}
+    if not pinned:
+        return out
+    for folder, uids in rec["folders"].items():
+        for uid in uids:
+            m = acc.index.get(ikey(folder, uid))
+            if m and m["msgid"] in pinned:
+                out.setdefault(folder, set()).add(uid)
+    return out
+
+
 def group_unsub_senders(rec: dict, acc) -> dict[str, tuple[str, bool]]:
     """{sender addr: (List-Unsubscribe header, one_click)} for the senders
     of this group that offer an unsubscribe - the NEWEST mail per sender
@@ -921,6 +942,7 @@ def public_state(acc=None) -> dict:
     unsub_entries = unsubstore.load_account(acc.name)
     new_addrs = knownsenders.new_since(acc.name, cfg.get(
         "new_sender_window_days", knownsenders.NEW_SENDER_WINDOW_DAYS))
+    pinned = pinstore.load_account(acc.name)
     with acc.lock:
         paddrs = _protected_addrs(plist, acc)
         out = {k: v for k, v in acc.state.items() if k != "groups"}
@@ -930,7 +952,9 @@ def public_state(acc=None) -> dict:
                     "ratings": _rating_counts(rec, mail_verdicts, acc),
                     "protected": _group_protected(rec, paddrs, acc),
                     "unsubscribed": _group_unsub(rec, unsub_entries, acc),
-                    "new": _group_new(rec, new_addrs, acc)}
+                    "new": _group_new(rec, new_addrs, acc),
+                    "pinned": sum(len(u) for u in
+                                  pinned_uids(rec, acc, pinned).values())}
                 for k, rec in recs.items()}
             for g, recs in acc.state["groups"].items()}
         return out
@@ -1390,32 +1414,38 @@ def _group_mail_items(rec: dict, acc) -> list[tuple[str, int, int]]:
 
 
 def retained_mails(rec: dict, acc, keep_latest: int | None = None,
-                   older_than_days: int | None = None) -> dict[str, set[int]]:
-    """{folder: {uid, …}} of mails in `rec` that a retention restriction
-    EXEMPTS from the action (the keep-window) - empty when neither setting
-    is given, meaning today's "act on everything" behavior. Mails sort
-    newest-first by `ts` (ts == 0 counts as oldest; ties break by
-    folder+uid for determinism)."""
-    if not keep_latest and not older_than_days:
-        return {}
-    items = sorted(_group_mail_items(rec, acc),
-                   key=lambda it: (-it[2], it[0], it[1]))
-    if keep_latest:
-        keep = items[:keep_latest]
-    else:
-        cutoff = time.time() - older_than_days * 86400
-        keep = [it for it in items if it[2] != 0 and it[2] >= cutoff]
+                   older_than_days: int | None = None,
+                   pinned: set[str] | None = None) -> dict[str, set[int]]:
+    """{folder: {uid, …}} of mails in `rec` that are EXEMPT from the action:
+    the retention keep-window plus every mail whose Message-ID is in
+    `pinned`. Pinned mails are kept regardless of age or keep-latest
+    ordering and don't use up a keep-latest slot. Empty when neither
+    restriction nor a pin applies, meaning today's "act on everything"
+    behavior. Mails sort newest-first by `ts` (ts == 0 counts as oldest;
+    ties break by folder+uid for determinism)."""
     out: dict[str, set[int]] = {}
-    for folder, uid, _ in keep:
-        out.setdefault(folder, set()).add(uid)
+    if keep_latest or older_than_days:
+        items = sorted(_group_mail_items(rec, acc),
+                       key=lambda it: (-it[2], it[0], it[1]))
+        if keep_latest:
+            keep = items[:keep_latest]
+        else:
+            cutoff = time.time() - older_than_days * 86400
+            keep = [it for it in items if it[2] != 0 and it[2] >= cutoff]
+        for folder, uid, _ in keep:
+            out.setdefault(folder, set()).add(uid)
+    for folder, uids in pinned_uids(rec, acc, pinned or set()).items():
+        out.setdefault(folder, set()).update(uids)
     return out
 
 
 def group_act_count(rec: dict, acc, keep_latest: int | None = None,
-                    older_than_days: int | None = None) -> int:
-    """How many of this group's mails a retention restriction leaves to
-    act on (i.e. its count minus the exempted keep-window)."""
-    keep = retained_mails(rec, acc, keep_latest, older_than_days)
+                    older_than_days: int | None = None,
+                    pinned: set[str] | None = None) -> int:
+    """How many of this group's mails a retention restriction (and any
+    pinned mails) leaves to act on (i.e. its count minus the exempted
+    keep-set)."""
+    keep = retained_mails(rec, acc, keep_latest, older_than_days, pinned)
     total = sum(len(uids) for uids in rec["folders"].values())
     return total - sum(len(s) for s in keep.values())
 
@@ -1430,6 +1460,13 @@ def delete_groups(grouping: str, keys: list[str],
         raise ValueError(
             "keep_latest and older_than_days are mutually exclusive")
     skipped = 0
+    skipped_pinned = 0
+    # Pinned mails are exempt from every action that moves a mail out of
+    # place (trash/archive/move) - NOT from mark_read, which is
+    # non-destructive. `force` does not lift this: it only confirms a
+    # protected GROUP; pinned mails are never part of a bulk action.
+    pinned = (pinstore.load_account(acc.name)
+              if action != "mark_read" else set())
     with acc.lock:
         if acc.state["status"] != "done":
             raise RuntimeError("No completed scan")
@@ -1455,23 +1492,55 @@ def delete_groups(grouping: str, keys: list[str],
         by_folder: dict[str, set[int]] = {}
         for rec in jobs.values():
             keep = retained_mails(rec, acc, keep_latest, older_than_days)
+            pins = pinned_uids(rec, acc, pinned)
             for folder, uids in rec["folders"].items():
-                remainder = set(uids) - keep.get(folder, set())
+                held = keep.get(folder, set())
+                pin = pins.get(folder, set())
+                remainder = set(uids) - held - pin
+                skipped_pinned += len((set(uids) & pin) - held)
                 if remainder:
                     by_folder.setdefault(folder, set()).update(remainder)
+        if skipped_pinned:
+            log.info("delete: skipped %d pinned mail(s)", skipped_pinned)
         if not by_folder:
+            if skipped_pinned:
+                raise ValueError(ALL_PINNED)
             raise RuntimeError("no known groups selected")
         labels = [jobs[k]["label"] for k in list(jobs)[:3]]
         label = ", ".join(labels) + ("…" if len(jobs) > 3 else "")
         _start_delete(by_folder, label, acc, action, dest, actor)
     return {"ok": True, "queued": sum(len(s) for s in by_folder.values()),
-            "skipped": skipped}
+            "skipped": skipped, "skipped_pinned": skipped_pinned}
+
+
+def set_pin(folder: str, uid: int, pinned: bool, acc=None) -> dict:
+    """Pin/unpin one mail. The client names a mail by (folder, uid) like
+    everywhere else; the Message-ID is resolved from the server-side
+    index. A mail without a Message-ID can't be pinned - there would be
+    nothing stable to recognise it by after a rescan or move."""
+    acc = acc or accounts.get()
+    with acc.lock:
+        m = acc.index.get(ikey(folder, uid))
+        if not m:
+            raise ValueError("unknown message")
+        msgid = m["msgid"]
+        if not msgid:
+            raise ValueError(NO_MESSAGE_ID)
+    pinstore.set_pinned(msgid, pinned, acc.name)
+    with acc.lock:
+        acc.state["groups_rev"] += 1     # group "pinned" counts changed
+    return {"ok": True, "pinned": pinned}
 
 
 def delete_messages(items: list, action: str = "trash",
-                    dest: str = "", acc=None) -> dict:
-    """Act on individual messages ([folder, uid] pairs)."""
+                    dest: str = "", acc=None, force: bool = False) -> dict:
+    """Act on individual messages ([folder, uid] pairs). A pinned mail is
+    only ever moved on explicit request: without `force` a selection that
+    contains one is refused as a whole (the UI asks per mail first and
+    then re-sends with force). mark_read is non-destructive and exempt."""
     acc = acc or accounts.get()
+    guard = (pinstore.load_account(acc.name)
+             if action != "mark_read" and not force else set())
     with acc.lock:
         if acc.state["status"] != "done":
             raise RuntimeError("No completed scan")
@@ -1480,7 +1549,10 @@ def delete_messages(items: list, action: str = "trash",
             if not (isinstance(it, (list, tuple)) and len(it) == 2):
                 continue
             folder, uid = str(it[0]), int(it[1])
-            if ikey(folder, uid) in acc.index:   # only messages we know about
+            m = acc.index.get(ikey(folder, uid))
+            if m:                       # only messages we know about
+                if m["msgid"] in guard:
+                    raise ValueError(PINNED_MAILS)
                 by_folder.setdefault(folder, set()).add(uid)
         if not by_folder:
             raise RuntimeError("no known messages selected")
@@ -2026,6 +2098,7 @@ def group_mails(grouping: str, key: str,
                 with_msgid: bool = False, acc=None) -> list[dict]:
     acc = acc or accounts.get()
     mail_verdicts = verdictstore.load_mails()
+    pinned = pinstore.load_account(acc.name)
     with acc.lock:
         rec = acc.state["groups"][grouping].get(key)
         if not rec:
@@ -2039,7 +2112,8 @@ def group_mails(grouping: str, key: str,
                              "date": m["date"], "ts": m["ts"],
                              "subject": m["subject"], "addr": m["addr"],
                              "size": m["size"], "seen": m["seen"],
-                             "ai": mail_verdicts.get(m["msgid"]) or None}
+                             "ai": mail_verdicts.get(m["msgid"]) or None,
+                             "pinned": m["msgid"] in pinned}
                     if with_msgid:
                         entry["msgid"] = m["msgid"]
                     out.append(entry)

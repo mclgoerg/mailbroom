@@ -8,6 +8,7 @@ import type { Group, Mail } from "./types";
 const group_ = vi.fn();
 const deleteMessages = vi.fn().mockResolvedValue({});
 const aiGroup = vi.fn();
+const pin = vi.fn().mockResolvedValue({ ok: true, pinned: true });
 
 vi.mock("./api", async (importOriginal) => {
   const actual = await importOriginal<typeof import("./api")>();
@@ -17,6 +18,7 @@ vi.mock("./api", async (importOriginal) => {
       group: (...args: unknown[]) => group_(...args),
       deleteMessages: (...args: unknown[]) => deleteMessages(...args),
       aiGroup: (...args: unknown[]) => aiGroup(...args),
+      pin: (...args: unknown[]) => pin(...args),
       unsubscribe: vi.fn(),
       unsubscribeAck: vi.fn(),
     },
@@ -36,7 +38,7 @@ const mkGroup = (over: Partial<Group> = {}): Group => ({
   count: 2, size: 2000, unread: 0, first: "2025-01-01", last: "2025-01-02",
   tags: [], samples: [], bulk: false, unsub: false, ai: null, ratings: null,
   protected: false, replied: false, att_size: 0, unsubscribed: null,
-  new: false, ...over,
+  new: false, pinned: 0, ...over,
 });
 
 const noop = () => {};
@@ -68,6 +70,8 @@ describe("DetailPanel", () => {
     group_.mockClear();
     deleteMessages.mockClear();
     aiGroup.mockReset();
+    pin.mockClear();
+    pin.mockResolvedValue({ ok: true, pinned: true });
     vi.spyOn(window, "confirm").mockReturnValue(true);
     localStorage.setItem("pmc_ai_ack", "1");   // skip the AI consent prompt
   });
@@ -116,7 +120,7 @@ describe("DetailPanel", () => {
     fireEvent.click(document.querySelectorAll('input[type="checkbox"]')[0]);
     fireEvent.click(await screen.findByText(/Trash selected/));
     await waitFor(() => expect(deleteMessages).toHaveBeenCalledWith(
-      [["INBOX", 1]], "trash", ""));
+      [["INBOX", 1]], "trash", "", false));
   });
 
   it("the move-to-folder picker always has a way back, and resets once "
@@ -184,5 +188,156 @@ describe("DetailPanel", () => {
     fireEvent.click(screen.getByText("Trash"));
     await waitFor(() => expect(onClose).toHaveBeenCalled());
     expect(onTrash).toHaveBeenCalled();
+  });
+
+  describe("pinned (protected) mails", () => {
+    const checkbox = (i: number) =>
+      document.querySelectorAll('input[type="checkbox"]')[i];
+
+    it("pin toggle calls the API, marks the row and updates the header",
+      async () => {
+      const onDeleted = vi.fn();
+      renderPanel([mkMail(1), mkMail(2)], { onDeleted });
+      await waitFor(() => screen.getByText("Mail 1"));
+      expect(document.querySelectorAll("[data-pinned]").length).toBe(0);
+
+      fireEvent.click(screen.getAllByTitle(/Protect this mail/)[0]);
+      await waitFor(() =>
+        expect(pin).toHaveBeenCalledWith("INBOX", 1, true));
+      await waitFor(() =>
+        expect(document.querySelectorAll("[data-pinned]").length).toBe(1));
+      expect(screen.getByText(/1 mail\(s\) protected/)).toBeTruthy();
+      expect(onDeleted).toHaveBeenCalled();      // overview badge refreshes
+
+      // toggling a pinned mail unpins it again
+      pin.mockResolvedValue({ ok: true, pinned: false });
+      fireEvent.click(screen.getByTitle(/Remove this mail's protection/));
+      await waitFor(() =>
+        expect(pin).toHaveBeenLastCalledWith("INBOX", 1, false));
+      await waitFor(() =>
+        expect(document.querySelectorAll("[data-pinned]").length).toBe(0));
+    });
+
+    it("shows the reason (already translated by the api layer) when a mail "
+      + "can't be pinned", async () => {
+      pin.mockRejectedValue(new Error("no Message-ID, can't protect"));
+      renderPanel([mkMail(1)]);
+      await waitFor(() => screen.getByText("Mail 1"));
+      fireEvent.click(screen.getByTitle(/Protect this mail/));
+      expect(await screen.findByText(/no Message-ID, can't protect/))
+        .toBeTruthy();
+      expect(document.querySelectorAll("[data-pinned]").length).toBe(0);
+    });
+
+    it("pinning a selected mail drops it from the selection", async () => {
+      renderPanel([mkMail(1), mkMail(2)]);
+      await waitFor(() => screen.getByText("Mail 1"));
+      fireEvent.click(checkbox(0));
+      expect(await screen.findByText("1 selected")).toBeTruthy();
+      fireEvent.click(screen.getAllByTitle(/Protect this mail/)[0]);
+      await waitFor(() => expect(screen.queryByText("1 selected")).toBeNull());
+    });
+
+    it("select-all never selects pinned mails", async () => {
+      renderPanel([mkMail(1, { pinned: true }), mkMail(2), mkMail(3)]);
+      await waitFor(() => screen.getByText("Mail 1"));
+      fireEvent.change(screen.getByDisplayValue("Select…"),
+        { target: { value: "all" } });
+      expect(await screen.findByText("2 selected")).toBeTruthy();
+      expect((checkbox(0) as HTMLInputElement).checked).toBe(false);
+      expect((checkbox(1) as HTMLInputElement).checked).toBe(true);
+      expect((checkbox(2) as HTMLInputElement).checked).toBe(true);
+    });
+
+    it("'older than' never selects pinned mails", async () => {
+      const old = 1_000_000;                       // 1970 - older than 2y
+      renderPanel([mkMail(1, { ts: old, pinned: true }),
+        mkMail(2, { ts: old }), mkMail(3, { ts: Date.now() / 1000 })]);
+      await waitFor(() => screen.getByText("Mail 1"));
+      fireEvent.change(screen.getByDisplayValue("Select…"),
+        { target: { value: "older24" } });
+      expect(await screen.findByText("1 selected")).toBeTruthy();
+      expect((checkbox(1) as HTMLInputElement).checked).toBe(true);
+      expect((checkbox(0) as HTMLInputElement).checked).toBe(false);
+    });
+
+    it("AI selection by rating never selects pinned mails", async () => {
+      aiGroup.mockResolvedValue({
+        verdicts: [["INBOX", 1, "keep"], ["INBOX", 2, "delete_safe"]],
+        note: "n", reviewed: 2, remaining: 0, total: 2,
+        usage: { input_tokens: 0, output_tokens: 0 } });
+      renderPanel([mkMail(1, { pinned: true, ai: "delete_safe" }),
+        mkMail(2), mkMail(3, { ai: "delete_safe" })], { aiEnabled: true });
+      await waitFor(() => screen.getByText("Mail 1"));
+      fireEvent.click(await screen.findByLabelText("More"));
+      fireEvent.click(screen.getByText("AI rate mails"));
+      expect(await screen.findByText("2 selected")).toBeTruthy();
+      expect((checkbox(0) as HTMLInputElement).checked).toBe(false);
+    });
+
+    it("explicitly trashing ONE pinned mail asks first and sends force",
+      async () => {
+      const confirm = vi.spyOn(window, "confirm").mockReturnValue(true);
+      renderPanel([mkMail(1, { pinned: true }), mkMail(2)]);
+      await waitFor(() => screen.getByText("Mail 1"));
+      fireEvent.click(checkbox(0));
+      fireEvent.click(await screen.findByText(/Trash selected/));
+      await waitFor(() => expect(deleteMessages).toHaveBeenCalledWith(
+        [["INBOX", 1]], "trash", "", true));
+      expect(confirm).toHaveBeenCalledTimes(1);   // the dedicated one only
+      expect(confirm.mock.calls[0][0]).toMatch(/protected mail "Mail 1"/);
+    });
+
+    it("declining the pinned-mail confirmation does nothing", async () => {
+      vi.spyOn(window, "confirm").mockReturnValue(false);
+      renderPanel([mkMail(1, { pinned: true }), mkMail(2)]);
+      await waitFor(() => screen.getByText("Mail 1"));
+      fireEvent.click(checkbox(0));
+      fireEvent.click(await screen.findByText(/Trash selected/));
+      expect(deleteMessages).not.toHaveBeenCalled();
+      expect(screen.getByText("1 selected")).toBeTruthy();   // still there
+    });
+
+    it("pinned mails ticked inside a bigger selection are left out, "
+      + "never forced", async () => {
+      const confirm = vi.spyOn(window, "confirm").mockReturnValue(true);
+      renderPanel([mkMail(1, { pinned: true }), mkMail(2), mkMail(3)]);
+      await waitFor(() => screen.getByText("Mail 1"));
+      fireEvent.click(checkbox(0));
+      fireEvent.click(checkbox(1));
+      fireEvent.click(await screen.findByText(/Trash selected/));
+      await waitFor(() => expect(deleteMessages).toHaveBeenCalledWith(
+        [["INBOX", 2]], "trash", "", false));
+      expect(confirm.mock.calls[0][0]).toMatch(/1 protected mail\(s\) skipped/);
+      // the pinned mail is still listed afterwards
+      await waitFor(() => expect(screen.queryByText("Mail 2")).toBeNull());
+      expect(screen.getByText("Mail 1")).toBeTruthy();
+    });
+
+    it("a selection of only several pinned mails is refused locally",
+      async () => {
+      renderPanel([mkMail(1, { pinned: true }), mkMail(2, { pinned: true }),
+        mkMail(3)]);
+      await waitFor(() => screen.getByText("Mail 1"));
+      fireEvent.click(checkbox(0));
+      fireEvent.click(checkbox(1));
+      fireEvent.click(await screen.findByText(/Trash selected/));
+      expect(await screen.findByText(/All selected mails are protected/))
+        .toBeTruthy();
+      expect(deleteMessages).not.toHaveBeenCalled();
+    });
+
+    it("mark as read is non-destructive: pinned mails need no confirmation",
+      async () => {
+      const confirm = vi.spyOn(window, "confirm").mockReturnValue(true);
+      renderPanel([mkMail(1, { pinned: true, seen: false }), mkMail(2)]);
+      await waitFor(() => screen.getByText("Mail 1"));
+      fireEvent.click(checkbox(0));
+      fireEvent.change(await screen.findByDisplayValue("Action…"),
+        { target: { value: "mark_read" } });
+      await waitFor(() => expect(deleteMessages).toHaveBeenCalledWith(
+        [["INBOX", 1]], "mark_read", "", false));
+      expect(confirm.mock.calls[0][0]).not.toMatch(/protected/);
+    });
   });
 });

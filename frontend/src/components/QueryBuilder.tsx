@@ -128,6 +128,7 @@ export function QueryBuilder({ value, onChange, className = "" }: {
               {flag("is:replied", t("qb.is_replied"))}
               {flag("is:protected", t("qb.is_protected"))}
               {flag("is:new", t("qb.is_new"))}
+              {flag("has:pinned", t("qb.has_pinned"))}
             </div>
           </div>
         </div>

@@ -1,3 +1,4 @@
+import { t } from "./i18n";
 import type {
   AdminTenantStats, AiGroupResult, AppState, AttMail, AuditResp, AuthProbe,
   Config, DupSet, FilterPreset, FoldersResp, Grouping, Mail, MessageDetail,
@@ -43,6 +44,14 @@ export async function downloadFile(url: string): Promise<void> {
   setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
 }
 
+/* Stable error codes the backend's pin feature answers with
+ * (mailops.NO_MESSAGE_ID / PINNED_MAILS / ALL_PINNED) -> translated text. */
+const ERROR_CODES: Record<string, string> = {
+  no_message_id: "pin.no_message_id",
+  pinned_mails: "pin.refused",
+  all_pinned: "toast.all_pinned",
+};
+
 async function req<T>(path: string, body?: unknown): Promise<T> {
   const res = await fetch(withAccount(path), {
     method: body === undefined ? "GET" : "POST",
@@ -56,7 +65,8 @@ async function req<T>(path: string, body?: unknown): Promise<T> {
     } catch {
       /* plain text */
     }
-    throw new Error(detail || `HTTP ${res.status}`);
+    const code = ERROR_CODES[detail];
+    throw new Error(code ? t(code) : detail || `HTTP ${res.status}`);
   }
   return res.json() as Promise<T>;
 }
@@ -78,9 +88,13 @@ export const api = {
         older_than_days: olderThanDays }),
   protect: (entry: string, on: boolean) =>
     req<{ protected: string[] }>("/api/protect", { entry, on }),
-  deleteMessages: (items: [string, number][], action = "trash", dest = "") =>
+  deleteMessages: (items: [string, number][], action = "trash", dest = "",
+                   force = false) =>
     req<{ ok: boolean; queued: number }>("/api/delete_messages",
-      { items, action, dest }),
+      { items, action, dest, force }),
+  pin: (folder: string, uid: number, pinned: boolean) =>
+    req<{ ok: boolean; pinned: boolean }>("/api/pin",
+      { folder, uid, pinned }),
   aiReview: (grouping: Grouping, keys?: string[]) =>
     req<{ ok: boolean }>("/api/ai", { grouping, keys: keys ?? null }),
   aiGroup: (grouping: Grouping, key: string, offset = 0, limit = 200,

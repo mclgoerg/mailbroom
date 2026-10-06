@@ -146,6 +146,15 @@ presets.
   (trashing one explicitly asks first), and the AI is told - and
   forced - to never rate their mails "safe to delete". Filter them with
   `is:protected`.
+- **Protected mails** - the same safety net for a single mail: the pin
+  toggle on a mail row in a group's detail view ("Protect this mail")
+  makes it exempt from every bulk action - group actions (trash/archive/
+  move), saved rules and retention actions (also in their report
+  numbers), selection presets and AI picks (its AI rating is forced to
+  "keep"). Marking read still works; acting on a protected mail yourself
+  asks first. It is remembered per account by Message-ID, so it survives
+  rescans and folder moves. Filter groups with `has:pinned`. (This is a
+  protection against accidental cleanup, not a PIN code or privacy lock.)
 - **One-click unsubscribe** - RFC 8058 one-click POST or unsubscribe mail
   via Bridge SMTP, straight from a group's detail view - or in bulk:
   select any number of groups and unsubscribe from every one of their

@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import { api, fmtSize, mailKey } from "../api";
 import type { Mail, MessageDetail } from "../types";
 import { t } from "../i18n";
-import { AiTag, Button, Spinner } from "./ui";
+import { AiTag, Button, PinButton, Spinner } from "./ui";
 
 const RENDER_CAP = 500;
 
@@ -44,11 +44,13 @@ export function MessageView({ mail, onBack }: {
   );
 }
 
-export function MailRows({ mails, sel, onToggle, onOpen }: {
+export function MailRows({ mails, sel, onToggle, onOpen, onPin }: {
   mails: Mail[];
   sel: Set<string>;
   onToggle: (k: string) => void;
   onOpen: (m: Mail) => void;
+  // Pin toggle per row; absent = no pin control (search results etc.).
+  onPin?: (m: Mail) => void;
 }) {
   const [cap, setCap] = useState(RENDER_CAP);
   // Sender/folder only earn a spot on the meta line when they actually
@@ -66,8 +68,9 @@ export function MailRows({ mails, sel, onToggle, onOpen }: {
         if (multiSender) meta.push(m.addr);
         meta.push(fmtSize(m.size));
         return (
-          <div key={mailKey(m)}
-            className="flex gap-3 border-b border-line/60 px-1 py-2.5">
+          <div key={mailKey(m)} data-pinned={m.pinned ? "true" : undefined}
+            className={`flex gap-3 border-b border-line/60 px-1 py-2.5 ${
+              m.pinned ? "border-l-2 border-l-accent bg-panel" : ""}`}>
             <input type="checkbox" className="mt-1 shrink-0"
               checked={sel.has(mailKey(m))}
               onChange={() => onToggle(mailKey(m))} />
@@ -96,6 +99,9 @@ export function MailRows({ mails, sel, onToggle, onOpen }: {
                 )}
               </div>
             </div>
+            {onPin && (
+              <PinButton on={!!m.pinned} onClick={() => onPin(m)} />
+            )}
           </div>
         );
       })}

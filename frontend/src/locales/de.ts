@@ -58,6 +58,28 @@ export const DE: Record<string, string> = {
   "confirm.protected_skipped": "({n} geschützte Gruppe(n) übersprungen.)",
   "toast.all_protected":
     "Alle ausgewählten Gruppen sind geschützt - nichts wurde gelöscht.",
+  "toast.all_pinned":
+    "Alle ausgewählten Mails sind geschützt - nichts wurde geändert.",
+  "confirm.pinned_skipped": "({n} geschützte Mail(s) übersprungen.)",
+  "confirm.pinned_kept": "({n} geschützte Mail(s) bleiben unberührt.)",
+  "confirm.act_pinned_mail":
+    "{verb}: die geschützte Mail „{subject}“? Geschützte Mails sind von "
+    + "Sammelaktionen ausgenommen - dies hebt ihren Schutz ausdrücklich auf.",
+  "pin.protect_tip":
+    "Diese Mail schützen - keine Sammelaktion, Regel oder KI-Auswahl "
+    + "verschiebt sie",
+  "pin.unprotect_tip": "Schutz dieser Mail aufheben",
+  "pin.badge_tip": "{n} Mail(s) vor Sammelaktionen geschützt",
+  "pin.n_protected": "{n} Mail(s) geschützt",
+  "pin.error": "Schutz der Mail konnte nicht geändert werden",
+  "pin.no_message_id":
+    "Diese Mail hat keine Message-ID und ließe sich nach einem erneuten "
+    + "Scan nicht wiedererkennen - sie kann nicht geschützt werden.",
+  "pin.refused":
+    "Die Auswahl enthält geschützte Mails - bestätige sie einzeln oder "
+    + "hebe zuerst ihren Schutz auf.",
+  "rule.pinned_skipped": "{n} geschützte Mails übersprungen",
+  "qb.has_pinned": "mit geschützten Mails",
   "confirm.block":
     "„{label}“ blockieren? Dies legt eine dauerhafte Regel an, die "
     + "künftige Mails täglich automatisch in den Papierkorb verschiebt - "

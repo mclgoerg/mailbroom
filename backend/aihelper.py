@@ -16,6 +16,7 @@ import time
 from . import accounts
 from . import config as cfgmod
 from . import mailops
+from . import pinstore
 from . import tenants
 from . import verdictstore
 
@@ -378,6 +379,7 @@ def ai_group(grouping: str, key: str, offset: int = 0,
              cfg["ai"]["provider"], model)
 
     known = {(m["folder"], m["uid"]): m["msgid"] for m in mails}
+    pinned = pinstore.load_account(acc.name)
     verdicts_out: list = []
     to_store: dict[str, str] = {}
     for it in data["items"]:
@@ -389,7 +391,12 @@ def ai_group(grouping: str, key: str, offset: int = 0,
         if pos not in known:
             continue
         verdict = it["verdict"]
-        if verdict == "delete_safe" and pos in prot:
+        if known[pos] in pinned:
+            # A pinned mail is never a deletion candidate, whatever the
+            # model says - forced AFTER the call, so no pin data has to
+            # enter the AI payload.
+            verdict = "keep"
+        elif verdict == "delete_safe" and pos in prot:
             log.info("downgraded delete_safe -> review for protected mail "
                      "uid %d in %r", pos[1], pos[0])
             verdict = "review"

@@ -187,6 +187,27 @@ export const EN: Record<string, string> = {
   "confirm.protected_skipped": "({n} protected group(s) skipped.)",
   "toast.all_protected":
     "All selected groups are protected - nothing was deleted.",
+  "toast.all_pinned":
+    "All selected mails are protected - nothing was changed.",
+  "confirm.pinned_skipped": "({n} protected mail(s) skipped.)",
+  "confirm.pinned_kept": "({n} protected mail(s) stay untouched.)",
+  "confirm.act_pinned_mail":
+    '{verb}: the protected mail "{subject}"? Protected mails are exempt '
+    + "from bulk actions - this explicitly overrides its protection.",
+  "pin.protect_tip":
+    "Protect this mail - no bulk action, rule or AI pick will move it",
+  "pin.unprotect_tip": "Remove this mail's protection",
+  "pin.badge_tip": "{n} mail(s) protected from bulk actions",
+  "pin.n_protected": "{n} mail(s) protected",
+  "pin.error": "Could not change the mail's protection",
+  "pin.no_message_id":
+    "This mail has no Message-ID header, so it could not be recognised "
+    + "again after a rescan - it can't be protected.",
+  "pin.refused":
+    "The selection contains protected mails - confirm them one at a time "
+    + "or remove their protection first.",
+  "rule.pinned_skipped": "{n} protected mails skipped",
+  "qb.has_pinned": "with protected mails",
   "confirm.block":
     'Block "{label}"? This creates a standing rule that automatically '
     + "moves its future mail to Trash on the daily schedule - reversible "
