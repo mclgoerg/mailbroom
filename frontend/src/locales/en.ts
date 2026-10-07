@@ -189,7 +189,8 @@ export const EN: Record<string, string> = {
     "The index was built with a different secret key and cannot be used - "
     + "rebuild it.",
   "index.building": "Indexing…",
-  "index.status": "{docs} mails indexed ({size}), last updated {ts}.",
+  "index.status": "{docs} mails indexed, last updated {ts}.",
+  "index.disk": "Disk space used: {size}",
   "index.build": "Build index",
   "index.update": "Update now",
   "index.rebuild": "Rebuild",

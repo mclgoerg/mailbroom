@@ -84,7 +84,8 @@ test("a usable index shows its size, offers update/rebuild/delete", async () => 
   indexInfo.mockResolvedValue(info({ exists: true, usable: true, reason: null,
     docs: 1531, bytes: 3 * 1048576, built_ts: 1790000000 }));
   renderPanel();
-  await screen.findByText(/1531 mails indexed \(3\.0 MB\)/);
+  await screen.findByText(/1531 mails indexed, last updated/);
+  expect(screen.getByText("Disk space used: 3.0 MB")).toBeTruthy();
   fireEvent.click(screen.getByText("Update now"));
   await waitFor(() => expect(indexBuild).toHaveBeenCalledWith("proton", false));
   fireEvent.click(screen.getByText("Rebuild"));
@@ -95,11 +96,12 @@ test("a usable index shows its size, offers update/rebuild/delete", async () => 
 });
 
 test("a running job shows progress and can be cancelled", async () => {
-  indexInfo.mockResolvedValue(info({ exists: true,
+  indexInfo.mockResolvedValue(info({ exists: true, bytes: 512 * 1024,
     job: { status: "running", progress: "40/120", error: "", done: 40,
       total: 120 } }));
   renderPanel();
   await screen.findByText(/Indexing… 40\/120 \(33%\)/);
+  expect(screen.getByText("Disk space used: 512 KB")).toBeTruthy();
   const bar = screen.getByRole("progressbar");
   expect(bar.getAttribute("aria-valuenow")).toBe("40");
   expect(bar.getAttribute("aria-valuemax")).toBe("120");
@@ -113,6 +115,9 @@ test("an index built under another key says it must be rebuilt", async () => {
   indexInfo.mockResolvedValue(info({ exists: true, reason: "index_key" }));
   renderPanel();
   await screen.findByText(/different secret key/);
+  // an unusable index still occupies space - and can be deleted
+  expect(screen.getByText("Disk space used: 0 B")).toBeTruthy();
+  expect(screen.getByText("Delete index")).toBeTruthy();
 });
 
 test("API errors are shown", async () => {

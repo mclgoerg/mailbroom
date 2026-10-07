@@ -721,7 +721,8 @@ export const DE: Record<string, string> = {
     "Der Index wurde mit einem anderen geheimen Schlüssel gebaut und ist "
     + "unbrauchbar - neu aufbauen.",
   "index.building": "Indexiere…",
-  "index.status": "{docs} Mails indexiert ({size}), zuletzt aktualisiert {ts}.",
+  "index.status": "{docs} Mails indexiert, zuletzt aktualisiert {ts}.",
+  "index.disk": "Belegter Speicherplatz: {size}",
   "index.build": "Index aufbauen",
   "index.update": "Jetzt aktualisieren",
   "index.rebuild": "Neu aufbauen",

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "../api";
 import { t } from "../i18n";
+import { fmtSize } from "../lib";
 import type { BodySearchMode, IndexInfo } from "../types";
 import { Button, ProgressBar, Spinner } from "./ui";
 
@@ -80,14 +81,18 @@ export function IndexPanel({ account, savedMode, secretKeySet }: {
         {info.job.status === "running"
           ? null
           : info.usable
-            ? t("index.status", { docs: info.docs,
-                size: `${(info.bytes / 1048576).toFixed(1)} MB`, ts: built })
+            ? t("index.status", { docs: info.docs, ts: built })
             : info.reason === "index_key"
               ? t("index.key_changed") : t("index.none")}
         {info.job.status === "error" && (
           <span className="ml-2 text-rose-400">{info.job.error}</span>
         )}
       </div>
+      {info.exists && (
+        <div className="text-xs text-muted">
+          {t("index.disk", { size: fmtSize(info.bytes) })}
+        </div>
+      )}
       <div className="flex flex-wrap gap-2">
         {running ? (
           <Button variant="ghost" onClick={() => act(() =>
