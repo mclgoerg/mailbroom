@@ -490,6 +490,23 @@ def get_message(folder: str = Query(...), uid: int = Query(...),
         raise HTTPException(500, f"{type(exc).__name__}: {exc}")
 
 
+class MessagesBody(BaseModel):
+    items: list[list] = Field(max_length=mailops.MESSAGES_BATCH_MAX)
+
+
+@app.post("/api/messages")
+def post_messages(body: MessagesBody, account: str | None = Query(None)):
+    """Several mails' text over one IMAP connection (the conversation
+    reader); see mailops.fetch_messages."""
+    acc = _acc(account)
+    try:
+        return {"messages": mailops.fetch_messages(body.items, acc)}
+    except ValueError as exc:
+        raise HTTPException(400, str(exc))
+    except Exception as exc:
+        raise HTTPException(500, f"{type(exc).__name__}: {exc}")
+
+
 @app.get("/api/thread")
 def get_thread(folder: str = Query(...), uid: int = Query(...),
                account: str | None = Query(None)):

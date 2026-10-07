@@ -79,6 +79,10 @@ export const api = {
   message: (folder: string, uid: number) =>
     req<MessageDetail>(
       `/api/message?folder=${encodeURIComponent(folder)}&uid=${uid}`),
+  // Several mails' text over ONE IMAP connection (conversation reader).
+  messages: (items: [string, number][]) =>
+    req<{ messages: (Partial<MessageDetail> & { folder: string; uid: number;
+      error?: string })[] }>("/api/messages", { items }),
   thread: (folder: string, uid: number) =>
     req<ConversationResp>(
       `/api/thread?folder=${encodeURIComponent(folder)}&uid=${uid}`),

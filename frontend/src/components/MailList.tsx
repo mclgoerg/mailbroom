@@ -26,7 +26,8 @@ export function MessageView({ mail, onBack }: {
   }, [mail.folder, mail.uid]);
 
   if (reading) {
-    return <ThreadView mail={mail} onBack={() => setReading(false)} />;
+    return <ThreadView mail={mail} initial={detail ?? undefined}
+      onBack={() => setReading(false)} />;
   }
 
   return (

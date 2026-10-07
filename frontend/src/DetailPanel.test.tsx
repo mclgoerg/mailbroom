@@ -27,6 +27,9 @@ vi.mock("./api", async (importOriginal) => {
       thread: (...args: unknown[]) => thread(...args),
       message: () => Promise.resolve({ from: "", to: "", date: "",
         subject: "", text: "body" }),
+      messages: (items: [string, number][]) => Promise.resolve({
+        messages: items.map(([folder, uid]) => ({ folder, uid, from: "",
+          to: "", date: "", subject: "", text: "body" })) }),
     },
   };
 });
