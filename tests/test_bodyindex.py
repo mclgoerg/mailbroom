@@ -322,3 +322,41 @@ def test_renaming_and_deleting_the_account_carry_the_index_along(
     assert client.post("/api/config", json={
         "delete_account": "main"}).status_code == 200
     assert not bodyindex._path("main").exists()
+
+
+# ------------------------------------------------------------ disk estimate
+
+def test_estimate_counts_what_the_index_still_lacks(scanned):
+    est = bodyindex.estimate(acc())
+    assert est["mails"] == 5
+    assert est["bytes"] == 5 * bodyindex.BYTES_PER_MAIL
+    assert est["bytes_max"] == 5 * bodyindex.BYTES_PER_MAIL_MAX
+    assert est["free"] > 0
+    build()
+    assert bodyindex.estimate(acc())["mails"] == 0           # nothing to add
+    assert bodyindex.estimate(acc(), rebuild=True)["mails"] == 5
+    scanned.mailbox["INBOX"].append(make_msg(70, body="newcomer"))
+    mailops.run_scan()
+    wait_index()
+    assert bodyindex.estimate(acc())["mails"] == 0           # scan topped up
+
+
+def test_index_endpoint_includes_both_estimates(scanned):
+    r = client.get("/api/index").json()
+    assert r["estimate"]["mails"] == 5 and r["estimate_full"]["mails"] == 5
+    assert r["estimate"]["bytes"] == 5 * bodyindex.BYTES_PER_MAIL
+    build()
+    r = client.get("/api/index").json()
+    assert r["estimate"]["mails"] == 0 and r["estimate_full"]["mails"] == 5
+
+
+def test_build_is_refused_when_the_disk_is_too_full(scanned, monkeypatch):
+    import collections
+    usage = collections.namedtuple("usage", "total used free")
+    monkeypatch.setattr(bodyindex.shutil, "disk_usage",
+                        lambda p: usage(10**9, 10**9 - 1000, 1000))
+    with pytest.raises(RuntimeError, match="not enough free disk space"):
+        bodyindex.start_build(acc())
+    assert client.post("/api/index/build", json={}).status_code == 409
+    assert acc().state["index"]["status"] == "idle"
+    assert not bodyindex._path(acc().name).exists()

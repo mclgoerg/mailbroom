@@ -174,8 +174,8 @@ export const EN: Record<string, string> = {
   "body_search.server": "Ask the mail server",
   "body_search.local": "Local word index",
   "body_search.local_help":
-    "Builds a local index once, then searches instantly - also on slow "
-    + "providers. It stores NO readable mail text, only keyed hashes of each "
+    "Meant for large mailboxes and slow providers: builds a local index "
+    + "once, then searches instantly. It stores NO readable mail text, only keyed hashes of each "
     + "mail's words (the key comes from MAILBROOM_SECRET_KEY). Searches match "
     + "whole words (case and accents ignored, several words must all "
     + "appear), not parts of words. Scans keep the index up to date; "
@@ -196,9 +196,17 @@ export const EN: Record<string, string> = {
   "index.rebuild": "Rebuild",
   "index.delete": "Delete index",
   "index.confirm":
-    "Mailbroom will now read the text of every scanned mail in this account "
+    "Mailbroom will now read the text of {n} scanned mails of this account "
     + "from your mail server (the first ~256 KB of each) and store only keyed "
-    + "word hashes locally - no readable text. It can take a while. Continue?",
+    + "word hashes locally - no readable text.\n\nThis will take roughly "
+    + "{size} of disk space (up to {max} for text-heavy mail); {free} are "
+    + "free on the data volume. It can take a while.\n\nDo you want to "
+    + "proceed?",
+  "index.estimate":
+    "Estimated disk space: about {size} for {n} mails (up to {max} for "
+    + "text-heavy mail); {free} free on the data volume.",
+  "index.confirm_tight":
+    "Warning: that may not fit on the data volume.",
   "index.confirm_delete": "Delete the local index of this account?",
   "notice.index_cancelled": "Indexing cancelled - what was indexed is kept.",
   "search.body_hint_local":

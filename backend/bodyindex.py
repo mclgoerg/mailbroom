@@ -32,6 +32,7 @@ import hmac
 import logging
 import os
 import re
+import shutil
 import sqlite3
 import threading
 import time
@@ -49,6 +50,10 @@ TEXT_CAP = 20_000            # characters of a mail's text that are indexed
 FETCH_BYTES = 262_144        # leading bytes fetched per mail (text parts come first)
 FETCH_BATCH = 20             # mails per FETCH
 MAX_WORDS = 2000             # distinct words kept per mail
+# Disk use per indexed mail: ~5.4 KB measured at 150 distinct words per mail
+# (see the README); text-heavy mail (newsletters) is about twice that.
+BYTES_PER_MAIL = 6 * 1024
+BYTES_PER_MAIL_MAX = 12 * 1024
 _WORD_RE = re.compile(r"[^\W_]{2,40}")
 
 # Why an index cannot be used (reported to the UI as translatable notes).
@@ -245,6 +250,30 @@ def info(acc) -> dict:
     return out
 
 
+def estimate(acc, rebuild: bool = False) -> dict:
+    """What a build/update would add: how many scanned mails the index still
+    lacks (all of them for a rebuild), the typical and the text-heavy disk
+    use that means, and the free space of the data volume - shown before
+    anything is read."""
+    with acc.lock:
+        current = {(m["folder"], m["uid"], acc.folder_uv.get(m["folder"], 0))
+                   for m in acc.index.values()}
+    have: set = set()
+    idx, _ = (None, None) if rebuild else open_index(acc.name, acc.tenant)
+    if idx is not None:
+        try:
+            have = set(idx.known())
+        finally:
+            idx.close()
+    todo = sum(1 for k in current if k not in have and k[2])
+    try:
+        free = shutil.disk_usage(_dir()).free
+    except OSError:
+        free = 0
+    return {"mails": todo, "bytes": todo * BYTES_PER_MAIL,
+            "bytes_max": todo * BYTES_PER_MAIL_MAX, "free": free}
+
+
 # ------------------------------------------------------------ build / sync
 
 class _Cancelled(Exception):
@@ -274,6 +303,15 @@ def start_build(acc, rebuild: bool = False) -> None:
     with acc.lock:
         if acc.state["status"] != "done":
             raise RuntimeError("No completed scan")
+        if _job_busy(acc):
+            raise RuntimeError("busy")
+    est = estimate(acc, rebuild)
+    if est["free"] and est["bytes"] > est["free"] * 0.9:
+        raise RuntimeError(
+            f"not enough free disk space for the index (about "
+            f"{est['bytes'] // 1048576} MB needed, "
+            f"{est['free'] // 1048576} MB free)")
+    with acc.lock:
         if _job_busy(acc):
             raise RuntimeError("busy")
         acc.state["index"].update(status="running", progress="connecting…",

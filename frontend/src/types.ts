@@ -293,6 +293,14 @@ export interface DigestSettings {
 
 export type BodySearchMode = "disabled" | "server" | "local";
 
+// What a build/update would add (see bodyindex.estimate).
+export interface IndexEstimate {
+  mails: number;           // scanned mails the index still lacks
+  bytes: number;           // typical disk use
+  bytes_max: number;       // text-heavy mail
+  free: number;            // free space of the data volume
+}
+
 // GET /api/index: the account's local mail-text index.
 export interface IndexInfo {
   mode: BodySearchMode;
@@ -303,6 +311,8 @@ export interface IndexInfo {
   docs: number;
   built_ts: number | null;
   bytes: number;
+  estimate: IndexEstimate;        // build / update
+  estimate_full: IndexEstimate;   // rebuild
   job: { status: "idle" | "running" | "done" | "error"; progress: string;
          error: string; done: number; total: number };
 }

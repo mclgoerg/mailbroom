@@ -706,8 +706,8 @@ export const DE: Record<string, string> = {
   "body_search.server": "Mailserver fragen",
   "body_search.local": "Lokaler Wortindex",
   "body_search.local_help":
-    "Baut einmal einen lokalen Index auf und sucht danach sofort - auch bei "
-    + "langsamen Anbietern. Er speichert KEINEN lesbaren Mailtext, nur "
+    "Gedacht für große Postfächer und langsame Anbieter: baut einmal einen "
+    + "lokalen Index auf und sucht danach sofort. Er speichert KEINEN lesbaren Mailtext, nur "
     + "geschlüsselte Hashes der Wörter jeder Mail (der Schlüssel stammt aus "
     + "MAILBROOM_SECRET_KEY). Die Suche findet ganze Wörter (Groß-/Kleinschreibung "
     + "und Akzente egal, mehrere Wörter müssen alle vorkommen), keine "
@@ -728,10 +728,17 @@ export const DE: Record<string, string> = {
   "index.rebuild": "Neu aufbauen",
   "index.delete": "Index löschen",
   "index.confirm":
-    "Mailbroom liest jetzt den Text jeder gescannten Mail dieses Kontos von "
-    + "Ihrem Mailserver (je die ersten ~256 KB) und speichert lokal nur "
-    + "geschlüsselte Wort-Hashes - keinen lesbaren Text. Das kann dauern. "
-    + "Fortfahren?",
+    "Mailbroom liest jetzt den Text von {n} gescannten Mails dieses Kontos "
+    + "von Ihrem Mailserver (je die ersten ~256 KB) und speichert lokal nur "
+    + "geschlüsselte Wort-Hashes - keinen lesbaren Text.\n\nDas belegt "
+    + "etwa {size} Speicherplatz (bis zu {max} bei textlastigen Mails); auf "
+    + "dem Datenträger sind {free} frei. Das kann dauern.\n\nMöchten Sie "
+    + "fortfahren?",
+  "index.estimate":
+    "Geschätzter Speicherplatz: etwa {size} für {n} Mails (bis zu {max} bei "
+    + "textlastigen Mails); {free} frei auf dem Datenträger.",
+  "index.confirm_tight":
+    "Achtung: das passt möglicherweise nicht auf den Datenträger.",
   "index.confirm_delete": "Den lokalen Index dieses Kontos löschen?",
   "notice.index_cancelled":
     "Indexierung abgebrochen - bereits Indexiertes bleibt erhalten.",

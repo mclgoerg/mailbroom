@@ -1,8 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "../api";
 import { t } from "../i18n";
-import { fmtSize } from "../lib";
-import type { BodySearchMode, IndexInfo } from "../types";
+import { fmtSize as fmtSmall } from "../lib";
+
+/** Like fmtSize, plus GB - volumes and big indexes outgrow 1000 MB. */
+const fmtSize = (b: number): string =>
+  b >= 1073741824 ? `${(b / 1073741824).toFixed(1)} GB` : fmtSmall(b);
+import type { BodySearchMode, IndexEstimate, IndexInfo } from "../types";
 import { Button, ProgressBar, Spinner } from "./ui";
 
 /** Settings -> mail-text search = "local index": status of the account's
@@ -48,8 +52,18 @@ export function IndexPanel({ account, savedMode, secretKeySet }: {
     load();
   };
 
+  const params = (est: IndexEstimate) => ({
+    n: est.mails, size: fmtSize(est.bytes), max: fmtSize(est.bytes_max),
+    free: fmtSize(est.free) });
+  const tight = (est: IndexEstimate) =>
+    est.free > 0 && est.bytes_max > est.free * 0.9;
+
   const build = (rebuild: boolean) => {
-    if (!confirm(t("index.confirm"))) return;
+    const est = rebuild ? info!.estimate_full : info!.estimate;
+    // Nothing to read (e.g. an up-to-date index): nothing to consent to.
+    if (est.mails > 0 && !confirm(
+      t("index.confirm", params(est))
+        + (tight(est) ? "\n\n" + t("index.confirm_tight") : ""))) return;
     act(() => api.indexBuild(account, rebuild));
   };
 
@@ -91,6 +105,13 @@ export function IndexPanel({ account, savedMode, secretKeySet }: {
       {info.exists && (
         <div className="text-xs text-muted">
           {t("index.disk", { size: fmtSize(info.bytes) })}
+        </div>
+      )}
+      {!running && info.estimate.mails > 0 && (
+        <div className={`text-xs ${tight(info.estimate)
+          ? "text-rose-400" : "text-muted"}`}>
+          {t("index.estimate", params(info.estimate))}
+          {tight(info.estimate) && ` ${t("index.confirm_tight")}`}
         </div>
       )}
       <div className="flex flex-wrap gap-2">

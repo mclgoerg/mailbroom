@@ -523,7 +523,9 @@ def get_index(account: str | None = Query(None)):
         job = dict(acc.state["index"])
     return {"mode": cfgmod.account_imap(acc.name).get("body_search"),
             "secret_key_set": secretbox.enabled(),
-            **bodyindex.info(acc), "job": job}
+            **bodyindex.info(acc), "estimate": bodyindex.estimate(acc),
+            "estimate_full": bodyindex.estimate(acc, rebuild=True),
+            "job": job}
 
 
 @app.post("/api/index/build")

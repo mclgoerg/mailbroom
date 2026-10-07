@@ -313,7 +313,13 @@ different key is unusable until rebuilt. Searches match **whole words**
 (case and accents ignored, several words are ANDed) - not word parts or
 phrases - and are instant for any provider. The build reads the first
 ~256 KB of every scanned mail from your server once (cancellable, with
-progress); later scans only add new mails and drop vanished ones.
+progress); later scans only add new mails and drop vanished ones. Before
+anything is read, Settings shows the **estimated disk use** and the free
+space of the data volume and asks for confirmation (about 5-6 KB per mail,
+up to ~12 KB for text-heavy mail: roughly 0.5-1.2 GB for 100,000 mails; the
+build is refused if even the typical estimate would not fit). It is meant
+for large mailboxes and slow providers - for a few thousand mails the
+server-side search is already fast.
 Switching the mode off or deleting the account removes the index.
 
 ## Development
