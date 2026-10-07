@@ -4,8 +4,8 @@ import { api, fmtSize, mailKey } from "../api";
 import { t } from "../i18n";
 import type { AppState, Mail, TrashResp } from "../types";
 import { MessageView } from "./MailList";
-import { Button, EmptyState, Input, Loading, Modal, PanelHeader, Select,
-  Spinner, Toolbar } from "./ui";
+import { Button, Checkbox, EmptyState, Input, Loading, Modal, PanelHeader,
+  Select, Spinner, Toolbar } from "./ui";
 
 /** Trash browser: live Trash contents (also mail deleted outside the app),
  *  with search and restore-to-folder. */
@@ -99,10 +99,10 @@ export function TrashPanel({ state, onClose, onChanged }: {
               ))}
             </Select>
             {busy && <Spinner />}
-            {note && <span className="w-full text-xs text-muted">{note}</span>}
+            {note && <span className="w-full type-meta text-muted">{note}</span>}
           </Toolbar>
           <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-4">
-            {error && <div className="p-4 text-sm text-rose-400">{error}</div>}
+            {error && <div className="p-4 type-body text-danger-fg">{error}</div>}
             {!shown && !error && <Loading />}
             {shown && shown.length === 0 && (
               <EmptyState>{t("trash.empty")}</EmptyState>
@@ -111,20 +111,20 @@ export function TrashPanel({ state, onClose, onChanged }: {
               <div key={mailKey(m)}
                 className="flex flex-wrap items-baseline gap-2 border-b
                   border-line/60 px-1 py-2">
-                <input type="checkbox" checked={sel.has(mailKey(m))}
+                <Checkbox checked={sel.has(mailKey(m))} className="-my-1"
                   onChange={() => toggle(mailKey(m))} />
-                <span className="text-xs whitespace-nowrap text-muted">
+                <span className="type-meta whitespace-nowrap text-muted">
                   {(m.date || "").slice(0, 10)}
                 </span>
                 <button className="min-w-0 flex-1 basis-full cursor-pointer
-                    truncate text-left text-sm hover:underline sm:basis-0"
+                    truncate text-left type-body hover:underline sm:basis-0"
                   onClick={() => setView(m)}>
                   {m.subject || t("(no subject)")}
-                  <span className="block truncate text-xs text-faint">
+                  <span className="block truncate type-meta text-muted">
                     {m.addr}
                   </span>
                 </button>
-                <span className="text-xs whitespace-nowrap text-faint">
+                <span className="type-meta whitespace-nowrap text-muted">
                   {fmtSize(m.size)}
                 </span>
               </div>
