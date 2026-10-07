@@ -15,10 +15,14 @@ export function SortControl<K extends string>({ options, value, dir,
   onValue: (k: K) => void;
   onDir: (d: "asc" | "desc") => void;
 }) {
-  const phone = useMediaQuery("(max-width: 767px)");
+  const phone = useMediaQuery("(width < 48rem)");
   if (phone) {
     return (
-      <Menu variant="secondary" icon label={t("sort.menu")}
+      <Menu variant="secondary" icon
+        label={t("sort.menu_state", {
+          key: t(options.find((o) => o.k === value)?.label ?? ""),
+          dir: t(dir === "asc" ? "sort.ascending" : "sort.descending")
+            .toLowerCase() })}
         trigger={<ArrowUpDown size={18} />}>
         {options.map((o) => (
           <MenuItem key={o.k} active={o.k === value}

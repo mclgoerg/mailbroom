@@ -803,7 +803,9 @@ export default function App() {
       // isModalOpen(): also covers confirm/prompt dialogs, which App's own
       // panel flags don't know about.
       if (anyModal || isModalOpen()
-          || ["INPUT", "SELECT", "TEXTAREA"].includes(el.tagName)) return;
+          || ["INPUT", "SELECT", "TEXTAREA"].includes(el.tagName)
+          // Menus and tablists own the arrow / Enter keys while focused.
+          || el.closest?.('[role="menu"], [role="tablist"]')) return;
       if (e.key === "/") {
         e.preventDefault();
         filterRef.current?.focus();
@@ -901,7 +903,7 @@ export default function App() {
   return (
     <div className={`mx-auto max-w-6xl p-3 sm:p-5
       ${selected.size > 0 ? "pb-28 sm:pb-20" : ""}`}>
-      <header className="mb-4 flex items-center gap-3">
+      <header className="mb-2 flex items-center gap-3 md:mb-4">
         <h1 className="type-title">
           Mailbroom
         </h1>
@@ -1128,7 +1130,7 @@ export default function App() {
           selection-dependent chrome here (that lives in the bottom bar,
           which only renders once something is selected). */}
       {!flat && (
-      <div className="mb-3 flex flex-wrap items-center gap-2">
+      <div className="mb-2 flex flex-wrap items-center gap-2">
         {PRESET_CHIPS.slice(0, 1).map((p) => (
           <Chip key={p.key} className="shrink-0"
             on={filter === presetFilterQuery(p.key)}
@@ -1327,13 +1329,15 @@ export default function App() {
         </div>
       )}
 
-      {/* 2 px strip (space always reserved, no layout jump) under the
-          toolbar while a job runs. */}
-      <div className="mb-1 h-0.5">
+      {/* 2 px strip overlaid on the gap under the toolbar while a job runs
+          (takes no space, so it never shifts the layout). */}
+      <div className="relative h-0">
         {(job || pending) && (
-          <ProgressBar thin label={job?.label ?? pending}
-            value={progress?.done ?? 0} max={progress?.total ?? 0}
-            indeterminate={!progress} />
+          <div className="absolute inset-x-0 -top-1">
+            <ProgressBar thin label={job?.label ?? pending}
+              value={progress?.done ?? 0} max={progress?.total ?? 0}
+              indeterminate={!progress} />
+          </div>
         )}
       </div>
       <div className="mb-1 flex min-h-5 items-center justify-between gap-2

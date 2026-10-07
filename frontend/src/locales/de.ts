@@ -626,6 +626,7 @@ export const DE: Record<string, string> = {
   "usage.last_scan": "Letzter Scan",
   "usage.disk": "Speicher",
   "usage.shared": "geteilter Schlüssel",
+  "sort.menu_state": "{key}, {dir}",
   "sort.menu": "Sortieren",
   "sort.ascending": "Aufsteigend",
   "sort.descending": "Absteigend",

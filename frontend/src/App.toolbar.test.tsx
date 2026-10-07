@@ -70,6 +70,7 @@ const baseState: AppState = {
 
 afterEach(() => {
   cleanup();
+  cfg.ai.available = true;
   localStorage.clear();
   vi.unstubAllGlobals();
 });
@@ -100,7 +101,7 @@ test("the Tools menu lists every tool with a label; no loose tool icons",
     fireEvent.click(screen.getByRole("button", { name: "Tools" }));
     for (const n of ["Rules", "Attachments", "Duplicates", "Statistics",
       "Audit Log", "AI review", "Export CSV"])
-      expect(screen.getByRole("button", { name: new RegExp(`^${n}`) }))
+      expect(screen.getByRole("menuitem", { name: new RegExp(`^${n}`) }))
         .toBeTruthy();
     expect(screen.getByLabelText("Search all mails")).toBeTruthy();
   });
@@ -108,7 +109,7 @@ test("the Tools menu lists every tool with a label; no loose tool icons",
 test("a Tools entry opens its panel", async () => {
   await open();
   fireEvent.click(screen.getByRole("button", { name: "Tools" }));
-  fireEvent.click(screen.getByRole("button", { name: /^Rules/ }));
+  fireEvent.click(screen.getByRole("menuitem", { name: /^Rules/ }));
   expect(await screen.findByRole("dialog")).toBeTruthy();
 });
 
@@ -149,10 +150,12 @@ test("on a phone the sort control is a menu for key and direction",
     }));
     await open();
     expect(screen.queryByDisplayValue("Sort: mails")).toBeNull();
-    fireEvent.click(screen.getByLabelText("Sort"));
+    const trigger = () => screen.getByRole("button", { name: /^Sort: / });
+    expect(trigger().getAttribute("aria-label")).toBe("Sort: mails, descending");
+    fireEvent.click(trigger());
     fireEvent.click(screen.getByRole("menuitemradio", { name: "Sort: size" }));
     expect(localStorage.getItem("pmc_sort_k")).toBe("size");
-    fireEvent.click(screen.getByLabelText("Sort"));
+    fireEvent.click(trigger());
     expect(screen.getByRole("menuitemradio", { name: /^Sort: size/ })
       .getAttribute("aria-checked")).toBe("true");
     expect(screen.getByRole("menuitemradio", { name: /^Descending/ })
@@ -171,4 +174,28 @@ test("All mails keeps its filter and sort in the toolbar row", async () => {
   expect(screen.getByDisplayValue("Date")).toBeTruthy();
   // Same slot as the group filter: directly under row A (Scan + tabs).
   expect(rowA.nextElementSibling?.contains(input)).toBe(true);
+});
+
+test("while scanning with AI unavailable: Duplicates disabled, no AI review",
+  async () => {
+    cfg.ai.available = false;
+    state = { ...baseState, status: "scanning", groups: { ...baseState.groups,
+      sender: { [group.key]: group } } };
+    render(<ToastProvider><App /></ToastProvider>);
+    await waitFor(() => expect(screen.getAllByText("Acme").length)
+      .toBeGreaterThan(0));
+    fireEvent.click(screen.getByRole("button", { name: "Tools" }));
+    expect((screen.getByRole("menuitem", { name: /^Duplicates/ }) as
+      HTMLButtonElement).disabled).toBe(true);
+    expect(screen.queryByRole("menuitem", { name: /^AI review/ })).toBeNull();
+  });
+
+test("Enter on a focused grouping tab doesn't trigger the list's Enter-opens-" +
+  "detail shortcut", async () => {
+  await open();
+  Element.prototype.scrollIntoView = () => {};              // jsdom lacks it
+  fireEvent.keyDown(document.body, { key: "j" });          // focus row 0
+  fireEvent.keyDown(screen.getByRole("tab", { name: "Domain" }),
+    { key: "Enter" });
+  expect(screen.queryByRole("dialog")).toBeNull();
 });

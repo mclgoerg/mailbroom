@@ -2,7 +2,8 @@ import { AlertCircle, Check, CheckCircle2, Info, Pin, Shield, X }
   from "lucide-react";
 import { createContext, useCallback, useContext, useEffect, useId,
   useLayoutEffect, useMemo, useRef, useState, type ComponentProps,
-  type ReactNode, type RefObject } from "react";
+  type KeyboardEvent as ReactKeyboardEvent, type ReactNode, type RefObject }
+  from "react";
 import { t } from "../i18n";
 import { engagementTier } from "../lib";
 import type { GroupAi } from "../types";
@@ -417,14 +418,14 @@ export function SectionLabel({ children, className = "" }: {
  * their onClick). Sits BELOW modals (z-modal). */
 export function Menu({ trigger, label, variant, icon, children }: {
   trigger: ReactNode;
-  label?: string;                 // accessible name / tooltip
-  /** Render the trigger as a design-system `Button` of this variant (a
-   *  labelled "Tools ▾" button, or with `icon` a square icon button whose
-   *  `label` is then required). Without it: the compact header trigger. */
-  variant?: ButtonVariant;
-  icon?: boolean;
   children: ReactNode;
-}) {
+} & (
+  /** `variant` renders the trigger as a design-system `Button` (a labelled
+   *  "Tools ▾" button; with `icon` a square icon button, whose `label` is
+   *  then required). Without it: the compact header trigger. */
+  | { variant: ButtonVariant; icon: true; label: string }
+  | { variant?: ButtonVariant; icon?: false; label?: string }
+)) {
   const [open, setOpen] = useState(false);
   const [alignLeft, setAlignLeft] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -435,13 +436,23 @@ export function Menu({ trigger, label, variant, icon, children }: {
     const r = pop.current?.getBoundingClientRect();
     if (r && r.width > 0 && r.left < 8) setAlignLeft(true);
   }, [open]);
+  const focusTrigger = () =>
+    ref.current?.querySelector<HTMLElement>(":scope > button")?.focus();
+  const items = () => [...(pop.current?.querySelectorAll<HTMLElement>(
+    '[role^="menuitem"]:not(:disabled)') ?? [])];
+  const close = (back = true) => {
+    setOpen(false);
+    if (back) focusTrigger();
+  };
+  // Keyboard users land on the first item.
+  useEffect(() => { if (open) items()[0]?.focus(); }, [open]);
   useEffect(() => {
     if (!open) return;
     const onDoc = (e: MouseEvent) => {
       if (!ref.current?.contains(e.target as Node)) setOpen(false);
     };
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setOpen(false);
+      if (e.key === "Escape") close();
     };
     document.addEventListener("mousedown", onDoc);
     document.addEventListener("keydown", onKey);
@@ -450,10 +461,21 @@ export function Menu({ trigger, label, variant, icon, children }: {
       document.removeEventListener("keydown", onKey);
     };
   }, [open]);
+  const onMenuKey = (e: ReactKeyboardEvent) => {
+    // Tab: focus goes back to the trigger, the browser then moves on from it.
+    if (e.key === "Tab") { close(); return; }
+    const list = items();
+    const i = list.indexOf(document.activeElement as HTMLElement);
+    const to = e.key === "ArrowDown" ? list[(i + 1) % list.length]
+      : e.key === "ArrowUp" ? list[(i - 1 + list.length) % list.length]
+      : e.key === "Home" ? list[0]
+      : e.key === "End" ? list[list.length - 1] : null;
+    if (to) { e.preventDefault(); to.focus(); }
+  };
   return (
     <div className="relative" ref={ref}>
       {variant && icon ? (
-        <Button variant={variant} size="icon" label={label ?? ""}
+        <Button variant={variant} size="icon" label={label}
           aria-haspopup="menu" aria-expanded={open}
           onClick={() => setOpen(!open)}>
           {trigger}
@@ -467,17 +489,18 @@ export function Menu({ trigger, label, variant, icon, children }: {
       ) : (
         <button className="flex min-h-8 items-center rounded-control border
           border-line bg-panel2 px-2 type-body hover:bg-chip"
-          title={label} aria-label={label} aria-expanded={open}
+          title={label} aria-label={label} aria-haspopup="menu"
+          aria-expanded={open}
           onClick={() => setOpen(!open)}>
           {trigger}
         </button>
       )}
       {open && (
-        <div ref={pop}
+        <div ref={pop} role="menu" onKeyDown={onMenuKey}
           className={`absolute top-full z-(--z-dropdown) mt-1 min-w-52
             max-w-[calc(100vw-1rem)] rounded-card border border-line bg-panel
             p-1 shadow-popover ${alignLeft ? "left-0" : "right-0"}`}
-          onClick={() => setOpen(false)}>
+          onClick={() => close()}>
           {children}
         </div>
       )}
@@ -496,7 +519,7 @@ export function MenuItem({ children, onClick, disabled, active, sub,
 }) {
   return (
     <button
-      role={active === undefined ? undefined : "menuitemradio"}
+      role={active === undefined ? "menuitem" : "menuitemradio"}
       aria-checked={active}
       className={`flex w-full items-center gap-2 rounded-control px-3 py-2
         text-left type-body enabled:hover:bg-chip
@@ -707,7 +730,7 @@ export function ChipGroup({ label, children, className = "" }: {
       bg-panel2 type-meta ${className}`}>
       {label != null && (
         <span id={labelId}
-          className="flex items-center pl-3 pr-1.5 text-muted">
+          className="flex items-center pl-2 pr-1 text-muted sm:pl-3 sm:pr-1.5">
           {label}
         </span>
       )}
@@ -721,7 +744,8 @@ export function ChipSegment({ on = false, children, className = "", ...rest }:
   return (
     <button type="button" aria-pressed={on} {...rest}
       className={`flex items-center whitespace-nowrap border-l border-line
-        px-3 transition-colors focus-visible:-outline-offset-2 enabled:active:translate-y-px
+        px-2 transition-colors focus-visible:-outline-offset-2 sm:px-3
+        enabled:active:translate-y-px
         disabled:cursor-not-allowed disabled:bg-chip disabled:text-faint
         ${on ? "bg-chiph text-body ring-1 ring-inset ring-accent"
           : "text-muted enabled:hover:bg-chip"} ${className}`}>
@@ -733,7 +757,7 @@ export function ChipSegment({ on = false, children, className = "", ...rest }:
 /** Segmented control for mutually exclusive views (tablist). The selected
  *  segment is the quiet "current" style (chiph + accent inset ring), never
  *  the solid accent that belongs to the one primary Button. `fill` makes
- *  the segments equal-width across the full row. */
+ *  the row full-width, segments sized to their content (`flex-auto`). */
 export function Segmented<T extends string>({ value, onChange, options,
   label, fill = false, className = "" }: {
   value: T | null;
@@ -743,19 +767,35 @@ export function Segmented<T extends string>({ value, onChange, options,
   fill?: boolean;
   className?: string;
 }) {
+  // Roving tabindex: Tab enters on the selected segment, Left/Right/Home/End
+  // move FOCUS only; Enter/Space (a native click) activates. Selection must
+  // not follow focus: a change can have side effects (clears a selection).
+  const onKey = (e: ReactKeyboardEvent<HTMLDivElement>) => {
+    const tabs = [...e.currentTarget.querySelectorAll<HTMLElement>('[role="tab"]')];
+    const i = tabs.indexOf(document.activeElement as HTMLElement);
+    if (i < 0) return;
+    const to = e.key === "ArrowRight" ? tabs[(i + 1) % tabs.length]
+      : e.key === "ArrowLeft" ? tabs[(i - 1 + tabs.length) % tabs.length]
+      : e.key === "Home" ? tabs[0]
+      : e.key === "End" ? tabs[tabs.length - 1] : null;
+    if (to) { e.preventDefault(); to.focus(); }
+  };
+  const tabStop = options.some((o) => o.value === value) ? value
+    : options[0]?.value;
   return (
-    <div role="tablist" aria-label={label}
+    <div role="tablist" aria-label={label} onKeyDown={onKey}
       className={`inline-flex items-stretch overflow-hidden rounded-control
         border border-line bg-panel2 ${fill ? "w-full" : ""} ${className}`}>
       {options.map((o, i) => {
         const on = o.value === value;
         return (
           <button key={o.value} type="button" role="tab" aria-selected={on}
+            tabIndex={o.value === tabStop ? 0 : -1}
             onClick={() => onChange(o.value)}
             className={`min-h-9 coarse:min-h-10 min-w-0 whitespace-nowrap
-              px-1.5 transition-colors type-meta md:type-body md:px-3
+              px-1.5 transition-colors type-meta md:type-body md:px-2 lg:px-3
               focus-visible:-outline-offset-2 enabled:active:translate-y-px
-              ${fill ? "flex-1" : ""} ${i > 0 ? "border-l border-line" : ""}
+              ${fill ? "flex-auto" : ""} ${i > 0 ? "border-l border-line" : ""}
               ${on ? "bg-chiph font-medium text-body ring-1 ring-inset ring-accent"
                 : "text-muted hover:bg-chip"}`}>
             {o.label}

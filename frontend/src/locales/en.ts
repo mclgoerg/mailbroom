@@ -94,6 +94,7 @@ export const EN: Record<string, string> = {
   "usage.last_scan": "Last scan",
   "usage.disk": "Disk",
   "usage.shared": "shared key",
+  "sort.menu_state": "{key}, {dir}",
   "sort.menu": "Sort",
   "sort.ascending": "Ascending",
   "sort.descending": "Descending",
