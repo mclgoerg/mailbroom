@@ -827,5 +827,6 @@ export const DE: Record<string, string> = {
   "Dismiss": "Schließen",
   "Refresh": "Aktualisieren",
   "OK": "OK",
+  "Select {label}": "{label} auswählen",
   "Select mail": "Mail auswählen",
 };

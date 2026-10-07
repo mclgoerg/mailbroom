@@ -247,7 +247,7 @@ export function AllMailsView({ state, onChanged, toolbarSlot }: {
              folder picker is a separate control (see DetailPanel). */
           action={<>
             <Select value=""
-              className="min-w-36 flex-1 md:w-56 md:min-w-0 md:flex-none"
+              className="min-w-36 flex-1 md:w-44 xl:w-56 md:min-w-0 md:flex-none"
               disabled={busy} onChange={(e) => onAction(e.target.value)}>
               <option value="" disabled>{t("Action…")}</option>
               <option value="archive">{t("Archive")}</option>
@@ -257,7 +257,7 @@ export function AllMailsView({ state, onChanged, toolbarSlot }: {
             {moveDest === "?" && (
               <>
                 <Select value=""
-                  className="min-w-36 flex-1 md:w-56 md:min-w-0 md:flex-none"
+                  className="min-w-36 flex-1 md:w-44 xl:w-56 md:min-w-0 md:flex-none"
                   onChange={(e) => {
                     if (e.target.value) act("move", e.target.value);
                     setMoveDest("");

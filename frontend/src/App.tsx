@@ -21,7 +21,7 @@ import { SettingsModal } from "./components/SettingsModal";
 import { StatsPanel } from "./components/StatsPanel";
 import { QueryBuilder } from "./components/QueryBuilder";
 import { TrashPanel } from "./components/TrashPanel";
-import { AccountAvatar, applyTheme, BulkBar, Button, Chip, ChipGroup, ChipSegment,
+import { AccountAvatar, applyTheme, BAR_ICON_BTN, BulkBar, Button, Chip, ChipGroup, ChipSegment,
   currentTheme, EmptyState, ensureAiAck, FILTER_ROW, Input, isModalOpen, LINK,
   LINK_ACCENT, Menu, MenuDivider, MenuHeading, MenuItem, Notice, ProgressBar,
   Segmented, Select, Spinner, useToast,
@@ -1249,7 +1249,7 @@ export default function App() {
           onClear={() => setSelected(new Set())}
           secondary={
             <Button variant="quiet" size="sm"
-              className="inline-flex shrink-0 items-center justify-center"
+              className={BAR_ICON_BTN}
               title={t("export.csv_tip")}
               onClick={() => downloadFile(api.exportUrl(mode, [...selected]))}>
               <Download size={16} aria-hidden />
@@ -1261,7 +1261,7 @@ export default function App() {
           modifiers={<>
             <span className="shrink-0">{t("bar.limit_to")}</span>
             <Select value={retention} title={t("retention.help")}
-              className="min-w-0 flex-1 md:w-56 md:flex-none"
+              className="min-w-0 flex-1 md:w-44 xl:w-56 md:flex-none"
               onChange={(e) =>
                 setRetention(e.target.value as typeof retention)}>
               <option value="none">{t("retention.none")}</option>
@@ -1279,7 +1279,7 @@ export default function App() {
           </>}
           action={<>
             <Select value=""
-              className="min-w-36 flex-1 md:w-56 md:min-w-0 md:flex-none"
+              className="min-w-36 flex-1 md:w-44 xl:w-56 md:min-w-0 md:flex-none"
               onChange={(e) => onAction(e.target.value)}>
               <option value="" disabled>{t("Action…")}</option>
               <option value="archive">{t("Archive")}</option>
@@ -1293,7 +1293,7 @@ export default function App() {
             {moveDest === "?" && (
               <>
                 <Select value=""
-                  className="min-w-36 flex-1 md:w-56 md:min-w-0 md:flex-none"
+                  className="min-w-36 flex-1 md:w-44 xl:w-56 md:min-w-0 md:flex-none"
                   onChange={(e) => {
                     if (e.target.value) act([...selected], "move",
                       e.target.value, ...retentionParams());

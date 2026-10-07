@@ -178,6 +178,7 @@ function DesktopTable({ slice, baseIdx, selected, focusedKey, onToggle,
               ${g.key === focusedKey ? "bg-panel outline outline-1 -outline-offset-1 outline-accent/60" : ""}`}>
             <td className="px-2 py-2 align-top" data-no-open>
               <Checkbox checked={selected.has(g.key)} className="-mx-2 -my-1"
+                aria-label={t("Select {label}", { label: g.label || g.key })}
                 onChange={() => onToggle(g.key)} />
             </td>
             <td className="py-2 pl-0 pr-2 align-top">
@@ -273,6 +274,7 @@ function MobileCards({ slice, baseIdx, selected, focusedKey, onToggle,
               checkbox's hit area; it never overlaps the open-detail area. */}
           <Checkbox checked={selected.has(g.key)}
             className="w-11 shrink-0 self-stretch coarse:min-h-0"
+            aria-label={t("Select {label}", { label: g.label || g.key })}
             onChange={() => onToggle(g.key)} />
           <div className="flex min-w-0 flex-1 cursor-pointer items-center
             gap-3 py-2.5 pr-1" onClick={() => onOpen(g)}>

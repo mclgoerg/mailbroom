@@ -932,6 +932,11 @@ export function useBulkBarHeight(ref: RefObject<HTMLElement | null>,
   }, [ref, active]);
 }
 
+/** Shared by the bar's Clear and `secondary` buttons: icon-only below md
+ *  (>= 44 px wide on touch), icon + text from md. */
+export const BAR_ICON_BTN = `inline-flex shrink-0 items-center justify-center
+  max-md:min-w-10 max-md:px-0 coarse:max-md:min-w-11`;
+
 /** The fixed bottom selection bar, shared by the group list and All mails.
  *  Phone (< md): summary + Clear + `secondary` / `modifiers` / `action` +
  *  `primary` on three compact rows. >= md: one row (wrapping to two at
@@ -958,8 +963,7 @@ export function BulkBar({ summary, onClear, secondary, modifiers, action,
             md:flex-none md:whitespace-nowrap">{summary}</span>
           {/* One button: icon-only on a phone, icon + text from md. */}
           <Button variant="quiet" size="sm" onClick={onClear}
-            className="inline-flex shrink-0 items-center justify-center
-              max-md:min-w-10 max-md:px-0 coarse:max-md:min-w-11">
+            className={BAR_ICON_BTN}>
             <X size={16} aria-hidden />
             <span className="sr-only md:not-sr-only md:ml-1.5">
               {t("bar.clear")}
@@ -971,10 +975,11 @@ export function BulkBar({ summary, onClear, secondary, modifiers, action,
           <div className="flex items-center gap-2 type-meta text-muted
             md:ml-auto">{modifiers}</div>
         )}
-        <div className="flex flex-wrap items-center gap-1.5 md:contents">
-          <div className={`flex min-w-0 flex-1 flex-wrap items-center gap-1.5
-            md:flex-none md:flex-nowrap md:gap-2
-            ${modifiers ? "" : "md:ml-auto"}`}>{action}</div>
+        {/* A real group from md, so Action + Trash wrap together. */}
+        <div className="flex flex-wrap items-center gap-1.5 md:flex-nowrap
+          md:gap-2 md:ml-auto">
+          <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5
+            md:flex-none md:flex-nowrap md:gap-2">{action}</div>
           <div className="shrink-0">{primary}</div>
         </div>
       </div>

@@ -658,5 +658,6 @@ export const EN: Record<string, string> = {
   "Dismiss": "Dismiss",
   "Refresh": "Refresh",
   "OK": "OK",
+  "Select {label}": "Select {label}",
   "Select mail": "Select mail",
 };
