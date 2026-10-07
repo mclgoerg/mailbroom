@@ -1,5 +1,6 @@
 import { mailKey } from "./api";
 import { t } from "./i18n";
+import { confirmDialog } from "./components/ui";
 import type { Mail } from "./types";
 
 export type MailActionPlan =
@@ -13,15 +14,18 @@ export type MailActionPlan =
  *  gets its own warning and is sent with `force`; pinned mails inside a
  *  larger selection are dropped from it (never silently moved).
  *  mark_read is non-destructive and exempt. */
-export function planMailAction(chosen: Mail[], action: string,
-                               verb: string): MailActionPlan {
+export async function planMailAction(chosen: Mail[], action: string,
+    verb: string): Promise<MailActionPlan> {
   let acting = chosen;
   let force = false;
+  const tone = action === "mark_read" ? "primary" : "danger";
   if (action !== "mark_read") {
     const pinned = chosen.filter((m) => m.pinned);
     if (chosen.length === 1 && pinned.length === 1) {
-      if (!confirm(t("confirm.act_pinned_mail", {
-        verb, subject: chosen[0].subject || t("(no subject)") })))
+      if (!await confirmDialog({ title: verb, tone,
+        body: t("confirm.act_pinned_mail", {
+          verb, subject: chosen[0].subject || t("(no subject)") }),
+        confirmLabel: t("confirm.btn_anyway", { verb }) }))
         return { kind: "cancelled" };
       force = true;
     } else if (pinned.length) {
@@ -29,12 +33,16 @@ export function planMailAction(chosen: Mail[], action: string,
       if (!acting.length) return { kind: "all_pinned" };
     }
   }
-  const skipNote = acting.length !== chosen.length
-    ? " " + t("confirm.pinned_skipped",
-        { n: chosen.length - acting.length }) : "";
-  if (!force && !confirm(
-    t("confirm.act_mails", { verb, n: acting.length }) + skipNote))
-    return { kind: "cancelled" };
+  if (!force) {
+    const bullets = [t("confirm.b_selected", { n: acting.length })];
+    if (acting.length !== chosen.length) {
+      bullets.push(t("confirm.b_pinned_skipped",
+        { n: chosen.length - acting.length }));
+    }
+    if (!await confirmDialog({ title: verb, bullets, tone,
+      confirmLabel: t("confirm.btn_n", { verb, n: acting.length }) }))
+      return { kind: "cancelled" };
+  }
   return { kind: "go", acting, force };
 }
 

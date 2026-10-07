@@ -37,7 +37,7 @@ afterEach(() => {
 
 async function restoreOne() {
   render(<TrashPanel state={state} onClose={() => {}}
-    onChanged={() => {}} />);
+    onChanged={() => {}} onEmptyTrash={async () => true} />);
   fireEvent.click(await screen.findByRole("checkbox"));
   fireEvent.change(screen.getByDisplayValue(/Restore to/),
     { target: { value: "INBOX" } });
@@ -58,3 +58,20 @@ test("restore while the server is busy still asks for a manual rescan",
     await waitFor(() => expect(screen.getByText(
       "Restored 1 mails - rescan to see them in the views.")).toBeTruthy());
   });
+
+test("the footer's Empty Trash runs the shared handler and reloads the list",
+  async () => {
+    const onEmptyTrash = vi.fn().mockResolvedValue(true);
+    render(<TrashPanel state={{ ...state, trash_count: 1 } as AppState}
+      onClose={() => {}} onChanged={() => {}} onEmptyTrash={onEmptyTrash} />);
+    await screen.findByText("Deleted elsewhere");
+    fireEvent.click(screen.getByRole("button", { name: "Empty Trash (1)…" }));
+    await waitFor(() => expect(onEmptyTrash).toHaveBeenCalledOnce());
+  });
+
+test("no Empty Trash footer when Trash is empty", async () => {
+  render(<TrashPanel state={{ ...state, trash_count: 0 } as AppState}
+    onClose={() => {}} onChanged={() => {}} onEmptyTrash={async () => true} />);
+  await screen.findByText("Deleted elsewhere");
+  expect(screen.queryByRole("button", { name: /Empty Trash/ })).toBeNull();
+});

@@ -9,9 +9,10 @@ import { engagementTier, fmtDate } from "../lib";
 import type { GroupAi } from "../types";
 
 /** One-time consent: what metadata the AI features transmit. */
-export function ensureAiAck(): boolean {
+export async function ensureAiAck(): Promise<boolean> {
   if (localStorage.getItem("pmc_ai_ack") === "1") return true;
-  if (confirm(t("ai.disclaimer"))) {
+  if (await confirmDialog({ title: t("ai.consent_title"),
+    body: t("ai.disclaimer"), confirmLabel: t("Continue") })) {
     localStorage.setItem("pmc_ai_ack", "1");
     return true;
   }
@@ -85,17 +86,26 @@ export function RatingChips({ ratings }: {
 
 /** Shield toggle: protected senders are skipped by bulk deletes and the AI
  *  never rates them delete_safe. Grayscale = not protected. */
-export function ProtectButton({ on, onClick, className = "" }: {
+export function ProtectButton({ on, onClick, className = "", showLabel }: {
   on: boolean; onClick: () => void; className?: string;
+  /** Visible "Protect" / "Protected" text next to the shield, from sm up. */
+  showLabel?: boolean;
 }) {
   return (
     <button
       title={t(on ? "unprotect.tip" : "protect.tip")}
       aria-label={t(on ? "unprotect.tip" : "protect.tip")}
+      aria-pressed={on}
       onClick={onClick}
-      className={`flex min-h-7 items-center rounded px-1 transition-opacity
-        ${on ? "" : "opacity-30 grayscale hover:opacity-70"} ${className}`}>
+      className={`flex min-h-7 items-center gap-1 rounded px-1
+        transition-opacity ${on ? "" : "opacity-30 grayscale hover:opacity-70"}
+        ${className}`}>
       <Shield size={16} />
+      {showLabel && (
+        <span className="hidden type-meta sm:inline">
+          {t(on ? "btn.protected" : "btn.protect")}
+        </span>
+      )}
     </button>
   );
 }
@@ -103,17 +113,24 @@ export function ProtectButton({ on, onClick, className = "" }: {
 /** Per-mail "Protect this mail" toggle (a pinned mail is skipped by every
  *  bulk action, rule and AI pick). Unrelated to any PIN code/privacy
  *  feature - the label says "protect", the icon is a drawing pin. */
-export function PinButton({ on, onClick, className = "" }: {
+export function PinButton({ on, onClick, className = "", showLabel }: {
   on: boolean; onClick: () => void; className?: string;
+  /** Visible "Protect" / "Protected" text next to the pin. */
+  showLabel?: boolean;
 }) {
   const label = t(on ? "pin.unprotect_tip" : "pin.protect_tip");
   return (
     <button title={label} aria-label={label} aria-pressed={on}
       onClick={onClick}
-      className={`flex min-h-7 shrink-0 items-center rounded px-1
+      className={`flex min-h-7 shrink-0 items-center gap-1 rounded px-1
         transition-opacity ${on ? "text-accent"
           : "opacity-40 hover:opacity-80"} ${className}`}>
       <Pin size={16} fill={on ? "currentColor" : "none"} />
+      {showLabel && (
+        <span className="type-meta">
+          {t(on ? "btn.protected" : "btn.protect")}
+        </span>
+      )}
     </button>
   );
 }
@@ -1019,6 +1036,8 @@ export function ToastProvider({ children }: { children: ReactNode }) {
 export type ConfirmOptions = {
   title: string; body?: ReactNode; bullets?: ReactNode[];
   confirmLabel: string; tone?: "danger" | "primary";
+  /** Replaces "Cancel" where declining isn't a cancel (e.g. "Only block"). */
+  cancelLabel?: string;
 };
 export type PromptOptions = {
   title: string; label: string; initial?: string; confirmLabel?: string;
@@ -1028,7 +1047,7 @@ export type PromptOptions = {
 
 /** Confirm sheet. Danger dialogs focus Cancel, the safe choice. */
 export function ConfirmDialog({ title, body, bullets, confirmLabel,
-  tone = "primary", onResult }: ConfirmOptions & {
+  cancelLabel, tone = "primary", onResult }: ConfirmOptions & {
   onResult: (ok: boolean) => void;
 }) {
   const safe = useRef<HTMLButtonElement>(null);
@@ -1059,7 +1078,7 @@ export function ConfirmDialog({ title, body, bullets, confirmLabel,
       <div className="flex justify-end gap-2 border-t border-line px-4 py-3
         sm:px-5">
         <Button ref={safe} variant="secondary"
-          onClick={() => onResult(false)}>{t("Cancel")}</Button>
+          onClick={() => onResult(false)}>{cancelLabel ?? t("Cancel")}</Button>
         <Button ref={ok} variant={tone === "danger" ? "danger" : "primary"}
           onClick={() => onResult(true)}>{confirmLabel}</Button>
       </div>

@@ -15,13 +15,10 @@ export const DE: Record<string, string> = {
   "notice.ai_all_cached":
     "Alle Gruppen haben bereits KI-Bewertungen - nichts zu prüfen.",
   "notice.ai_cancelled": "KI-Prüfung nach {done}/{total} Gruppen abgebrochen.",
-  "confirm.act": "{verb}: {n} Mails aus {k} Gruppe(n)?",
   "confirm.act_mails": "{verb}: {n} ausgewählte Mails?",
   "confirm.unsubscribe":
     "Von den Absendern in {k} ausgewählten Gruppe(n) abbestellen?",
   "confirm.restore": "{count} Mails wiederherstellen ({label})?",
-  "confirm.empty_trash":
-    "Alle {n} Mails im Papierkorb ENDGÜLTIG löschen? Das kann nicht rückgängig gemacht werden.",
   "confirm.clear_verdicts": "Alle gespeicherten KI-Bewertungen löschen?",
   "confirm.reset_spend": "KI-Kostenzähler zurücksetzen?",
   "confirm.switch_profile":
@@ -39,8 +36,7 @@ export const DE: Record<string, string> = {
     + "lokales Modell): Absendernamen "
     + "und -adressen, Anzahl, Größen, Daten, Lesestatus, Kategorien, "
     + "Betreffzeilen, Schutz-Markierungen und ob Sie einem Absender je "
-    + "geantwortet haben. Mail-Inhalte und Anhänge werden NIE gesendet. "
-    + "Fortfahren?",
+    + "geantwortet haben. Mail-Inhalte und Anhänge werden NIE gesendet.",
   "ai.data_note":
     "An den KI-Anbieter gesendet: Absendernamen/-adressen, Anzahl, "
     + "Größen, Daten, Lesestatus, Kategorien, Betreffzeilen, "
@@ -57,7 +53,6 @@ export const DE: Record<string, string> = {
   "confirm.trash_protected":
     "Die Gruppe „{label}“ ist geschützt. Mails trotzdem in den "
     + "Papierkorb verschieben?",
-  "confirm.protected_skipped": "({n} geschützte Gruppe(n) übersprungen.)",
   "toast.all_protected":
     "Alle ausgewählten Gruppen sind geschützt - nichts wurde gelöscht.",
   "pin.group_on": "Alle Mails dieser Gruppe schützen",
@@ -87,8 +82,6 @@ export const DE: Record<string, string> = {
   "bar.all_pinned": "alles geschützt - nichts zu verschieben",
   "toast.all_pinned":
     "Alle ausgewählten Mails sind geschützt - nichts wurde geändert.",
-  "confirm.pinned_skipped": "({n} geschützte Mail(s) übersprungen.)",
-  "confirm.pinned_kept": "({n} geschützte Mail(s) bleiben unberührt.)",
   "confirm.act_pinned_mail":
     "{verb}: die geschützte Mail „{subject}“? Geschützte Mails sind von "
     + "Sammelaktionen ausgenommen - dies hebt ihren Schutz ausdrücklich auf.",
@@ -107,10 +100,6 @@ export const DE: Record<string, string> = {
     + "hebe zuerst ihren Schutz auf.",
   "rule.pinned_skipped": "{n} geschützte Mails übersprungen",
   "qb.has_pinned": "mit geschützten Mails",
-  "confirm.block":
-    "„{label}“ blockieren? Dies legt eine dauerhafte Regel an, die "
-    + "künftige Mails täglich automatisch in den Papierkorb verschiebt - "
-    + "umkehrbar durch Löschen der Regel in Regeln.",
   "confirm.block_trash_existing":
     "Auch die {n} vorhandene(n) Mail(s) jetzt in den Papierkorb "
     + "verschieben?",
@@ -120,9 +109,6 @@ export const DE: Record<string, string> = {
     + "an, die künftige Mails automatisch in den Papierkorb verschiebt",
   "Block": "Blockieren",
   "Blocked": "Blockiert",
-  "confirm.unblock":
-    "„{label}“ entblocken? Dies löscht die dauerhafte Regel - künftige "
-    + "Mails werden nicht mehr automatisch in den Papierkorb verschoben.",
   "toast.unblocked": "„{label}“ entblockt.",
   "unblock.tip":
     "Entblocken: löscht die von Blockieren angelegte dauerhafte Regel",
@@ -283,15 +269,11 @@ export const DE: Record<string, string> = {
   "rule.back_to_report": "Zurück zu Bericht",
   "rule.need_report": "Zuerst mindestens einen Bericht ausführen",
   "rule.confirm_execute": "Regel „{name}“ jetzt im AUSFÜHREN-Modus starten?",
-  "rule.confirm_enable":
-    "Regel „{name}“ auf AUSFÜHREN umschalten? Geplante Läufe verarbeiten "
-    + "dann passende Mails (max. 500 pro Lauf, geschützte Absender "
-    + "übersprungen, Undo verfügbar).",
   "rule.confirm_delete": "Regel „{name}“ löschen?",
   "rule.edit_title": "Regel bearbeiten",
   "rule.new_title": "Neue Regel",
   "rule.name": "Regelname",
-  "rule.create": "Anlegen (Bericht-Modus)",
+  "rule.create": "Regel anlegen (nur Bericht)",
   "rule.match_count":
     "trifft aktuell {groups} Gruppen · {mails} Mails (ohne geschützte)",
   "rule.match_unknown": "Für Live-Trefferzahlen zuerst scannen",
@@ -829,4 +811,53 @@ export const DE: Record<string, string> = {
   "OK": "OK",
   "Select {label}": "{label} auswählen",
   "Select mail": "Mail auswählen",
+  "ai.consent_title": "Mail-Metadaten an den KI-Anbieter senden?",
+  "Continue": "Fortfahren",
+  "btn.protect": "Schützen",
+  "btn.protected": "Geschützt",
+  "confirm.btn_n": "{verb} ({n})",
+  "confirm.btn_anyway": "Trotzdem: {verb}",
+  "confirm.b_mails_groups": "{n} Mails aus {k} Gruppe(n) sind betroffen",
+  "confirm.b_selected": "{n} ausgewählte Mail(s)",
+  "confirm.b_protected_groups_skipped": "{n} geschützte Gruppe(n) übersprungen",
+  "confirm.b_pinned_kept": "{n} geschützte Mail(s) bleiben unberührt",
+  "confirm.b_pinned_skipped": "{n} geschützte Mail(s) übersprungen",
+  "confirm.unsubscribe_btn": "Abbestellen",
+  "confirm.restore_btn": "Wiederherstellen",
+  "confirm.empty_trash_title": "Papierkorb leeren?",
+  "confirm.empty_trash_body":
+    "{n} Mails liegen im Papierkorb. Sie werden endgültig gelöscht; das "
+    + "lässt sich nicht rückgängig machen.",
+  "confirm.empty_trash_btn": "{n} Mails endgültig löschen",
+  "confirm.unpin_btn": "Schutz aufheben",
+  "confirm.block_title": "„{label}“ blockieren?",
+  "confirm.block_body":
+    "Dies legt eine dauerhafte Regel an, die künftige Mails täglich "
+    + "automatisch in den Papierkorb verschiebt - umkehrbar durch Löschen "
+    + "der Regel in Regeln.",
+  "confirm.block_only": "Nur blockieren",
+  "confirm.block_trash_btn": "{n} Mails in den Papierkorb",
+  "confirm.unblock_title": "„{label}“ entblocken?",
+  "confirm.unblock_body":
+    "Dies löscht die dauerhafte Regel - künftige Mails werden nicht mehr "
+    + "automatisch in den Papierkorb verschoben.",
+  "saved_filter.name_label": "Name",
+  "saved_filter.name_required": "Bitte einen Namen eingeben.",
+  "saved_filter.confirm_btn": "Löschen",
+  "rule.enable_title": "Regel „{name}“ auf AUSFÜHREN umschalten?",
+  "rule.enable_body":
+    "Geplante Läufe verarbeiten dann passende Mails (max. 500 pro Lauf, "
+    + "geschützte Absender übersprungen, Undo verfügbar).",
+  "trash_all.btn": "Alle {n} löschen",
+  "trash_all.tip": "Alle {n} Mails dieser Gruppe in den Papierkorb verschieben",
+  "trash_this.btn": "Diese Mail löschen",
+  "block.btn": "Absender blockieren",
+  "rule.f_grouping": "Gruppierung",
+  "rule.f_filter": "Filter",
+  "rule.f_action": "Aktion",
+  "rule.f_schedule": "Zeitplan",
+  "rule.f_apply": "Anwenden auf",
+  "rule.f_retention_n": "Anzahl",
+  "rule.f_dest": "Ordner",
+  "rule.f_name": "Name",
 };

@@ -14,13 +14,10 @@ export const EN: Record<string, string> = {
   "notice.ai_all_cached":
     "All groups already have cached AI verdicts - nothing to review.",
   "notice.ai_cancelled": "AI review cancelled after {done}/{total} groups.",
-  "confirm.act": "{verb}: {n} mails from {k} group(s)?",
   "confirm.act_mails": "{verb}: {n} selected mails?",
   "confirm.unsubscribe":
     "Unsubscribe from the senders of {k} selected group(s)?",
   "confirm.restore": "Restore {count} mails ({label})?",
-  "confirm.empty_trash":
-    "PERMANENTLY delete all {n} mails in Trash? This cannot be undone.",
   "confirm.clear_verdicts": "Clear all cached AI verdicts?",
   "confirm.reset_spend": "Reset the AI spend counter?",
   "account.label": "Account to edit",
@@ -255,7 +252,7 @@ export const EN: Record<string, string> = {
     + "sender names and addresses, "
     + "mail counts, sizes, dates, read state, category tags, subject "
     + "lines, protected-sender markers and whether you ever replied to a "
-    + "sender. Mail bodies and attachments are NEVER sent. Continue?",
+    + "sender. Mail bodies and attachments are NEVER sent.",
   "ai.data_note":
     "Sent to the AI provider: sender names/addresses, counts, sizes, "
     + "dates, read state, tags, subject lines, protected-sender markers "
@@ -263,7 +260,6 @@ export const EN: Record<string, string> = {
     + "attachments.",
   "confirm.trash_protected":
     'The group "{label}" is protected. Move its mails to Trash anyway?',
-  "confirm.protected_skipped": "({n} protected group(s) skipped.)",
   "toast.all_protected":
     "All selected groups are protected - nothing was deleted.",
   "pin.group_on": "Protect all mails in this group",
@@ -292,8 +288,6 @@ export const EN: Record<string, string> = {
   "bar.all_pinned": "all protected - nothing to move",
   "toast.all_pinned":
     "All selected mails are protected - nothing was changed.",
-  "confirm.pinned_skipped": "({n} protected mail(s) skipped.)",
-  "confirm.pinned_kept": "({n} protected mail(s) stay untouched.)",
   "confirm.act_pinned_mail":
     '{verb}: the protected mail "{subject}"? Protected mails are exempt '
     + "from bulk actions - this explicitly overrides its protection.",
@@ -311,19 +305,12 @@ export const EN: Record<string, string> = {
     + "or remove their protection first.",
   "rule.pinned_skipped": "{n} protected mails skipped",
   "qb.has_pinned": "with protected mails",
-  "confirm.block":
-    'Block "{label}"? This creates a standing rule that automatically '
-    + "moves its future mail to Trash on the daily schedule - reversible "
-    + "by deleting the rule in Rules.",
   "confirm.block_trash_existing":
     "Also move its {n} existing mail(s) to Trash now?",
   "toast.blocked": 'Blocked "{label}".',
   "block.tip":
     "Block this sender/domain: creates a standing rule that auto-trashes "
     + "future mail",
-  "confirm.unblock":
-    'Unblock "{label}"? This deletes the standing rule - future mail is '
-    + "no longer auto-trashed.",
   "toast.unblocked": 'Unblocked "{label}".',
   "unblock.tip": "Unblock: deletes the standing rule created by Block",
   "protect.tip":
@@ -379,15 +366,11 @@ export const EN: Record<string, string> = {
   "rule.back_to_report": "Back to report mode",
   "rule.need_report": "Run at least one report first",
   "rule.confirm_execute": 'Run rule "{name}" in EXECUTE mode now?',
-  "rule.confirm_enable":
-    'Switch rule "{name}" to EXECUTE? Scheduled runs will then act on '
-    + "matching mails (cap 500 per run, protected senders skipped, "
-    + "undo available).",
   "rule.confirm_delete": 'Delete rule "{name}"?',
   "rule.edit_title": "Edit rule",
   "rule.new_title": "New rule",
   "rule.name": "Rule name",
-  "rule.create": "Create (report mode)",
+  "rule.create": "Create rule (report only)",
   "rule.match_count":
     "currently matches {groups} groups · {mails} mails (protected excluded)",
   "rule.match_unknown": "run a scan to see live match counts",
@@ -660,4 +643,53 @@ export const EN: Record<string, string> = {
   "OK": "OK",
   "Select {label}": "Select {label}",
   "Select mail": "Select mail",
+  "ai.consent_title": "Send mail metadata to the AI provider?",
+  "Continue": "Continue",
+  "btn.protect": "Protect",
+  "btn.protected": "Protected",
+  "confirm.btn_n": "{verb} ({n})",
+  "confirm.btn_anyway": "{verb} anyway",
+  "confirm.b_mails_groups": "{n} mails from {k} group(s) will be affected",
+  "confirm.b_selected": "{n} selected mail(s)",
+  "confirm.b_protected_groups_skipped": "{n} protected group(s) skipped",
+  "confirm.b_pinned_kept": "{n} protected mail(s) stay untouched",
+  "confirm.b_pinned_skipped": "{n} protected mail(s) skipped",
+  "confirm.unsubscribe_btn": "Unsubscribe",
+  "confirm.restore_btn": "Restore",
+  "confirm.empty_trash_title": "Empty Trash?",
+  "confirm.empty_trash_body":
+    "{n} mails are in Trash. This permanently deletes them; it cannot be "
+    + "undone.",
+  "confirm.empty_trash_btn": "Delete {n} mails permanently",
+  "confirm.unpin_btn": "Remove protection",
+  "confirm.block_title": 'Block "{label}"?',
+  "confirm.block_body":
+    "This creates a standing rule that automatically moves its future mail "
+    + "to Trash on the daily schedule - reversible by deleting the rule in "
+    + "Rules.",
+  "confirm.block_only": "Only block",
+  "confirm.block_trash_btn": "Move {n} mails to Trash",
+  "confirm.unblock_title": 'Unblock "{label}"?',
+  "confirm.unblock_body":
+    "This deletes the standing rule - future mail is no longer "
+    + "auto-trashed.",
+  "saved_filter.name_label": "Name",
+  "saved_filter.name_required": "Enter a name.",
+  "saved_filter.confirm_btn": "Delete",
+  "rule.enable_title": 'Switch rule "{name}" to EXECUTE?',
+  "rule.enable_body":
+    "Scheduled runs will then act on matching mails (cap 500 per run, "
+    + "protected senders skipped, undo available).",
+  "trash_all.btn": "Trash all {n}",
+  "trash_all.tip": "Move all {n} mails of this group to Trash",
+  "trash_this.btn": "Trash this mail",
+  "block.btn": "Block sender",
+  "rule.f_grouping": "Grouping",
+  "rule.f_filter": "Filter",
+  "rule.f_action": "Action",
+  "rule.f_schedule": "Schedule",
+  "rule.f_apply": "Apply to",
+  "rule.f_retention_n": "Number",
+  "rule.f_dest": "Folder",
+  "rule.f_name": "Name",
 };

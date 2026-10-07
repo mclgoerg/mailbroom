@@ -47,7 +47,8 @@ vi.mock("./api", () => ({
 }));
 
 import App from "./App";
-import { ToastProvider } from "./components/ui";
+import { DialogProvider, ToastProvider } from "./components/ui";
+import { cancelDialog, findDialog, pressDialog } from "./dialogTestUtils";
 import type { AppState, Config } from "./types";
 
 const acct = {
@@ -134,7 +135,7 @@ const settleStateCalls = () =>
 test("profile menu lists every account with its address", async () => {
   cfg = multiCfg;
   state = { ...baseState };
-  render(<ToastProvider><App /></ToastProvider>);
+  render(<ToastProvider><DialogProvider><App /></DialogProvider></ToastProvider>);
   // Wait for config to load (multi-account trigger) before opening the
   // menu - opening too early would still show the single-account menu.
   await waitFor(() => expect(screen.getByLabelText("Profile & settings")
@@ -150,7 +151,7 @@ test("the active account is marked and the trigger shows its name",
   async () => {
     cfg = multiCfg;
     state = { ...baseState };
-    render(<ToastProvider><App /></ToastProvider>);
+    render(<ToastProvider><DialogProvider><App /></DialogProvider></ToastProvider>);
     await waitFor(() => expect(screen.getByLabelText("Profile & settings")
       .textContent).toContain("proton"));
     await openMenu();
@@ -165,7 +166,7 @@ test("clicking a different account switches; clicking the active one " +
   "does not re-fetch", async () => {
   cfg = multiCfg;
   state = { ...baseState };
-  render(<ToastProvider><App /></ToastProvider>);
+  render(<ToastProvider><DialogProvider><App /></DialogProvider></ToastProvider>);
   await waitFor(() => expect(screen.getByLabelText("Profile & settings")
     .textContent).toContain("proton"));
   await settleStateCalls();
@@ -189,7 +190,7 @@ test("single account: no Accounts section, header keeps the plain " +
   "profile trigger", async () => {
   cfg = singleCfg;
   state = { ...baseState };
-  render(<ToastProvider><App /></ToastProvider>);
+  render(<ToastProvider><DialogProvider><App /></DialogProvider></ToastProvider>);
   await openMenu();
   expect(screen.queryByText("Accounts")).toBeNull();
   expect(screen.queryByRole("menuitemradio")).toBeNull();
@@ -199,7 +200,7 @@ test("header has a single account control, not a separate pill strip",
   async () => {
     cfg = multiCfg;
     state = { ...baseState };
-    render(<ToastProvider><App /></ToastProvider>);
+    render(<ToastProvider><DialogProvider><App /></DialogProvider></ToastProvider>);
     await waitFor(() => expect(screen.getByLabelText("Profile & settings")
       .textContent).toContain("proton"));
     // Before opening the menu, only the trigger mentions account names -
@@ -217,7 +218,7 @@ test("shows an update banner once the server build changes, and " +
   versions = ["v1", "v2"];       // first poll establishes the baseline
   vi.useFakeTimers();
   try {
-    render(<ToastProvider><App /></ToastProvider>);
+    render(<ToastProvider><DialogProvider><App /></DialogProvider></ToastProvider>);
     await vi.advanceTimersByTimeAsync(0);        // flush the initial check
     expect(screen.queryByText(/new version/i)).toBeNull();
     await vi.advanceTimersByTimeAsync(20_000);   // the next poll tick
@@ -237,7 +238,7 @@ test("profile menu shows the release version and the build this tab " +
     cfg = singleCfg;
     state = { ...baseState };
     versions = ["abc123"];
-    render(<ToastProvider><App /></ToastProvider>);
+    render(<ToastProvider><DialogProvider><App /></DialogProvider></ToastProvider>);
     await openMenu();
     // package.json's version baked in via vite.config.ts's define, plus
     // the loaded build hash from the (mocked) /api/version poll - async,
@@ -263,7 +264,7 @@ const renderWithOneSenderGroup = () => {
   state = { ...baseState, status: "done",
     groups: { sender: { [groupFixture.key]: groupFixture },
               domain: {}, subject: {}, thread: {} } };
-  return render(<ToastProvider><App /></ToastProvider>);
+  return render(<ToastProvider><DialogProvider><App /></DialogProvider></ToastProvider>);
 };
 
 // Block/Unblock/Protect moved from the group row into DetailPanel (single-
@@ -277,24 +278,35 @@ const openDetail = async () => {
 
 test("Block button confirms, then calls api.block with the trash-existing " +
   "choice", async () => {
-  const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(true);
   renderWithOneSenderGroup();
   await openDetail();
-  fireEvent.click(screen.getAllByText("Block")[0]);
-  expect(confirmSpy).toHaveBeenCalledWith(
-    expect.stringContaining("DHL Paket"));
+  fireEvent.click(screen.getByRole("button", { name: "Block sender" }));
+  expect((await findDialog()).textContent).toContain("DHL Paket");
+  await pressDialog("Block");
+  // second question: also trash the existing mails
+  expect((await findDialog()).textContent).toContain("existing");
+  await pressDialog(/Move 3 mails to Trash/);
   await waitFor(() => expect(block).toHaveBeenCalledWith(
     "sender", "noreply@dhl.example", "DHL Paket", true));
-  confirmSpy.mockRestore();
+});
+
+test("declining the trash-existing question still blocks, without trashing",
+  async () => {
+  renderWithOneSenderGroup();
+  await openDetail();
+  fireEvent.click(screen.getByRole("button", { name: "Block sender" }));
+  await pressDialog("Block");
+  await pressDialog("Only block");
+  await waitFor(() => expect(block).toHaveBeenCalledWith(
+    "sender", "noreply@dhl.example", "DHL Paket", false));
 });
 
 test("declining the block confirmation never calls api.block", async () => {
-  const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(false);
   renderWithOneSenderGroup();
   await openDetail();
-  fireEvent.click(screen.getAllByText("Block")[0]);
+  fireEvent.click(screen.getByRole("button", { name: "Block sender" }));
+  await cancelDialog();
   expect(block).not.toHaveBeenCalled();
-  confirmSpy.mockRestore();
 });
 
 const blockRuleFixture = {
@@ -312,56 +324,52 @@ const renderWithOneBlockedSenderGroup = () => {
     groups: { sender: { [groupFixture.key]: groupFixture },
               domain: {}, subject: {}, thread: {} },
     rules: [blockRuleFixture] };
-  return render(<ToastProvider><App /></ToastProvider>);
+  return render(<ToastProvider><DialogProvider><App /></DialogProvider></ToastProvider>);
 };
 
 test("a blocked group shows Unblock (not Block), which confirms and " +
   "deletes the rule", async () => {
-  const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(true);
   renderWithOneBlockedSenderGroup();
   await openDetail();
-  expect(screen.queryAllByText("Block").length).toBe(0);
+  expect(screen.queryAllByText("Block sender").length).toBe(0);
   fireEvent.click(screen.getAllByText("Unblock")[0]);
-  expect(confirmSpy).toHaveBeenCalledWith(
-    expect.stringContaining("DHL Paket"));
+  expect((await findDialog()).textContent).toContain("DHL Paket");
+  await pressDialog("Unblock");
   await waitFor(() => expect(deleteRule).toHaveBeenCalledWith("rule1"));
-  confirmSpy.mockRestore();
 });
 
 test("declining the unblock confirmation never calls api.deleteRule",
   async () => {
-  const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(false);
   renderWithOneBlockedSenderGroup();
   await openDetail();
   fireEvent.click(screen.getAllByText("Unblock")[0]);
+  await cancelDialog();
   expect(deleteRule).not.toHaveBeenCalled();
-  confirmSpy.mockRestore();
 });
 
 test("the detail panel's Trash button confirms, trashes the whole group " +
   "and closes the panel", async () => {
-  const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(true);
   renderWithOneSenderGroup();
   await openDetail();
-  fireEvent.click(screen.getByTitle("Move every mail in this group to Trash"));
+  fireEvent.click(screen.getByRole("button", { name: "Trash all 3" }));
+  const dlg = await findDialog();
+  expect(dlg.textContent).toContain("3 mails from 1 group(s)");
+  await pressDialog("Move to Trash (3)");
   await waitFor(() => expect(deleteGroups).toHaveBeenCalledWith(
     "sender", [groupFixture.key], "trash", "", false, null, null));
-  expect(confirmSpy).toHaveBeenCalled();
   // the panel closed: its Block action (detail-only) is gone again
-  await waitFor(() => expect(screen.queryAllByText("Block").length).toBe(0));
-  confirmSpy.mockRestore();
+  await waitFor(() => expect(screen.queryAllByText("Block sender").length)
+    .toBe(0));
 });
 
 test("declining the detail panel's Trash confirmation leaves it open and " +
   "never calls api.deleteGroups", async () => {
-  const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(false);
   renderWithOneSenderGroup();
   await openDetail();
-  fireEvent.click(screen.getByTitle("Move every mail in this group to Trash"));
-  await waitFor(() => expect(confirmSpy).toHaveBeenCalled());
+  fireEvent.click(screen.getByRole("button", { name: "Trash all 3" }));
+  await cancelDialog();
   expect(deleteGroups).not.toHaveBeenCalled();
-  expect(screen.getAllByText("Block").length).toBeGreaterThan(0);
-  confirmSpy.mockRestore();
+  expect(screen.getAllByText("Block sender").length).toBeGreaterThan(0);
 });
 
 // The contextual bulk-action bar: the ONLY bulk-action chrome in the app -
@@ -500,7 +508,7 @@ test("the bar's Action… offers AI review (only when AI is enabled) and " +
   state = { ...baseState, status: "done",
     groups: { sender: { [groupFixture.key]: groupFixture },
               domain: {}, subject: {}, thread: {} } };
-  render(<ToastProvider><App /></ToastProvider>);
+  render(<ToastProvider><DialogProvider><App /></DialogProvider></ToastProvider>);
   await waitFor(() => expect(screen.getAllByText("DHL Paket").length)
     .toBeGreaterThan(0));
   await selectRowCheckbox();

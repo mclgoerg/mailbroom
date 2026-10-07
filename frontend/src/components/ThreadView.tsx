@@ -1,5 +1,5 @@
 import { ArrowLeft, ChevronDown, ChevronRight } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { api, mailKey } from "../api";
 import { t } from "../i18n";
 import { splitQuoted } from "../quoted";
@@ -14,10 +14,12 @@ type Body = MessageDetail | "loading" | { error: string };
  *  their quoted history is folded away. */
 const BATCH = 8;                    // mails per request / IMAP connection
 
-export function ThreadView({ mail, initial, onBack }: {
+export function ThreadView({ mail, initial, onBack, actions }: {
   mail: Mail;                       // the mail the reader was opened from
   initial?: MessageDetail;          // its text, if the caller already has it
   onBack: () => void;
+  /** Message-scoped actions for `mail`, right of the back button. */
+  actions?: ReactNode;
 }) {
   const [conv, setConv] = useState<ConversationResp | null>(null);
   const [error, setError] = useState("");
@@ -150,11 +152,17 @@ export function ThreadView({ mail, initial, onBack }: {
           );
         })}
       </div>
-      <div className="border-t border-line px-4 py-2">
+      <div className="flex flex-wrap items-center gap-2 border-t border-line
+        px-4 py-2">
         <Button variant="secondary" onClick={onBack}>
           <ArrowLeft size={16} className="mr-1 inline align-text-bottom" />
           {t("back to list")}
         </Button>
+        {actions && (
+          <div className="ml-auto flex flex-wrap items-center gap-2">
+            {actions}
+          </div>
+        )}
       </div>
     </div>
   );

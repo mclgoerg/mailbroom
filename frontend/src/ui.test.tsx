@@ -12,7 +12,7 @@ import {
   ConfirmDialog, DialogProvider, EmptyState, MailRow, Menu, MenuDivider,
   MenuHeading, MenuItem, Modal, Notice, ProgressBar, Segmented, ToastProvider,
   confirmDialog,
-  LINK, Tag, promptDialog, useToast,
+  LINK, Tag, ensureAiAck, promptDialog, ProtectButton, useToast,
 } from "./components/ui";
 
 afterEach(cleanup);
@@ -334,6 +334,39 @@ test("danger confirm focuses Cancel, primary confirm focuses the confirm button"
   cleanup();
   render(<ConfirmDialog title="T" confirmLabel="Do" onResult={() => {}} />);
   expect(document.activeElement).toBe(screen.getByText("Do"));
+});
+
+test("ConfirmDialog cancelLabel replaces Cancel", () => {
+  const onResult = vi.fn();
+  render(<ConfirmDialog title="T" confirmLabel="Do" cancelLabel="Only block"
+    onResult={onResult} />);
+  expect(screen.queryByText("Cancel")).toBeNull();
+  fireEvent.click(screen.getByText("Only block"));
+  expect(onResult).toHaveBeenCalledWith(false);
+});
+
+test("ensureAiAck asks once: declining stays unacknowledged, accepting is remembered", async () => {
+  localStorage.clear();
+  render(<DialogProvider><span /></DialogProvider>);
+  let p = ensureAiAck();
+  fireEvent.click(await screen.findByText("Cancel"));
+  expect(await p).toBe(false);
+  expect(localStorage.getItem("pmc_ai_ack")).toBeNull();
+  p = ensureAiAck();
+  fireEvent.click(await screen.findByText("Continue"));
+  expect(await p).toBe(true);
+  expect(await ensureAiAck()).toBe(true);        // no dialog the second time
+  localStorage.clear();
+});
+
+test("ProtectButton exposes aria-pressed and an optional visible label", () => {
+  const { rerender } = render(<ProtectButton on={false} showLabel onClick={() => {}} />);
+  const btn = screen.getByRole("button");
+  expect(btn.getAttribute("aria-pressed")).toBe("false");
+  expect(btn.textContent).toBe("Protect");
+  rerender(<ProtectButton on showLabel onClick={() => {}} />);
+  expect(btn.getAttribute("aria-pressed")).toBe("true");
+  expect(btn.textContent).toBe("Protected");
 });
 
 test("confirmDialog rejects without a provider (the action must not proceed)", async () => {

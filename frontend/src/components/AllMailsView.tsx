@@ -143,7 +143,7 @@ export function AllMailsView({ state, onChanged, toolbarSlot }: {
     const chosen = mails.filter((m) => sel.has(mailKey(m)));
     if (!chosen.length) return;
     const verb = actionVerb(action, dest);
-    const plan = planMailAction(chosen, action, verb);
+    const plan = await planMailAction(chosen, action, verb);
     if (plan.kind === "cancelled") return;
     if (plan.kind === "all_pinned") {
       toast.show(t("toast.all_pinned"));

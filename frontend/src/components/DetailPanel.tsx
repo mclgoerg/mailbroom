@@ -9,8 +9,9 @@ import { fmtSize, fmtUsd, mailKey, olderThan, sieveSnippet,
 import type { AppState, Group, Grouping, GroupUnsub, Mail } from "../types";
 import { MailRows, MessageView } from "./MailList";
 import { ThreadView } from "./ThreadView";
-import { Button, Chip, ensureAiAck, Input, LINK, LINK_ACCENT, Loading, Menu, MenuItem, Modal,
-  PanelHeader, ProtectButton, Select, Spinner } from "./ui";
+import { Button, Chip, confirmDialog, ensureAiAck, Input, LINK, LINK_ACCENT, Loading, Menu,
+  MenuItem, Modal, PanelHeader, PinButton, ProtectButton, Select, Spinner }
+  from "./ui";
 
 // Rating filter chips: same green/yellow/red/unrated buckets as the
 // select they replace, now an exclusive pill row (like the overview's
@@ -121,7 +122,7 @@ export function DetailPanel({ grouping, group, aiEnabled, protectedNow,
   };
 
   const aiSelect = async () => {
-    if (!mails || !ensureAiAck()) return;
+    if (!mails || !await ensureAiAck()) return;
     setBusy(true);
     cancelAi.current = false;
     // With an active selection, rate ONLY those mails (and afterward narrow
@@ -234,8 +235,9 @@ export function DetailPanel({ grouping, group, aiEnabled, protectedNow,
   // Pin/unpin every mail currently in the group (the group's own shield
   // covers future mail; this covers what is in it now).
   const pinAll = async (pinned: boolean) => {
-    if (!pinned && !confirm(t("confirm.unpin_group",
-      { n: pinnedCount }))) return;
+    if (!pinned && !await confirmDialog({
+      title: t("confirm.unpin_group", { n: pinnedCount }),
+      confirmLabel: t("confirm.unpin_btn") })) return;
     try {
       const r = await api.pinGroup(grouping, group.key, pinned);
       setMails(await api.group(grouping, group.key));
@@ -248,11 +250,17 @@ export function DetailPanel({ grouping, group, aiEnabled, protectedNow,
     }
   };
 
-  const act = async (action: string, dest = "") => {
-    if (!mails || sel.size === 0) return;
+  const act = (action: string, dest = "") => {
+    if (!mails || sel.size === 0) return Promise.resolve();
+    return actOn(mails.filter((m) => sel.has(mailKey(m))), action, dest);
+  };
+
+  // `chosen` is the checked mails, or the single mail open in the reader
+  // ("Trash this mail") - both go through the same confirm/pinned flow.
+  const actOn = async (chosen: Mail[], action: string, dest = "") => {
+    if (!mails) return;
     const verb = actionVerb(action, dest);
-    const chosen = mails.filter((m) => sel.has(mailKey(m)));
-    const plan = planMailAction(chosen, action, verb);
+    const plan = await planMailAction(chosen, action, verb);
     if (plan.kind === "cancelled") return;
     if (plan.kind === "all_pinned") {
       setNote(t("toast.all_pinned"));
@@ -273,6 +281,9 @@ export function DetailPanel({ grouping, group, aiEnabled, protectedNow,
       }
       if (action !== "mark_read") {
         setMails(mails.filter((m) => !actingKeys.has(mailKey(m))));
+        // The mail open in the reader is gone: back to the list.
+        setView(null);
+        setReading(null);
       } else {
         setMails(mails.map((m) =>
           actingKeys.has(mailKey(m)) ? { ...m, seen: true } : m));
@@ -291,6 +302,19 @@ export function DetailPanel({ grouping, group, aiEnabled, protectedNow,
     else if (v) act(v);
   };
 
+  // Message-scoped footer actions (reader / thread view): the pin state is
+  // read live from `mails`, since `view` / `reading` are snapshots.
+  const mailActions = (m: Mail) => {
+    const live = mails?.find((x) => mailKey(x) === mailKey(m)) ?? m;
+    return <>
+      <PinButton showLabel on={!!live.pinned} onClick={() => togglePin(live)} />
+      <Button variant="danger-quiet" onClick={() => actOn([live], "trash")}>
+        {t("trash_this.btn")}
+      </Button>
+    </>;
+  };
+  const groupCount = mails?.length || group.count;
+
   return (
     <Modal onClose={onClose} full>
       <PanelHeader
@@ -307,35 +331,19 @@ export function DetailPanel({ grouping, group, aiEnabled, protectedNow,
           )}
           {blocked && <> · 🚫 {t("Blocked")}</>}
         </>}
-        actions={<>
-          <Button variant="danger" title={t("trash_group.tip")}
-            onClick={async () => { if (await onTrash(group)) onClose(); }}>
-            {t("Trash")}
-          </Button>
-          {onBlock && !blocked && (
-            <Button variant="secondary" title={t("block.tip")}
-              onClick={() => onBlock(group)}>
-              {t("Block")}
-            </Button>
-          )}
-          {onUnblock && blocked && (
-            <Button variant="secondary" title={t("unblock.tip")}
-              onClick={() => onUnblock(group)}>
-              {t("Unblock")}
-            </Button>
-          )}
-          {onProtect && (
-            <ProtectButton on={protectedNow}
-              onClick={() => onProtect({ ...group, protected: protectedNow })} />
-          )}
-        </>}
+        actions={onProtect && (
+          <ProtectButton showLabel on={protectedNow}
+            onClick={() => onProtect({ ...group, protected: protectedNow })} />
+        )}
         onClose={onClose}
       />
 
       {reading ? (
-        <ThreadView mail={reading} onBack={() => setReading(null)} />
+        <ThreadView mail={reading} onBack={() => setReading(null)}
+          actions={mailActions(reading)} />
       ) : view ? (
-        <MessageView mail={view} onBack={() => setView(null)} />
+        <MessageView mail={view} onBack={() => setView(null)}
+          actions={mailActions(view)} />
       ) : (
         <>
           <div className="flex flex-col gap-2 border-b border-line px-4 py-2">
@@ -558,6 +566,33 @@ export function DetailPanel({ grouping, group, aiEnabled, protectedNow,
               </div>
             </div>
           )}
+
+          {/* Group-scoped actions. They live here (not in the header) so
+              "Trash all N" names its scope and sits away from Close. */}
+          <div className="flex flex-wrap items-center gap-2 border-t
+            border-line px-4 py-2"
+            style={{ paddingBottom:
+              "calc(env(safe-area-inset-bottom) + 0.5rem)" }}>
+            {onBlock && !blocked && (
+              <Button variant="secondary" title={t("block.tip")}
+                onClick={() => onBlock(group)}>
+                {t("block.btn")}
+              </Button>
+            )}
+            {onUnblock && blocked && (
+              <Button variant="secondary" title={t("unblock.tip")}
+                onClick={() => onUnblock(group)}>
+                {t("Unblock")}
+              </Button>
+            )}
+            {groupCount > 0 && (
+              <Button variant="danger" className="ml-auto"
+                title={t("trash_all.tip", { n: groupCount })}
+                onClick={async () => { if (await onTrash(group)) onClose(); }}>
+                {t("trash_all.btn", { n: groupCount })}
+              </Button>
+            )}
+          </div>
         </>
       )}
     </Modal>

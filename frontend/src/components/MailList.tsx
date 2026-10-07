@@ -1,5 +1,5 @@
 import { ArrowLeft, MessagesSquare } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { api, fmtSize, mailKey } from "../api";
 import type { Mail, MessageDetail } from "../types";
 import { getLang, t } from "../i18n";
@@ -9,8 +9,10 @@ import { ThreadView } from "./ThreadView";
 
 const RENDER_CAP = 500;
 
-export function MessageView({ mail, onBack }: {
+export function MessageView({ mail, onBack, actions }: {
   mail: Mail; onBack: () => void;
+  /** Message-scoped actions (pin, trash this mail), right of the back button. */
+  actions?: ReactNode;
 }) {
   const [detail, setDetail] = useState<MessageDetail | null>(null);
   const [error, setError] = useState("");
@@ -28,7 +30,7 @@ export function MessageView({ mail, onBack }: {
 
   if (reading) {
     return <ThreadView mail={mail} initial={detail ?? undefined}
-      onBack={() => setReading(false)} />;
+      actions={actions} onBack={() => setReading(false)} />;
   }
 
   return (
@@ -55,6 +57,11 @@ export function MessageView({ mail, onBack }: {
               className="mr-1 inline align-text-bottom" />
             {t("thread.read")}
           </Button>
+        )}
+        {actions && (
+          <div className="ml-auto flex flex-wrap items-center gap-2">
+            {actions}
+          </div>
         )}
       </div>
     </div>
