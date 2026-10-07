@@ -82,7 +82,7 @@ export function DuplicatesPanel({ onClose, onDeleted }: {
       ) : (
         <>
           <Toolbar>
-            <Button variant="ghost" onClick={selectAllButNewest}
+            <Button variant="secondary" onClick={selectAllButNewest}
               disabled={!sets?.length}>
               {t("dups.keep_newest")}
             </Button>

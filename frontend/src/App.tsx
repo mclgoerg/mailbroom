@@ -964,7 +964,7 @@ export default function App() {
             )}
           </div>
           <QueryBuilder value={filter} onChange={setFilter} />
-          <Button variant="ghost" className="!px-2 sm:!px-3"
+          <Button variant="secondary" className="!px-2 sm:!px-3"
             title={t("saved_filter.save_tip")}
             disabled={!filter.trim()}
             onClick={saveFilterPreset}>
@@ -976,25 +976,25 @@ export default function App() {
             to Scan on one line. */}
         <div className={`ml-auto flex items-center gap-1.5 sm:gap-2 ${
           flat ? "" : "sm:ml-0"}`}>
-          <Button variant="ghost" className="!px-2 sm:!px-3"
+          <Button variant="secondary" className="!px-2 sm:!px-3"
             title={t("Search all mails")}
             onClick={() => setSearchOpen(true)}><Search size={17} /></Button>
-          <Button variant="ghost" className="!px-2 sm:!px-3"
+          <Button variant="secondary" className="!px-2 sm:!px-3"
             title={t("Rules")}
             onClick={() => setRulesOpen(true)}>
             <ClipboardList size={17} />
           </Button>
-          <Button variant="ghost" className="!px-2 sm:!px-3"
+          <Button variant="secondary" className="!px-2 sm:!px-3"
             title={t("Attachments")}
             onClick={() => setAttsOpen(true)}><Paperclip size={17} /></Button>
-          <Button variant="ghost" className="!px-2 sm:!px-3"
+          <Button variant="secondary" className="!px-2 sm:!px-3"
             title={t("Duplicates")}
             disabled={state?.status !== "done"}
             onClick={() => setDupsOpen(true)}><Copy size={17} /></Button>
-          <Button variant="ghost" className="!px-2 sm:!px-3"
+          <Button variant="secondary" className="!px-2 sm:!px-3"
             title={t("Statistics")}
             onClick={() => setStatsOpen(true)}><BarChart3 size={17} /></Button>
-          <Button variant="ghost" className="!px-2 sm:!px-3"
+          <Button variant="secondary" className="!px-2 sm:!px-3"
             title={t("Audit Log")}
             onClick={() => setAuditOpen(true)}><ScrollText size={17} /></Button>
           <Menu label={t("menu.more")} trigger={<MoreHorizontal size={17} />}>
@@ -1137,7 +1137,7 @@ export default function App() {
             onClick={saveEditedPreset}>
             {t("Save")}
           </Button>
-          <Button variant="ghost" className="!min-h-8 !px-3 !text-xs"
+          <Button variant="secondary" className="!min-h-8 !px-3 !text-xs"
             onClick={() => setEditingPreset(null)}>
             {t("Cancel")}
           </Button>
@@ -1222,7 +1222,7 @@ export default function App() {
                       </option>
                     ))}
                   </Select>
-                  <Button variant="ghost" className="!px-2 shrink-0"
+                  <Button variant="secondary" className="!px-2 shrink-0"
                     title={t("Cancel")} onClick={() => setMoveDest("")}>
                     <X size={15} />
                   </Button>
@@ -1254,7 +1254,7 @@ export default function App() {
         )}
         {(state?.undo.length ?? 0) > 0 && !deleting && (
           <span className="relative">
-            <Button variant="ghost" className="!min-h-7 !px-2 !py-0.5 !text-xs"
+            <Button variant="secondary" className="!min-h-7 !px-2 !py-0.5 !text-xs"
               onClick={() => setUndoOpen(!undoOpen)}>
               {t("Undo")}
               <ChevronDown size={13}
@@ -1300,7 +1300,7 @@ export default function App() {
           </ol>
           <div className="mt-4 flex items-center gap-3">
             {acct?.password_set && (
-              <Button variant="ghost" onClick={async () => {
+              <Button variant="secondary" onClick={async () => {
                 setToast(t("onboard.testing"));
                 try {
                   const r = await api.testConnection();

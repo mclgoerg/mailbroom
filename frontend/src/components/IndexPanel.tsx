@@ -116,19 +116,19 @@ export function IndexPanel({ account, savedMode, secretKeySet }: {
       )}
       <div className="flex flex-wrap gap-2">
         {running ? (
-          <Button variant="ghost" onClick={() => act(() =>
+          <Button variant="secondary" onClick={() => act(() =>
             api.indexCancel(account))}>{t("cancel")}</Button>
         ) : (<>
           <Button onClick={() => build(false)}>
             {info.usable ? t("index.update") : t("index.build")}
           </Button>
           {info.usable && (
-            <Button variant="ghost" onClick={() => build(true)}>
+            <Button variant="secondary" onClick={() => build(true)}>
               {t("index.rebuild")}
             </Button>
           )}
           {info.exists && (
-            <Button variant="ghost" onClick={() => {
+            <Button variant="secondary" onClick={() => {
               if (confirm(t("index.confirm_delete")))
                 act(() => api.indexDelete(account));
             }}>{t("index.delete")}</Button>

@@ -80,7 +80,7 @@ export function SearchPanel({ bodySearch = false, bodyMode = "server",
         <Button onClick={run} disabled={busy || q.trim().length < 2}>
           {busy ? <Spinner className="!text-white" /> : t("Search")}
         </Button>
-        <Button variant="ghost" onClick={onClose} title={t("Close")}>
+        <Button variant="secondary" onClick={onClose} title={t("Close")}>
           <X size={17} />
         </Button>
       </div>
@@ -90,7 +90,7 @@ export function SearchPanel({ bodySearch = false, bodyMode = "server",
       ) : (
         <>
           <Toolbar>
-            <Button variant="ghost" disabled={!mails?.length}
+            <Button variant="secondary" disabled={!mails?.length}
               onClick={() => setSel(sel.size === (mails?.length ?? 0)
                 ? new Set() : new Set((mails ?? []).map(mailKey)))}>
               {t("Select all")}

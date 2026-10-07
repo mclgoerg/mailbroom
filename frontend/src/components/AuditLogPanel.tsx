@@ -62,12 +62,12 @@ export function AuditLogPanel({ rules, onClose }: {
         onClose={onClose}
       />
       <Toolbar>
-        <Button variant="ghost" disabled={offset === 0}
+        <Button variant="secondary" disabled={offset === 0}
           onClick={() => setOffset(Math.max(0, offset - PAGE_SIZE))}>
           <ChevronLeft size={16} className="mr-1 inline align-text-bottom" />
           {t("Previous")}
         </Button>
-        <Button variant="ghost"
+        <Button variant="secondary"
           disabled={total == null || offset + PAGE_SIZE >= total}
           onClick={() => setOffset(offset + PAGE_SIZE)}>
           {t("Next")}

@@ -244,7 +244,7 @@ export function AllMailsView({ state, onChanged }: {
         onPin={togglePin} detailed paged />
       {mails.length < total && (
         <div className="py-3 text-center">
-          <Button variant="ghost" disabled={more} onClick={loadMore}>
+          <Button variant="secondary" disabled={more} onClick={loadMore}>
             {t("mails.load_more", { n: Math.min(PAGE, total - mails.length) })}
           </Button>
         </div>
@@ -286,7 +286,7 @@ export function AllMailsView({ state, onChanged }: {
                       <option key={f} value={f}>{state.folders[i] ?? f}</option>
                     ))}
                   </Select>
-                  <Button variant="ghost" className="!px-2 shrink-0"
+                  <Button variant="secondary" className="!px-2 shrink-0"
                     title={t("Cancel")} onClick={() => setMoveDest("")}>
                     <X size={15} />
                   </Button>

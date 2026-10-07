@@ -313,13 +313,13 @@ export function DetailPanel({ grouping, group, aiEnabled, protectedNow,
             {t("Trash")}
           </Button>
           {onBlock && !blocked && (
-            <Button variant="ghost" title={t("block.tip")}
+            <Button variant="secondary" title={t("block.tip")}
               onClick={() => onBlock(group)}>
               {t("Block")}
             </Button>
           )}
           {onUnblock && blocked && (
-            <Button variant="ghost" title={t("unblock.tip")}
+            <Button variant="secondary" title={t("unblock.tip")}
               onClick={() => onUnblock(group)}>
               {t("Unblock")}
             </Button>
@@ -399,17 +399,17 @@ export function DetailPanel({ grouping, group, aiEnabled, protectedNow,
                   </span>
                 ) : unsubscribedNow?.status === "link" ? (
                   <>
-                    <Button variant="ghost" disabled={busy} onClick={() =>
+                    <Button variant="secondary" disabled={busy} onClick={() =>
                       window.open(unsubscribedNow.link, "_blank", "noopener")}>
                       {t("unsub.open_link")}
                     </Button>
-                    <Button variant="ghost" onClick={ackUnsubscribe}
+                    <Button variant="secondary" onClick={ackUnsubscribe}
                       disabled={busy}>
                       {t("unsub.mark_done")}
                     </Button>
                   </>
                 ) : (
-                  <Button variant="ghost" onClick={unsubscribe} disabled={busy}>
+                  <Button variant="secondary" onClick={unsubscribe} disabled={busy}>
                     {unsubscribedNow?.status === "failed"
                       ? t("unsub.retry") : t("Unsubscribe")}
                   </Button>
@@ -482,7 +482,7 @@ export function DetailPanel({ grouping, group, aiEnabled, protectedNow,
                       placeholder="Archive"
                       onChange={(e) => setSieveFolder(e.target.value)} />
                   )}
-                  <Button variant="ghost" onClick={() => {
+                  <Button variant="secondary" onClick={() => {
                     navigator.clipboard?.writeText(sieveSnippet(
                       grouping, group.key, sieveAction, sieveFolder));
                     setNote(t("sieve.copied"));
@@ -552,7 +552,7 @@ export function DetailPanel({ grouping, group, aiEnabled, protectedNow,
                       <option value="" disabled>{t("Move to folder…")}</option>
                       {folders.map((f) => <option key={f} value={f}>{f}</option>)}
                     </Select>
-                    <Button variant="ghost" className="!px-2 shrink-0"
+                    <Button variant="secondary" className="!px-2 shrink-0"
                       title={t("Cancel")} onClick={() => setMoveDest("")}>
                       <X size={15} />
                     </Button>

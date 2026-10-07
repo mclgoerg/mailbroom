@@ -77,7 +77,7 @@ export function TrashPanel({ state, onClose, onChanged }: {
                ? ` (${t("trash.newest_shown", { n: trash.mails.length })})`
                : "")
           : t("loading…")}
-        actions={<Button variant="ghost" onClick={load}>⟳</Button>}
+        actions={<Button variant="secondary" onClick={load}>⟳</Button>}
         onClose={onClose}
       />
 

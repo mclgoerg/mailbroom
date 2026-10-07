@@ -84,12 +84,12 @@ export function AttachmentsPanel({ state, onClose, onDeleted }: {
           ? t("atts.summary", { n: atts.mails, size: fmtSize(atts.size) })
           : t("atts.hint")}
         actions={running ? (
-          <Button variant="ghost" onClick={cancel}>
+          <Button variant="secondary" onClick={cancel}>
             <Spinner /> {starting ? t("Starting…") : atts.progress}{" "}
             - {t("cancel")}
           </Button>
         ) : (
-          <Button variant="ghost" onClick={analyze}
+          <Button variant="secondary" onClick={analyze}
             disabled={state.status !== "done"}>
             {atts?.status === "done" ? t("atts.reanalyze") : t("atts.analyze")}
           </Button>

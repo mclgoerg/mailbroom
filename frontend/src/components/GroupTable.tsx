@@ -342,16 +342,16 @@ export function GroupTable(props: Props) {
       {(groups.length > Math.min(perPage, ...PAGE_SIZES)) && (
         <div className="flex flex-wrap items-center justify-center gap-2
           py-3 text-sm text-muted">
-          <Button variant="ghost" className="!min-h-8 !px-2.5 !py-1"
+          <Button variant="secondary" className="!min-h-8 !px-2.5 !py-1"
               disabled={page === 0} onClick={() => setPage(0)}>«</Button>
-          <Button variant="ghost" className="!min-h-8 !px-2.5 !py-1"
+          <Button variant="secondary" className="!min-h-8 !px-2.5 !py-1"
               disabled={page === 0} onClick={() => setPage(page - 1)}>‹</Button>
           <span className="tabular-nums">
             {t("page.of", { p: page + 1, n: maxPage + 1 })}
           </span>
-          <Button variant="ghost" className="!min-h-8 !px-2.5 !py-1"
+          <Button variant="secondary" className="!min-h-8 !px-2.5 !py-1"
               disabled={page >= maxPage} onClick={() => setPage(page + 1)}>›</Button>
-          <Button variant="ghost" className="!min-h-8 !px-2.5 !py-1"
+          <Button variant="secondary" className="!min-h-8 !px-2.5 !py-1"
               disabled={page >= maxPage} onClick={() => setPage(maxPage)}>»</Button>
           <Select className="!min-h-8 !py-1"
             value={perPage}

@@ -32,7 +32,7 @@ export function QueryBuilder({ value, onChange, className = "" }: {
     onChange(q ? `${q} ${tok}` : tok);
   };
   const addBtn = (tok: string) => (
-    <Button variant="ghost" className="!min-h-8 shrink-0 !px-2 !text-xs"
+    <Button variant="secondary" className="!min-h-8 shrink-0 !px-2 !text-xs"
       onClick={() => add(tok)}>
       {t("qb.add")}
     </Button>
@@ -49,7 +49,7 @@ export function QueryBuilder({ value, onChange, className = "" }: {
 
   return (
     <>
-      <Button variant="ghost" className={`!px-2 ${className}`}
+      <Button variant="secondary" className={`!px-2 ${className}`}
         title={t("qb.tip")} aria-expanded={open}
         onClick={() => setOpen(!open)}>
         <SlidersHorizontal size={17} />

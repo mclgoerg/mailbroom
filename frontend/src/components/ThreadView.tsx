@@ -151,7 +151,7 @@ export function ThreadView({ mail, initial, onBack }: {
         })}
       </div>
       <div className="border-t border-line px-4 py-2">
-        <Button variant="ghost" onClick={onBack}>
+        <Button variant="secondary" onClick={onBack}>
           <ArrowLeft size={15} className="mr-1 inline align-text-bottom" />
           {t("back to list")}
         </Button>

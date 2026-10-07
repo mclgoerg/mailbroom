@@ -500,14 +500,14 @@ export function SettingsModal({ cfg, account, onClose, onSaved,
                 <option key={n}>{n}</option>)}
             </Select>
           </Field>
-          <Button variant="ghost" onClick={newAccount}>
+          <Button variant="secondary" onClick={newAccount}>
             {t("account.add")}
           </Button>
-          <Button variant="ghost" onClick={renameAccount}>
+          <Button variant="secondary" onClick={renameAccount}>
             {t("account.rename")}
           </Button>
           {Object.keys(cfg.accounts).length > 1 && (
-            <Button variant="ghost" onClick={deleteAccount}>
+            <Button variant="secondary" onClick={deleteAccount}>
               {t("Delete…")}
             </Button>
           )}
@@ -622,7 +622,7 @@ export function SettingsModal({ cfg, account, onClose, onSaved,
               <span className="text-sm text-emerald-400">
                 ✓ {t("oauth.connected")}
               </span>
-              <Button variant="ghost" onClick={disconnectOauth}>
+              <Button variant="secondary" onClick={disconnectOauth}>
                 {t("oauth.disconnect")}
               </Button>
             </>) : oauthProvider === "microsoft"
@@ -663,7 +663,7 @@ export function SettingsModal({ cfg, account, onClose, onSaved,
             <span className="text-xs text-muted">
               {t("folders.title", { name: editAcct })}
             </span>
-            <Button variant="ghost" className="!min-h-7 !px-2 !py-0.5 !text-xs"
+            <Button variant="secondary" className="!min-h-7 !px-2 !py-0.5 !text-xs"
               title={t("folders.discover_tip")}
               onClick={() => discoverFolders(editAcct)}>
               <RefreshCw size={14} className="mr-1 inline align-text-bottom" />
@@ -762,7 +762,7 @@ export function SettingsModal({ cfg, account, onClose, onSaved,
           </div>
           <p className="mt-1 text-xs text-muted">{t("digest.help")}</p>
           <div className="mt-3 flex flex-wrap items-center gap-2">
-            <Button variant="ghost" className="!min-h-8 !px-3 !text-xs"
+            <Button variant="secondary" className="!min-h-8 !px-3 !text-xs"
               onClick={sendTestDigest} disabled={digestTesting}>
               {digestTesting ? <Spinner /> : t("digest.send_test")}
             </Button>
@@ -1147,11 +1147,11 @@ export function SettingsModal({ cfg, account, onClose, onSaved,
             {" "}- {s.runs} {t("runs")}, {s.input_tokens.toLocaleString()} /{" "}
             {s.output_tokens.toLocaleString()}
           </span>
-          <Button variant="ghost" className="!min-h-7 !px-2 !py-0.5 !text-xs"
+          <Button variant="secondary" className="!min-h-7 !px-2 !py-0.5 !text-xs"
             onClick={resetStats}>
             {t("Reset")}
           </Button>
-          <Button variant="ghost" className="!min-h-7 !px-2 !py-0.5 !text-xs"
+          <Button variant="secondary" className="!min-h-7 !px-2 !py-0.5 !text-xs"
             onClick={clearVerdicts}>
             {t("Clear AI verdict cache")}
           </Button>

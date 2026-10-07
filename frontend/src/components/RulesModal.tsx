@@ -182,11 +182,11 @@ export function RulesModal({ state, onClose, onChanged }: {
               <RunSummary rule={rule} />
             </div>
             <div className="mt-2 flex flex-wrap gap-2">
-              <Button variant="ghost" className="!min-h-7 !px-2 !text-xs"
+              <Button variant="secondary" className="!min-h-7 !px-2 !text-xs"
                 onClick={() => run(rule)} disabled={busyId === rule.id}>
                 {busyId === rule.id ? <Spinner /> : t("rule.run_now")}
               </Button>
-              <Button variant={rule.mode === "report" ? "danger" : "ghost"}
+              <Button variant={rule.mode === "report" ? "danger" : "secondary"}
                 className="!min-h-7 !px-2 !text-xs"
                 disabled={rule.mode === "report" && rule.report_runs < 1}
                 title={rule.mode === "report" && rule.report_runs < 1
@@ -195,9 +195,9 @@ export function RulesModal({ state, onClose, onChanged }: {
                 {rule.mode === "report"
                   ? t("rule.enable_execute") : t("rule.back_to_report")}
               </Button>
-              <Button variant="ghost" className="!min-h-7 !px-2 !text-xs"
+              <Button variant="secondary" className="!min-h-7 !px-2 !text-xs"
                 onClick={() => edit(rule)}>{t("Edit")}</Button>
-              <Button variant="ghost" className="!min-h-7 !px-2 !text-xs"
+              <Button variant="secondary" className="!min-h-7 !px-2 !text-xs"
                 onClick={() => del(rule)}>{t("Delete")}</Button>
             </div>
           </div>
@@ -273,7 +273,7 @@ export function RulesModal({ state, onClose, onChanged }: {
               {editId ? t("Save") : t("rule.create")}
             </Button>
             {editId && (
-              <Button variant="ghost" onClick={() => {
+              <Button variant="secondary" onClick={() => {
                 setEditId(null); setForm({ ...EMPTY });
               }}>{t("cancel")}</Button>
             )}

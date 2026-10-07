@@ -44,12 +44,12 @@ export function MessageView({ mail, onBack }: {
       </pre>
       <div className="flex flex-wrap items-center gap-2 border-t border-line
         px-4 py-2">
-        <Button variant="ghost" onClick={onBack}>
+        <Button variant="secondary" onClick={onBack}>
           <ArrowLeft size={15} className="mr-1 inline align-text-bottom" />
           {t("back to list")}
         </Button>
         {detail?.thread && (
-          <Button variant="ghost" onClick={() => setReading(true)}>
+          <Button variant="secondary" onClick={() => setReading(true)}>
             <MessagesSquare size={15}
               className="mr-1 inline align-text-bottom" />
             {t("thread.read")}
@@ -132,7 +132,7 @@ export function MailRows({ mails, sel, onToggle, onOpen, onPin, detailed,
       })}
       {!paged && mails.length > cap && (
         <div className="py-3 text-center">
-          <Button variant="ghost" onClick={() => setCap(cap + RENDER_CAP)}>
+          <Button variant="secondary" onClick={() => setCap(cap + RENDER_CAP)}>
             {t("show_more", { n: Math.min(RENDER_CAP, mails.length - cap),
               hidden: mails.length - cap })}
           </Button>
