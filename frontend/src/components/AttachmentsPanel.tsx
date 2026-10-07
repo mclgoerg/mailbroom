@@ -4,8 +4,8 @@ import { api, fmtSize, mailKey } from "../api";
 import { t } from "../i18n";
 import type { AppState, AttMail, Mail } from "../types";
 import { MessageView } from "./MailList";
-import { Button, EmptyState, Loading, Modal, PanelHeader, Spinner, Tag,
-  Toolbar } from "./ui";
+import { Button, Checkbox, EmptyState, Loading, Modal, PanelHeader, Spinner,
+  Tag, Toolbar } from "./ui";
 
 /** Attachment explorer: lazy BODYSTRUCTURE analysis, then the mailbox's
  *  attachment-heaviest mails. Proton IMAP cannot strip attachments, so the
@@ -107,9 +107,9 @@ export function AttachmentsPanel({ state, onClose, onDeleted }: {
               {t("Trash selected")}{sel.size > 0 && ` (${sel.size})`}
             </Button>
             {atts?.status === "error" && (
-              <span className="text-xs text-rose-400">{atts.error}</span>
+              <span className="type-meta text-danger-fg">{atts.error}</span>
             )}
-            {note && <span className="text-xs text-muted">{note}</span>}
+            {note && <span className="type-meta text-muted">{note}</span>}
           </Toolbar>
           <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-4">
             {!mails && !running && atts?.status !== "done" && (
@@ -128,22 +128,22 @@ export function AttachmentsPanel({ state, onClose, onDeleted }: {
               <div key={mailKey(m)}
                 className="flex flex-wrap items-baseline gap-2 border-b
                   border-line/60 px-1 py-2">
-                <input type="checkbox" checked={sel.has(mailKey(m))}
+                <Checkbox checked={sel.has(mailKey(m))} className="-my-1"
                   onChange={() => toggle(mailKey(m))} />
-                <span className="text-xs whitespace-nowrap text-muted">
+                <span className="type-meta whitespace-nowrap text-muted">
                   {(m.date || "").slice(0, 10)}
                 </span>
                 <button className="min-w-0 flex-1 basis-full cursor-pointer
-                    truncate text-left text-sm hover:underline sm:basis-0"
+                    truncate text-left type-body hover:underline sm:basis-0"
                   title={m.addr}
                   onClick={() => setView(m)}>
                   {m.subject || t("(no subject)")}
-                  <span className="block truncate text-xs text-faint">
+                  <span className="block truncate type-meta text-muted">
                     {m.addr} · {m.atts.map((a) =>
                       `${a.name} (${fmtSize(a.size)})`).join(", ")}
                   </span>
                 </button>
-                <Tag className="!bg-orange-950 !text-orange-300">
+                <Tag tone="attach">
                   📎 {fmtSize(m.att_size)}
                 </Tag>
               </div>
