@@ -970,9 +970,10 @@ export default function App() {
           </Button>
         </div>
         )}
-        {/* One wrap unit; tighter padding on phones so the strip fits next
-            to Scan on one line. */}
-        <div className={`ml-auto flex items-center gap-1.5 sm:gap-2 ${
+        {/* One wrap unit; a tight gap on phones (deliberate: the 40 px touch
+            icons would otherwise push the strip onto its own line, UX5
+            reworks this toolbar). */}
+        <div className={`ml-auto flex items-center gap-0.5 sm:gap-2 ${
           flat ? "" : "sm:ml-0"}`}>
           <Button variant="secondary" size="icon" label={t("Search all mails")}
             onClick={() => setSearchOpen(true)}><Search size={18} /></Button>

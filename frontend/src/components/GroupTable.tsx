@@ -251,7 +251,7 @@ function MobileCards({ slice, baseIdx, selected, focusedKey, onToggle,
         <div key={g.key} data-gidx={baseIdx + i}
           className={`flex items-center gap-3 border-b border-line px-1
             py-2.5 ${g.key === focusedKey ? "bg-panel" : ""}`}>
-          <Checkbox checked={selected.has(g.key)}
+          <Checkbox checked={selected.has(g.key)} className="-ml-2 -mr-1"
             onChange={() => onToggle(g.key)} />
           <div className="flex min-w-0 flex-1 cursor-pointer items-center
             gap-3" onClick={() => onOpen(g)}>

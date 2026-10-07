@@ -116,7 +116,7 @@ export function DuplicatesPanel({ onClose, onDeleted }: {
                   <div key={mailKey(m)}
                     className="flex flex-wrap items-baseline gap-2 border-t
                       border-line/60 px-1 py-1.5">
-                    <Checkbox checked={sel.has(mailKey(m))} className="-my-1"
+                    <Checkbox checked={sel.has(mailKey(m))} className="-my-1 self-center"
                       onChange={() => toggle(mailKey(m))} />
                     <span className="type-meta whitespace-nowrap text-muted">
                       {(m.date || "").slice(0, 16)}
