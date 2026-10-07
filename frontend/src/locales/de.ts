@@ -704,6 +704,56 @@ export const DE: Record<string, string> = {
   "body_search.title": "Mailtext-Suche",
   "body_search.label": "Im Mailtext suchen",
   "body_search.server": "Mailserver fragen",
+  "body_search.local": "Lokaler Wortindex",
+  "body_search.local_help":
+    "Gedacht für große Postfächer und langsame Anbieter: baut einmal einen "
+    + "lokalen Index auf und sucht danach sofort. Er speichert KEINEN lesbaren Mailtext, nur "
+    + "geschlüsselte Hashes der Wörter jeder Mail (der Schlüssel stammt aus "
+    + "MAILBROOM_SECRET_KEY). Die Suche findet ganze Wörter (Groß-/Kleinschreibung "
+    + "und Akzente egal, mehrere Wörter müssen alle vorkommen), keine "
+    + "Wortteile. Scans halten den Index aktuell; Ausschalten löscht ihn.",
+  "index.need_key":
+    "Der lokale Index braucht MAILBROOM_SECRET_KEY auf dem Server.",
+  "index.save_first":
+    "Erst die Einstellungen speichern, dann hier den Index aufbauen.",
+  "index.none": "Noch kein Index aufgebaut.",
+  "index.key_changed":
+    "Der Index wurde mit einem anderen geheimen Schlüssel gebaut und ist "
+    + "unbrauchbar - neu aufbauen.",
+  "index.building": "Indexiere…",
+  "index.status": "{docs} Mails indexiert, zuletzt aktualisiert {ts}.",
+  "index.disk": "Belegter Speicherplatz: {size}",
+  "index.build": "Index aufbauen",
+  "index.update": "Jetzt aktualisieren",
+  "index.rebuild": "Neu aufbauen",
+  "index.delete": "Index löschen",
+  "index.confirm":
+    "Mailbroom liest jetzt den Text von {n} gescannten Mails dieses Kontos "
+    + "von Ihrem Mailserver (je die ersten ~256 KB) und speichert lokal nur "
+    + "geschlüsselte Wort-Hashes - keinen lesbaren Text.\n\nDas belegt "
+    + "etwa {size} Speicherplatz (bis zu {max} bei textlastigen Mails); auf "
+    + "dem Datenträger sind {free} frei. Das kann dauern.\n\nMöchten Sie "
+    + "fortfahren?",
+  "index.estimate":
+    "Geschätzter Speicherplatz: etwa {size} für {n} Mails (bis zu {max} bei "
+    + "textlastigen Mails); {free} frei auf dem Datenträger.",
+  "index.confirm_tight":
+    "Achtung: das passt möglicherweise nicht auf den Datenträger.",
+  "index.confirm_delete": "Den lokalen Index dieses Kontos löschen?",
+  "notice.index_cancelled":
+    "Indexierung abgebrochen - bereits Indexiertes bleibt erhalten.",
+  "search.body_hint_local":
+    "Durchsucht den lokalen Wortindex: nur ganze Wörter, alle müssen vorkommen.",
+  "search.note.index_missing":
+    "Der lokale Index wurde noch nicht aufgebaut - in den Einstellungen "
+    + "aufbauen. Es werden nur Treffer in Betreff und Absender angezeigt.",
+  "search.note.index_key":
+    "Der lokale Index wurde mit einem anderen geheimen Schlüssel gebaut - in "
+    + "den Einstellungen neu aufbauen. Es werden nur Treffer in Betreff und "
+    + "Absender angezeigt.",
+  "search.note.index_behind":
+    "{n} neuere Mails sind noch nicht im Index - die Treffer sind evtl. "
+    + "unvollständig.",
   "body_search.disabled": "Aus (nur Betreff und Absender)",
   "body_search.help":
     "Die Mailtext-Suche läuft bei jeder Anfrage auf Ihrem Mailserver - "

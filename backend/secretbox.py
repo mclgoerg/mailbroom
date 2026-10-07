@@ -40,6 +40,17 @@ def enabled() -> bool:
     return bool(os.environ.get(ENV_VAR, "").strip())
 
 
+def derive_key(purpose: str) -> bytes | None:
+    """A 32-byte key for `purpose`, derived from MAILBROOM_SECRET_KEY (None
+    without it). Different purposes get unrelated keys."""
+    key = os.environ.get(ENV_VAR, "").strip()
+    if not key:
+        return None
+    import hmac
+    return hmac.new(key.encode(), f"mailbroom/{purpose}".encode(),
+                    hashlib.sha256).digest()
+
+
 def seal(value: str) -> str:
     """Encrypt one secret for persistence. Pass-through when no key is
     configured, the value is empty, or it is already sealed."""

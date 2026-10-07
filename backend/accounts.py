@@ -35,6 +35,8 @@ def _initial_state() -> dict:
                                # when this moves
         "undo": [],            # summaries of undoable move jobs (newest last)
         "folders_raw": [],     # raw IMAP folder names (targets for move-to)
+        "index": {"status": "idle", "progress": "", "error": "",
+                  "done": 0, "total": 0},   # local body index job
         "rules": [],           # this account's rules (mirrored for SSE)
         "presets": [],         # this account's saved filter presets (SSE)
     }
@@ -60,7 +62,7 @@ class AccountState:
         self.replied: set[str] = set()
         self.replied_loaded = False
         self.cancel = {"scan": False, "ai": False, "delete": False,
-                       "atts": False, "unsub": False}
+                       "atts": False, "unsub": False, "index": False}
         self.delete_pending: list[dict] = []
         # UIDs of the delete job currently being processed (guarded by
         # `lock`) - new jobs dedup against these too, not just the queue.

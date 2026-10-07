@@ -70,6 +70,7 @@ def isolate(tmp_path, monkeypatch):
     end = time.time() + 5
     while time.time() < end and any(
             a.state["status"] == "scanning"
+            or a.state["index"]["status"] == "running"
             for a in accountsmod.all_instantiated()):
         time.sleep(0.01)
     verdictstore._mails_cache.clear()

@@ -194,9 +194,10 @@ presets.
   CSV export scope to the current selection here; their "⋯" overflow-menu
   versions (nothing selected) act on everything, as before.
 - **Bulk workflows** - background deletion queue with live progress and
-  cancel, global mail search (optionally inside the message text - your
-  mail server does that search per query, nothing is stored locally; a
-  per-account setting), Empty-Trash button, cancellable scans and AI runs.
+  cancel, global mail search (optionally inside the message text, a
+  per-account setting: your mail server does that search per query and
+  nothing is stored, or an opt-in local word index for instant searches -
+  see below), Empty-Trash button, cancellable scans and AI runs.
 - **Multiple accounts** - connect several providers at once (e.g. Proton
   Bridge + Gmail). Every account is strictly separate: its own scans,
   groups, rules, saved presets, digest settings, statistics, folder
@@ -298,6 +299,28 @@ without the key, a copied `/data` contains no usable credentials. Keep
 the key in the environment only, never in the backups; if it is lost,
 re-enter the secrets. Unset = plaintext as before (a startup log line
 reminds you).
+
+### Local mail-text search index (opt-in)
+
+Settings -> Mail account -> *Mail text search* -> **Local word index**
+(needs `MAILBROOM_SECRET_KEY`) builds, on a button press, a small SQLite
+index per account next to the scan snapshots. It stores **no readable mail
+text**: for every mail only keyed hashes (HMAC-SHA256 with a key derived
+from `MAILBROOM_SECRET_KEY` plus a random per-index salt) of its distinct
+words, and the same message handles the scan snapshot holds. A copied
+`/data` therefore reveals no mail content, and an index built under a
+different key is unusable until rebuilt. Searches match **whole words**
+(case and accents ignored, several words are ANDed) - not word parts or
+phrases - and are instant for any provider. The build reads the first
+~256 KB of every scanned mail from your server once (cancellable, with
+progress); later scans only add new mails and drop vanished ones. Before
+anything is read, Settings shows the **estimated disk use** and the free
+space of the data volume and asks for confirmation (about 5-6 KB per mail,
+up to ~12 KB for text-heavy mail: roughly 0.5-1.2 GB for 100,000 mails; the
+build is refused if even the typical estimate would not fit). It is meant
+for large mailboxes and slow providers - for a few thousand mails the
+server-side search is already fast.
+Switching the mode off or deleting the account removes the index.
 
 ## Development
 

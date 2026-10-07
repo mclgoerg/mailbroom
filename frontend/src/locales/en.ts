@@ -172,6 +172,53 @@ export const EN: Record<string, string> = {
   "body_search.title": "Mail text search",
   "body_search.label": "Search inside mail text",
   "body_search.server": "Ask the mail server",
+  "body_search.local": "Local word index",
+  "body_search.local_help":
+    "Meant for large mailboxes and slow providers: builds a local index "
+    + "once, then searches instantly. It stores NO readable mail text, only keyed hashes of each "
+    + "mail's words (the key comes from MAILBROOM_SECRET_KEY). Searches match "
+    + "whole words (case and accents ignored, several words must all "
+    + "appear), not parts of words. Scans keep the index up to date; "
+    + "switching this off deletes it.",
+  "index.need_key":
+    "The local index needs MAILBROOM_SECRET_KEY to be set on the server.",
+  "index.save_first":
+    "Save the settings first, then build the index here.",
+  "index.none": "No index built yet.",
+  "index.key_changed":
+    "The index was built with a different secret key and cannot be used - "
+    + "rebuild it.",
+  "index.building": "Indexing…",
+  "index.status": "{docs} mails indexed, last updated {ts}.",
+  "index.disk": "Disk space used: {size}",
+  "index.build": "Build index",
+  "index.update": "Update now",
+  "index.rebuild": "Rebuild",
+  "index.delete": "Delete index",
+  "index.confirm":
+    "Mailbroom will now read the text of {n} scanned mails of this account "
+    + "from your mail server (the first ~256 KB of each) and store only keyed "
+    + "word hashes locally - no readable text.\n\nThis will take roughly "
+    + "{size} of disk space (up to {max} for text-heavy mail); {free} are "
+    + "free on the data volume. It can take a while.\n\nDo you want to "
+    + "proceed?",
+  "index.estimate":
+    "Estimated disk space: about {size} for {n} mails (up to {max} for "
+    + "text-heavy mail); {free} free on the data volume.",
+  "index.confirm_tight":
+    "Warning: that may not fit on the data volume.",
+  "index.confirm_delete": "Delete the local index of this account?",
+  "notice.index_cancelled": "Indexing cancelled - what was indexed is kept.",
+  "search.body_hint_local":
+    "Searches the local word index: whole words only, all must appear.",
+  "search.note.index_missing":
+    "The local index has not been built yet - build it in Settings. Showing "
+    + "subject and sender matches only.",
+  "search.note.index_key":
+    "The local index was built with a different secret key - rebuild it in "
+    + "Settings. Showing subject and sender matches only.",
+  "search.note.index_behind":
+    "{n} newer mails are not in the index yet - results may be incomplete.",
   "body_search.disabled": "Off (subject and sender only)",
   "body_search.help":
     "Mail-text search runs on your mail server for each query - Mailbroom "

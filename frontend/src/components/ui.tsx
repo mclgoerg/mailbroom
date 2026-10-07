@@ -204,6 +204,24 @@ export function Spinner({ size = "sm", className = "" }: {
   );
 }
 
+/** Determinate progress bar (theme tokens only). `max` 0 = not known yet:
+ *  the bar stays empty. */
+export function ProgressBar({ value, max, label, className = "" }: {
+  value: number; max: number; label?: string; className?: string;
+}) {
+  const pct = max > 0 ? Math.min(100, Math.round((100 * value) / max)) : 0;
+  return (
+    <div role="progressbar" aria-label={label} aria-valuemin={0}
+      aria-valuemax={max > 0 ? max : undefined}
+      aria-valuenow={max > 0 ? value : undefined}
+      className={`h-2 w-full overflow-hidden rounded-full bg-chip
+        ${className}`}>
+      <div className="h-full rounded-full bg-accent transition-[width]
+        duration-300" style={{ width: `${pct}%` }} />
+    </div>
+  );
+}
+
 /** Standard block-level loading state: big spinner + muted label,
  *  centered, with a short fade-in delay. Use this in every panel. */
 export function Loading({ label, className = "" }: {

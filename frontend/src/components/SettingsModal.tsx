@@ -7,6 +7,7 @@ import { fmtAgo, fmtSize } from "../lib";
 import type { AdminTenantStats, AuthMode, AutoScanUnit, BodySearchMode, Config,
   DigestSchedule, FoldersResp, OauthProvider, Preset, Security,
   SmtpSecurity } from "../types";
+import { IndexPanel } from "./IndexPanel";
 import { Button, Field, Input, Loading, Modal, PanelHeader,
   SectionLabel, Select, Spinner, TextArea } from "./ui";
 
@@ -815,10 +816,24 @@ export function SettingsModal({ cfg, account, onClose, onSaved,
             <Select className="w-full" value={f.bodySearch}
               onChange={set("bodySearch")}>
               <option value="server">{t("body_search.server")}</option>
+              <option value="local" disabled={!cfg.secret_key_set}>
+                {t("body_search.local")}
+              </option>
               <option value="disabled">{t("body_search.disabled")}</option>
             </Select>
           </Field>
-          <p className="mt-1 text-xs text-muted">{t("body_search.help")}</p>
+          <p className="mt-1 text-xs text-muted">
+            {t(f.bodySearch === "local"
+              ? "body_search.local_help" : "body_search.help")}
+          </p>
+          {f.bodySearch === "local" && (
+            <>
+              <IndexPanel account={editAcct}
+                savedMode={(cfg.accounts[editAcct]?.body_search ?? "server"
+                  ) as BodySearchMode}
+                secretKeySet={!!cfg.secret_key_set} />
+            </>
+          )}
         </div>
         </>)}
 

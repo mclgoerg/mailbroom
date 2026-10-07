@@ -29,6 +29,7 @@ imaplib._MAXLINE = 10_000_000  # bulk FETCH responses exceed the default 1MB
 
 from . import accounts
 from . import auditlog
+from . import bodyindex
 from . import config as cfgmod
 from . import knownsenders
 from . import pinstore
@@ -1234,6 +1235,7 @@ def run_scan(acc=None) -> None:
                                  sum(m["size"] for m in messages),
                                  len(groups["sender"]), acc.name)
             save_snapshot(acc)
+            bodyindex.sync_after_scan(acc)       # no-op unless mode "local"
         finally:
             try:
                 conn.logout()
@@ -1275,7 +1277,8 @@ def start_scan(acc=None, notice: dict | None = None) -> None:
                 or acc.state["ai"]["status"] == "running" \
                 or acc.state["delete"]["status"] == "running" \
                 or acc.state["atts"]["status"] == "running" \
-                or acc.state["unsub"]["status"] == "running":
+                or acc.state["unsub"]["status"] == "running" \
+                or acc.state["index"]["status"] == "running":
             raise RuntimeError("busy")
         # `groups` is left as-is (not reset to {}) so the UI keeps showing
         # the last-known-good table instead of flashing empty - important
@@ -2392,6 +2395,44 @@ def _set_timeout(conn, seconds: float) -> None:
             sock.settimeout(max(1.0, seconds))
         except OSError:
             pass
+
+
+def search_local(query: str, limit: int = 500, acc=None) -> dict:
+    """Metadata hits plus mails whose text contains every WORD of the query,
+    answered from the local keyed word index (backend/bodyindex.py): instant,
+    whole words only. Only mails still in the scan index are returned (their
+    UIDVALIDITY must match). `notes`: the index is missing / was built under
+    another key, or some scanned mails are not in it yet."""
+    acc = acc or accounts.get()
+    found = {(m["folder"], m["uid"]): m
+             for m in search_mails(query, limit=10**9, acc=acc)}
+    notes: list[dict] = []
+    terms = [w for t in body_search_terms(query)
+             for w in sorted(bodyindex.words(t))]
+    if len(query.strip()) >= 2 and terms:
+        idx, reason = bodyindex.open_index(acc.name, acc.tenant)
+        if idx is None:
+            notes.append({"key": reason, "params": {}})
+        else:
+            try:
+                hits = idx.query(terms)
+                have = idx.known()
+            finally:
+                idx.close()
+            with acc.lock:
+                uv = dict(acc.folder_uv)
+                for folder, uid, huv in hits:
+                    m = acc.index.get(ikey(folder, uid))
+                    if m and uv.get(folder) == huv:
+                        found.setdefault((folder, uid), m)
+                behind = sum(1 for m in acc.index.values()
+                             if (m["folder"], m["uid"],
+                                 uv.get(m["folder"], 0)) not in have)
+            if behind:
+                notes.append({"key": "index_behind", "params": {"n": behind}})
+    mails = sorted((_search_row(m) for m in found.values()),
+                   key=lambda m: -m["ts"])
+    return {"mails": mails[:limit], "notes": notes}
 
 
 def search_body(query: str, limit: int = 500, acc=None,
