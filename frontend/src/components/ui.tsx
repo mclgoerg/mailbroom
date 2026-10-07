@@ -628,13 +628,14 @@ export function Checkbox({ label, className = "", ...rest }:
   Omit<ComponentProps<"input">, "type"> & { label?: ReactNode }) {
   return (
     <label className={`inline-flex min-h-8 min-w-8 coarse:min-h-11
-      coarse:min-w-11 shrink-0 cursor-pointer items-center justify-center
-      gap-2 type-body ${rest.disabled ? "cursor-not-allowed text-faint" : ""}
+      coarse:min-w-11 cursor-pointer items-center gap-2 type-body
+      ${label != null ? "justify-start" : "shrink-0 justify-center"}
+      ${rest.disabled ? "cursor-not-allowed text-faint" : ""}
       ${className}`}>
       <input type="checkbox"
         className="size-4.5 shrink-0 cursor-[inherit] accent-accent"
         {...rest} />
-      {label != null && <span>{label}</span>}
+      {label != null && <span className="min-w-0">{label}</span>}
     </label>
   );
 }

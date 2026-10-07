@@ -8,8 +8,8 @@ import type { AdminTenantStats, AuthMode, AutoScanUnit, BodySearchMode, Config,
   DigestSchedule, FoldersResp, OauthProvider, Preset, Security,
   SmtpSecurity } from "../types";
 import { IndexPanel } from "./IndexPanel";
-import { Button, Field, Input, Loading, Modal, PanelHeader,
-  SectionLabel, Select, Spinner, TextArea } from "./ui";
+import { Button, Checkbox, Field, Input, LINK, Loading, Modal, PanelHeader,
+  SectionLabel, Select, Spinner, Tag, TextArea } from "./ui";
 
 /* Provider presets only PREFILL the connection fields - everything stays
  * editable. "custom" prefills nothing. Hosts per provider docs; all of
@@ -447,10 +447,10 @@ export function SettingsModal({ cfg, account, onClose, onSaved,
         <SettingsIcon size={18} /> {t("Settings")}
       </span>} onClose={onClose} />
       <div role="tablist" className="flex flex-wrap gap-1 border-b
-        border-line px-5 pt-3">
+        border-line px-4 pt-3 sm:px-5">
         {tabs.map(([k, label]) => (
           <button key={k} role="tab" aria-selected={tab === k}
-            className={`rounded-t-md px-3 py-1.5 text-sm ${tab === k
+            className={`rounded-t-control px-3 py-1.5 type-body ${tab === k
               ? "bg-accent text-white"
               : "bg-panel2 text-body hover:bg-chip"}`}
             onClick={() => setTab(k)}>
@@ -458,7 +458,7 @@ export function SettingsModal({ cfg, account, onClose, onSaved,
           </button>
         ))}
       </div>
-      <div className="grid flex-1 content-start gap-4 overflow-y-auto p-5
+      <div className="grid flex-1 content-start gap-4 overflow-y-auto p-4 sm:p-5
         sm:grid-cols-2">
         {tab === "general" && (<>
         <Field label={t("Language")}>
@@ -471,8 +471,8 @@ export function SettingsModal({ cfg, account, onClose, onSaved,
             <option value="de">Deutsch</option>
           </Select>
         </Field>
-        <label className="flex items-center gap-2 text-sm sm:col-span-2">
-          <input type="checkbox"
+        <Checkbox className="sm:col-span-2"
+          label={t("notify.toggle")}
             defaultChecked={localStorage.getItem("pmc_notify") === "1"}
             onChange={async (e) => {
               if (!e.target.checked) {
@@ -488,8 +488,6 @@ export function SettingsModal({ cfg, account, onClose, onSaved,
                 setMsg(t("notify.denied"));
               }
             }} />
-          {t("notify.toggle")}
-        </label>
         </>)}
         {tab === "account" && (<>
         <div className="sm:col-span-2 flex flex-wrap items-end gap-2">
@@ -511,7 +509,7 @@ export function SettingsModal({ cfg, account, onClose, onSaved,
               {t("Delete…")}
             </Button>
           )}
-          <span className="pb-2 text-xs text-muted">
+          <span className="pb-2 type-meta text-muted">
             {t("account.hint")}
           </span>
         </div>
@@ -525,7 +523,7 @@ export function SettingsModal({ cfg, account, onClose, onSaved,
             </Select>
           </Field>
           {presetHint && (
-            <p className="mt-1 text-xs text-muted">{t(presetHint)}</p>
+            <p className="mt-1 type-meta text-muted">{t(presetHint)}</p>
           )}
         </div>
         <Field label={t("Host")}>
@@ -583,7 +581,7 @@ export function SettingsModal({ cfg, account, onClose, onSaved,
         </div>
 
         {oauthProvider && (
-        <div className="sm:col-span-2 rounded-md border border-line
+        <div className="sm:col-span-2 rounded-card border border-line
           bg-panel2 p-3">
           <SectionLabel>
             {t("oauth.title", { provider: oauthProvider === "google"
@@ -591,13 +589,13 @@ export function SettingsModal({ cfg, account, onClose, onSaved,
           </SectionLabel>
 
           {oauthProvider === "google" && (
-            <p className="my-2 text-xs text-muted">{t("oauth.google_help")}</p>
+            <p className="my-2 type-meta text-muted">{t("oauth.google_help")}</p>
           )}
           {oauthProvider === "microsoft" && cfg.oauth_ms_device_available && (
-            <p className="my-2 text-xs text-muted">{t("oauth.ms_device_help")}</p>
+            <p className="my-2 type-meta text-muted">{t("oauth.ms_device_help")}</p>
           )}
           {oauthProvider === "microsoft" && !cfg.oauth_ms_device_available && (
-            <p className="my-2 text-xs text-muted">{t("oauth.ms_byo_help")}</p>
+            <p className="my-2 type-meta text-muted">{t("oauth.ms_byo_help")}</p>
           )}
 
           {!(oauthProvider === "microsoft"
@@ -619,7 +617,7 @@ export function SettingsModal({ cfg, account, onClose, onSaved,
 
           <div className="mt-3 flex flex-wrap items-center gap-2">
             {f.oauthConnected ? (<>
-              <span className="text-sm text-emerald-400">
+              <span className="type-body text-safe-fg">
                 ✓ {t("oauth.connected")}
               </span>
               <Button variant="secondary" onClick={disconnectOauth}>
@@ -638,32 +636,33 @@ export function SettingsModal({ cfg, account, onClose, onSaved,
           </div>
 
           {deviceInfo && (
-            <div className="mt-2 rounded-md border border-line bg-panel p-3
-              text-sm">
+            <div className="mt-2 rounded-card border border-line bg-panel p-3
+              type-body">
               <p>{t("oauth.device_instructions")}</p>
               <p className="mt-1">
                 <a href={deviceInfo.verificationUri} target="_blank"
-                  rel="noreferrer" className="text-accent underline">
+                  rel="noreferrer" className={`text-accent ${LINK}`}>
                   {deviceInfo.verificationUri}
                 </a>
               </p>
-              <p className="mt-1 font-mono text-lg tracking-widest">
+              {/* tracking-widest: a code the user types, so keep its letters apart. */}
+              <p className="mt-1 font-mono type-heading tracking-widest">
                 {deviceInfo.userCode}
               </p>
             </div>
           )}
           {oauthMsg && (
-            <p className="mt-2 text-xs text-muted">{oauthMsg}</p>
+            <p className="mt-2 type-meta text-muted">{oauthMsg}</p>
           )}
         </div>
         )}
 
         <div className="sm:col-span-2">
           <div className="mb-1 flex items-center gap-2">
-            <span className="text-xs text-muted">
+            <span className="type-meta text-muted">
               {t("folders.title", { name: editAcct })}
             </span>
-            <Button variant="secondary" className="!min-h-7 !px-2 !py-0.5 !text-xs"
+            <Button variant="secondary" size="sm"
               title={t("folders.discover_tip")}
               onClick={() => discoverFolders(editAcct)}>
               <RefreshCw size={14} className="mr-1 inline align-text-bottom" />
@@ -672,13 +671,13 @@ export function SettingsModal({ cfg, account, onClose, onSaved,
           </div>
           {!folders && !foldersErr && <Loading className="!p-3" />}
           {foldersErr && (
-            <div className="text-xs text-rose-400">
+            <div className="type-meta text-danger-fg">
               {foldersErr}
               <span className="ml-1 text-muted">{t("folders.err_hint")}</span>
             </div>
           )}
           {folders && (
-            <div className="rounded-md border border-line bg-panel2 p-3">
+            <div className="rounded-card border border-line bg-panel2 p-3">
               <div className="grid gap-1 sm:grid-cols-2">
                 {folders.folders
                   .filter((x) => !wildcards.some((w) =>
@@ -691,43 +690,40 @@ export function SettingsModal({ cfg, account, onClose, onSaved,
                   // backend - their checkboxes are informational only.
                   const locked = !!x.role && x.role !== "archive";
                   return (
-                  <label key={x.raw}
-                    className={`flex items-center gap-2 text-sm${
-                      locked ? " opacity-60" : ""}`}
+                  <span key={x.raw} className="min-w-0"
                     title={locked ? t("folder.role_excluded") : undefined}>
-                    <input type="checkbox" checked={included.has(x.raw)}
+                    <Checkbox className="max-w-full"
+                      checked={included.has(x.raw)}
                       disabled={locked}
                       onChange={() => {
                         const next = new Set(included);
                         next.has(x.raw) ? next.delete(x.raw)
                           : next.add(x.raw);
                         setIncluded(next);
-                      }} />
-                    <span className="truncate">{x.name}</span>
-                    {x.role && (
-                      <span className="rounded bg-chip px-1 text-[10px]
-                        text-chiptext">{x.role}</span>
-                    )}
-                  </label>
+                      }}
+                      label={<span className="flex min-w-0 items-center gap-2">
+                        <span className="truncate">{x.name}</span>
+                        {x.role && <Tag>{x.role}</Tag>}
+                      </span>} />
+                  </span>
                   );
                 })}
               </div>
               {wildcards.length > 0 && (
                 <div className="mt-2 flex flex-wrap items-center gap-1.5
-                  border-t border-line pt-2 text-xs text-muted">
+                  border-t border-line pt-2 type-meta text-muted">
                   {t("Excluded by rule:")}
                   {wildcards.map((w) => (
-                    <span key={w} className="rounded bg-chip px-1.5 py-0.5
-                      text-chiptext">
+                    <Tag key={w}>
                       {w}{" "}
                       <button className="inline-flex align-text-bottom
                           text-muted hover:text-body"
-                        title={t("Remove")}
+                        title={t("Remove")} aria-label={t("Remove")}
                         onClick={() => setWildcards(
                           wildcards.filter((x) => x !== w))}>
-                        <X size={12} />
+                        <X size={14} />
                       </button>
-                    </span>
+                    </Tag>
                   ))}
                 </div>
               )}
@@ -735,7 +731,7 @@ export function SettingsModal({ cfg, account, onClose, onSaved,
           )}
         </div>
 
-        <div className="sm:col-span-2 rounded-md border border-line
+        <div className="sm:col-span-2 rounded-card border border-line
           bg-panel2 p-3">
           <SectionLabel className="mb-2">{t("digest.title")}</SectionLabel>
           <div className="grid gap-3 sm:grid-cols-2">
@@ -760,19 +756,19 @@ export function SettingsModal({ cfg, account, onClose, onSaved,
               </Field>
             )}
           </div>
-          <p className="mt-1 text-xs text-muted">{t("digest.help")}</p>
+          <p className="mt-1 type-meta text-muted">{t("digest.help")}</p>
           <div className="mt-3 flex flex-wrap items-center gap-2">
-            <Button variant="secondary" className="!min-h-8 !px-3 !text-xs"
+            <Button variant="secondary" size="sm"
               onClick={sendTestDigest} disabled={digestTesting}>
               {digestTesting ? <Spinner /> : t("digest.send_test")}
             </Button>
             {digestTestMsg && (
-              <span className="text-xs text-muted">{digestTestMsg}</span>
+              <span className="type-meta text-muted">{digestTestMsg}</span>
             )}
           </div>
         </div>
 
-        <div className="sm:col-span-2 rounded-md border border-line
+        <div className="sm:col-span-2 rounded-card border border-line
           bg-panel2 p-3">
           <SectionLabel className="mb-2">{t("auto_scan.title")}</SectionLabel>
           <div className="grid gap-3 sm:grid-cols-3">
@@ -806,10 +802,10 @@ export function SettingsModal({ cfg, account, onClose, onSaved,
               </Field>
             </>)}
           </div>
-          <p className="mt-1 text-xs text-muted">{t("auto_scan.help")}</p>
+          <p className="mt-1 type-meta text-muted">{t("auto_scan.help")}</p>
         </div>
 
-        <div className="sm:col-span-2 rounded-md border border-line
+        <div className="sm:col-span-2 rounded-card border border-line
           bg-panel2 p-3">
           <SectionLabel className="mb-2">{t("body_search.title")}</SectionLabel>
           <Field label={t("body_search.label")}>
@@ -822,7 +818,7 @@ export function SettingsModal({ cfg, account, onClose, onSaved,
               <option value="disabled">{t("body_search.disabled")}</option>
             </Select>
           </Field>
-          <p className="mt-1 text-xs text-muted">
+          <p className="mt-1 type-meta text-muted">
             {t(f.bodySearch === "local"
               ? "body_search.local_help" : "body_search.help")}
           </p>
@@ -840,7 +836,7 @@ export function SettingsModal({ cfg, account, onClose, onSaved,
         {tab === "general" && (<>
         <div className="sm:col-span-2">
           <Field label={<span className="inline-flex items-center gap-1">
-            <Shield size={13} /> {t("Protected senders")}
+            <Shield size={14} /> {t("Protected senders")}
           </span>}>
             <TextArea
               value={protectedText}
@@ -848,7 +844,7 @@ export function SettingsModal({ cfg, account, onClose, onSaved,
               onChange={(e) => setProtectedText(e.target.value)}
             />
           </Field>
-          <p className="mt-1 text-xs text-muted">{t("protected.help")}</p>
+          <p className="mt-1 type-meta text-muted">{t("protected.help")}</p>
         </div>
 
         <div className="sm:col-span-2">
@@ -859,7 +855,7 @@ export function SettingsModal({ cfg, account, onClose, onSaved,
               onChange={(e) => setCategoriesText(e.target.value)}
             />
           </Field>
-          <p className="mt-1 text-xs text-muted">{t("categories.help")}</p>
+          <p className="mt-1 type-meta text-muted">{t("categories.help")}</p>
         </div>
 
         <div className="sm:col-span-2">
@@ -868,7 +864,7 @@ export function SettingsModal({ cfg, account, onClose, onSaved,
               value={f.newSenderWindowDays}
               onChange={set("newSenderWindowDays")} />
           </Field>
-          <p className="mt-1 text-xs text-muted">
+          <p className="mt-1 type-meta text-muted">
             {t("new_sender.window_help")}
           </p>
         </div>
@@ -878,7 +874,7 @@ export function SettingsModal({ cfg, account, onClose, onSaved,
           <SectionLabel className="sm:col-span-2 mt-2">
             {t("login.section")}
           </SectionLabel>
-          <p className="sm:col-span-2 -mt-2 text-xs text-muted">
+          <p className="sm:col-span-2 -mt-2 type-meta text-muted">
             {t("login.help")}
           </p>
           <Field label={t("login.mode")}>
@@ -924,7 +920,7 @@ export function SettingsModal({ cfg, account, onClose, onSaved,
                   placeholder={t("login.oidc_admin_ph")}
                   onChange={set("oidcAdmin")} />
               </Field>
-              <div className="self-end pb-2 text-xs text-muted">
+              <div className="self-end pb-2 type-meta text-muted">
                 {t("login.tenancy_note")}
               </div>
               <div className="sm:col-span-2">
@@ -934,7 +930,7 @@ export function SettingsModal({ cfg, account, onClose, onSaved,
                     onChange={(e) =>
                       setF({ ...f, oidcAllowed: e.target.value })} />
                 </Field>
-                <p className="mt-1 text-xs text-muted">
+                <p className="mt-1 type-meta text-muted">
                   {t("login.oidc_allowed_help")}
                 </p>
               </div>
@@ -944,15 +940,13 @@ export function SettingsModal({ cfg, account, onClose, onSaved,
           <SectionLabel className="sm:col-span-2 mt-2">
             {t("shared.section")}
           </SectionLabel>
-          <p className="sm:col-span-2 -mt-2 text-xs text-muted">
+          <p className="sm:col-span-2 -mt-2 type-meta text-muted">
             {t("shared.help")}
           </p>
-          <label className="flex items-center gap-2 text-sm">
-            <input type="checkbox" checked={f.sharedEnabled}
-              onChange={(e) =>
-                setF({ ...f, sharedEnabled: e.target.checked })} />
-            {t("shared.enabled")}
-          </label>
+          <Checkbox checked={f.sharedEnabled}
+            label={t("shared.enabled")}
+            onChange={(e) =>
+              setF({ ...f, sharedEnabled: e.target.checked })} />
           <Field label={t("shared.budget")}>
             <Input className="w-full" type="number" step="0.5" min="0"
               value={f.sharedBudget} placeholder={t("budget.none")}
@@ -996,17 +990,17 @@ export function SettingsModal({ cfg, account, onClose, onSaved,
           <SectionLabel className="sm:col-span-2 mt-2">
             {t("usage.section")}
           </SectionLabel>
-          <p className="sm:col-span-2 -mt-2 text-xs text-muted">
+          <p className="sm:col-span-2 -mt-2 type-meta text-muted">
             {t("usage.help")}
           </p>
           <div className="min-w-0 sm:col-span-2">
             {!tenantStats && !tenantStatsErr && <Loading className="!p-3" />}
             {tenantStatsErr && (
-              <div className="text-xs text-rose-400">{tenantStatsErr}</div>
+              <div className="type-meta text-danger-fg">{tenantStatsErr}</div>
             )}
             {tenantStats && (
-              <div className="overflow-x-auto rounded-md border border-line">
-                <table className="w-full min-w-[560px] table-fixed text-xs">
+              <div className="overflow-x-auto rounded-card border border-line">
+                <table className="w-full min-w-[560px] table-fixed type-meta">
                   <thead>
                     <tr className="border-b border-line text-left text-muted">
                       <th className="w-[26%] px-2 py-1.5 font-medium">
@@ -1032,7 +1026,7 @@ export function SettingsModal({ cfg, account, onClose, onSaved,
                             u.scans} scan(s), ${u.rules} rule(s), ${
                             u.verdicts} AI verdict(s)`}>
                           {u.is_admin_workspace && (
-                            <Star size={11}
+                            <Star size={14}
                               className="mr-1 inline align-text-bottom" />
                           )}
                           {u.label || u.id}
@@ -1075,7 +1069,7 @@ export function SettingsModal({ cfg, account, onClose, onSaved,
         <SectionLabel className="sm:col-span-2">
           {t("AI review (optional)")}
         </SectionLabel>
-        <p className="sm:col-span-2 -mt-2 text-xs text-muted">
+        <p className="sm:col-span-2 -mt-2 type-meta text-muted">
           {t("ai.data_note")}
         </p>
         <Field label={t("Provider")}>
@@ -1113,7 +1107,7 @@ export function SettingsModal({ cfg, account, onClose, onSaved,
               onChange={set("apiKey")} />
           </Field>
           {cfg.ai.source === "shared" && (
-            <p className="mt-1 text-xs text-muted">
+            <p className="mt-1 type-meta text-muted">
               {t("ai.shared_note", {
                 cap: cfg.ai.shared_budget_usd
                   ? fmtUsd(cfg.ai.shared_budget_usd) : t("budget.none"),
@@ -1136,22 +1130,22 @@ export function SettingsModal({ cfg, account, onClose, onSaved,
             value={f.budget} placeholder={t("budget.none")}
             onChange={set("budget")} />
         </Field>
-        <div className="self-end pb-2 text-xs text-muted">
+        <div className="self-end pb-2 type-meta text-muted">
           {t("budget.month", { spent: fmtUsd(cfg.ai.month_cost ?? 0) })}
         </div>
 
         <div className="sm:col-span-2 flex flex-wrap items-center gap-3
-          rounded-lg bg-panel2 px-4 py-3 text-xs text-muted">
+          rounded-card bg-panel2 px-4 py-3 type-meta text-muted">
           <span>
             {t("AI spend")}: <b className="text-body">{fmtUsd(s.cost)}</b>
             {" "}- {s.runs} {t("runs")}, {s.input_tokens.toLocaleString()} /{" "}
             {s.output_tokens.toLocaleString()}
           </span>
-          <Button variant="secondary" className="!min-h-7 !px-2 !py-0.5 !text-xs"
+          <Button variant="secondary" size="sm"
             onClick={resetStats}>
             {t("Reset")}
           </Button>
-          <Button variant="secondary" className="!min-h-7 !px-2 !py-0.5 !text-xs"
+          <Button variant="secondary" size="sm"
             onClick={clearVerdicts}>
             {t("Clear AI verdict cache")}
           </Button>
@@ -1159,13 +1153,13 @@ export function SettingsModal({ cfg, account, onClose, onSaved,
         </>)}
       </div>
       <div className="flex flex-wrap items-center gap-3 border-t border-line
-        px-5 py-3">
+        px-4 py-3 sm:px-5">
         <Button onClick={() => save()}>{t("Save")}</Button>
         <Button variant="secondary"
           onClick={() => downloadFile("/api/export_config")}
           title={t("export.tip")}>{t("Export")}</Button>
-        <label className="min-h-9 cursor-pointer rounded-md bg-chip px-3
-          py-1.5 text-sm font-medium text-body hover:bg-chiph">
+        <label className="min-h-9 cursor-pointer rounded-control bg-chip px-3
+          py-1.5 type-body font-medium text-body hover:bg-chiph">
           {t("Import…")}
           <input type="file" accept="application/json" className="hidden"
             onChange={async (e) => {
@@ -1190,7 +1184,7 @@ export function SettingsModal({ cfg, account, onClose, onSaved,
               }
             }} />
         </label>
-        <span className="text-xs text-muted">{msg}</span>
+        <span className="type-meta text-muted">{msg}</span>
       </div>
     </Modal>
   );
