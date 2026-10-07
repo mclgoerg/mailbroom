@@ -4,7 +4,7 @@ import { api, mailKey } from "../api";
 import { t } from "../i18n";
 import type { Mail, SearchNote } from "../types";
 import { MailRows, MessageView } from "./MailList";
-import { Button, EmptyState, Input, Modal, Spinner, Toolbar } from "./ui";
+import { Button, Checkbox, EmptyState, Input, Modal, Spinner, Toolbar } from "./ui";
 
 export function SearchPanel({ bodySearch = false, bodyMode = "server",
   onClose, onDeleted }: {
@@ -78,10 +78,11 @@ export function SearchPanel({ bodySearch = false, bodyMode = "server",
           onKeyDown={(e) => e.key === "Enter" && run()}
         />
         <Button onClick={run} disabled={busy || q.trim().length < 2}>
-          {busy ? <Spinner className="!text-white" /> : t("Search")}
+          {busy ? <Spinner className="text-white" /> : t("Search")}
         </Button>
-        <Button variant="secondary" onClick={onClose} title={t("Close")}>
-          <X size={17} />
+        <Button variant="secondary" size="icon" label={t("Close")}
+          onClick={onClose}>
+          <X size={18} />
         </Button>
       </div>
 
@@ -100,25 +101,23 @@ export function SearchPanel({ bodySearch = false, bodyMode = "server",
               {t("Trash selected")}{sel.size > 0 && ` (${sel.size})`}
             </Button>
             {bodySearch && (
-              <label className="flex items-center gap-1.5 text-xs text-muted">
-                <input type="checkbox" checked={inBody}
-                  onChange={(e) => setInBody(e.target.checked)} />
-                {t("search.body_toggle")}
-              </label>
+              <Checkbox className="type-meta text-muted" checked={inBody}
+                onChange={(e) => setInBody(e.target.checked)}
+                label={t("search.body_toggle")} />
             )}
-            <span className="text-xs text-muted">
+            <span className="type-meta text-muted">
               {mails !== null && `${mails.length} ${t("matches")}`} {note}
             </span>
           </Toolbar>
           {bodySearch && inBody && (
-            <p className="px-4 pb-1 text-xs text-muted">
+            <p className="px-4 pb-1 type-meta text-muted">
               {t(bodyMode === "local"
                 ? "search.body_hint_local" : "search.body_hint")}
             </p>
           )}
           {notes.map((n) => (
             <p key={n.key + JSON.stringify(n.params)}
-              className="px-4 pb-1 text-xs text-muted">
+              className="px-4 pb-1 type-meta text-muted">
               {t(`search.note.${n.key}`, n.params)}
             </p>
           ))}
