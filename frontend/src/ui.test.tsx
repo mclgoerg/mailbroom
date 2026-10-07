@@ -88,3 +88,24 @@ test("menu stays right-aligned when it fits", () => {
   expect(popover.className).toContain("right-0");
   rect.mockRestore();
 });
+
+// jsdom can't hit-test, so pin the stacking layers at class level: the
+// popover must sit on the dropdown layer, above the sticky table header.
+test("menu popover uses the dropdown layer", () => {
+  renderMenu(vi.fn());
+  fireEvent.click(screen.getByLabelText("Profile"));
+  const pop = screen.getByText("Do it").closest("div.absolute")!;
+  expect(pop.className).toContain("z-(--z-dropdown)");
+});
+
+test("z-index scale is strictly ordered sticky < bulkbar < dropdown < toast < modal", async () => {
+  // vitest blanks CSS imports (even ?raw), so read the file from disk (cwd is frontend/).
+  // @ts-expect-error node builtins have no types in this project
+  const { readFileSync } = await import("node:fs");
+  const indexCss: string = readFileSync("src/index.css", "utf8");
+  const z = (n: string) => Number(new RegExp(`--z-${n}:\\s*(\\d+)`).exec(indexCss)?.[1]);
+  const order = ["sticky", "bulkbar", "dropdown", "toast", "modal"].map(z);
+  expect(order.every(Number.isFinite)).toBe(true);
+  expect([...order].sort((a, b) => a - b)).toEqual(order);
+  expect(new Set(order).size).toBe(order.length);
+});
