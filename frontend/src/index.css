@@ -12,15 +12,100 @@
   --color-accenth: #bd7609;
   --color-muted: #b5a68d;
   --color-body: #f0e8d8;
-  --color-faint: #8c7d64;
+  --color-faint: #9a8a70;
   --color-chip: #3b2f1f;
   --color-chiph: #4c3d29;
   --color-chiptext: #e5c890;
+
+  /* Semantic pairs (bg / fg), dark values; light overrides below. Raw
+     palette classes (emerald/amber/rose/...) are never used in components. */
+  --color-safe-bg: #022c22;
+  --color-safe-fg: #6ee7b7;
+  --color-review-bg: #451a03;
+  --color-review-fg: #fcd34d;
+  --color-keep-bg: #4c0519;
+  --color-keep-fg: #fda4af;
+  --color-info-bg: #082f49;
+  --color-info-fg: #7dd3fc;
+  --color-attach-bg: #431407;
+  --color-attach-fg: #fdba74;
+  --color-new-bg: #172554;
+  --color-new-fg: #93c5fd;
+  --color-danger: #b91c1c;       /* solid destructive button, white text */
+  --color-danger-h: #dc2626;
+  --color-danger-fg: #fb7185;    /* error / destructive text */
+  --color-overlay: rgb(0 0 0 / 0.6);
+
+  /* Radii: badge/tag, control (button/input/menu item), card/popover/
+     toast, dialog (modal >= sm). `rounded-full` stays for chips/avatars. */
+  --radius-badge: var(--radius-sm);
+  --radius-control: var(--radius-md);
+  --radius-card: var(--radius-lg);
+  --radius-dialog: var(--radius-xl);
 }
+
+/* Pointer-coarse (touch) variant: `coarse:min-h-10` etc. */
+@custom-variant coarse (@media (pointer: coarse));
+
+/* Typography layers. Size / line-height / weight only: the colour (meta ->
+   text-muted, ...) is applied by the component, so a layer can be combined
+   with any colour. `body` is a layer, not `text-body`, because that is
+   already the body colour. `section` also carries its casing. */
+@utility type-title {
+  font-size: 1.125rem; line-height: 1.625rem; font-weight: 700;
+}
+@utility type-heading {
+  font-size: 1rem; line-height: 1.5rem; font-weight: 600;
+}
+@utility type-body {
+  font-size: 0.875rem; line-height: 1.25rem; font-weight: 400;
+}
+@utility type-body-mobile {
+  font-size: 0.9375rem; line-height: 1.375rem; font-weight: 500;
+}
+@utility type-meta {
+  font-size: 0.75rem; line-height: 1rem; font-weight: 400;
+}
+@utility type-caption {
+  font-size: 0.6875rem; line-height: 0.875rem; font-weight: 500;
+}
+@utility type-section {
+  font-size: 0.75rem; line-height: 1rem; font-weight: 600;
+  text-transform: uppercase; letter-spacing: var(--tracking-wide);
+}
+
+/* Keyboard focus: one accent ring everywhere (3.75:1 on surface). In
+   @layer base so utilities can still tune it (focus-visible:-outline-offset-2,
+   outline-accent/60). Text fields already show an accent border on focus, so
+   their ring hugs the border instead of floating 2px off it. */
+@layer base {
+  :where(*) {
+    /* Base colour on every element: transition-colors would otherwise fade
+       the ring in from currentColor (a cream flash). */
+    outline-color: var(--color-accent);
+  }
+  :focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 2px;
+  }
+  input:not([type="checkbox"], [type="radio"], [type="file"]):focus-visible,
+  select:focus-visible, textarea:focus-visible {
+    outline-offset: 0;
+  }
+}
+
+/* Theme-aware shadows. Plain variables + utilities (not @theme): Tailwind
+   inlines @theme shadows, which would freeze the dark value. */
+:root {
+  --shadow-popover: 0 8px 24px rgb(0 0 0 / 0.35);
+  --shadow-bar: 0 -4px 16px rgb(0 0 0 / 0.3);
+}
+@utility shadow-popover { box-shadow: var(--shadow-popover); }
+@utility shadow-bar { box-shadow: var(--shadow-bar); }
 
 /* Stacking scale: every z-index in the app comes from here (use
    z-(--z-dropdown) etc.), never a bare z-10/z-20. Popovers must sit above
-   the sticky table header; modals above everything. --z-toast is reserved. */
+   the sticky table header; modals above everything. --z-toast is used by Toast. */
 :root {
   --z-sticky: 10;
   --z-bulkbar: 20;
@@ -49,10 +134,26 @@ html[data-theme="light"] {
   --color-accenth: #7a4708;
   --color-muted: #6e5e45;
   --color-body: #2c2115;
-  --color-faint: #96866b;
+  --color-faint: #7a6a50;
   --color-chip: #e5d9bd;
   --color-chiph: #d8c8a4;
   --color-chiptext: #7a5410;
+  --color-safe-bg: #d1fae5;
+  --color-safe-fg: #065f46;
+  --color-review-bg: #fef3c7;
+  --color-review-fg: #92400e;
+  --color-keep-bg: #ffe4e6;
+  --color-keep-fg: #9f1239;
+  --color-info-bg: #e0f2fe;
+  --color-info-fg: #075985;
+  --color-attach-bg: #ffedd5;
+  --color-attach-fg: #9a3412;
+  --color-new-bg: #dbeafe;
+  --color-new-fg: #1e40af;
+  --color-danger-fg: #be123c;
+  --color-overlay: rgb(44 33 21 / 0.35);
+  --shadow-popover: 0 8px 24px rgb(60 40 10 / 0.15);
+  --shadow-bar: 0 -2px 12px rgb(60 40 10 / 0.12);
   color-scheme: light;
 }
 
