@@ -9,7 +9,7 @@ import { fmtSize, fmtUsd, mailKey, olderThan, sieveSnippet,
 import type { AppState, Group, Grouping, GroupUnsub, Mail } from "../types";
 import { MailRows, MessageView } from "./MailList";
 import { ThreadView } from "./ThreadView";
-import { Button, ensureAiAck, Input, Loading, Menu, MenuItem, Modal,
+import { Button, Chip, ensureAiAck, Input, LINK, Loading, Menu, MenuItem, Modal,
   PanelHeader, ProtectButton, Select, Spinner } from "./ui";
 
 // Rating filter chips: same green/yellow/red/unrated buckets as the
@@ -302,7 +302,7 @@ export function DetailPanel({ grouping, group, aiEnabled, protectedNow,
           {fmtSize(group.size)}
           {protectedNow && (
             <span className="inline-flex items-center gap-1">
-              {" "}· <Shield size={13} /> {t("protected")}
+              {" "}· <Shield size={14} /> {t("protected")}
             </span>
           )}
           {blocked && <> · 🚫 {t("Blocked")}</>}
@@ -345,31 +345,23 @@ export function DetailPanel({ grouping, group, aiEnabled, protectedNow,
                 ended up stranded alone on a 2nd line, flush right with a
                 big empty gap to its left. */}
             <div className="flex flex-wrap items-center gap-2">
-              <button
-                className={`shrink-0 rounded-full border px-3 py-1.5 text-xs
-                  whitespace-nowrap ${vFilter === "all"
-                    ? "border-accent bg-accent text-white"
-                    : "border-line bg-panel2 text-muted hover:bg-chip hover:text-body"}`}
+              <Chip className="shrink-0" on={vFilter === "all"}
                 onClick={() => { setVFilter("all"); setSel(new Set()); }}>
                 {t("filter.all")} ({mails ? mails.length : group.count})
-              </button>
+              </Chip>
               {RATING_FILTERS.filter((f) =>
                 vCounts[f.key as keyof typeof vCounts] > 0).map((f) => (
-                <button key={f.key}
-                  className={`shrink-0 rounded-full border px-3 py-1.5 text-xs
-                    whitespace-nowrap ${vFilter === f.key
-                      ? "border-accent bg-accent text-white"
-                      : "border-line bg-panel2 text-muted hover:bg-chip hover:text-body"}`}
+                <Chip key={f.key} className="shrink-0" on={vFilter === f.key}
                   onClick={() => { setVFilter(f.key); setSel(new Set()); }}>
                   {f.label} ({vCounts[f.key as keyof typeof vCounts]})
-                </button>
+                </Chip>
               ))}
               {/* Not in the header's sub line: that one is truncated to a
                   few words on a phone, which hid the count entirely. */}
               {pinnedCount > 0 && (
-                <span className="inline-flex items-center gap-1 text-xs
+                <span className="inline-flex items-center gap-1 type-meta
                   text-muted" title={t("pin.badge_tip", { n: pinnedCount })}>
-                  <Pin size={13} /> {t("pin.n_protected", { n: pinnedCount })}
+                  <Pin size={14} /> {t("pin.n_protected", { n: pinnedCount })}
                 </span>
               )}
             </div>
@@ -393,7 +385,7 @@ export function DetailPanel({ grouping, group, aiEnabled, protectedNow,
               </Select>
               {group.unsub && (
                 unsubscribedNow?.status === "done" ? (
-                  <span className="rounded bg-chip px-2 py-1 text-xs
+                  <span className="rounded-badge bg-chip px-2 py-1 type-meta
                     text-chiptext">
                     ✓ {t("Unsubscribed")}
                   </span>
@@ -415,7 +407,7 @@ export function DetailPanel({ grouping, group, aiEnabled, protectedNow,
                   </Button>
                 )
               )}
-              <Menu label={t("menu.more")} trigger={<MoreHorizontal size={17} />}>
+              <Menu label={t("menu.more")} trigger={<MoreHorizontal size={18} />}>
                 {/* AI rate mails only lives here while nothing is selected
                     (rate the whole group - secondary/occasional, like the
                     overview's own overflow entry). Once something IS
@@ -431,26 +423,26 @@ export function DetailPanel({ grouping, group, aiEnabled, protectedNow,
                 )}
                 {aiEnabled && !busy && sel.size === 0 && (
                   <MenuItem onClick={aiSelect}>
-                    <Wand2 size={15} className="mr-1 inline align-text-bottom" />
+                    <Wand2 size={16} className="mr-1 inline align-text-bottom" />
                     {t("ai.rate")}
                   </MenuItem>
                 )}
                 {grouping === "thread" && mails && mails.length > 0 && (
                   <MenuItem onClick={() => setReading(mails[0])}>
-                    <MessagesSquare size={15}
+                    <MessagesSquare size={16}
                       className="mr-1 inline align-text-bottom" />
                     {t("thread.read")}
                   </MenuItem>
                 )}
                 {mails && mails.length > 0 && pinnedCount < mails.length && (
                   <MenuItem onClick={() => pinAll(true)}>
-                    <Pin size={15} className="mr-1 inline align-text-bottom" />
+                    <Pin size={16} className="mr-1 inline align-text-bottom" />
                     {t("pin.group_on")}
                   </MenuItem>
                 )}
                 {pinnedCount > 0 && (
                   <MenuItem onClick={() => pinAll(false)}>
-                    <PinOff size={15}
+                    <PinOff size={16}
                       className="mr-1 inline align-text-bottom" />
                     {t("pin.group_off")}
                   </MenuItem>
@@ -462,14 +454,14 @@ export function DetailPanel({ grouping, group, aiEnabled, protectedNow,
                 )}
               </Menu>
               {note && (
-                <div className="w-full text-xs text-muted">{note}</div>
+                <div className="w-full type-meta text-muted">{note}</div>
               )}
             </div>
 
             {sieve && sieveOpen && (grouping === "sender" || grouping === "domain") && (
-              <div className="rounded-md border border-line bg-panel2 p-3">
+              <div className="rounded-card border border-line bg-panel2 p-3">
                 <div className="mb-2 flex flex-wrap items-center gap-2">
-                  <span className="text-xs text-muted">{t("sieve.intro")}</span>
+                  <span className="type-meta text-muted">{t("sieve.intro")}</span>
                   <Select value={sieveAction}
                     onChange={(e) =>
                       setSieveAction(e.target.value as SieveAction)}>
@@ -487,14 +479,14 @@ export function DetailPanel({ grouping, group, aiEnabled, protectedNow,
                       grouping, group.key, sieveAction, sieveFolder));
                     setNote(t("sieve.copied"));
                   }}>{t("Copy")}</Button>
-                  <a className="text-xs text-accent underline"
+                  <a className={`type-meta text-accent ${LINK}`}
                     href="https://account.proton.me/mail/filters"
                     target="_blank" rel="noopener">
                     {t("sieve.open_proton")}
                   </a>
                 </div>
-                <pre className="overflow-x-auto rounded bg-surface p-2
-                  text-xs leading-relaxed">
+                <pre className="overflow-x-auto rounded-control bg-surface p-2
+                  type-meta leading-relaxed">
                   {sieveSnippet(grouping, group.key, sieveAction, sieveFolder)}
                 </pre>
               </div>
@@ -502,7 +494,7 @@ export function DetailPanel({ grouping, group, aiEnabled, protectedNow,
           </div>
 
           <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-2">
-            {error && <div className="p-4 text-sm text-rose-400">{error}</div>}
+            {error && <div className="p-4 type-body text-danger-fg">{error}</div>}
             {!shown && !error && <Loading />}
             {shown && (
               <MailRows mails={shown} sel={sel} onToggle={toggle}
@@ -519,9 +511,9 @@ export function DetailPanel({ grouping, group, aiEnabled, protectedNow,
             <div className="border-t border-line bg-panel2 px-4 py-2"
               style={{ paddingBottom:
                 "calc(env(safe-area-inset-bottom) + 0.5rem)" }}>
-              <div className="mb-2 flex items-center gap-2 text-xs text-muted">
+              <div className="mb-2 flex items-center gap-2 type-meta text-muted">
                 <span>{t("detail.n_selected", { n: sel.size })}</span>
-                <button className="underline hover:text-body"
+                <button className={LINK}
                   onClick={() => setSel(new Set())}>
                   {t("Clear selection")}
                 </button>
@@ -552,9 +544,9 @@ export function DetailPanel({ grouping, group, aiEnabled, protectedNow,
                       <option value="" disabled>{t("Move to folder…")}</option>
                       {folders.map((f) => <option key={f} value={f}>{f}</option>)}
                     </Select>
-                    <Button variant="secondary" className="!px-2 shrink-0"
-                      title={t("Cancel")} onClick={() => setMoveDest("")}>
-                      <X size={15} />
+                    <Button variant="secondary" size="icon" label={t("Cancel")}
+                      className="shrink-0" onClick={() => setMoveDest("")}>
+                      <X size={18} />
                     </Button>
                   </>
                 )}
