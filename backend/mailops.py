@@ -556,6 +556,19 @@ def decode_mime(raw) -> str:
         return str(raw).strip()
 
 
+def header_text(value) -> str:
+    """A header value as text. The email package hands back an
+    email.header.Header OBJECT instead of a str for headers that carry raw
+    8-bit bytes ("From: Müller <..>", "Message-ID: <grüße@..>" sent without
+    RFC 2047 encoding - common with old or misconfigured mailers): .strip(),
+    slicing and .lower() then raise, and parseaddr() quietly returns
+    nothing. Those values are decoded as UTF-8; plain str values pass
+    through untouched (RFC 2047 words stay for decode_mime to handle)."""
+    if value is None:
+        return ""
+    return value if isinstance(value, str) else decode_mime(value)
+
+
 _UID_RE = re.compile(rb"UID (\d+)")
 _SIZE_RE = re.compile(rb"RFC822\.SIZE (\d+)")
 _FLAGS_RE = re.compile(rb"FLAGS \(([^)]*)\)")
@@ -589,20 +602,21 @@ def _fetch_full_chunk(conn, folder: str, chunk: list[bytes],
             if tt:
                 ts = int(time.mktime(tt))
             msg = email.message_from_bytes(item[1])
-            name, addr = parseaddr(msg.get("From", ""))
+            name, addr = parseaddr(header_text(msg.get("From")))
             addr = addr.strip().lower() or "(unparseable sender)"
             messages.append({
                 "uid": int(m.group(1)), "folder": folder, "addr": addr,
                 "name": decode_mime(name) if name else "",
                 "subject": decode_mime(msg.get("Subject", ""))[:150],
-                "bulk": bool(msg.get("List-Unsubscribe")),
-                "unsub": (msg.get("List-Unsubscribe") or "")[:1000],
+                "bulk": bool(header_text(msg.get("List-Unsubscribe"))),
+                "unsub": header_text(msg.get("List-Unsubscribe"))[:1000],
                 "unsub_post": "one-click" in
-                              (msg.get("List-Unsubscribe-Post")
-                               or "").lower(),
-                "msgid": (msg.get("Message-ID") or "").strip()[:300],
-                "irt": header_ids(msg.get("In-Reply-To"))[:1],
-                "refs": capped_refs(header_ids(msg.get("References"))),
+                              header_text(msg.get("List-Unsubscribe-Post")
+                                          ).lower(),
+                "msgid": header_text(msg.get("Message-ID")).strip()[:300],
+                "irt": header_ids(header_text(msg.get("In-Reply-To")))[:1],
+                "refs": capped_refs(header_ids(
+                    header_text(msg.get("References")))),
                 "size": int(sm.group(1)) if sm else 0,
                 "seen": bool(fm and b"\\Seen" in fm.group(1)),
                 "ts": ts,
@@ -741,7 +755,8 @@ def scan_sent_recipients(conn, progress_cb=None,
             try:
                 msg = email.message_from_bytes(item[1])
                 for _, addr in getaddresses(
-                        msg.get_all("To", []) + msg.get_all("Cc", [])):
+                        [header_text(h) for h in
+                         msg.get_all("To", []) + msg.get_all("Cc", [])]):
                     addr = addr.strip().lower()
                     if addr and "@" in addr:
                         out.add(addr)
@@ -2702,7 +2717,7 @@ def _message_detail(msg) -> dict:
     return {
         "from": decode_mime(msg.get("From", "")),
         "to": decode_mime(msg.get("To", "")),
-        "date": msg.get("Date", ""),
+        "date": header_text(msg.get("Date", "")),
         "subject": decode_mime(msg.get("Subject", "")),
         "text": extract_text(msg),
     }
