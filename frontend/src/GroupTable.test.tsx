@@ -284,6 +284,25 @@ describe("engagement indicator", () => {
     expect(onOpen).not.toHaveBeenCalled();
   });
 
+  it("a tap on the card's checkbox gutter toggles selection without opening the detail", () => {
+    const onOpen = vi.fn();
+    const onToggle = vi.fn();
+    const { container } = renderTable({ groups: [mk(1)], onOpen, onToggle });
+    const card = container.querySelector(".md\\:hidden [data-gidx]")!;
+    const gutter = card.querySelector("label")!;
+    expect(gutter.className).toContain("w-11");
+    expect(gutter.className).toContain("self-stretch");
+    // The open-detail area is a sibling of the gutter, never an ancestor.
+    expect(gutter.nextElementSibling!.contains(gutter)).toBe(false);
+    fireEvent.click(gutter.querySelector("input")!);
+    expect(onToggle).toHaveBeenCalledWith(mk(1).key);
+    expect(onOpen).not.toHaveBeenCalled();
+    fireEvent.click(gutter);
+    expect(onOpen).not.toHaveBeenCalled();
+    fireEvent.click(gutter.nextElementSibling!);
+    expect(onOpen).toHaveBeenCalledTimes(1);
+  });
+
   it("the popover flips to the right edge when it would overflow", () => {
     const rect = vi.spyOn(Element.prototype, "getBoundingClientRect");
     rect.mockReturnValue({ left: 300, right: window.innerWidth + 40,

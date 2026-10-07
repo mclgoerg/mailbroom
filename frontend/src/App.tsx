@@ -21,10 +21,10 @@ import { SettingsModal } from "./components/SettingsModal";
 import { StatsPanel } from "./components/StatsPanel";
 import { QueryBuilder } from "./components/QueryBuilder";
 import { TrashPanel } from "./components/TrashPanel";
-import { AccountAvatar, applyTheme, Button, Chip, ChipGroup, ChipSegment,
+import { AccountAvatar, applyTheme, BAR_ICON_BTN, BulkBar, Button, Chip, ChipGroup, ChipSegment,
   currentTheme, EmptyState, ensureAiAck, FILTER_ROW, Input, isModalOpen, LINK,
   LINK_ACCENT, Menu, MenuDivider, MenuHeading, MenuItem, Notice, ProgressBar,
-  Segmented, Select, Spinner, useBulkBarHeight, useToast,
+  Segmented, Select, Spinner, useToast,
   type ToastVariant } from "./components/ui";
 import { t } from "./i18n";
 import { applyStatus, fmtAgo, fmtSize, fmtUsd, matchGroup, parseFilter,
@@ -362,9 +362,6 @@ export default function App() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state]);
-
-  const bulkBar = useRef<HTMLDivElement>(null);
-  useBulkBarHeight(bulkBar, selected.size > 0);
 
   /* Update check: installed PWAs have no service worker here, so an
      already-open tab can only learn a new build is live by asking the
@@ -904,8 +901,8 @@ export default function App() {
   }
 
   return (
-    <div className={`mx-auto max-w-6xl p-3 sm:p-5
-      ${selected.size > 0 ? "pb-28 sm:pb-20" : ""}`}>
+    <div className="mx-auto max-w-6xl p-3 pb-[calc(var(--bulkbar-h,0px)+0.75rem)]
+      sm:p-5 sm:pb-[calc(var(--bulkbar-h,0px)+1.25rem)]">
       <header className="mb-2 flex items-center gap-3 md:mb-4">
         <h1 className="type-title">
           Mailbroom
@@ -1235,101 +1232,99 @@ export default function App() {
 
       {/* Contextual bulk-action bar: the ONLY bulk-action chrome in the
           app - it does not exist at all until something is selected.
-          Three clearly separate rows: (1) what's selected, (2) the
+          Slots (see BulkBar): what's selected + Clear + Export, the
           retention limit - a modifier that applies to WHICHEVER action
-          runs below, labelled instead of relying on a hover-only title
-          (useless on touch), (3) the actions themselves. */}
+          runs - labelled instead of relying on a hover-only title (useless
+          on touch), then the action select and the Trash button. */}
       {selected.size > 0 && (
-        <div ref={bulkBar} className="fixed inset-x-0 bottom-0 z-(--z-bulkbar) border-t border-line
-          bg-panel px-3 py-2 shadow-bar"
-          style={{ paddingBottom: "calc(env(safe-area-inset-bottom) + 0.5rem)" }}>
-          <div className="mx-auto flex max-w-6xl flex-col gap-2">
-            <div className="flex items-center gap-2 type-meta text-muted">
-              <span>
-                {selCountPending
-                  ? <>{selected.size} {t("groups")} <Spinner /></>
-                  : t("bar.selected", { n: selected.size, mails: selCount })}
-                {selAllPinned && (
-                  <span className="text-accent"> · {t("bar.all_pinned")}</span>
-                )}
+        <BulkBar
+          summary={<>
+            {selCountPending
+              ? <>{selected.size} {t("groups")} <Spinner /></>
+              : t("bar.selected", { n: selected.size, mails: selCount })}
+            {selAllPinned && (
+              <span className="text-accent"> · {t("bar.all_pinned")}</span>
+            )}
+          </>}
+          onClear={() => setSelected(new Set())}
+          secondary={
+            <Button variant="quiet" size="sm"
+              className={BAR_ICON_BTN}
+              title={t("export.csv_tip")}
+              onClick={() => downloadFile(api.exportUrl(mode, [...selected]))}>
+              <Download size={16} aria-hidden />
+              <span className="sr-only md:not-sr-only md:ml-1.5">
+                {t("bar.export")}
               </span>
-              <button className={LINK}
-                onClick={() => setSelected(new Set())}>
-                {t("Clear selection")}
-              </button>
-              <button
-                onClick={() => downloadFile(api.exportUrl(mode, [...selected]))}
-                title={t("export.csv_tip")}
-                className="ml-auto flex items-center gap-1 hover:text-body">
-                <Download size={14} /> {t("export.csv")}
-              </button>
-            </div>
-            <div className="flex flex-wrap items-center gap-2 type-meta
-              text-muted">
-              <span className="shrink-0">{t("bar.limit_to")}</span>
-              <Select value={retention} title={t("retention.help")}
-                className="min-w-0 flex-1"
-                onChange={(e) =>
-                  setRetention(e.target.value as typeof retention)}>
-                <option value="none">{t("retention.none")}</option>
-                <option value="keep_latest">{t("retention.keep_latest")}</option>
-                <option value="older_than_days">
-                  {t("retention.older_than_days")}
-                </option>
-              </Select>
-              {retention !== "none" && (
-                <Input type="number" min={1} className="w-16 shrink-0"
-                  placeholder={t("retention.n_placeholder")}
-                  value={retentionN}
-                  onChange={(e) => setRetentionN(e.target.value)} />
+            </Button>
+          }
+          modifiers={<>
+            <span className="shrink-0">{t("bar.limit_to")}</span>
+            <Select value={retention} title={t("retention.help")}
+              className="min-w-0 flex-1 md:w-44 xl:w-56 md:flex-none"
+              onChange={(e) =>
+                setRetention(e.target.value as typeof retention)}>
+              <option value="none">{t("retention.none")}</option>
+              <option value="keep_latest">{t("retention.keep_latest")}</option>
+              <option value="older_than_days">
+                {t("retention.older_than_days")}
+              </option>
+            </Select>
+            {retention !== "none" && (
+              <Input type="number" min={1} className="w-16 shrink-0"
+                placeholder={t("retention.n_placeholder")}
+                value={retentionN}
+                onChange={(e) => setRetentionN(e.target.value)} />
+            )}
+          </>}
+          action={<>
+            <Select value=""
+              className="min-w-36 flex-1 md:w-44 xl:w-56 md:min-w-0 md:flex-none"
+              onChange={(e) => onAction(e.target.value)}>
+              <option value="" disabled>{t("Action…")}</option>
+              <option value="archive">{t("Archive")}</option>
+              <option value="move">{t("Move to folder…")}</option>
+              <option value="mark_read">{t("Mark read")}</option>
+              <option value="unsubscribe">{t("Unsubscribe")}</option>
+              {aiEnabled && (
+                <option value="ai_review">{t("AI review")}</option>
               )}
-            </div>
-            <div className="flex flex-wrap items-center gap-2">
-              <Select value="" className="min-w-0 flex-1"
-                onChange={(e) => onAction(e.target.value)}>
-                <option value="" disabled>{t("Action…")}</option>
-                <option value="archive">{t("Archive")}</option>
-                <option value="move">{t("Move to folder…")}</option>
-                <option value="mark_read">{t("Mark read")}</option>
-                <option value="unsubscribe">{t("Unsubscribe")}</option>
-                {aiEnabled && (
-                  <option value="ai_review">{t("AI review")}</option>
-                )}
-              </Select>
-              {moveDest === "?" && (
-                <>
-                  <Select value="" className="min-w-0 flex-1"
-                    onChange={(e) => {
-                      if (e.target.value) act([...selected], "move",
-                        e.target.value, ...retentionParams());
-                      setMoveDest("");
-                    }}>
-                    <option value="" disabled>{t("Move to folder…")}</option>
-                    {(state?.folders_raw ?? []).map((f, i) => (
-                      <option key={f} value={f}>
-                        {state?.folders[i] ?? f}
-                      </option>
-                    ))}
-                  </Select>
-                  <Button variant="secondary" size="icon" label={t("Cancel")}
-                    className="shrink-0" onClick={() => setMoveDest("")}>
-                    <X size={18} />
-                  </Button>
-                </>
-              )}
-              <Button variant="danger"
-                disabled={selCountPending || selAllPinned}
-                title={selAllPinned ? t("bar.all_pinned") : undefined}
-                className="ml-auto shrink-0"
-                onClick={() =>
-                  act([...selected], "trash", "", ...retentionParams())}>
-                {selCountPending
-                  ? <>{t("Trash")} <Spinner /></>
-                  : `${t("Trash")} ${selCount}`}
-              </Button>
-            </div>
-          </div>
-        </div>
+            </Select>
+            {moveDest === "?" && (
+              <>
+                <Select value=""
+                  className="min-w-36 flex-1 md:w-44 xl:w-56 md:min-w-0 md:flex-none"
+                  onChange={(e) => {
+                    if (e.target.value) act([...selected], "move",
+                      e.target.value, ...retentionParams());
+                    setMoveDest("");
+                  }}>
+                  <option value="" disabled>{t("Move to folder…")}</option>
+                  {(state?.folders_raw ?? []).map((f, i) => (
+                    <option key={f} value={f}>
+                      {state?.folders[i] ?? f}
+                    </option>
+                  ))}
+                </Select>
+                <Button variant="secondary" size="icon" label={t("Cancel")}
+                  className="shrink-0" onClick={() => setMoveDest("")}>
+                  <X size={18} />
+                </Button>
+              </>
+            )}
+          </>}
+          primary={
+            <Button variant="danger"
+              disabled={selCountPending || selAllPinned}
+              title={selAllPinned ? t("bar.all_pinned") : undefined}
+              className="whitespace-nowrap"
+              onClick={() =>
+                act([...selected], "trash", "", ...retentionParams())}>
+              {selCountPending
+                ? <>{t("Trash")} <Spinner /></>
+                : `${t("Trash")} ${selCount}`}
+            </Button>
+          } />
       )}
 
       {/* 2 px strip overlaid on the gap under the toolbar while a job runs

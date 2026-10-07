@@ -178,6 +178,7 @@ function DesktopTable({ slice, baseIdx, selected, focusedKey, onToggle,
               ${g.key === focusedKey ? "bg-panel outline outline-1 -outline-offset-1 outline-accent/60" : ""}`}>
             <td className="px-2 py-2 align-top" data-no-open>
               <Checkbox checked={selected.has(g.key)} className="-mx-2 -my-1"
+                aria-label={t("Select {label}", { label: g.label || g.key })}
                 onChange={() => onToggle(g.key)} />
             </td>
             <td className="py-2 pl-0 pr-2 align-top">
@@ -267,12 +268,16 @@ function MobileCards({ slice, baseIdx, selected, focusedKey, onToggle,
     <div>
       {slice.map((g, i) => (
         <div key={g.key} data-gidx={baseIdx + i}
-          className={`flex items-center gap-3 border-b border-line px-1
-            py-2.5 ${g.key === focusedKey ? "bg-panel" : ""}`}>
-          <Checkbox checked={selected.has(g.key)} className="-ml-2 -mr-1 coarse:-ml-3 coarse:-mr-4"
+          className={`flex items-stretch border-b border-line
+            ${g.key === focusedKey ? "bg-panel" : ""}`}>
+          {/* The whole left gutter (44 px, full card height) is the
+              checkbox's hit area; it never overlaps the open-detail area. */}
+          <Checkbox checked={selected.has(g.key)}
+            className="w-11 shrink-0 self-stretch coarse:min-h-0"
+            aria-label={t("Select {label}", { label: g.label || g.key })}
             onChange={() => onToggle(g.key)} />
           <div className="flex min-w-0 flex-1 cursor-pointer items-center
-            gap-3" onClick={() => onOpen(g)}>
+            gap-3 py-2.5 pr-1" onClick={() => onOpen(g)}>
             <Avatar name={g.label || g.key} size="md" />
             <div className="min-w-0 flex-1">
               <div className="truncate type-body-mobile">{g.label}</div>

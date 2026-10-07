@@ -932,6 +932,61 @@ export function useBulkBarHeight(ref: RefObject<HTMLElement | null>,
   }, [ref, active]);
 }
 
+/** Shared by the bar's Clear and `secondary` buttons: icon-only below md
+ *  (>= 44 px wide on touch), icon + text from md. */
+export const BAR_ICON_BTN = `inline-flex shrink-0 items-center justify-center
+  max-md:min-w-10 max-md:px-0 coarse:max-md:min-w-11`;
+
+/** The fixed bottom selection bar, shared by the group list and All mails.
+ *  Phone (< md): summary + Clear + `secondary` / `modifiers` / `action` +
+ *  `primary` on three compact rows. >= md: one row (wrapping to two at
+ *  768-1023), inside the same `max-w-6xl` + page padding as the content.
+ *  Publishes its height as `--bulkbar-h` (page padding, toasts). Mount it
+ *  only while something is selected. */
+export function BulkBar({ summary, onClear, secondary, modifiers, action,
+  primary }: {
+  summary: ReactNode; onClear: () => void; secondary?: ReactNode;
+  modifiers?: ReactNode; action: ReactNode; primary: ReactNode;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+  useBulkBarHeight(ref, true);
+  return (
+    <div ref={ref} role="region" aria-label={t("bar.label")}
+      className="fixed inset-x-0 bottom-0 z-(--z-bulkbar) border-t border-line
+        bg-panel pt-1.5 shadow-bar"
+      style={{ paddingBottom:
+        "calc(env(safe-area-inset-bottom) + 0.375rem)" }}>
+      <div className="mx-auto flex max-w-6xl flex-col gap-1.5 px-3 sm:px-5
+        md:flex-row md:flex-wrap md:items-center md:gap-x-2">
+        <div className="flex items-center gap-2 md:contents">
+          <span className="min-w-0 flex-1 truncate type-meta text-muted
+            md:flex-none md:whitespace-nowrap">{summary}</span>
+          {/* One button: icon-only on a phone, icon + text from md. */}
+          <Button variant="quiet" size="sm" onClick={onClear}
+            className={BAR_ICON_BTN}>
+            <X size={16} aria-hidden />
+            <span className="sr-only md:not-sr-only md:ml-1.5">
+              {t("bar.clear")}
+            </span>
+          </Button>
+          {secondary}
+        </div>
+        {modifiers && (
+          <div className="flex items-center gap-2 type-meta text-muted
+            md:ml-auto">{modifiers}</div>
+        )}
+        {/* A real group from md, so Action + Trash wrap together. */}
+        <div className="flex flex-wrap items-center gap-1.5 md:flex-nowrap
+          md:gap-2 md:ml-auto">
+          <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5
+            md:flex-none md:flex-nowrap md:gap-2">{action}</div>
+          <div className="shrink-0">{primary}</div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /** Mount once at the app root; `useToast()` anywhere below. Toasts stack
  *  bottom-centre above the bulk bar (`--bulkbar-h`) and the safe area, and
  *  above modals; they never take focus. */
@@ -1186,13 +1241,13 @@ export function MailRow({ checked = false, onToggle, unread = false, subject,
   return (
     <div data-pinned={pinned ? "true" : undefined}
       data-selected={selected ? "true" : undefined}
-      className={`flex items-start gap-1 border-b border-l-2 border-b-line/60
+      className={`flex items-stretch gap-1 border-b border-l-2 border-b-line/60
         px-3 py-3 md:px-2 md:py-2.5 ${selected
           ? "border-l-accent bg-panel2"
           : pinned ? "border-l-accent bg-panel" : "border-l-transparent"}`}>
       {onToggle && (
         <Checkbox checked={checked} onChange={onToggle}
-          className="-my-1.5 coarse:-mt-2.5 coarse:-mb-0.5"
+          className="-my-3 self-stretch md:-my-2.5"
           aria-label={selectLabel ?? t("Select mail")} />
       )}
       {onOpen ? (
