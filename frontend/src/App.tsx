@@ -804,8 +804,11 @@ export default function App() {
       // panel flags don't know about.
       if (anyModal || isModalOpen()
           || ["INPUT", "SELECT", "TEXTAREA"].includes(el.tagName)
-          // Menus and tablists own the arrow / Enter keys while focused.
-          || el.closest?.('[role="menu"], [role="tablist"]')) return;
+          // Menus and tablists own their navigation keys while focused
+          // (but not j/k etc., e.g. after a mouse click left focus on a tab).
+          || (el.closest?.('[role="menu"], [role="tablist"]')
+            && ["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "Home",
+              "End", "Enter", " "].includes(e.key))) return;
       if (e.key === "/") {
         e.preventDefault();
         filterRef.current?.focus();

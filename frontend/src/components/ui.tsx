@@ -452,7 +452,9 @@ export function Menu({ trigger, label, variant, icon, children }: {
       if (!ref.current?.contains(e.target as Node)) setOpen(false);
     };
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") close();
+      // Stop it here (document, before window): a Modal around the menu
+      // must not also close on the same Esc.
+      if (e.key === "Escape") { e.stopPropagation(); close(); }
     };
     document.addEventListener("mousedown", onDoc);
     document.addEventListener("keydown", onKey);

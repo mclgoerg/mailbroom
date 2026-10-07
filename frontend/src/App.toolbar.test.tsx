@@ -199,3 +199,16 @@ test("Enter on a focused grouping tab doesn't trigger the list's Enter-opens-" +
     { key: "Enter" });
   expect(screen.queryByRole("dialog")).toBeNull();
 });
+
+test("after clicking a grouping tab, j still moves the row focus", async () => {
+  await open();
+  Element.prototype.scrollIntoView = () => {};              // jsdom lacks it
+  const tab = screen.getByRole("tab", { name: "Sender" });
+  fireEvent.click(tab);
+  tab.focus();
+  fireEvent.keyDown(tab, { key: "j" });
+  await waitFor(() => expect(document.querySelector('[data-gidx="0"]'))
+    .toBeTruthy());
+  expect(document.querySelector('[data-gidx="0"]')?.className)
+    .toMatch(/outline-accent|bg-panel/);
+});

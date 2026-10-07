@@ -708,3 +708,19 @@ test("Menu: roles, focus on open, arrow keys, Esc / Tab return focus", () => {
   fireEvent.click(screen.getByRole("menuitem", { name: "One" }));
   expect(document.activeElement).toBe(trigger);
 });
+
+test("Esc in a Menu inside a Modal closes only the menu; then the Modal", () => {
+  const onClose = vi.fn();
+  render(<Modal onClose={onClose}>
+    <Menu label="More" trigger={<>⋯</>}><MenuItem>One</MenuItem></Menu>
+  </Modal>);
+  const trigger = screen.getByLabelText("More");
+  fireEvent.click(trigger);
+  fireEvent.keyDown(screen.getByRole("menuitem", { name: "One" }),
+    { key: "Escape" });
+  expect(screen.queryByRole("menu")).toBeNull();
+  expect(onClose).not.toHaveBeenCalled();
+  expect(document.activeElement).toBe(trigger);
+  fireEvent.keyDown(trigger, { key: "Escape" });         // no menu open now
+  expect(onClose).toHaveBeenCalledOnce();
+});
