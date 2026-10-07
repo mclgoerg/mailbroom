@@ -99,7 +99,11 @@ test("a running job shows progress and can be cancelled", async () => {
     job: { status: "running", progress: "40/120", error: "", done: 40,
       total: 120 } }));
   renderPanel();
-  await screen.findByText(/Indexing… 40\/120/);
+  await screen.findByText(/Indexing… 40\/120 \(33%\)/);
+  const bar = screen.getByRole("progressbar");
+  expect(bar.getAttribute("aria-valuenow")).toBe("40");
+  expect(bar.getAttribute("aria-valuemax")).toBe("120");
+  expect((bar.firstElementChild as HTMLElement).style.width).toBe("33%");
   expect(screen.queryByText("Build index")).toBeNull();
   fireEvent.click(screen.getByText("cancel"));
   await waitFor(() => expect(indexCancel).toHaveBeenCalledWith("proton"));
@@ -117,4 +121,15 @@ test("API errors are shown", async () => {
   renderPanel();
   fireEvent.click(await screen.findByText("Build index"));
   await screen.findByText("busy");
+});
+
+test("before the total is known the bar is empty, not NaN", async () => {
+  indexInfo.mockResolvedValue(info({ exists: true,
+    job: { status: "running", progress: "connecting…", error: "", done: 0,
+      total: 0 } }));
+  renderPanel();
+  await screen.findByText(/Indexing… connecting…/);
+  const bar = screen.getByRole("progressbar");
+  expect(bar.hasAttribute("aria-valuenow")).toBe(false);
+  expect((bar.firstElementChild as HTMLElement).style.width).toBe("0%");
 });

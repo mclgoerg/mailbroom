@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "../api";
 import { t } from "../i18n";
 import type { BodySearchMode, IndexInfo } from "../types";
-import { Button, Spinner } from "./ui";
+import { Button, ProgressBar, Spinner } from "./ui";
 
 /** Settings -> mail-text search = "local index": status of the account's
  *  keyed word index plus build / update / rebuild / cancel / delete. The
@@ -64,9 +64,21 @@ export function IndexPanel({ account, savedMode, secretKeySet }: {
     ? new Date(info.built_ts * 1000).toLocaleString() : "";
   return (
     <div className="mt-2 flex flex-col gap-2">
+      {running && (
+        <div className="flex flex-col gap-1">
+          <ProgressBar value={info.job.done} max={info.job.total}
+            label={t("index.building")} />
+          <div className="text-xs text-muted">
+            <Spinner /> {t("index.building")} {info.job.progress}
+            {info.job.total > 0 && (
+              ` (${Math.round(100 * info.job.done / info.job.total)}%)`
+            )}
+          </div>
+        </div>
+      )}
       <div className="text-xs text-muted">
         {info.job.status === "running"
-          ? <><Spinner /> {t("index.building")} {info.job.progress}</>
+          ? null
           : info.usable
             ? t("index.status", { docs: info.docs,
                 size: `${(info.bytes / 1048576).toFixed(1)} MB`, ts: built })
