@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import { api, fmtSize, mailKey } from "../api";
 import type { Mail, MessageDetail } from "../types";
 import { t } from "../i18n";
-import { AiTag, Button, PinButton, Spinner } from "./ui";
+import { AiTag, Button, Checkbox, PinButton, Spinner } from "./ui";
 import { ThreadView } from "./ThreadView";
 
 const RENDER_CAP = 500;
@@ -32,25 +32,25 @@ export function MessageView({ mail, onBack }: {
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <div className="border-b border-line px-4 py-3 text-xs
+      <div className="border-b border-line px-4 py-3 type-meta
         whitespace-pre-wrap text-muted">
         {error || (detail
           ? `From: ${detail.from}\nDate: ${detail.date}\nSubject: ${detail.subject}`
           : <Spinner />)}
       </div>
       <pre className="min-h-0 flex-1 overflow-y-auto whitespace-pre-wrap
-        p-4 font-sans text-sm leading-relaxed">
+        p-4 font-sans type-body leading-relaxed">
         {detail?.text}
       </pre>
       <div className="flex flex-wrap items-center gap-2 border-t border-line
         px-4 py-2">
         <Button variant="secondary" onClick={onBack}>
-          <ArrowLeft size={15} className="mr-1 inline align-text-bottom" />
+          <ArrowLeft size={16} className="mr-1 inline align-text-bottom" />
           {t("back to list")}
         </Button>
         {detail?.thread && (
           <Button variant="secondary" onClick={() => setReading(true)}>
-            <MessagesSquare size={15}
+            <MessagesSquare size={16}
               className="mr-1 inline align-text-bottom" />
             {t("thread.read")}
           </Button>
@@ -96,13 +96,13 @@ export function MailRows({ mails, sel, onToggle, onOpen, onPin, detailed,
           <div key={mailKey(m)} data-pinned={m.pinned ? "true" : undefined}
             className={`flex gap-3 border-b border-line/60 px-1 py-2.5 ${
               m.pinned ? "border-l-2 border-l-accent bg-panel" : ""}`}>
-            <input type="checkbox" className="mt-1 shrink-0"
+            <Checkbox className="-my-1"
               checked={sel.has(mailKey(m))}
               onChange={() => onToggle(mailKey(m))} />
             <div className="min-w-0 flex-1">
               <button
                 className="flex w-full min-w-0 cursor-pointer items-center
-                  gap-1.5 text-left text-sm hover:underline"
+                  gap-1.5 text-left type-body hover:underline"
                 onClick={() => onOpen(m)}>
                 {!m.seen && (
                   <span title={t("unread")} className="inline-block size-2
@@ -113,7 +113,7 @@ export function MailRows({ mails, sel, onToggle, onOpen, onPin, detailed,
                 </span>
               </button>
               <div className="mt-0.5 flex min-w-0 items-center gap-1.5
-                text-xs text-faint">
+                type-meta text-muted">
                 <span className="min-w-0 truncate">
                   {meta.join(" · ")}
                 </span>
