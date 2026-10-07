@@ -146,7 +146,7 @@ function DesktopTable({ slice, baseIdx, selected, focusedKey, onToggle,
               onChange={(e) => onToggleAll(e.target.checked,
                 slice.map((g) => g.key))} />
           </th>
-          <th className={`${th} w-12`} />
+          <th className="w-10" />
           <th className={sortableTh} aria-sort={ariaSort("label")}>
             {sortBtn("label", groupLabel)}
           </th>
@@ -163,11 +163,11 @@ function DesktopTable({ slice, baseIdx, selected, focusedKey, onToggle,
             aria-sort={ariaSort("size")}>
             {sortBtn("size", t("Size"), undefined, true)}
           </th>
-          <th className={`${sortableTh} hidden w-26 text-right md:table-cell`}
+          <th className={`${sortableTh} hidden w-30 text-right md:table-cell`}
             aria-sort={ariaSort("last")}>
             {sortBtn("last", t("Last"), undefined, true)}
           </th>
-          <th className={`${th} w-12`} />
+          <th className="w-11" />
         </tr>
       </thead>
       <tbody>
@@ -180,7 +180,7 @@ function DesktopTable({ slice, baseIdx, selected, focusedKey, onToggle,
               <Checkbox checked={selected.has(g.key)} className="-mx-2 -my-1"
                 onChange={() => onToggle(g.key)} />
             </td>
-            <td className="px-2 py-2 align-top">
+            <td className="py-2 pl-0 pr-2 align-top">
               <Avatar name={g.label || g.key} size="md" />
             </td>
             <td className="min-w-0 px-2 py-2">
@@ -246,7 +246,7 @@ function DesktopTable({ slice, baseIdx, selected, focusedKey, onToggle,
               tabular-nums text-muted md:table-cell">
               <ShortDate iso={g.last} />
             </td>
-            <td className="px-2 py-2 text-right align-top">
+            <td className="px-1 py-2 text-right align-top">
               <Button variant="quiet" size="icon" label={t("View details")}
                 className="text-faint" onClick={() => onOpen(g)}>
                 <ChevronRight size={18} />
