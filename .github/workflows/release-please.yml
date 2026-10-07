@@ -39,3 +39,52 @@ jobs:
           # standing release PR would never show a green build/lint
           # check of its own. A real token sidesteps both.
           token: ${{ secrets.RELEASE_PLEASE_TOKEN }}
+
+  # release-please renders each changelog entry from the PR TITLE only. Right
+  # after it (re)writes the standing release PR, copy every listed PR's
+  # "## Release notes" section (see scripts/release_notes.py and
+  # CONTRIBUTING.md) under its entry - in the release PR's description (the
+  # text of the GitHub Release) and in CHANGELOG.md on the release branch.
+  # Idempotent, and a no-op when there is no open release PR.
+  release-notes:
+    needs: release-please
+    runs-on: ubuntu-latest
+    steps:
+      - name: Find the release PR
+        id: pr
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_PLEASE_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          n=$(gh pr list --state open --head release-please--branches--main \
+                --json number -q '.[0].number // empty')
+          echo "number=$n" >> "$GITHUB_OUTPUT"
+      - if: steps.pr.outputs.number != ''
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          path: main
+          persist-credentials: false
+      - if: steps.pr.outputs.number != ''
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: release-please--branches--main
+          path: release
+          # The PAT (not GITHUB_TOKEN) so the push re-runs the PR's checks.
+          token: ${{ secrets.RELEASE_PLEASE_TOKEN }}
+      - if: steps.pr.outputs.number != ''
+        name: Add the per-PR release notes
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_PLEASE_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          PR: ${{ steps.pr.outputs.number }}
+        run: |
+          script=main/scripts/release_notes.py
+          python3 "$script" enrich-pr "$PR"
+          python3 "$script" enrich-changelog release/CHANGELOG.md
+          cd release
+          if ! git diff --quiet; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git commit -am "docs: add per-PR release notes to the changelog"
+            git push
+          fi

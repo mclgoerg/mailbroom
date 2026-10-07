@@ -1,0 +1,29 @@
+name: Release Notes Check
+
+# release-please lists a PR in the changelog by its TITLE only; the
+# "## Release notes" section of the PR description is what
+# release-please.yml copies under that entry. Without it a feat/fix/perf
+# PR (or any breaking change) would show up as a bare one-liner.
+# Exempt: other types (chore, docs, ci, test, build, refactor) and PRs
+# labelled `skip-release-notes`. See CONTRIBUTING.md.
+on:
+  pull_request:
+    types: [opened, edited, reopened, synchronize, labeled, unlabeled]
+
+permissions:
+  contents: read
+
+jobs:
+  release-notes:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      # Title/body/labels go through env, never interpolated into the shell.
+      - name: Check for a release-notes section
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_BODY: ${{ github.event.pull_request.body }}
+          PR_LABELS: ${{ toJSON(github.event.pull_request.labels.*.name) }}
+        run: python3 scripts/release_notes.py check

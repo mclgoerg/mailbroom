@@ -2,6 +2,15 @@
 
 <!-- One or two sentences. The PR title becomes the squash-commit line. -->
 
+## Release notes
+
+<!-- feat / fix / perf PRs (and breaking changes): 1-4 plain-language lines
+     on what changes for the USER, plus anything to know when upgrading.
+     This text is copied under the PR's entry in the release PR, CHANGELOG.md
+     and the GitHub Release. Not user-facing? Use the `skip-release-notes`
+     label instead. One PR shipping several distinct changes? See
+     "Release notes" in CONTRIBUTING.md (BEGIN_COMMIT_OVERRIDE). -->
+
 ## Checklist
 
 - [ ] Tests added/updated (pytest for backend, vitest for frontend) and

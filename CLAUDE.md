@@ -17,5 +17,13 @@ followed exactly, not just as style:
   doesn't just read badly, it silently drops the change from the next
   release's notes.
 
+- **User-facing PRs need a `## Release notes` section** in the PR
+  description (`feat`/`fix`/`perf`/breaking; 1-4 plain-language lines on
+  what changes for the user, plus upgrade caveats) - release-please only
+  sees the title, and `release-please.yml` copies that section under the
+  PR's entry in the release PR / `CHANGELOG.md`. A CI check enforces it;
+  use the `skip-release-notes` label for the rare non-user-facing case.
+  Details in CONTRIBUTING.md.
+
 One topic per PR, CI green before merge, never push directly to
 `main`.
