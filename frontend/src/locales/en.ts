@@ -472,6 +472,17 @@ export const EN: Record<string, string> = {
     "Not applied to single mails: {list} (these filters only work on groups).",
   "mails.load_more": "Load {n} more",
   "mails.none": "No mails match this filter.",
+  "thread.title": "Conversation",
+  "thread.read": "Read conversation",
+  "thread.you": "You",
+  "thread.n_mails": "{n} mails",
+  "thread.expand_all": "Expand all",
+  "thread.collapse_all": "Collapse all",
+  "thread.show_quoted": "Show quoted text",
+  "thread.hide_quoted": "Hide quoted text",
+  "thread.note.sent_unavailable":
+    "Your own replies could not be loaded from the Sent folder - only the "
+    + "received mails are shown.",
   "no.matches": "No groups match this filter.",
   "onboard.title": "Welcome - three steps to a tidy mailbox",
   "onboard.step_bridge":

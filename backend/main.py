@@ -490,6 +490,20 @@ def get_message(folder: str = Query(...), uid: int = Query(...),
         raise HTTPException(500, f"{type(exc).__name__}: {exc}")
 
 
+@app.get("/api/thread")
+def get_thread(folder: str = Query(...), uid: int = Query(...),
+               account: str | None = Query(None)):
+    """The conversation a scanned mail belongs to, oldest first (including
+    the user's own replies found in Sent) - see mailops.thread_conversation."""
+    acc = _acc(account)
+    try:
+        return mailops.thread_conversation(folder, uid, acc)
+    except RuntimeError as exc:
+        raise HTTPException(404, str(exc))
+    except Exception as exc:
+        raise HTTPException(500, f"{type(exc).__name__}: {exc}")
+
+
 @app.post("/api/delete")
 def post_delete(body: DeleteBody, account: str | None = Query(None)):
     _check_grouping(body.grouping)

@@ -1,4 +1,5 @@
-import { MoreHorizontal, Pin, PinOff, Shield, Wand2, X } from "lucide-react";
+import { MessagesSquare, MoreHorizontal, Pin, PinOff, Shield, Wand2, X }
+  from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { api } from "../api";
 import { t } from "../i18n";
@@ -7,6 +8,7 @@ import { fmtSize, fmtUsd, mailKey, olderThan, sieveSnippet,
   type SieveAction } from "../lib";
 import type { AppState, Group, Grouping, GroupUnsub, Mail } from "../types";
 import { MailRows, MessageView } from "./MailList";
+import { ThreadView } from "./ThreadView";
 import { Button, ensureAiAck, Input, Loading, Menu, MenuItem, Modal,
   PanelHeader, ProtectButton, Select, Spinner } from "./ui";
 
@@ -48,6 +50,7 @@ export function DetailPanel({ grouping, group, aiEnabled, protectedNow,
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
   const [view, setView] = useState<Mail | null>(null);
+  const [reading, setReading] = useState<Mail | null>(null);
   const [sortBy, setSortBy] = useState<"date" | "size">("date");
   const [moveDest, setMoveDest] = useState("");
   const [vFilter, setVFilter] = useState("all");
@@ -329,7 +332,9 @@ export function DetailPanel({ grouping, group, aiEnabled, protectedNow,
         onClose={onClose}
       />
 
-      {view ? (
+      {reading ? (
+        <ThreadView mail={reading} onBack={() => setReading(null)} />
+      ) : view ? (
         <MessageView mail={view} onBack={() => setView(null)} />
       ) : (
         <>
@@ -428,6 +433,13 @@ export function DetailPanel({ grouping, group, aiEnabled, protectedNow,
                   <MenuItem onClick={aiSelect}>
                     <Wand2 size={15} className="mr-1 inline align-text-bottom" />
                     {t("ai.rate")}
+                  </MenuItem>
+                )}
+                {grouping === "thread" && mails && mails.length > 0 && (
+                  <MenuItem onClick={() => setReading(mails[0])}>
+                    <MessagesSquare size={15}
+                      className="mr-1 inline align-text-bottom" />
+                    {t("thread.read")}
                   </MenuItem>
                 )}
                 {mails && mails.length > 0 && pinnedCount < mails.length && (

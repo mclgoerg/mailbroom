@@ -94,7 +94,29 @@ def mails(frm: str, subjects: list[str], n: int, *, newest_days=1.0,
     return out
 
 
-PROTON_INBOX = (
+# One real conversation (Anna writes, the user replies from Sent, Anna answers
+# with a quoted history) so the "Read conversation" view has something to show.
+WANDER_1 = "<wander-1@demo.example>"
+WANDER_R1 = "<wander-r1@demo.example>"
+WANDER = [
+    make_msg(next(_UID), frm='"Anna Weber" <anna.weber@mailfox.example>',
+             subject="Wanderung am Samstag?", msgid=WANDER_1, size=2400,
+             seen=True, date=_date(5),
+             body="Hi!\n\nHast du am Samstag Zeit für eine Wanderung? Ich "
+                  "dachte an die Runde um den See, ca. 5 Stunden.\n\nLG Anna"),
+    make_msg(next(_UID), frm='"Anna Weber" <anna.weber@mailfox.example>',
+             subject="Re: Wanderung am Samstag?", msgid="<wander-2@demo.example>",
+             irt=WANDER_R1, refs=f"{WANDER_1} {WANDER_R1}", size=3100,
+             seen=False, date=_date(2),
+             body="Super, dann treffen wir uns um 9 Uhr am Parkplatz!\n\n"
+                  "Am Mittwoch, 1. Oktober 2026 um 18:30 schrieb Demo "
+                  "<demo@example.com>:\n> Klingt gut, ich bringe Brote mit.\n"
+                  "> Wann geht es los?\n>\n> Am Montag, 29. September 2026 "
+                  "um 09:12 schrieb Anna Weber <anna.weber@mailfox.example>:\n"
+                  ">> Hi! Hast du am Samstag Zeit für eine Wanderung?\n"),
+]
+
+PROTON_INBOX = WANDER + (
     mails('"ACME Store" <news@acme-store.example>',
           ["Weekend SALE - up to 70% off ✨", "Your points expire soon",
            "New arrivals for autumn", "Last chance: free shipping"],
@@ -144,9 +166,16 @@ PROTON_INBOX = (
 PROTON = FakeIMAP({
     "INBOX": PROTON_INBOX,
     "Sent": [make_msg(next(_UID), frm="Demo <demo@example.com>",
-                      subject="Re: Wanderung am Samstag?",
+                      subject="Re: Wanderung am Samstag?", msgid=WANDER_R1,
+                      irt=WANDER_1, refs=WANDER_1,
                       to="anna.weber@mailfox.example",
-                      cc="praxis@dr-meier.example", seen=True)],
+                      cc="praxis@dr-meier.example", seen=True,
+                      date=_date(4),
+                      body="Klingt gut, ich bringe Brote mit. Wann geht es "
+                           "los?\n\nAm Montag, 29. September 2026 um 09:12 "
+                           "schrieb Anna Weber <anna.weber@mailfox.example>:\n"
+                           "> Hi! Hast du am Samstag Zeit für eine "
+                           "Wanderung?")],
     "Trash": mails('"Old Newsletter" <bye@gone.example>',
                    ["We miss you!"], 34, unread=0.9),
     "Spam": [],

@@ -2653,6 +2653,7 @@ def fetch_message(folder: str, uid: int, acc=None) -> dict:
     # (trash_list populated acc.folder_roles); the literal stays as fallback.
     if ikey(folder, uid) not in acc.index \
             and folder != acc.folder_roles.get("trash") \
+            and folder != acc.folder_roles.get("sent") \
             and folder.lower() != "trash":
         raise RuntimeError("unknown message")
     conn = connect(cfgmod.account_imap(acc.name), acc.name)
@@ -2675,4 +2676,113 @@ def fetch_message(folder: str, uid: int, acc=None) -> dict:
         "date": msg.get("Date", ""),
         "subject": decode_mime(msg.get("Subject", "")),
         "text": extract_text(msg),
+        # Only set for scanned mails that belong to a conversation worth
+        # reading as one (UI: "Read conversation").
+        "thread": _thread_hint(acc, folder, uid),
     }
+
+
+# ----------------------------------------------------- conversation reading
+
+# Looking up the user's own replies (Sent is not scanned) is a live IMAP
+# query per request; same idea as the body search's time budget.
+THREAD_SENT_BUDGET_S = 15.0
+THREAD_SENT_MAX_IDS = 30
+
+
+def _thread_rec(acc, folder: str, uid: int) -> dict | None:
+    """The thread group record containing this mail (lock held)."""
+    for rec in acc.state["groups"].get("thread", {}).values():
+        if uid in rec["folders"].get(folder, ()):
+            return rec
+    return None
+
+
+def _thread_hint(acc, folder: str, uid: int) -> dict | None:
+    """{"count": N} when the mail is part of a multi-mail thread, or is a
+    reply whose parent is not scanned (the user's own mail in Sent), else
+    None - so the reader is only offered where it shows something."""
+    with acc.lock:
+        m = acc.index.get(ikey(folder, uid))
+        if m is None:
+            return None
+        rec = _thread_rec(acc, folder, uid)
+        if rec is None:
+            return None
+        if rec["count"] > 1 or m.get("irt"):
+            return {"count": rec["count"]}
+    return None
+
+
+def thread_conversation(folder: str, uid: int, acc=None,
+                        budget: float | None = None) -> dict:
+    """The conversation a scanned mail belongs to, oldest first, for the
+    reading view: the thread's scanned mails plus - when a Sent folder is
+    known - the user's own replies that those mails answer (found live by
+    Message-ID, since Sent is excluded from scans). Read-only; nothing is
+    stored. `notes` carries translatable caveats (Sent lookup failed or
+    ran out of time)."""
+    acc = acc or accounts.get()
+    budget = THREAD_SENT_BUDGET_S if budget is None else budget
+    with acc.lock:
+        rec = _thread_rec(acc, folder, uid)
+        if rec is None:
+            raise RuntimeError("unknown message")
+        key, label = rec["key"], rec["label"]
+        members = [acc.index[ikey(f, u)]
+                   for f, us in rec["folders"].items() for u in us
+                   if ikey(f, u) in acc.index]
+        own = {_own_id(m) for m in members}
+        wanted = sorted({i for m in members for i in (m.get("irt") or [])}
+                        - own)[:THREAD_SENT_MAX_IDS]
+        sent = acc.folder_roles.get("sent")
+    rows = group_mails("thread", key, acc=acc)
+    notes: list[dict] = []
+    if wanted and sent:
+        found: list[dict] = []
+        try:
+            found = _find_sent_replies(acc, sent, wanted, budget)
+        except Exception as exc:        # any IMAP/network failure
+            log.warning("[%s] conversation: Sent lookup failed: %s",
+                        acc.name, exc)
+            notes.append({"key": "sent_unavailable", "params": {}})
+        rows += [{"uid": m["uid"], "folder": sent, "date": m["date"],
+                  "ts": m["ts"], "subject": m["subject"], "addr": m["addr"],
+                  "size": m["size"], "seen": True, "ai": None,
+                  "pinned": False, "sent": True} for m in found]
+    rows.sort(key=lambda r: (r["ts"], r["folder"], r["uid"]))
+    return {"key": key, "label": label, "mails": rows, "notes": notes}
+
+
+def _find_sent_replies(acc, sent: str, msgids: list[str],
+                       budget: float) -> list[dict]:
+    """Records of the mails in `sent` whose Message-ID is in `msgids`."""
+    deadline = time.monotonic() + budget
+    conn = connect(cfgmod.account_imap(acc.name), acc.name)
+    try:
+        status, _ = conn.select(quote_folder(sent), readonly=True)
+        if status != "OK":
+            raise RuntimeError(f"cannot open {decode_mutf7(sent)!r}")
+        uids: list[bytes] = []
+        for msgid in msgids:
+            left = deadline - time.monotonic()
+            if left <= 0:
+                raise TimeoutError("budget exhausted")
+            _set_timeout(conn, left)
+            conn.literal = msgid.encode("utf-8")
+            try:
+                status, data = conn.uid("SEARCH", "HEADER", "Message-ID")
+            finally:
+                conn.literal = None
+            if status == "OK" and data and data[0]:
+                uids += data[0].split()
+        found: list[dict] = []
+        for start in range(0, len(uids), FETCH_CHUNK):
+            _fetch_full_chunk(conn, sent, uids[start:start + FETCH_CHUNK],
+                              found, acc)
+        return found
+    finally:
+        try:
+            conn.logout()
+        except Exception:
+            pass

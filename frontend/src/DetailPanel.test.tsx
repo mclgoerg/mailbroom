@@ -10,6 +10,7 @@ const deleteMessages = vi.fn().mockResolvedValue({});
 const aiGroup = vi.fn();
 const pin = vi.fn().mockResolvedValue({ ok: true, pinned: true });
 const pinGroup = vi.fn();
+const thread = vi.fn();
 
 vi.mock("./api", async (importOriginal) => {
   const actual = await importOriginal<typeof import("./api")>();
@@ -23,6 +24,9 @@ vi.mock("./api", async (importOriginal) => {
       pinGroup: (...args: unknown[]) => pinGroup(...args),
       unsubscribe: vi.fn(),
       unsubscribeAck: vi.fn(),
+      thread: (...args: unknown[]) => thread(...args),
+      message: () => Promise.resolve({ from: "", to: "", date: "",
+        subject: "", text: "body" }),
     },
   };
 });
@@ -392,5 +396,26 @@ describe("DetailPanel", () => {
       expect(screen.queryByText("Protect all mails in this group")).toBeNull();
       expect(screen.getByText("Remove protection from all mails")).toBeTruthy();
     });
+  });
+
+  it("thread groups offer 'Read conversation' (newest mail first); other "
+    + "groupings do not", async () => {
+    thread.mockResolvedValue({ key: "k", label: "Plan", notes: [],
+      mails: [mkMail(1), mkMail(2)] });
+    renderPanel([mkMail(2), mkMail(1)], { grouping: "thread" });
+    await waitFor(() => screen.getByText("Mail 1"));
+    fireEvent.click(await screen.findByLabelText("More"));
+    fireEvent.click(screen.getByText("Read conversation"));
+    await waitFor(() => expect(thread).toHaveBeenCalledWith("INBOX", 2));
+    await screen.findByText("2 mails");
+    fireEvent.click(screen.getByText("back to list"));
+    await screen.findByText("Mail 1");          // back on the group's list
+  });
+
+  it("a sender group has no 'Read conversation' entry", async () => {
+    renderPanel([mkMail(1)]);
+    await waitFor(() => screen.getByText("Mail 1"));
+    fireEvent.click(await screen.findByLabelText("More"));
+    expect(screen.queryByText("Read conversation")).toBeNull();
   });
 });
