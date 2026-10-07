@@ -105,13 +105,14 @@
 
 /* Stacking scale: every z-index in the app comes from here (use
    z-(--z-dropdown) etc.), never a bare z-10/z-20. Popovers must sit above
-   the sticky table header; modals above everything. --z-toast is used by Toast. */
+   the sticky table header; modals above that; toasts above everything (an
+   error raised from inside a panel must not hide under its scrim). */
 :root {
   --z-sticky: 10;
   --z-bulkbar: 20;
   --z-dropdown: 30;
-  --z-toast: 40;
   --z-modal: 50;
+  --z-toast: 60;
 }
 
 html {
@@ -229,7 +230,20 @@ body {
   animation: pmc-slide 1.2s ease-in-out infinite;
 }
 @media (prefers-reduced-motion: reduce) {
-  .pmc-indeterminate { animation: none; width: 50%; }
+  /* A full, dimmed bar: a static partial segment would read as "half done". */
+  .pmc-indeterminate { animation: none; width: 100%; opacity: 0.5; }
+}
+
+/* Toast stack: bottom-centre above the bulk bar and the safe area. */
+.pmc-toasts {
+  bottom: calc(var(--bulkbar-h, 0px) + env(safe-area-inset-bottom) + 1rem);
+}
+/* A phone bottom sheet (Modal sm) owns the bottom edge: toasts go to the top. */
+@media (width < 40rem) {
+  :root:has([role="dialog"][data-size="sm"]) .pmc-toasts {
+    top: calc(env(safe-area-inset-top) + 1rem);
+    bottom: auto;
+  }
 }
 
 /* Block-level loading rows fade in after a short delay, so anything that

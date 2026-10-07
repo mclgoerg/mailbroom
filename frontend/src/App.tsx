@@ -22,7 +22,7 @@ import { QueryBuilder } from "./components/QueryBuilder";
 import { TrashPanel } from "./components/TrashPanel";
 import { AccountAvatar, applyTheme, Button, Chip, currentTheme, EmptyState,
   ensureAiAck, Input, isModalOpen, LINK, LINK_ACCENT, Menu, MenuHeading,
-  MenuItem, Notice, ProgressBar, Select, Spinner, useToast,
+  MenuItem, Notice, ProgressBar, Select, Spinner, useBulkBarHeight, useToast,
   type ToastVariant } from "./components/ui";
 import { t } from "./i18n";
 import { applyStatus, fmtAgo, fmtSize, fmtUsd, matchGroup, parseFilter,
@@ -63,6 +63,9 @@ const sortValue = (g: Group, k: SortKey): number | string => {
   if (k === "unreadPct") return g.count ? g.unread / g.count : 0;
   return g[k];
 };
+
+const undoId = (u: { ts: number; count: number; label: string }) =>
+  `${u.ts}|${u.count}|${u.label}`;
 
 const actionVerb = (a: string): string =>
   ({ trash: t("Move to Trash"), archive: t("Archive"), move: t("Move"),
@@ -286,46 +289,54 @@ export default function App() {
       t: state.atts?.status, u: state.unsub?.status };
   }, [state]);
 
-  /* Job outcomes as toasts. Only a CHANGE of a job's status toasts (a page
-     load or account switch that finds an old "done" stays quiet); a scan
-     error is the one exception, there is no other trace of it. */
+  /* Job outcomes as toasts. A finished move is detected by NEW undo entries
+     as well as by its status changing: SSE ticks once a second, so a short
+     job can go done -> running -> done between two ticks. Only a change
+     toasts (a page load or account switch that finds an old "done" stays
+     quiet); a scan error is the one exception, nothing else shows it. */
   const seenJobs = useRef<{ scan?: string; d?: string; a?: string;
-    u?: string; undo?: string } | null>(null);
+    u?: string; undo: string[] } | null>(null);
+  const startToast = useRef<{ unsub?: number }>({});
   useEffect(() => {
     if (!state) { seenJobs.current = null; return; }
     const prev = seenJobs.current;
-    const last = state.undo[state.undo.length - 1];
-    const undoKey = last ? `${last.ts}|${last.count}|${last.label}` : "";
+    const { delete: del, ai, unsub } = state;
+    const ids = state.undo.map(undoId);
     // Undo entries are also recorded mid-job, so while a move runs the
-    // baseline stays the key from before it started.
-    seenJobs.current = { scan: state.status, d: state.delete.status,
-      a: state.ai.status, u: state.unsub?.status,
-      undo: state.delete.status === "running" && prev ? prev.undo : undoKey };
+    // baseline stays what it was before it started.
+    seenJobs.current = { scan: state.status, d: del.status,
+      a: ai.status, u: unsub?.status,
+      undo: del.status === "running" && prev ? prev.undo : ids };
     if (state.status === "error" && prev?.scan !== "error")
       notify(t("err.generic", { msg: state.error }), "error");
     if (!prev) return;
-    const { delete: del, ai, unsub } = state;
-    if (del.status !== prev.d) {
+    const fresh = state.undo.filter((u) => !prev.undo.includes(undoId(u)));
+    if (del.status !== "running" && (del.status !== prev.d || fresh.length)) {
       if (del.status === "error") {
         notify(t("err.generic", { msg: del.error }), "error");
-      } else if (del.status === "done" && del.moved > 0) {
-        // Offer Undo only for the entry THIS job recorded, found again by
-        // identity at click time (the list may have shifted by then).
-        const entry = undoKey !== prev.undo ? last : undefined;
-        toast.show(entry?.action === "trash"
-          ? t("toast.moved_trash", { n: del.moved })
-          : t("done_moved", { n: del.moved }), {
+      } else if (fresh.length || del.moved > 0) {
+        const n = fresh.length
+          ? fresh.reduce((a, u) => a + u.count, 0) : del.moved;
+        const entry = fresh.length === 1 ? fresh[0] : undefined;
+        toast.show(fresh.length && fresh.every((u) => u.action === "trash")
+          ? t("toast.moved_trash", { n }) : t("done_moved", { n }), {
           variant: "success",
+          // Undo targets THIS job's entry by identity (the list may have
+          // shifted by click time), never "the latest".
           action: entry ? { label: t("Undo"), onClick: () => {
-            const i = stateRef.current?.undo.findIndex((u) =>
-              u.ts === entry.ts && u.count === entry.count
-              && u.label === entry.label) ?? -1;
+            const i = stateRef.current?.undo.findIndex(
+              (u) => undoId(u) === undoId(entry)) ?? -1;
             if (i >= 0) undo(i);
           } } : undefined,
         });
+        if (del.error) notify(t("err.generic", { msg: del.error }), "error");
       }
     }
-    if (unsub && unsub.status !== prev.u) {
+    if (unsub && unsub.status !== "running" && unsub.status !== prev.u) {
+      if (startToast.current.unsub != null) {
+        toast.dismiss(startToast.current.unsub);
+        startToast.current.unsub = undefined;
+      }
       if (unsub.status === "error")
         notify(t("err.unsub", { msg: unsub.error }), "error");
       else if (unsub.status === "done" && unsub.total > 0)
@@ -345,20 +356,8 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state]);
 
-  /* The toast stack sits above the bulk bar: publish its height. */
   const bulkBar = useRef<HTMLDivElement>(null);
-  const hasSelection = selected.size > 0;
-  useEffect(() => {
-    const root = document.documentElement.style;
-    const el = bulkBar.current;
-    if (!hasSelection || !el) { root.removeProperty("--bulkbar-h"); return; }
-    const sync = () => root.setProperty("--bulkbar-h", `${el.offsetHeight}px`);
-    sync();
-    if (typeof ResizeObserver === "undefined") return;
-    const ro = new ResizeObserver(sync);
-    ro.observe(el);
-    return () => { ro.disconnect(); root.removeProperty("--bulkbar-h"); };
-  }, [hasSelection]);
+  useBulkBarHeight(bulkBar, selected.size > 0);
 
   /* Update check: installed PWAs have no service worker here, so an
      already-open tab can only learn a new build is live by asking the
@@ -515,15 +514,17 @@ export default function App() {
   const startAi = async (keys?: string[]) => {
     if (!ensureAiAck()) return;
     setPending(t("Starting…"));
-    try { await api.aiReview(mode, keys); refresh(); }
+    try {
+      await api.aiReview(mode, keys);
+      if (seenJobs.current) seenJobs.current.a = "running";   // see effect
+      refresh();
+    }
     catch (e: any) { fail(e, "err.ai"); }
     setPending("");
   };
 
   const cancel = async () => {
-    const target = scanning ? "scan" : aiRunning ? "ai"
-      : attsRunning ? "atts" : unsubRunning ? "unsub" : "delete";
-    try { await api.cancel(target); refresh(); } catch { /* too late */ }
+    try { await api.cancel(job?.target ?? "delete"); refresh(); } catch { /* too late */ }
   };
 
   const undo = async (index: number) => {
@@ -689,6 +690,7 @@ export default function App() {
       await api.deleteGroups(mode, effective, action, dest, force,
         keepLatest, olderThanDays);
       setSelected(new Set());
+      if (seenJobs.current) seenJobs.current.d = "running";   // see effect
       refresh();   // runs in the background; SSE/polling follows it
       return true;
     } catch (e: any) {
@@ -705,10 +707,15 @@ export default function App() {
     try {
       const r = await api.unsubscribeBulk(mode, [...selected]);
       const skipped = r.skipped_protected + r.skipped_done + r.capped;
-      notify(r.queued
+      const id = toast.show(r.queued
         ? t("toast.unsub_started", { n: r.queued })
           + (skipped ? " " + t("toast.unsub_skipped", { n: skipped }) : "")
         : t("toast.unsub_nothing"));
+      if (r.queued) {
+        // Replaced by the result toast when the job ends.
+        startToast.current.unsub = id;
+        if (seenJobs.current) seenJobs.current.u = "running";
+      }
       refresh();
     } catch (e: any) {
       fail(e);
@@ -828,22 +835,24 @@ export default function App() {
   // The running job (if any): its label, raw progress text and icon. One
   // source for the status text, the cancel button and the progress strip.
   const job = !state ? null
-    : scanning ? { label: t("Scanning…"), progress: state.progress }
-    : deleting ? { label: t("Moving…"), progress: state.delete.progress }
-    : aiRunning ? { label: `AI (${state.ai.grouping})…`,
+    : scanning ? { target: "scan" as const, label: t("Scanning…"),
+        progress: state.progress }
+    : deleting ? { target: "delete" as const, label: t("Moving…"),
+        progress: state.delete.progress }
+    : aiRunning ? { target: "ai" as const, label: `AI (${state.ai.grouping})…`,
         progress: state.ai.progress }
-    : attsRunning ? { label: t("atts.running"), progress: state.atts.progress,
-        icon: <Paperclip size={14} /> }
-    : unsubRunning ? { label: t("unsub.running"),
+    : attsRunning ? { target: "atts" as const, label: t("atts.running"),
+        progress: state.atts.progress, icon: <Paperclip size={14} /> }
+    : unsubRunning ? { target: "unsub" as const, label: t("unsub.running"),
         progress: state.unsub.progress, icon: <Mail size={14} /> }
     : null;
 
   // Persistent summary only: results and errors are toasts.
   const summary = (): string => {
     if (!state) return "";
+    if (filter && !groups.length && allGroups.length)
+      return t("status.filter_none", { n: allGroups.length });
     if (groups.length || state.scanned_ts) {
-      if (!groups.length && filter && allGroups.length)
-        return t("status.filter_none", { n: allGroups.length });
       const mails = groups.reduce((n, g) => n + g.count, 0);
       const size = groups.reduce((n, g) => n + g.size, 0);
       const ago = fmtAgo(state.scanned_ts);
@@ -1365,7 +1374,7 @@ export default function App() {
       )}
 
       {/* First-run onboarding: no credentials or no scan yet. */}
-      {cfg && state?.status === "idle" && groups.length === 0
+      {cfg && state?.status === "idle" && allGroups.length === 0
         && !scanning && (
         <div className="mx-auto my-10 max-w-md rounded-dialog border border-line
           bg-panel p-4 type-body sm:p-5">
@@ -1437,7 +1446,8 @@ export default function App() {
           resetSignal={`${mode}\u0000${filter}`}
         />
       ) : (
-        !scanning && state?.status === "done" && (
+        state && !scanning && (filter && allGroups.length > 0
+            || state.status === "done") && (
           filter && allGroups.length > 0 ? (
             <EmptyState icon={<Search size={18} />} title={t("no.matches")}
               action={

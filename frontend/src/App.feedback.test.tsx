@@ -196,3 +196,62 @@ test("a running job shows its progress strip, determinate when structured",
     expect(screen.getByRole("progressbar").getAttribute("aria-valuenow"))
       .toBeNull();
   });
+
+const entry = (ts: number, count: number, label = "Shop News") =>
+  ({ ts, label, count, action: "trash" });
+
+test("a short job (done -> done, only a new undo entry) still toasts",
+  async () => {
+    await mount({ ...baseState, delete: job("done", { moved: 5 }) as any,
+      undo: [entry(1, 5)] });
+    tick({ delete: job("done", { moved: 10 }) as any,
+      undo: [entry(1, 5), entry(2, 10)] });
+    const msg = await screen.findByText("Moved 10 mails to Trash");
+    expect(within(msg.parentElement!).getByRole("button", { name: "Undo" }))
+      .toBeTruthy();
+  });
+
+test("two new entries toast their total without an Undo action", async () => {
+  await mount({ ...baseState });
+  tick({ delete: job("done", { moved: 15 }) as any,
+    undo: [entry(1, 5), entry(2, 10)] });
+  const msg = await screen.findByText("Moved 15 mails to Trash");
+  expect(within(msg.parentElement!).queryByRole("button", { name: "Undo" }))
+    .toBeNull();
+});
+
+test("undoing the last entry does not toast", async () => {
+  await mount({ ...baseState, undo: [entry(1, 5)] });
+  tick({ undo: [] });
+  expect(document.querySelector("[data-variant]")).toBeNull();
+});
+
+test("Undo targets its own entry after the list shifted", async () => {
+  vi.stubGlobal("confirm", () => true);
+  await mount({ ...baseState, undo: [entry(1, 5)] });
+  tick({ delete: job("done", { moved: 10 }) as any,
+    undo: [entry(1, 5), entry(2, 10)] });
+  const msg = await screen.findByText("Moved 10 mails to Trash");
+  tick({ undo: [entry(2, 10)] });                  // the older one was undone
+  fireEvent.click(within(msg.parentElement!)
+    .getByRole("button", { name: "Undo" }));
+  await waitFor(() => expect(undoApi).toHaveBeenCalledWith(0));
+});
+
+test("a partly failed move also shows its error", async () => {
+  await mount({ ...baseState });
+  tick({ delete: job("done", { moved: 3, error: "folder gone" }) as any,
+    undo: [entry(1, 3)] });
+  await screen.findByText("Moved 3 mails to Trash");
+  expect(screen.getByText("Error: folder gone")).toBeTruthy();
+});
+
+test("a zero-match filter after a failed rescan still offers Clear filter",
+  async () => {
+    await mount({ ...baseState });
+    fireEvent.change(screen.getByPlaceholderText("filter groups…"),
+      { target: { value: "zzz-nothing" } });
+    tick({ status: "error", error: "x" } as any);
+    expect(await screen.findByText("No groups match this filter")).toBeTruthy();
+    expect(screen.queryByText(/Welcome/)).toBeNull();
+  });

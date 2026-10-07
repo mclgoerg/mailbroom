@@ -1,7 +1,8 @@
 import { AlertCircle, Check, CheckCircle2, Info, Pin, Shield, X }
   from "lucide-react";
 import { createContext, useCallback, useContext, useEffect, useId,
-  useLayoutEffect, useMemo, useRef, useState, type ComponentProps, type ReactNode } from "react";
+  useLayoutEffect, useMemo, useRef, useState, type ComponentProps,
+  type ReactNode, type RefObject } from "react";
 import { t } from "../i18n";
 import { engagementTier } from "../lib";
 import type { GroupAi } from "../types";
@@ -795,8 +796,26 @@ function ToastView({ toast, dismiss }: {
   );
 }
 
+/** Publishes the height of a fixed bottom bar as `--bulkbar-h` while
+ *  `active`, so the toast stack (`.pmc-toasts`) sits above it. */
+export function useBulkBarHeight(ref: RefObject<HTMLElement | null>,
+    active: boolean) {
+  useEffect(() => {
+    const root = document.documentElement.style;
+    const el = ref.current;
+    if (!active || !el) return;
+    const sync = () => root.setProperty("--bulkbar-h", `${el.offsetHeight}px`);
+    sync();
+    const ro = typeof ResizeObserver === "undefined"
+      ? null : new ResizeObserver(sync);
+    ro?.observe(el);
+    return () => { ro?.disconnect(); root.removeProperty("--bulkbar-h"); };
+  }, [ref, active]);
+}
+
 /** Mount once at the app root; `useToast()` anywhere below. Toasts stack
- *  bottom-centre above the bulk bar (`--bulkbar-h`) and the safe area. */
+ *  bottom-centre above the bulk bar (`--bulkbar-h`) and the safe area, and
+ *  above modals; they never take focus. */
 export function ToastProvider({ children }: { children: ReactNode }) {
   const [items, setItems] = useState<ToastItem[]>([]);
   const nextId = useRef(1);
@@ -811,9 +830,8 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   return (
     <ToastContext.Provider value={api}>
       {children}
-      <div aria-live="polite" className="pointer-events-none fixed inset-x-0
-        z-(--z-toast) flex flex-col items-center gap-2 px-3"
-        style={{ bottom: "calc(var(--bulkbar-h, 0px) + env(safe-area-inset-bottom) + 1rem)" }}>
+      <div aria-live="polite" className="pmc-toasts pointer-events-none fixed
+        inset-x-0 z-(--z-toast) flex flex-col items-center gap-2 px-3">
         {items.map((x) => (
           <ToastView key={x.id} toast={x} dismiss={dismiss} />
         ))}

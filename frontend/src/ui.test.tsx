@@ -106,13 +106,13 @@ test("menu popover uses the dropdown layer", () => {
   expect(pop.className).toContain("z-(--z-dropdown)");
 });
 
-test("z-index scale is strictly ordered sticky < bulkbar < dropdown < toast < modal", async () => {
+test("z-index scale is strictly ordered sticky < bulkbar < dropdown < modal < toast", async () => {
   // vitest blanks CSS imports (even ?raw), so read the file from disk (cwd is frontend/).
   // @ts-expect-error node builtins have no types in this project
   const { readFileSync } = await import("node:fs");
   const indexCss: string = readFileSync("src/index.css", "utf8");
   const z = (n: string) => Number(new RegExp(`--z-${n}:\\s*(\\d+)`).exec(indexCss)?.[1]);
-  const order = ["sticky", "bulkbar", "dropdown", "toast", "modal"].map(z);
+  const order = ["sticky", "bulkbar", "dropdown", "modal", "toast"].map(z);
   expect(order.every(Number.isFinite)).toBe(true);
   expect([...order].sort((a, b) => a - b)).toEqual(order);
   expect(new Set(order).size).toBe(order.length);
@@ -303,7 +303,7 @@ test("toast stack sits on the toast layer above the bulk bar", () => {
   fireEvent.click(screen.getByText("fire"));
   const stack = document.querySelector("[aria-live=polite]") as HTMLElement;
   expect(stack.className).toContain("z-(--z-toast)");
-  expect(stack.style.bottom).toContain("var(--bulkbar-h, 0px)");
+  expect(stack.className).toContain("pmc-toasts");
 });
 
 test("confirmDialog resolves true on confirm, false on Cancel / Esc / backdrop", async () => {

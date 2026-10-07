@@ -5,7 +5,8 @@ import { t } from "../i18n";
 import { actionVerb, itemsOf, planMailAction } from "../mailActions";
 import type { AppState, Mail } from "../types";
 import { MailRows, MessageView } from "./MailList";
-import { Button, EmptyState, Input, LINK, Loading, Modal, Select, useToast }
+import { Button, EmptyState, Input, LINK, Loading, Modal, Select,
+  useBulkBarHeight, useToast }
   from "./ui";
 
 type MailSort = "date" | "size" | "sender";
@@ -47,6 +48,8 @@ export function AllMailsView({ state, onChanged }: {
   const [sel, setSel] = useState<Set<string>>(new Set());
   const [view, setView] = useState<Mail | null>(null);
   const toast = useToast();
+  const bulkBar = useRef<HTMLDivElement>(null);
+  useBulkBarHeight(bulkBar, sel.size > 0);
   const [busy, setBusy] = useState(false);
   const [moveDest, setMoveDest] = useState("");
   // What the list on screen was loaded for: a rescan/deletion (groups_rev)
@@ -253,7 +256,7 @@ export function AllMailsView({ state, onChanged }: {
       {sel.size > 0 && <div className="h-28" aria-hidden />}
 
       {sel.size > 0 && (
-        <div className="fixed inset-x-0 bottom-0 z-(--z-bulkbar) border-t border-line
+        <div ref={bulkBar} className="fixed inset-x-0 bottom-0 z-(--z-bulkbar) border-t border-line
           bg-panel px-3 py-2 shadow-bar"
           style={{ paddingBottom:
             "calc(env(safe-area-inset-bottom) + 0.5rem)" }}>
