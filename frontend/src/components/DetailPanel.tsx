@@ -257,7 +257,8 @@ export function DetailPanel({ grouping, group, aiEnabled, protectedNow,
 
   // `chosen` is the checked mails, or the single mail open in the reader
   // ("Trash this mail") - both go through the same confirm/pinned flow.
-  const actOn = async (chosen: Mail[], action: string, dest = "") => {
+  const actOn = async (chosen: Mail[], action: string, dest = "",
+      single = false) => {
     if (!mails) return;
     const verb = actionVerb(action, dest);
     const plan = await planMailAction(chosen, action, verb);
@@ -288,7 +289,15 @@ export function DetailPanel({ grouping, group, aiEnabled, protectedNow,
         setMails(mails.map((m) =>
           actingKeys.has(mailKey(m)) ? { ...m, seen: true } : m));
       }
-      setSel(new Set());
+      // A single-mail action (reader) only drops that mail from the
+      // selection; the checked-mails flow clears it as before.
+      if (single) {
+        setSel((cur) => {
+          const next = new Set(cur);
+          actingKeys.forEach((k) => next.delete(k));
+          return next;
+        });
+      } else setSel(new Set());
       setNote(t("note.background", { verb }));
       onDeleted();
     } catch (e: any) {
@@ -308,12 +317,15 @@ export function DetailPanel({ grouping, group, aiEnabled, protectedNow,
     const live = mails?.find((x) => mailKey(x) === mailKey(m)) ?? m;
     return <>
       <PinButton showLabel on={!!live.pinned} onClick={() => togglePin(live)} />
-      <Button variant="danger-quiet" onClick={() => actOn([live], "trash")}>
+      <Button variant="danger-quiet" onClick={() => actOn([live], "trash", "", true)}>
         {t("trash_this.btn")}
       </Button>
     </>;
   };
-  const groupCount = mails?.length || group.count;
+  // Only mails "Trash all" will really move: protected ones stay untouched.
+  const groupCount = mails
+    ? mails.filter((m) => !m.pinned).length
+    : group.count - (group.pinned ?? 0);
 
   return (
     <Modal onClose={onClose} full>
@@ -568,8 +580,10 @@ export function DetailPanel({ grouping, group, aiEnabled, protectedNow,
           )}
 
           {/* Group-scoped actions. They live here (not in the header) so
-              "Trash all N" names its scope and sits away from Close. */}
-          <div className="flex flex-wrap items-center gap-2 border-t
+              "Trash all N" names its scope and sits away from Close. Hidden
+              while a selection exists: the selection bar above is then the
+              one place to act (no two red buttons stacked). */}
+          {sel.size === 0 && <div className="flex flex-wrap items-center gap-2 border-t
             border-line px-4 py-2"
             style={{ paddingBottom:
               "calc(env(safe-area-inset-bottom) + 0.5rem)" }}>
@@ -592,7 +606,7 @@ export function DetailPanel({ grouping, group, aiEnabled, protectedNow,
                 {t("trash_all.btn", { n: groupCount })}
               </Button>
             )}
-          </div>
+          </div>}
         </>
       )}
     </Modal>

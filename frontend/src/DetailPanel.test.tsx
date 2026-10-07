@@ -36,7 +36,7 @@ vi.mock("./api", async (importOriginal) => {
 
 import { DetailPanel } from "./components/DetailPanel";
 import { DialogProvider } from "./components/ui";
-import { cancelDialog, findDialog, pressDialog } from "./dialogTestUtils";
+import { cancelDialog, expectNoDialog, findDialog, pressDialog } from "./dialogTestUtils";
 
 const mkMail = (uid: number, over: Partial<Mail> = {}): Mail => ({
   uid, folder: "INBOX", date: "2025-01-01", ts: 0,
@@ -141,6 +141,7 @@ describe("DetailPanel", () => {
     fireEvent.click(document.querySelectorAll('input[type="checkbox"]')[0]);
     fireEvent.click(await screen.findByText(/Trash selected/));
     await cancelDialog();
+    await expectNoDialog();
     expect(deleteMessages).not.toHaveBeenCalled();
   });
 
@@ -160,6 +161,29 @@ describe("DetailPanel", () => {
     renderPanel([], { group: mkGroup({ count: 0 }) });
     await waitFor(() => expect(group_).toHaveBeenCalled());
     expect(screen.queryByRole("button", { name: /Trash all/ })).toBeNull();
+  });
+
+  it("'Trash all N' counts only unpinned mails and hides when none are left",
+    async () => {
+    const { unmount } = renderPanel([mkMail(1, { pinned: true }),
+      mkMail(2, { pinned: true }), mkMail(3), mkMail(4)]);
+    await screen.findByRole("button", { name: "Trash all 2" });
+    unmount();
+    renderPanel([mkMail(1, { pinned: true }), mkMail(2, { pinned: true })]);
+    await waitFor(() => screen.getByText("Mail 1"));
+    expect(screen.queryByRole("button", { name: /Trash all/ })).toBeNull();
+  });
+
+  it("with a selection the group footer gives way to the selection bar "
+    + "(never two red buttons)", async () => {
+    renderPanel([mkMail(1), mkMail(2)], { onBlock: vi.fn() });
+    await screen.findByRole("button", { name: "Trash all 2" });
+    fireEvent.click(document.querySelectorAll('input[type="checkbox"]')[0]);
+    await screen.findByText(/Trash selected/);
+    expect(screen.queryByRole("button", { name: /Trash all/ })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Block sender" })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Clear selection" }));
+    await screen.findByRole("button", { name: "Trash all 2" });
   });
 
   describe("message view footer", () => {
@@ -185,7 +209,7 @@ describe("DetailPanel", () => {
       + "the list", async () => {
       await open([mkMail(1), mkMail(2)]);
       fireEvent.click(screen.getByRole("button", { name: "Trash this mail" }));
-      expect((await findDialog()).textContent).toContain("1 selected mail(s)");
+      expect((await findDialog()).textContent).toContain('"Mail 1"');
       await pressDialog("Move to Trash (1)");
       await waitFor(() => expect(deleteMessages).toHaveBeenCalledWith(
         [["INBOX", 1]], "trash", "", false));
@@ -193,10 +217,44 @@ describe("DetailPanel", () => {
       expect(screen.queryByText("Mail 1")).toBeNull();
     });
 
+    it("the pin is labelled for the mail, distinct from the sender's Protect",
+      async () => {
+      await open([mkMail(1), mkMail(2)], { onProtect: vi.fn() });
+      const footerPin = screen.getByRole("button", { name: /Protect this mail/ });
+      expect(footerPin.textContent).toBe("Protect mail");
+      expect(screen.getByRole("button", { name: /Protect this sender/ })
+        .textContent).toBe("Protect");
+    });
+
+    it("trashing the open mail leaves other selected mails selected",
+      async () => {
+      renderPanel([mkMail(1), mkMail(2), mkMail(3)]);
+      await waitFor(() => screen.getByText("Mail 1"));
+      const boxes = document.querySelectorAll('input[type="checkbox"]');
+      fireEvent.click(boxes[1]);
+      fireEvent.click(boxes[2]);
+      fireEvent.click(screen.getByText("Mail 1"));
+      await screen.findByText("back to list");
+      fireEvent.click(screen.getByRole("button", { name: "Trash this mail" }));
+      await pressDialog("Move to Trash (1)");
+      expect(await screen.findByText("2 selected")).toBeTruthy();
+    });
+
+    it("the protected-mail warning doesn't repeat its title in the body",
+      async () => {
+      await open([mkMail(1, { pinned: true }), mkMail(2)]);
+      fireEvent.click(screen.getByRole("button", { name: "Trash this mail" }));
+      const text = (await findDialog()).textContent!;
+      expect(text).toContain('The protected mail "Mail 1"');
+      expect(text).not.toContain("Move to Trash:");
+      await cancelDialog();
+    });
+
     it("cancelling Trash this mail keeps the message open", async () => {
       await open([mkMail(1), mkMail(2)]);
       fireEvent.click(screen.getByRole("button", { name: "Trash this mail" }));
       await cancelDialog();
+      await expectNoDialog();
       expect(deleteMessages).not.toHaveBeenCalled();
       expect(screen.getByText("back to list")).toBeTruthy();
     });
@@ -393,6 +451,7 @@ describe("DetailPanel", () => {
       fireEvent.click(checkbox(0));
       fireEvent.click(await screen.findByText(/Trash selected/));
       await cancelDialog();
+      await expectNoDialog();
       expect(deleteMessages).not.toHaveBeenCalled();
       expect(screen.getByText("1 selected")).toBeTruthy();   // still there
     });
@@ -471,6 +530,7 @@ describe("DetailPanel", () => {
       expect(screen.getByText("Protect all mails in this group")).toBeTruthy();
       fireEvent.click(screen.getByText("Remove protection from all mails"));
       await cancelDialog();
+      await expectNoDialog();
       expect(pinGroup).not.toHaveBeenCalled();
 
       fireEvent.click(screen.getByLabelText("More"));

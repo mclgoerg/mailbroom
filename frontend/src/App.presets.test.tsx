@@ -35,7 +35,7 @@ vi.mock("./api", () => ({
 
 import App from "./App";
 import { DialogProvider, ToastProvider } from "./components/ui";
-import { cancelDialog, findDialog, pressDialog } from "./dialogTestUtils";
+import { cancelDialog, expectNoDialog, findDialog, pressDialog } from "./dialogTestUtils";
 import type { AppState, Config } from "./types";
 
 const acct = {
@@ -135,6 +135,7 @@ test("declining the delete confirmation never calls api.deletePreset",
     await waitFor(() => expect(screen.getByText("Old DHL")).toBeTruthy());
     fireEvent.click(screen.getByLabelText("Delete"));
     await cancelDialog();
+    await expectNoDialog();
     expect(deletePreset).not.toHaveBeenCalled();
   });
 
@@ -173,6 +174,7 @@ test("declining the save name prompt never calls api.createPreset",
     fireEvent.change(filterInput, { target: { value: "from:dhl" } });
     fireEvent.click(screen.getByTitle("Save current filter as a preset"));
     await cancelDialog();
+    await expectNoDialog();
     expect(createPreset).not.toHaveBeenCalled();
   });
 

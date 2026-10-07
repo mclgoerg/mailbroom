@@ -7,7 +7,7 @@ import { cleanup, fireEvent, render, screen, waitFor }
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import { AllMailsView } from "./components/AllMailsView";
 import { DialogProvider, ToastProvider } from "./components/ui";
-import { cancelDialog, findDialog, pressDialog } from "./dialogTestUtils";
+import { cancelDialog, expectNoDialog, findDialog, pressDialog } from "./dialogTestUtils";
 import type { AppState, Mail, MailsResp } from "./types";
 
 const mails = vi.fn();
@@ -129,7 +129,7 @@ test("selecting shows the action bar; Trash sends the picked mails",
     fireEvent.click(tick(2));
     expect(screen.getByText("1 selected")).toBeTruthy();
     fireEvent.click(screen.getByText(/Trash selected/));
-    expect((await findDialog()).textContent).toContain("1 selected mail(s)");
+    expect((await findDialog()).textContent).toContain('"Subject 2"');
     await pressDialog("Move to Trash (1)");
     await waitFor(() => expect(deleteMessages)
       .toHaveBeenCalledWith([["Archive", 2]], "trash", "", false));
@@ -145,6 +145,7 @@ test("cancelling the trash confirmation sends nothing", async () => {
   fireEvent.click(tick(1));
   fireEvent.click(screen.getByText(/Trash selected/));
   await cancelDialog();
+  await expectNoDialog();
   expect(deleteMessages).not.toHaveBeenCalled();
   expect(screen.getByText("Subject 1")).toBeTruthy();
 });

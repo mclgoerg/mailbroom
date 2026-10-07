@@ -34,7 +34,12 @@ vi.mock("./api", () => ({
       { build: versions[Math.min(versionCalls++, versions.length - 1)] }),
     block: (...args: unknown[]) => block(...args),
     deleteRule: (...args: unknown[]) => deleteRule(...args),
-    group: () => Promise.resolve([]),
+    // three unpinned mails, matching groupFixture.count (the detail panel's
+    // "Trash all N" counts the loaded, unpinned mails)
+    group: () => Promise.resolve([1, 2, 3].map((uid) => ({
+      uid, folder: "INBOX", date: "2024-01-01", ts: uid,
+      subject: `Mail ${uid}`, addr: "noreply@dhl.example", size: 100,
+      seen: true, ai: null, pinned: false }))),
     deleteGroups: (...args: unknown[]) => deleteGroups(...args),
     aiReview: (...args: unknown[]) => aiReview(...args),
   },
@@ -48,7 +53,7 @@ vi.mock("./api", () => ({
 
 import App from "./App";
 import { DialogProvider, ToastProvider } from "./components/ui";
-import { cancelDialog, findDialog, pressDialog } from "./dialogTestUtils";
+import { cancelDialog, expectNoDialog, findDialog, pressDialog } from "./dialogTestUtils";
 import type { AppState, Config } from "./types";
 
 const acct = {
@@ -285,7 +290,7 @@ test("Block button confirms, then calls api.block with the trash-existing " +
   await pressDialog("Block");
   // second question: also trash the existing mails
   expect((await findDialog()).textContent).toContain("existing");
-  await pressDialog(/Move 3 mails to Trash/);
+  await pressDialog("Move to Trash (3)");
   await waitFor(() => expect(block).toHaveBeenCalledWith(
     "sender", "noreply@dhl.example", "DHL Paket", true));
 });
@@ -306,6 +311,8 @@ test("declining the block confirmation never calls api.block", async () => {
   await openDetail();
   fireEvent.click(screen.getByRole("button", { name: "Block sender" }));
   await cancelDialog();
+  // cancelling the FIRST question must not proceed to the second one
+  await expectNoDialog();
   expect(block).not.toHaveBeenCalled();
 });
 
@@ -344,6 +351,7 @@ test("declining the unblock confirmation never calls api.deleteRule",
   await openDetail();
   fireEvent.click(screen.getAllByText("Unblock")[0]);
   await cancelDialog();
+  await expectNoDialog();
   expect(deleteRule).not.toHaveBeenCalled();
 });
 
@@ -368,6 +376,7 @@ test("declining the detail panel's Trash confirmation leaves it open and " +
   await openDetail();
   fireEvent.click(screen.getByRole("button", { name: "Trash all 3" }));
   await cancelDialog();
+  await expectNoDialog();
   expect(deleteGroups).not.toHaveBeenCalled();
   expect(screen.getAllByText("Block sender").length).toBeGreaterThan(0);
 });

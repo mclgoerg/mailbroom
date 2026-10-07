@@ -288,9 +288,6 @@ export const EN: Record<string, string> = {
   "bar.all_pinned": "all protected - nothing to move",
   "toast.all_pinned":
     "All selected mails are protected - nothing was changed.",
-  "confirm.act_pinned_mail":
-    '{verb}: the protected mail "{subject}"? Protected mails are exempt '
-    + "from bulk actions - this explicitly overrides its protection.",
   "pin.protect_tip":
     "Protect this mail - no bulk action, rule or AI pick will move it",
   "pin.unprotect_tip": "Remove this mail's protection",
@@ -627,7 +624,6 @@ export const EN: Record<string, string> = {
   "audit.outcome.done": "done",
   "audit.outcome.link": "link",
   "audit.outcome.failed": "failed",
-  "trash_group.tip": "Move every mail in this group to Trash",
   "menu.more": "More",
   "export.csv": "Export CSV",
   "export.csv_tip": "Export the current grouping as CSV",
@@ -645,9 +641,22 @@ export const EN: Record<string, string> = {
   "Select mail": "Select mail",
   "ai.consent_title": "Send mail metadata to the AI provider?",
   "Continue": "Continue",
+  "btn.mail_protect": "Protect mail",
+  "btn.mail_protected": "Mail protected",
   "btn.protect": "Protect",
   "btn.protected": "Protected",
   "confirm.btn_n": "{verb} ({n})",
+  "confirm.act_pinned_mail":
+    'The protected mail "{subject}" is exempt from bulk actions - this '
+    + "explicitly overrides its protection.",
+  "confirm.empty_trash_body":
+    "{n} mails in Trash will be permanently deleted. This cannot be undone.",
+  "confirm.empty_trash_body_1":
+    "The 1 mail in Trash will be permanently deleted. This cannot be undone.",
+  "confirm.empty_trash_body_nocount":
+    "All mails in Trash will be permanently deleted. This cannot be undone.",
+  "confirm.empty_trash_btn": "Delete permanently ({n})",
+  "confirm.empty_trash_btn_nocount": "Delete permanently",
   "confirm.btn_anyway": "{verb} anyway",
   "confirm.b_mails_groups": "{n} mails from {k} group(s) will be affected",
   "confirm.b_selected": "{n} selected mail(s)",
@@ -657,10 +666,6 @@ export const EN: Record<string, string> = {
   "confirm.unsubscribe_btn": "Unsubscribe",
   "confirm.restore_btn": "Restore",
   "confirm.empty_trash_title": "Empty Trash?",
-  "confirm.empty_trash_body":
-    "{n} mails are in Trash. This permanently deletes them; it cannot be "
-    + "undone.",
-  "confirm.empty_trash_btn": "Delete {n} mails permanently",
   "confirm.unpin_btn": "Remove protection",
   "confirm.block_title": 'Block "{label}"?',
   "confirm.block_body":
@@ -668,7 +673,6 @@ export const EN: Record<string, string> = {
     + "to Trash on the daily schedule - reversible by deleting the rule in "
     + "Rules.",
   "confirm.block_only": "Only block",
-  "confirm.block_trash_btn": "Move {n} mails to Trash",
   "confirm.unblock_title": 'Unblock "{label}"?',
   "confirm.unblock_body":
     "This deletes the standing rule - future mail is no longer "

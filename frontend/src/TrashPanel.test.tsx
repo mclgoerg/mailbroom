@@ -14,7 +14,7 @@ const trashRestore = vi.fn();
 vi.mock("./api", () => ({
   api: {
     trash: () => Promise.resolve({
-      folder: "Trash", uv: 1, total: 1,
+      folder: "Trash", uv: 1, total,
       mails: [{ uid: 30, folder: "Trash", date: "2026-01-02", ts: 1,
         subject: "Deleted elsewhere", addr: "old@gone.example", size: 700,
         seen: true, ai: null }],
@@ -25,6 +25,7 @@ vi.mock("./api", () => ({
   mailKey: (m: { folder: string; uid: number }) => `${m.folder}\0${m.uid}`,
 }));
 
+let total = 1;
 const state = {
   folders: ["INBOX"], folders_raw: ["INBOX"],
 } as unknown as AppState;
@@ -32,6 +33,7 @@ const state = {
 afterEach(() => {
   cleanup();
   trashRestore.mockReset();
+  total = 1;
   setLang("en");
 });
 
@@ -62,15 +64,18 @@ test("restore while the server is busy still asks for a manual rescan",
 test("the footer's Empty Trash runs the shared handler and reloads the list",
   async () => {
     const onEmptyTrash = vi.fn().mockResolvedValue(true);
+    total = 7;
     render(<TrashPanel state={{ ...state, trash_count: 1 } as AppState}
       onClose={() => {}} onChanged={() => {}} onEmptyTrash={onEmptyTrash} />);
     await screen.findByText("Deleted elsewhere");
-    fireEvent.click(screen.getByRole("button", { name: "Empty Trash (1)…" }));
-    await waitFor(() => expect(onEmptyTrash).toHaveBeenCalledOnce());
+    // the panel's own listing total, not the (possibly stale) state count
+    fireEvent.click(screen.getByRole("button", { name: "Empty Trash (7)…" }));
+    await waitFor(() => expect(onEmptyTrash).toHaveBeenCalledWith(7));
   });
 
 test("no Empty Trash footer when Trash is empty", async () => {
-  render(<TrashPanel state={{ ...state, trash_count: 0 } as AppState}
+  total = 0;
+  render(<TrashPanel state={{ ...state, trash_count: 3 } as AppState}
     onClose={() => {}} onChanged={() => {}} onEmptyTrash={async () => true} />);
   await screen.findByText("Deleted elsewhere");
   expect(screen.queryByRole("button", { name: /Empty Trash/ })).toBeNull();

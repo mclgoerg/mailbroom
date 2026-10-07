@@ -546,12 +546,22 @@ export default function App() {
   };
 
   // Shared by the profile menu and the Trash panel; resolves whether the
-  // Trash was actually emptied (false = declined or failed).
-  const emptyTrash = async (): Promise<boolean> => {
-    const n = state?.trash_count ?? 0;
+  // Trash was actually emptied (false = declined or failed). The count on
+  // the irreversible button must be live: state.trash_count is only
+  // refreshed by scans/listings, so it can lag behind mails trashed since.
+  // `known` = a total the caller just read (the Trash panel's own list).
+  const emptyTrash = async (known?: number): Promise<boolean> => {
+    let n: number | null = known ?? null;
+    if (n === null) {
+      try { n = (await api.trash()).total; } catch { n = null; }
+    }
     if (!await confirmDialog({ title: t("confirm.empty_trash_title"),
-      body: t("confirm.empty_trash_body", { n }), tone: "danger",
-      confirmLabel: t("confirm.empty_trash_btn", { n }) })) return false;
+      body: n === null ? t("confirm.empty_trash_body_nocount")
+        : t(n === 1 ? "confirm.empty_trash_body_1"
+          : "confirm.empty_trash_body", { n }),
+      tone: "danger",
+      confirmLabel: n === null ? t("confirm.empty_trash_btn_nocount")
+        : t("confirm.empty_trash_btn", { n }) })) return false;
     setPending(t("Emptying Trash…"));
     let ok = true;
     try { await api.emptyTrash(); refresh(); }
@@ -774,7 +784,8 @@ export default function App() {
       && await confirmDialog({
         title: t("confirm.block_trash_existing", { n: g.count }),
         tone: "danger", cancelLabel: t("confirm.block_only"),
-        confirmLabel: t("confirm.block_trash_btn", { n: g.count }) });
+        confirmLabel: t("confirm.btn_n",
+          { verb: actionVerb("trash"), n: g.count }) });
     try {
       await api.block(mode, g.key, g.label, trashExisting);
       notify(t("toast.blocked", { label: g.label }), "success");
@@ -1021,7 +1032,7 @@ export default function App() {
             {state?.trash_count != null && state.trash_count > 0 && (
               <>
                 <MenuDivider />
-                <MenuItem danger onClick={emptyTrash}>
+                <MenuItem danger onClick={() => emptyTrash()}>
                   <Trash2 size={16} className="mr-1 inline align-text-bottom" />
                   {t("Empty Trash")} ({state.trash_count})…
                 </MenuItem>

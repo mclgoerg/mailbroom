@@ -6,7 +6,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from
 import { afterEach, expect, test, vi } from "vitest";
 import { RulesModal } from "./components/RulesModal";
 import { DialogProvider } from "./components/ui";
-import { cancelDialog, findDialog, pressDialog } from "./dialogTestUtils";
+import { cancelDialog, expectNoDialog, findDialog, pressDialog } from "./dialogTestUtils";
 import { setLang } from "./i18n";
 import type { AppState, Rule } from "./types";
 
@@ -149,6 +149,7 @@ test("cancelling Delete keeps the rule", async () => {
   renderCards([rule]);
   fireEvent.click(screen.getByText("Delete"));
   await cancelDialog();
+  await expectNoDialog();
   expect(deleteRule).not.toHaveBeenCalled();
 });
 
@@ -167,6 +168,7 @@ test("cancelling Enable execute leaves the rule in report mode", async () => {
   renderCards([rule]);
   fireEvent.click(screen.getByText("Enable execute"));
   await cancelDialog();
+  await expectNoDialog();
   expect(updateRule).not.toHaveBeenCalled();
 });
 
@@ -176,6 +178,7 @@ test("Run now on an execute-mode rule confirms; report mode runs directly",
   const { unmount } = renderCards([exec]);
   fireEvent.click(screen.getByText("Run now"));
   await cancelDialog();
+  await expectNoDialog();
   expect(runRule).not.toHaveBeenCalled();
   fireEvent.click(screen.getByText("Run now"));
   await pressDialog("Run now");

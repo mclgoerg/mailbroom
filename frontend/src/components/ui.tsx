@@ -115,7 +115,7 @@ export function ProtectButton({ on, onClick, className = "", showLabel }: {
  *  feature - the label says "protect", the icon is a drawing pin. */
 export function PinButton({ on, onClick, className = "", showLabel }: {
   on: boolean; onClick: () => void; className?: string;
-  /** Visible "Protect" / "Protected" text next to the pin. */
+  /** Visible "Protect mail" / "Mail protected" text next to the pin. */
   showLabel?: boolean;
 }) {
   const label = t(on ? "pin.unprotect_tip" : "pin.protect_tip");
@@ -128,7 +128,7 @@ export function PinButton({ on, onClick, className = "", showLabel }: {
       <Pin size={16} fill={on ? "currentColor" : "none"} />
       {showLabel && (
         <span className="type-meta">
-          {t(on ? "btn.protected" : "btn.protect")}
+          {t(on ? "btn.mail_protected" : "btn.mail_protect")}
         </span>
       )}
     </button>
@@ -1045,6 +1045,15 @@ export type PromptOptions = {
   validate?: (value: string) => string | null;
 };
 
+/** Confirm/submit is ignored this long after a dialog opens. On a phone the
+ *  sheet's confirm button lands under the trigger, so the second tap of a
+ *  double-tap would otherwise confirm a destructive action unseen. */
+export const DIALOG_ARM_MS = 500;
+const useArmed = () => {
+  const openedAt = useRef(Date.now());
+  return () => Date.now() - openedAt.current >= DIALOG_ARM_MS;
+};
+
 /** Confirm sheet. Danger dialogs focus Cancel, the safe choice. */
 export function ConfirmDialog({ title, body, bullets, confirmLabel,
   cancelLabel, tone = "primary", onResult }: ConfirmOptions & {
@@ -1052,6 +1061,7 @@ export function ConfirmDialog({ title, body, bullets, confirmLabel,
 }) {
   const safe = useRef<HTMLButtonElement>(null);
   const ok = useRef<HTMLButtonElement>(null);
+  const armed = useArmed();
   const titleId = useId();
   const bodyId = useId();
   const hasBody = body != null || (bullets?.length ?? 0) > 0;
@@ -1080,7 +1090,9 @@ export function ConfirmDialog({ title, body, bullets, confirmLabel,
         <Button ref={safe} variant="secondary"
           onClick={() => onResult(false)}>{cancelLabel ?? t("Cancel")}</Button>
         <Button ref={ok} variant={tone === "danger" ? "danger" : "primary"}
-          onClick={() => onResult(true)}>{confirmLabel}</Button>
+          onClick={() => { if (armed()) onResult(true); }}>
+          {confirmLabel}
+        </Button>
       </div>
     </Modal>
   );
@@ -1096,6 +1108,7 @@ export function PromptDialog({ title, label, initial = "", confirmLabel,
   const [value, setValue] = useState(initial);
   const [touched, setTouched] = useState(false);
   const input = useRef<HTMLInputElement>(null);
+  const armed = useArmed();
   const titleId = useId();
   useEffect(() => { input.current?.focus(); input.current?.select(); }, []);
   const error = validate?.(value) ?? null;
@@ -1103,6 +1116,7 @@ export function PromptDialog({ title, label, initial = "", confirmLabel,
     <Modal size="sm" labelledBy={titleId} onClose={() => onResult(null)}>
       <form className="flex min-h-0 flex-1 flex-col" onSubmit={(e) => {
         e.preventDefault();
+        if (!armed()) return;
         if (error) setTouched(true); else onResult(value);
       }}>
         <div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-4 sm:p-5">

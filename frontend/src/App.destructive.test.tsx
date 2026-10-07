@@ -11,6 +11,8 @@ let state: any;
 let versions = ["v1"];        // api.version() walks through this in order
 let versionCalls = 0;
 
+let trashTotal = 5;            // what the live Trash listing reports
+let trashFails = false;
 const emptyTrash = vi.fn().mockResolvedValue({ ok: true });
 const aiReview = vi.fn().mockResolvedValue({ ok: true });
 const undoApi = vi.fn().mockResolvedValue({ ok: true });
@@ -22,7 +24,9 @@ vi.mock("./api", () => ({
     state: () => { stateCalls.n++; return Promise.resolve(state); },
     emptyTrash: (...a: unknown[]) => emptyTrash(...a),
     undo: (...a: unknown[]) => undoApi(...a),
-    trash: () => Promise.resolve({ folder: "Trash", uv: 1, total: 0, mails: [] }),
+    trash: () => trashFails
+      ? Promise.reject(new Error("imap down"))
+      : Promise.resolve({ folder: "Trash", uv: 1, total: trashTotal, mails: [] }),
     logout: () => Promise.resolve(),
     exportUrl: (mode: string, keys?: string[]) =>
       `/api/export?grouping=${mode}`
@@ -41,7 +45,7 @@ vi.mock("./api", () => ({
 
 import App from "./App";
 import { DialogProvider, ToastProvider } from "./components/ui";
-import { cancelDialog, findDialog, pressDialog } from "./dialogTestUtils";
+import { cancelDialog, expectNoDialog, findDialog, pressDialog } from "./dialogTestUtils";
 import type { AppState, Config } from "./types";
 
 const acct = {
@@ -110,6 +114,8 @@ afterEach(() => {
   cleanup();
   localStorage.clear();
   emptyTrash.mockClear();
+  trashTotal = 5;
+  trashFails = false;
   aiReview.mockClear();
   undoApi.mockClear();
 });
@@ -150,11 +156,45 @@ test("Empty Trash from the profile menu states N + irreversibility, then " +
   openProfile();
   fireEvent.click(await screen.findByRole("menuitem", { name: /Empty Trash/ }));
   const dlg = await findDialog();
-  expect(dlg.textContent).toContain("5 mails are in Trash");
-  expect(dlg.textContent).toContain(
-    "This permanently deletes them; it cannot be undone.");
+  expect(dlg.textContent).toContain("5 mails in Trash");
+  expect(dlg.textContent).toContain("This cannot be undone.");
   expect(emptyTrash).not.toHaveBeenCalled();
-  await pressDialog("Delete 5 mails permanently");
+  await pressDialog("Delete permanently (5)");
+  await waitFor(() => expect(emptyTrash).toHaveBeenCalledOnce());
+});
+
+test("Empty Trash uses the LIVE Trash total, not the stale state count",
+  async () => {
+  trashTotal = 9;                       // state.trash_count still says 5
+  await mount();
+  openProfile();
+  fireEvent.click(await screen.findByRole("menuitem", { name: /Empty Trash/ }));
+  expect((await findDialog()).textContent).toContain("9 mails in Trash");
+  await pressDialog("Delete permanently (9)");
+  await waitFor(() => expect(emptyTrash).toHaveBeenCalledOnce());
+});
+
+test("a single mail reads 'The 1 mail', not '1 mails'", async () => {
+  trashTotal = 1;
+  await mount();
+  openProfile();
+  fireEvent.click(await screen.findByRole("menuitem", { name: /Empty Trash/ }));
+  const text = (await findDialog()).textContent!;
+  expect(text).toContain("The 1 mail in Trash");
+  expect(text).not.toContain("1 mails");
+  await cancelDialog();
+});
+
+test("if the live count can't be fetched the button carries no number",
+  async () => {
+  trashFails = true;
+  await mount();
+  openProfile();
+  fireEvent.click(await screen.findByRole("menuitem", { name: /Empty Trash/ }));
+  const dlg = await findDialog();
+  expect(dlg.textContent).not.toMatch(/\d+ mails/);
+  expect(dlg.textContent).toContain("All mails in Trash");
+  await pressDialog("Delete permanently");
   await waitFor(() => expect(emptyTrash).toHaveBeenCalledOnce());
 });
 
@@ -164,6 +204,7 @@ test("cancelling Empty Trash from the profile menu deletes nothing",
   openProfile();
   fireEvent.click(await screen.findByRole("menuitem", { name: /Empty Trash/ }));
   await cancelDialog();
+  await expectNoDialog();
   expect(emptyTrash).not.toHaveBeenCalled();
 });
 
@@ -177,9 +218,9 @@ test("the Trash panel footer offers the same Empty Trash confirm",
   await mount();
   fireEvent.click(await openTrashPanel());
   const dlg = await findDialog();
-  expect(dlg.textContent).toContain("5 mails are in Trash");
-  expect(dlg.textContent).toContain("it cannot be undone");
-  await pressDialog("Delete 5 mails permanently");
+  expect(dlg.textContent).toContain("5 mails in Trash");
+  expect(dlg.textContent).toContain("cannot be undone");
+  await pressDialog("Delete permanently (5)");
   await waitFor(() => expect(emptyTrash).toHaveBeenCalledOnce());
 });
 
@@ -188,6 +229,7 @@ test("cancelling Empty Trash in the Trash panel deletes nothing",
   await mount();
   fireEvent.click(await openTrashPanel());
   await cancelDialog();
+  await expectNoDialog();
   expect(emptyTrash).not.toHaveBeenCalled();
 });
 
@@ -215,6 +257,7 @@ test("AI consent: declining sends nothing and is asked again next time",
   const dlg = await findDialog();
   expect(dlg.textContent).toContain("NEVER sent");
   await cancelDialog();
+  await expectNoDialog();
   expect(aiReview).not.toHaveBeenCalled();
   expect(localStorage.getItem("pmc_ai_ack")).toBeNull();
 });

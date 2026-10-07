@@ -82,9 +82,6 @@ export const DE: Record<string, string> = {
   "bar.all_pinned": "alles geschützt - nichts zu verschieben",
   "toast.all_pinned":
     "Alle ausgewählten Mails sind geschützt - nichts wurde geändert.",
-  "confirm.act_pinned_mail":
-    "{verb}: die geschützte Mail „{subject}“? Geschützte Mails sind von "
-    + "Sammelaktionen ausgenommen - dies hebt ihren Schutz ausdrücklich auf.",
   "pin.protect_tip":
     "Diese Mail schützen - keine Sammelaktion, Regel oder KI-Auswahl "
     + "verschiebt sie",
@@ -795,7 +792,6 @@ export const DE: Record<string, string> = {
   "Close": "Schließen",
   "Remove": "Entfernen",
   "View details": "Details anzeigen",
-  "trash_group.tip": "Alle Mails dieser Gruppe in den Papierkorb verschieben",
   "menu.more": "Mehr",
   "export.csv": "CSV exportieren",
   "export.csv_tip": "Aktuelle Gruppierung als CSV exportieren",
@@ -813,9 +809,25 @@ export const DE: Record<string, string> = {
   "Select mail": "Mail auswählen",
   "ai.consent_title": "Mail-Metadaten an den KI-Anbieter senden?",
   "Continue": "Fortfahren",
+  "btn.mail_protect": "Mail schützen",
+  "btn.mail_protected": "Mail geschützt",
   "btn.protect": "Schützen",
   "btn.protected": "Geschützt",
   "confirm.btn_n": "{verb} ({n})",
+  "confirm.act_pinned_mail":
+    "Die geschützte Mail „{subject}“ ist von Sammelaktionen ausgenommen - "
+    + "dies hebt ihren Schutz ausdrücklich auf.",
+  "confirm.empty_trash_body":
+    "{n} Mails im Papierkorb werden endgültig gelöscht. Das lässt sich "
+    + "nicht rückgängig machen.",
+  "confirm.empty_trash_body_1":
+    "Die 1 Mail im Papierkorb wird endgültig gelöscht. Das lässt sich nicht "
+    + "rückgängig machen.",
+  "confirm.empty_trash_body_nocount":
+    "Alle Mails im Papierkorb werden endgültig gelöscht. Das lässt sich "
+    + "nicht rückgängig machen.",
+  "confirm.empty_trash_btn": "Endgültig löschen ({n})",
+  "confirm.empty_trash_btn_nocount": "Endgültig löschen",
   "confirm.btn_anyway": "Trotzdem: {verb}",
   "confirm.b_mails_groups": "{n} Mails aus {k} Gruppe(n) sind betroffen",
   "confirm.b_selected": "{n} ausgewählte Mail(s)",
@@ -825,10 +837,6 @@ export const DE: Record<string, string> = {
   "confirm.unsubscribe_btn": "Abbestellen",
   "confirm.restore_btn": "Wiederherstellen",
   "confirm.empty_trash_title": "Papierkorb leeren?",
-  "confirm.empty_trash_body":
-    "{n} Mails liegen im Papierkorb. Sie werden endgültig gelöscht; das "
-    + "lässt sich nicht rückgängig machen.",
-  "confirm.empty_trash_btn": "{n} Mails endgültig löschen",
   "confirm.unpin_btn": "Schutz aufheben",
   "confirm.block_title": "„{label}“ blockieren?",
   "confirm.block_body":
@@ -836,7 +844,6 @@ export const DE: Record<string, string> = {
     + "automatisch in den Papierkorb verschiebt - umkehrbar durch Löschen "
     + "der Regel in Regeln.",
   "confirm.block_only": "Nur blockieren",
-  "confirm.block_trash_btn": "{n} Mails in den Papierkorb",
   "confirm.unblock_title": "„{label}“ entblocken?",
   "confirm.unblock_body":
     "Dies löscht die dauerhafte Regel - künftige Mails werden nicht mehr "
@@ -848,9 +855,9 @@ export const DE: Record<string, string> = {
   "rule.enable_body":
     "Geplante Läufe verarbeiten dann passende Mails (max. 500 pro Lauf, "
     + "geschützte Absender übersprungen, Undo verfügbar).",
-  "trash_all.btn": "Alle {n} löschen",
+  "trash_all.btn": "Alle {n} in den Papierkorb",
   "trash_all.tip": "Alle {n} Mails dieser Gruppe in den Papierkorb verschieben",
-  "trash_this.btn": "Diese Mail löschen",
+  "trash_this.btn": "Diese Mail in den Papierkorb",
   "block.btn": "Absender blockieren",
   "rule.f_grouping": "Gruppierung",
   "rule.f_filter": "Filter",

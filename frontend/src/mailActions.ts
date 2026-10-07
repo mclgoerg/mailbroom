@@ -24,7 +24,7 @@ export async function planMailAction(chosen: Mail[], action: string,
     if (chosen.length === 1 && pinned.length === 1) {
       if (!await confirmDialog({ title: verb, tone,
         body: t("confirm.act_pinned_mail", {
-          verb, subject: chosen[0].subject || t("(no subject)") }),
+          subject: chosen[0].subject || t("(no subject)") }),
         confirmLabel: t("confirm.btn_anyway", { verb }) }))
         return { kind: "cancelled" };
       force = true;
@@ -34,7 +34,10 @@ export async function planMailAction(chosen: Mail[], action: string,
     }
   }
   if (!force) {
-    const bullets = [t("confirm.b_selected", { n: acting.length })];
+    // A single mail is named by its subject, several by their count.
+    const bullets = [acting.length === 1
+      ? `"${acting[0].subject || t("(no subject)")}"`
+      : t("confirm.b_selected", { n: acting.length })];
     if (acting.length !== chosen.length) {
       bullets.push(t("confirm.b_pinned_skipped",
         { n: chosen.length - acting.length }));
