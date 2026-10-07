@@ -5,7 +5,7 @@ import { createContext, useCallback, useContext, useEffect, useId,
   type KeyboardEvent as ReactKeyboardEvent, type ReactNode, type RefObject }
   from "react";
 import { t } from "../i18n";
-import { engagementTier } from "../lib";
+import { engagementTier, fmtDate } from "../lib";
 import type { GroupAi } from "../types";
 
 /** One-time consent: what metadata the AI features transmit. */
@@ -1128,6 +1128,20 @@ export function DialogProvider({ children }: { children: ReactNode }) {
           onResult={(v) => done(cur, () => cur.resolve(v))} />
       )}
     </>
+  );
+}
+
+/** A date in its short locale form (see fmtDate); the full ISO date is the
+ *  `title` and the `<time>` value. Empty input renders nothing. */
+export function ShortDate({ iso, className }: {
+  iso: string; className?: string;
+}) {
+  if (!iso) return null;
+  const day = iso.slice(0, 10);
+  const short = fmtDate(iso);
+  if (short === iso) return <span className={className}>{iso}</span>;
+  return (
+    <time dateTime={day} title={day} className={className}>{short}</time>
   );
 }
 

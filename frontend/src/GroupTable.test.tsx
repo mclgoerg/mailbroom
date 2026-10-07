@@ -325,3 +325,38 @@ describe("GroupTable stacking", () => {
     expect(tr.className).toContain("z-(--z-sticky)");
   });
 });
+
+describe("GroupTable rows and header", () => {
+  beforeEach(() => setLang("en"));
+  afterEach(cleanup);
+
+  it("shows a short, non-wrapping date with the ISO date as title", () => {
+    const { container } = renderTable({ groups: [mk(0)] });
+    const td = container.querySelector("tbody tr td:nth-last-child(2)")!;
+    expect(td.className).toContain("whitespace-nowrap");
+    const time = td.querySelector("time")!;
+    expect(time.getAttribute("title")).toBe("2025-01-01");
+    expect(time.textContent).toBe("1 Jan 2025");
+  });
+
+  it("marks only the sorted column with aria-sort", () => {
+    const { container } = renderTable();
+    const sorted = container.querySelectorAll("th[aria-sort]");
+    expect(sorted.length).toBe(1);
+    expect(sorted[0].getAttribute("aria-sort")).toBe("descending");
+    expect(sorted[0].textContent).toBe("Mails");
+  });
+
+  it("opens the detail from a row click, but not from the checkbox, meter or buttons", () => {
+    const onOpen = vi.fn();
+    const { container } = renderTable({ onOpen, groups: [mk(0)] });
+    const row = container.querySelector("tbody tr")!;
+    fireEvent.click(row.querySelector("input[type=checkbox]")!);
+    fireEvent.click(row.querySelector("[data-eng]")!);
+    expect(onOpen).not.toHaveBeenCalled();
+    fireEvent.click(row.querySelectorAll("td")[6]);
+    expect(onOpen).toHaveBeenCalledTimes(1);
+    fireEvent.click(row.querySelector("button[aria-label='View details']")!);
+    expect(onOpen).toHaveBeenCalledTimes(2);
+  });
+});

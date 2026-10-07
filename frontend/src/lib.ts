@@ -1,10 +1,27 @@
 /* Pure helpers - kept dependency-free so they are unit-testable. */
 
+import { getLang } from "./i18n";
 import type { Group } from "./types";
 
 export const fmtSize = (b: number): string =>
   b >= 1048576 ? `${(b / 1048576).toFixed(1)} MB`
   : b >= 1024 ? `${Math.round(b / 1024)} KB` : `${b} B`;
+
+/** Short locale date for display: "6 Oct" / "6. Okt." this year, with the
+ *  year ("6 Oct 2024") otherwise. Takes the leading YYYY-MM-DD of an ISO
+ *  string; anything else (empty, malformed) is returned unchanged. Put the
+ *  full ISO date in a title - see ShortDate in ui.tsx. */
+export function fmtDate(iso: string, now: Date = new Date()): string {
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso || "");
+  if (!m) return iso;
+  const [y, mo, d] = [Number(m[1]), Number(m[2]), Number(m[3])];
+  const dt = new Date(Date.UTC(y, mo - 1, d));
+  if (dt.getUTCMonth() !== mo - 1) return iso;   // e.g. 2025-02-31
+  return new Intl.DateTimeFormat(getLang() === "de" ? "de-DE" : "en-GB", {
+    day: "numeric", month: "short", timeZone: "UTC",
+    ...(y === now.getFullYear() ? {} : { year: "numeric" }),
+  }).format(dt);
+}
 
 export const fmtUsd = (c: number): string =>
   `$${c < 0.1 ? c.toFixed(4) : c.toFixed(2)}`;

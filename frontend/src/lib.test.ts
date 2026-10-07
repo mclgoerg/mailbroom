@@ -1,5 +1,7 @@
+// @vitest-environment jsdom
 import { describe, expect, it } from "vitest";
-import { applyStatus, ENGAGEMENT_HIGH_MIN, ENGAGEMENT_LOW_MAX,
+import { setLang } from "./i18n";
+import { applyStatus, fmtDate, ENGAGEMENT_HIGH_MIN, ENGAGEMENT_LOW_MAX,
   engagementTier, fmtAgo, fmtSize, fmtUsd, mailKey, matchGroup, olderThan,
   parseFilter, parseProgress, retainedMailKeys, sieveSnippet } from "./lib";
 import type { Group } from "./types";
@@ -338,5 +340,29 @@ describe("parseProgress", () => {
     expect(parseProgress("queued…")).toBeNull();
     expect(parseProgress("0/0")).toBeNull();
     expect(parseProgress("")).toBeNull();
+  });
+});
+
+describe("fmtDate", () => {
+  const now = new Date(2026, 9, 7);
+  it("omits the year in the current year", () => {
+    setLang("en");
+    expect(fmtDate("2026-10-06", now)).toBe("6 Oct");
+    expect(fmtDate("2026-10-06 14:32:00+02:00", now)).toBe("6 Oct");
+  });
+  it("adds the year for other years", () => {
+    setLang("en");
+    expect(fmtDate("2024-10-06", now)).toBe("6 Oct 2024");
+  });
+  it("follows the app language", () => {
+    setLang("de");
+    expect(fmtDate("2026-10-06", now)).toBe("6. Okt.");
+    expect(fmtDate("2024-10-06", now)).toBe("6. Okt. 2024");
+    setLang("en");
+  });
+  it("returns empty or invalid input unchanged", () => {
+    expect(fmtDate("", now)).toBe("");
+    expect(fmtDate("yesterday", now)).toBe("yesterday");
+    expect(fmtDate("2026-02-31", now)).toBe("2026-02-31");
   });
 });

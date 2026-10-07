@@ -5,7 +5,7 @@ import { t } from "../i18n";
 import type { AppState, AttMail, Mail } from "../types";
 import { MessageView } from "./MailList";
 import { Button, Checkbox, EmptyState, Loading, Modal, PanelHeader, Spinner,
-  Tag, Toolbar } from "./ui";
+  ShortDate, Tag, Toolbar } from "./ui";
 
 /** Attachment explorer: lazy BODYSTRUCTURE analysis, then the mailbox's
  *  attachment-heaviest mails. Proton IMAP cannot strip attachments, so the
@@ -130,9 +130,8 @@ export function AttachmentsPanel({ state, onClose, onDeleted }: {
                   border-line/60 px-1 py-2">
                 <Checkbox checked={sel.has(mailKey(m))} className="-my-1 self-center"
                   onChange={() => toggle(mailKey(m))} />
-                <span className="type-meta whitespace-nowrap text-muted">
-                  {(m.date || "").slice(0, 10)}
-                </span>
+                <ShortDate iso={m.date || ""}
+                  className="type-meta whitespace-nowrap text-muted" />
                 <button className="min-w-0 flex-1 basis-full cursor-pointer
                     truncate text-left type-body hover:underline sm:basis-0"
                   title={m.addr}
