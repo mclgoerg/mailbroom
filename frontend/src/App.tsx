@@ -19,8 +19,9 @@ import { SettingsModal } from "./components/SettingsModal";
 import { StatsPanel } from "./components/StatsPanel";
 import { QueryBuilder } from "./components/QueryBuilder";
 import { TrashPanel } from "./components/TrashPanel";
-import { AccountAvatar, applyTheme, Button, currentTheme, ensureAiAck, Input,
-  isModalOpen, Menu, MenuHeading, MenuItem, Select, Spinner } from "./components/ui";
+import { AccountAvatar, applyTheme, Button, Chip, currentTheme, ensureAiAck,
+  Input, isModalOpen, LINK, LINK_ACCENT, Menu, MenuHeading, MenuItem, Select, Spinner }
+  from "./components/ui";
 import { t } from "./i18n";
 import { applyStatus, fmtAgo, fmtSize, fmtUsd, matchGroup, parseFilter,
   retainedMailKeys } from "./lib";
@@ -734,21 +735,21 @@ export default function App() {
     if (!state) return <Spinner />;
     if (scanning)
       return <>{t("Scanning…")} {state.progress} <Spinner />{" "}
-        <button className="underline" onClick={cancel}>{t("cancel")}</button></>;
+        <button className={LINK} onClick={cancel}>{t("cancel")}</button></>;
     if (state.status === "error") return `Error: ${state.error}`;
     if (deleting)
       return <>{t("Moving…")} {state.delete.progress} <Spinner />{" "}
-        <button className="underline" onClick={cancel}>{t("cancel")}</button></>;
+        <button className={LINK} onClick={cancel}>{t("cancel")}</button></>;
     if (aiRunning)
       return <>AI ({state.ai.grouping})… {state.ai.progress}{" "}
-        <Spinner /> <button className="underline" onClick={cancel}>
+        <Spinner /> <button className={LINK} onClick={cancel}>
         {t("cancel")}</button></>;
     if (attsRunning)
       return <>📎 {t("atts.running")} {state.atts.progress} <Spinner />{" "}
-        <button className="underline" onClick={cancel}>{t("cancel")}</button></>;
+        <button className={LINK} onClick={cancel}>{t("cancel")}</button></>;
     if (unsubRunning)
       return <>✉ {t("unsub.running")} {state.unsub.progress} <Spinner />{" "}
-        <button className="underline" onClick={cancel}>{t("cancel")}</button></>;
+        <button className={LINK} onClick={cancel}>{t("cancel")}</button></>;
     const parts: string[] = [];
     if (groups.length) {
       const mails = groups.reduce((n, g) => n + g.count, 0);
@@ -794,18 +795,18 @@ export default function App() {
     <div className={`mx-auto max-w-6xl p-3 sm:p-5
       ${selected.size > 0 ? "pb-28 sm:pb-20" : ""}`}>
       <header className="mb-4 flex items-center gap-3">
-        <h1 className="text-lg font-bold">
+        <h1 className="type-title">
           Mailbroom
         </h1>
         <span className="ml-auto flex items-center gap-2">
           {state?.trash_count != null && state.trash_count > 0 && (
-            <button className="flex min-h-8 items-center gap-1
-              whitespace-nowrap rounded-md px-2 text-xs text-muted
-              hover:bg-chip"
+            <Button variant="quiet" size="sm"
+              className="inline-flex items-center gap-1 whitespace-nowrap
+                text-muted hover:text-body"
               title={t("trash.browse")}
               onClick={() => setTrashOpen(true)}>
               <Trash2 size={14} /> {state.trash_count}
-            </button>
+            </Button>
           )}
           {/* Profile menu: account switcher (when >1 account), identity,
               theme, settings, trash, logout - keeps the header to three
@@ -818,13 +819,13 @@ export default function App() {
                     {account}
                   </span>
                   {auth.is_admin && auth.mode === "oidc"
-                    ? <Star size={12} className="shrink-0" /> : null}
+                    ? <Star size={14} className="shrink-0" /> : null}
                   <ChevronDown size={14} className="shrink-0 text-faint" />
                 </>
               : <span className="inline-flex items-center gap-0.5">
                   <User size={18} />
                   {auth.is_admin && auth.mode === "oidc"
-                    && <Star size={11} />}
+                    && <Star size={14} />}
                 </span>}>
             {multiAccount && (
               <>
@@ -839,7 +840,7 @@ export default function App() {
                   </MenuItem>
                 ))}
                 <MenuItem onClick={() => setSettingsOpen(true)}>
-                  <Plus size={15} className="mr-1 inline align-text-bottom" />
+                  <Plus size={16} className="mr-1 inline align-text-bottom" />
                   {t("account.add")}…
                 </MenuItem>
                 <div className="my-1 border-t border-line" />
@@ -850,25 +851,25 @@ export default function App() {
                 {auth.sub}
                 {auth.is_admin && (
                   <span className="inline-flex items-center gap-1">
-                    {" "}<Star size={11} /> {t("login.admin_tip")}
+                    {" "}<Star size={14} /> {t("login.admin_tip")}
                   </span>
                 )}
               </MenuHeading>
             )}
             <MenuItem onClick={toggleTheme}>
               {theme === "dark"
-                ? <Sun size={15} className="mr-1 inline align-text-bottom" />
-                : <Moon size={15} className="mr-1 inline align-text-bottom" />}
+                ? <Sun size={16} className="mr-1 inline align-text-bottom" />
+                : <Moon size={16} className="mr-1 inline align-text-bottom" />}
               {t("menu.theme", {
                 next: theme === "dark" ? t("menu.light") : t("menu.dark") })}
             </MenuItem>
             <MenuItem onClick={() => setSettingsOpen(true)}>
-              <SettingsIcon size={15} className="mr-1 inline align-text-bottom" />
+              <SettingsIcon size={16} className="mr-1 inline align-text-bottom" />
               {t("Settings")}
             </MenuItem>
             {state?.trash_count != null && state.trash_count > 0 && (
               <MenuItem onClick={emptyTrash}>
-                <Trash2 size={15} className="mr-1 inline align-text-bottom" />
+                <Trash2 size={16} className="mr-1 inline align-text-bottom" />
                 {t("Empty Trash")} ({state.trash_count})
               </MenuItem>
             )}
@@ -877,7 +878,7 @@ export default function App() {
                 try { await api.logout(); } catch { /* session gone */ }
                 window.location.reload();
               }}>
-                <Power size={15} className="mr-1 inline align-text-bottom" />
+                <Power size={16} className="mr-1 inline align-text-bottom" />
                 {t("login.logout")}
               </MenuItem>
             )}
@@ -892,12 +893,11 @@ export default function App() {
 
       {updateAvailable && (
         <div className="mb-3 flex items-center justify-between gap-2
-          rounded-md border border-accent/40 bg-panel2 px-3 py-2 text-sm">
+          rounded-control border border-accent/40 bg-panel2 px-3 py-2 type-body">
           <span className="inline-flex items-center gap-1.5">
-            <Sparkles size={15} /> {t("update.available")}
+            <Sparkles size={16} /> {t("update.available")}
           </span>
-          <Button className="!min-h-7 !px-2.5 !py-1 !text-xs"
-            onClick={() => window.location.reload()}>
+          <Button size="sm" onClick={() => window.location.reload()}>
             {t("update.reload")}
           </Button>
         </div>
@@ -908,11 +908,11 @@ export default function App() {
         <Button onClick={startScan}
           disabled={scanning || aiRunning || deleting || attsRunning
             || unsubRunning}>
-          {scanning ? <Spinner className="!text-white" /> : t("Scan")}
+          {scanning ? <Spinner className="text-white" /> : t("Scan")}
         </Button>
         {/* order-2 + w-full: on phones the grouping toggle gets a full line
             of its own instead of being shrunk by the icon strip. */}
-        <div className="order-2 flex w-full overflow-hidden rounded-md border
+        <div className="order-2 flex w-full overflow-hidden rounded-control border
           border-line sm:order-none sm:w-auto">
           {(Object.keys(GROUPING_LABEL) as Grouping[]).map((g) => (
             <button key={g}
@@ -920,7 +920,7 @@ export default function App() {
                 setFlat(false); setMode(g); setSelected(new Set());
                 setFocusIdx(-1);
               }}
-              className={`flex-1 whitespace-nowrap px-2 py-1.5 text-sm sm:flex-none sm:px-3 ${
+              className={`flex-1 whitespace-nowrap px-2 py-1.5 type-body sm:flex-none sm:px-3 ${
                 !flat && mode === g
                   ? "bg-accent text-white"
                   : "bg-panel2 text-body hover:bg-chip"}`}>
@@ -931,7 +931,7 @@ export default function App() {
             onClick={() => {
               setFlat(true); setSelected(new Set()); setFocusIdx(-1);
             }}
-            className={`flex-1 whitespace-nowrap px-2 py-1.5 text-sm sm:flex-none sm:px-3 ${flat
+            className={`flex-1 whitespace-nowrap px-2 py-1.5 type-body sm:flex-none sm:px-3 ${flat
               ? "bg-accent text-white"
               : "bg-panel2 text-body hover:bg-chip"}`}>
             {t("view.all_mails")}
@@ -946,71 +946,66 @@ export default function App() {
           <div className="relative min-w-0 flex-1">
             <Input
               ref={filterRef}
-              className="w-full pr-8"
+              className="w-full pr-9 coarse:pr-10"
               placeholder={t("filter groups…")}
               title="Combinable: tag:shipping ai:safe age:>1y unread:>80 is:unsub text"
               value={filter}
               onChange={(e) => setFilter(e.target.value)}
             />
             {!!filter && (
-              <button
-                className="absolute right-2 top-1/2 -translate-y-1/2
-                  text-muted hover:text-body"
-                title={t("Clear filter")}
-                aria-label={t("Clear filter")}
-                onClick={() => { setFilter(""); filterRef.current?.focus(); }}>
-                <X size={14} />
-              </button>
+              <span className="absolute inset-y-0 right-0 flex items-center">
+                {/* The wrapper centres the Button: a transform on the Button
+                    itself is replaced by its pressed translate-y-px. */}
+                <Button variant="quiet" size="icon" label={t("Clear filter")}
+                  className="text-muted hover:text-body"
+                  onClick={() => { setFilter(""); filterRef.current?.focus(); }}>
+                  <X size={16} />
+                </Button>
+              </span>
             )}
           </div>
           <QueryBuilder value={filter} onChange={setFilter} />
-          <Button variant="ghost" className="!px-2 sm:!px-3"
-            title={t("saved_filter.save_tip")}
+          <Button variant="secondary" size="icon"
+            label={t("saved_filter.save_tip")}
             disabled={!filter.trim()}
             onClick={saveFilterPreset}>
-            <BookmarkPlus size={17} />
+            <BookmarkPlus size={18} />
           </Button>
         </div>
         )}
-        {/* One wrap unit; tighter padding on phones so the strip fits next
-            to Scan on one line. */}
-        <div className={`ml-auto flex items-center gap-1.5 sm:gap-2 ${
+        {/* One wrap unit; a tight gap on phones (deliberate: the 40 px touch
+            icons would otherwise push the strip onto its own line, UX5
+            reworks this toolbar). */}
+        <div className={`ml-auto flex items-center gap-0.5 sm:gap-2 ${
           flat ? "" : "sm:ml-0"}`}>
-          <Button variant="ghost" className="!px-2 sm:!px-3"
-            title={t("Search all mails")}
-            onClick={() => setSearchOpen(true)}><Search size={17} /></Button>
-          <Button variant="ghost" className="!px-2 sm:!px-3"
-            title={t("Rules")}
+          <Button variant="secondary" size="icon" label={t("Search all mails")}
+            onClick={() => setSearchOpen(true)}><Search size={18} /></Button>
+          <Button variant="secondary" size="icon" label={t("Rules")}
             onClick={() => setRulesOpen(true)}>
-            <ClipboardList size={17} />
+            <ClipboardList size={18} />
           </Button>
-          <Button variant="ghost" className="!px-2 sm:!px-3"
-            title={t("Attachments")}
-            onClick={() => setAttsOpen(true)}><Paperclip size={17} /></Button>
-          <Button variant="ghost" className="!px-2 sm:!px-3"
-            title={t("Duplicates")}
+          <Button variant="secondary" size="icon" label={t("Attachments")}
+            onClick={() => setAttsOpen(true)}><Paperclip size={18} /></Button>
+          <Button variant="secondary" size="icon" label={t("Duplicates")}
             disabled={state?.status !== "done"}
-            onClick={() => setDupsOpen(true)}><Copy size={17} /></Button>
-          <Button variant="ghost" className="!px-2 sm:!px-3"
-            title={t("Statistics")}
-            onClick={() => setStatsOpen(true)}><BarChart3 size={17} /></Button>
-          <Button variant="ghost" className="!px-2 sm:!px-3"
-            title={t("Audit Log")}
-            onClick={() => setAuditOpen(true)}><ScrollText size={17} /></Button>
-          <Menu label={t("menu.more")} trigger={<MoreHorizontal size={17} />}>
+            onClick={() => setDupsOpen(true)}><Copy size={18} /></Button>
+          <Button variant="secondary" size="icon" label={t("Statistics")}
+            onClick={() => setStatsOpen(true)}><BarChart3 size={18} /></Button>
+          <Button variant="secondary" size="icon" label={t("Audit Log")}
+            onClick={() => setAuditOpen(true)}><ScrollText size={18} /></Button>
+          <Menu label={t("menu.more")} trigger={<MoreHorizontal size={18} />}>
             {aiEnabled && (
               <MenuItem onClick={() => startAi()}
                 disabled={scanning || aiRunning || state?.status !== "done"}>
-                <Wand2 size={15} className="mr-1 inline align-text-bottom" />
+                <Wand2 size={16} className="mr-1 inline align-text-bottom" />
                 {t("AI review")}
               </MenuItem>
             )}
-            <button onClick={() => downloadFile(api.exportUrl(mode))}
-              title={t("export.csv_tip")}
-              className="flex w-full items-center gap-2 rounded-md px-3
-                py-2 text-left text-sm text-body hover:bg-chip">
-              <Download size={15} /> {t("export.csv")}
-            </button>
+            <MenuItem onClick={() => downloadFile(api.exportUrl(mode))}
+              sub={t("export.csv_tip")}>
+              <Download size={16} className="mr-1 inline align-text-bottom" />
+              {t("export.csv")}
+            </MenuItem>
           </Menu>
         </div>
       </div>
@@ -1023,15 +1018,11 @@ export default function App() {
       {!flat && (
       <div className="mb-3 flex flex-wrap items-center gap-2">
         {PRESET_CHIPS.map((p) => (
-          <button key={p.key}
-            className={`shrink-0 rounded-full border px-3 py-1.5 text-xs
-              whitespace-nowrap ${filter === presetFilterQuery(p.key)
-                ? "border-accent bg-accent text-white"
-                : "border-line bg-panel2 text-muted hover:bg-chip "
-                  + "hover:text-body"}`}
+          <Chip key={p.key} className="shrink-0"
+            on={filter === presetFilterQuery(p.key)}
             onClick={() => selectPreset(p.key)}>
             {t(p.label)}
-          </button>
+          </Chip>
         ))}
         {/* New-sender review: only shown once there's something to review -
             an always-visible "New (0)" chip would just be clutter. Count
@@ -1039,16 +1030,11 @@ export default function App() {
             currently-filtered groups - otherwise another active chip's
             filter could hide this one. */}
         {allGroups.some((g) => g.new) && (
-          <button
-            className={`shrink-0 rounded-full border px-3 py-1.5 text-xs
-              whitespace-nowrap ${filter === "is:new"
-                ? "border-accent bg-accent text-white"
-                : "border-line bg-panel2 text-muted hover:bg-chip "
-                  + "hover:text-body"}`}
+          <Chip className="shrink-0" on={filter === "is:new"}
             onClick={() => selectPreset("new")}>
             {t("chip.new_count",
               { n: allGroups.filter((g) => g.new).length })}
-          </button>
+          </Chip>
         )}
         {/* Saved filter presets: user-defined, visually distinct (outlined
             accent vs. the built-ins' filled muted look above) - tapping one
@@ -1060,7 +1046,7 @@ export default function App() {
         {(state?.presets ?? []).map((p) => (
           <span key={p.id}
             className="inline-flex shrink-0 items-center gap-1 rounded-full
-              border border-accent/50 bg-transparent px-3 py-1.5 text-xs
+              border border-accent/50 bg-transparent px-3 py-1.5 type-meta
               whitespace-nowrap text-accent hover:bg-chip">
             <button onClick={() => setFilter(p.query)} title={p.query}>
               {p.name}
@@ -1074,7 +1060,7 @@ export default function App() {
                 setEditingPreset(p);
                 setEditQuery(p.query);
               }}>
-              <Pencil size={12} />
+              <Pencil size={14} />
             </button>
             <button
               className="opacity-60 hover:opacity-100"
@@ -1084,7 +1070,7 @@ export default function App() {
                 e.stopPropagation();
                 deleteFilterPreset(p.id, p.name);
               }}>
-              <X size={12} />
+              <X size={14} />
             </button>
           </span>
         ))}
@@ -1095,7 +1081,7 @@ export default function App() {
             with a big empty gap in front - it just flows after the last
             chip now, like any other item in this row. */}
         <div className="flex shrink-0 items-stretch overflow-hidden
-          rounded-md border border-line">
+          rounded-control border border-line">
           <Select className="min-w-0 flex-1 !rounded-none !border-0"
             value={sortK}
             onChange={(e) => {
@@ -1107,16 +1093,15 @@ export default function App() {
               <option key={o.k} value={o.k}>{t(o.label)}</option>
             ))}
           </Select>
-          <button
-            className="flex w-9 shrink-0 items-center justify-center
-              border-l border-line bg-panel2 text-accent hover:bg-chip"
-            title={t(sortDir < 0 ? "sort.desc_tip" : "sort.asc_tip")}
-            aria-label={t(sortDir < 0 ? "sort.desc_tip" : "sort.asc_tip")}
+          {/* !rounded-none: the segment's corners belong to the wrapper. */}
+          <Button variant="secondary" size="icon"
+            label={t(sortDir < 0 ? "sort.desc_tip" : "sort.asc_tip")}
+            className="shrink-0 !rounded-none border-l border-line"
             onClick={() => setSortDir(-sortDir)}>
             <ArrowDown aria-hidden size={16}
-              className={`transition-transform duration-200
+              className={`text-accent transition-transform duration-200
                 ${sortDir > 0 ? "rotate-180" : ""}`} />
-          </button>
+          </Button>
         </div>
       </div>
       )}
@@ -1126,18 +1111,17 @@ export default function App() {
           leaving a swapped-in control with no way back. */}
       {!flat && editingPreset && (
         <div className="relative mb-3 flex flex-wrap items-center gap-2
-          rounded-lg border border-accent/50 bg-panel2 p-2">
-          <span className="shrink-0 text-xs text-muted">
+          rounded-card border border-accent/50 bg-panel2 p-2">
+          <span className="shrink-0 type-meta text-muted">
             {t("saved_filter.editing", { name: editingPreset.name })}
           </span>
           <Input className="min-w-0 flex-1" value={editQuery}
             onChange={(e) => setEditQuery(e.target.value)} />
           <QueryBuilder value={editQuery} onChange={setEditQuery} />
-          <Button className="!min-h-8 !px-3 !text-xs"
-            onClick={saveEditedPreset}>
+          <Button size="sm" onClick={saveEditedPreset}>
             {t("Save")}
           </Button>
-          <Button variant="ghost" className="!min-h-8 !px-3 !text-xs"
+          <Button variant="secondary" size="sm"
             onClick={() => setEditingPreset(null)}>
             {t("Cancel")}
           </Button>
@@ -1152,10 +1136,10 @@ export default function App() {
           (useless on touch), (3) the actions themselves. */}
       {selected.size > 0 && (
         <div className="fixed inset-x-0 bottom-0 z-(--z-bulkbar) border-t border-line
-          bg-panel px-3 py-2 shadow-[0_-4px_16px_rgba(0,0,0,0.3)]"
+          bg-panel px-3 py-2 shadow-bar"
           style={{ paddingBottom: "calc(env(safe-area-inset-bottom) + 0.5rem)" }}>
           <div className="mx-auto flex max-w-6xl flex-col gap-2">
-            <div className="flex items-center gap-2 text-xs text-muted">
+            <div className="flex items-center gap-2 type-meta text-muted">
               <span>
                 {selCountPending
                   ? <>{selected.size} {t("groups")} <Spinner /></>
@@ -1164,7 +1148,7 @@ export default function App() {
                   <span className="text-accent"> · {t("bar.all_pinned")}</span>
                 )}
               </span>
-              <button className="underline hover:text-body"
+              <button className={LINK}
                 onClick={() => setSelected(new Set())}>
                 {t("Clear selection")}
               </button>
@@ -1175,7 +1159,7 @@ export default function App() {
                 <Download size={14} /> {t("export.csv")}
               </button>
             </div>
-            <div className="flex flex-wrap items-center gap-2 text-xs
+            <div className="flex flex-wrap items-center gap-2 type-meta
               text-muted">
               <span className="shrink-0">{t("bar.limit_to")}</span>
               <Select value={retention} title={t("retention.help")}
@@ -1222,9 +1206,9 @@ export default function App() {
                       </option>
                     ))}
                   </Select>
-                  <Button variant="ghost" className="!px-2 shrink-0"
-                    title={t("Cancel")} onClick={() => setMoveDest("")}>
-                    <X size={15} />
+                  <Button variant="secondary" size="icon" label={t("Cancel")}
+                    className="shrink-0" onClick={() => setMoveDest("")}>
+                    <X size={18} />
                   </Button>
                 </>
               )}
@@ -1243,26 +1227,26 @@ export default function App() {
         </div>
       )}
 
-      <div className="mb-1 min-h-5 text-xs text-muted">{statusLine()}</div>
-      <div className="mb-2 flex flex-wrap items-center gap-2 text-xs">
+      <div className="mb-1 min-h-5 type-meta text-muted">{statusLine()}</div>
+      <div className="mb-2 flex flex-wrap items-center gap-2 type-meta">
         {state?.notice && (
           <span className="rounded bg-panel2 px-2 py-1 text-chiptext">
             {t(`notice.${state.notice.key}`, state.notice.params)}{" "}
-            <button className="text-muted underline"
+            <button className={`text-muted ${LINK}`}
               onClick={dismissNotice}>{t("dismiss")}</button>
           </span>
         )}
         {(state?.undo.length ?? 0) > 0 && !deleting && (
           <span className="relative">
-            <Button variant="ghost" className="!min-h-7 !px-2 !py-0.5 !text-xs"
+            <Button variant="secondary" size="sm"
               onClick={() => setUndoOpen(!undoOpen)}>
               {t("Undo")}
-              <ChevronDown size={13}
+              <ChevronDown size={14}
                 className="ml-0.5 inline align-text-bottom" />
             </Button>
             {undoOpen && (
               <span className="absolute left-0 top-8 z-(--z-dropdown) block w-72
-                rounded-md border border-line bg-panel p-1 shadow-lg">
+                rounded-card border border-line bg-panel p-1 shadow-popover">
                 {[...state!.undo].map((u, i) => ({ u, i })).reverse()
                   .map(({ u, i }) => (
                   <button key={i}
@@ -1282,16 +1266,16 @@ export default function App() {
       {/* First-run onboarding: no credentials or no scan yet. */}
       {cfg && state?.status === "idle" && groups.length === 0
         && !scanning && (
-        <div className="mx-auto my-10 max-w-md rounded-xl border border-line
-          bg-panel p-6 text-sm">
-          <div className="mb-3 text-base font-semibold">
+        <div className="mx-auto my-10 max-w-md rounded-dialog border border-line
+          bg-panel p-4 type-body sm:p-5">
+          <div className="mb-3 type-heading">
             {t("onboard.title")}
           </div>
           <ol className="list-decimal space-y-2 pl-5 text-muted">
             <li>{t("onboard.step_bridge")}</li>
             <li>
               {t("onboard.step_creds")}{" "}
-              <button className="text-accent underline"
+              <button className={LINK_ACCENT}
                 onClick={() => setSettingsOpen(true)}>
                 {t("Settings")}
               </button>
@@ -1300,7 +1284,7 @@ export default function App() {
           </ol>
           <div className="mt-4 flex items-center gap-3">
             {acct?.password_set && (
-              <Button variant="ghost" onClick={async () => {
+              <Button variant="secondary" onClick={async () => {
                 setToast(t("onboard.testing"));
                 try {
                   const r = await api.testConnection();
@@ -1351,7 +1335,7 @@ export default function App() {
         />
       ) : (
         !scanning && state?.status === "done" && (
-          <div className="py-16 text-center text-sm text-muted">
+          <div className="py-16 text-center type-body text-muted">
             {filter ? t("no.matches") : t("No scan yet - hit “Scan”.")}
           </div>
         )

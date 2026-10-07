@@ -10,9 +10,9 @@ const pct = (n: number, of: number) => (of ? Math.round((100 * n) / of) : 0);
 
 function Card({ value, label }: { value: ReactNode; label: string }) {
   return (
-    <div className="rounded-lg bg-panel2 p-3">
-      <div className="text-lg font-semibold tabular-nums">{value}</div>
-      <div className="text-xs text-muted">{label}</div>
+    <div className="rounded-card bg-panel2 p-3">
+      <div className="type-heading tabular-nums">{value}</div>
+      <div className="type-meta text-muted">{label}</div>
     </div>
   );
 }
@@ -27,16 +27,16 @@ function Bars({ rows }: {
     <>
       {rows.map((r) => (
         <div key={r.label} className="mb-1 flex items-center gap-2">
-          <span className="w-24 shrink-0 truncate text-xs tabular-nums
+          <span className="w-24 shrink-0 truncate type-meta tabular-nums
             text-muted" title={r.label}>
             {r.label}
           </span>
           <div className="h-4 min-w-0 flex-1">
-            <div className="h-4 rounded bg-accent/70"
+            <div className="h-4 rounded-badge bg-accent/70"
               style={{ width: `${(100 * r.count) / max}%`, minWidth: 2 }} />
           </div>
-          <span className="w-28 shrink-0 text-right text-xs
-            whitespace-nowrap text-faint">
+          <span className="w-28 shrink-0 text-right type-meta
+            whitespace-nowrap text-muted">
             {r.count} · {fmtSize(r.size)}
           </span>
         </div>
@@ -71,8 +71,8 @@ export function StatsPanel({ onClose }: { onClose: () => void }) {
       <PanelHeader title={<span className="inline-flex items-center gap-2">
         <BarChart3 size={18} /> {t("Statistics")}
       </span>} onClose={onClose} />
-      <div className="space-y-5 p-5 text-sm">
-        {error && <div className="text-rose-400">{error}</div>}
+      <div className="space-y-6 p-4 type-body sm:p-5">
+        {error && <div className="text-danger-fg">{error}</div>}
         {!stats && !error && <Loading />}
         {stats && (
           <>
@@ -94,7 +94,7 @@ export function StatsPanel({ onClose }: { onClose: () => void }) {
               <Card value={stats.oldest || "-"} label={t("stats.oldest")} />
             </div>
             {thisMonth && (
-              <div className="text-xs text-muted">
+              <div className="type-meta text-muted">
                 {t("stats.this_month", { n: thisMonth.trash,
                   size: fmtSize(thisMonth.freed) })}
               </div>
@@ -141,11 +141,11 @@ export function StatsPanel({ onClose }: { onClose: () => void }) {
                   <span className="min-w-0 flex-1 truncate" title={s.key}>
                     {s.label}
                   </span>
-                  <span className="text-xs text-muted">
+                  <span className="type-meta text-muted">
                     {s.count} {t("mails")}
                   </span>
-                  <span className="w-20 text-right text-xs tabular-nums
-                    text-faint">{fmtSize(s.size)}</span>
+                  <span className="w-20 text-right type-meta tabular-nums
+                    text-muted">{fmtSize(s.size)}</span>
                 </div>
               ))}
             </div>
@@ -159,25 +159,25 @@ export function StatsPanel({ onClose }: { onClose: () => void }) {
                   className="flex items-baseline gap-2 border-b
                     border-line/60 py-1">
                   <span className="min-w-0 flex-1 truncate">{d.domain}</span>
-                  <span className="text-xs text-muted">
+                  <span className="type-meta text-muted">
                     {d.count} {t("mails")}
                   </span>
-                  <span className="w-20 text-right text-xs tabular-nums
-                    text-faint">{fmtSize(d.size)}</span>
+                  <span className="w-20 text-right type-meta tabular-nums
+                    text-muted">{fmtSize(d.size)}</span>
                 </div>
               ))}
             </div>
 
             <div>
               <SectionLabel className="mb-2">{t("stats.ai")}</SectionLabel>
-              <div className="flex flex-wrap items-center gap-1.5 text-xs">
-                <Tag className="!bg-emerald-950 !text-emerald-300">
+              <div className="flex flex-wrap items-center gap-1.5 type-meta">
+                <Tag tone="safe">
                   {t("v.delete_safe")}: {stats.ai_groups.delete_safe}
                 </Tag>
-                <Tag className="!bg-amber-950 !text-amber-300">
+                <Tag tone="review">
                   {t("v.review")}: {stats.ai_groups.review}
                 </Tag>
-                <Tag className="!bg-rose-950 !text-rose-300">
+                <Tag tone="keep">
                   {t("v.keep")}: {stats.ai_groups.keep}
                 </Tag>
                 <Tag>{t("v.unrated")}: {stats.ai_groups.unrated}</Tag>
@@ -197,7 +197,7 @@ export function StatsPanel({ onClose }: { onClose: () => void }) {
                   const a = stats.actions[m];
                   return (
                     <div key={m} className="flex items-baseline gap-2 py-0.5
-                      text-xs text-muted">
+                      type-meta text-muted">
                       <span className="w-16 tabular-nums">{m}</span>
                       <span>
                         {t("stats.actions_line", { trash: a.trash,
@@ -215,7 +215,7 @@ export function StatsPanel({ onClose }: { onClose: () => void }) {
                 <SectionLabel className="mb-2">{t("stats.scans")}</SectionLabel>
                 {stats.scans.slice(-8).reverse().map((s) => (
                   <div key={s.ts} className="flex items-baseline gap-2 py-0.5
-                    text-xs text-muted">
+                    type-meta text-muted">
                     <span className="w-32 tabular-nums">
                       {new Date(s.ts * 1000).toLocaleString()}
                     </span>

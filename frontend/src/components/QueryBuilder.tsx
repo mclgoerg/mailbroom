@@ -1,7 +1,7 @@
 import { SlidersHorizontal } from "lucide-react";
 import { useState } from "react";
 import { t } from "../i18n";
-import { Button, Input, Select } from "./ui";
+import { Button, Chip, Input, LINK, SectionLabel, Select } from "./ui";
 
 /* Interactive helper for the filter/rule query DSL: instead of
  * remembering the syntax, users click conditions together - each one
@@ -32,56 +32,52 @@ export function QueryBuilder({ value, onChange, className = "" }: {
     onChange(q ? `${q} ${tok}` : tok);
   };
   const addBtn = (tok: string) => (
-    <Button variant="ghost" className="!min-h-8 shrink-0 !px-2 !text-xs"
+    <Button variant="secondary" size="sm" className="shrink-0"
       onClick={() => add(tok)}>
       {t("qb.add")}
     </Button>
   );
   const flag = (tok: string, label: string) => (
-    <button key={tok}
-      className={`rounded-md border border-line px-2 py-1 text-xs ${
-        value.split(/\s+/).includes(tok)
-          ? "bg-accent text-white" : "bg-panel2 text-body hover:bg-chip"}`}
+    <Chip key={tok} on={value.split(/\s+/).includes(tok)}
       onClick={() => add(tok)}>
       {label}
-    </button>
+    </Chip>
   );
 
   return (
     <>
-      <Button variant="ghost" className={`!px-2 ${className}`}
-        title={t("qb.tip")} aria-expanded={open}
+      <Button variant="secondary" size="icon" className={className}
+        label={t("qb.tip")} aria-expanded={open}
         onClick={() => setOpen(!open)}>
-        <SlidersHorizontal size={17} />
+        <SlidersHorizontal size={18} />
       </Button>
       {/* z-dropdown: must cover the group table's sticky header (z-sticky). */}
       {open && (
-        <div className={`w-full rounded-lg border border-line bg-panel2 p-3
+        <div className={`w-full rounded-card border border-line bg-panel2 p-3
           sm:absolute sm:left-0 sm:right-0 sm:top-full sm:z-(--z-dropdown) sm:mt-1
-          sm:shadow-lg ${className}`}>
-          <div className="mb-2 flex items-center gap-2 text-xs text-muted">
-            <span className="font-medium uppercase tracking-wide">
-              {t("qb.title")}</span>
+          sm:shadow-popover ${className}`}>
+          <div className="mb-2 flex items-center gap-2 type-meta text-muted">
+            <SectionLabel>{t("qb.title")}</SectionLabel>
             <span>{t("qb.hint")}</span>
-            <button className="ml-auto underline-offset-2 hover:underline"
+            <button className={`ml-auto ${LINK}`}
               onClick={() => onChange("")}>{t("qb.clear")}</button>
-            <button className="underline-offset-2 hover:underline"
+            <button className={LINK}
               onClick={() => setOpen(false)}>{t("qb.done")}</button>
           </div>
           <div className="grid gap-2">
-            <div className="flex min-w-0 items-center gap-2 text-sm">
-              <span className="w-24 shrink-0 text-xs text-muted">
+            <div className="flex min-w-0 items-center gap-2 type-body">
+              <span className="w-24 shrink-0 type-meta text-muted">
                 {t("qb.tag")}</span>
-              <Select className="!min-h-8 min-w-0 flex-1 !text-xs" value={tag}
+              <Select className="min-w-0 flex-1" value={tag}
                 onChange={(e) => setTag(e.target.value)}>
                 {TAGS.map((x) => <option key={x}>{x}</option>)}
               </Select>
               {addBtn(`tag:${tag}`)}
             </div>
-            <div className="flex min-w-0 items-center gap-2 text-sm">
-              <span className="w-24 shrink-0 text-xs text-muted">
+            <div className="flex min-w-0 items-center gap-2 type-body">
+              <span className="w-24 shrink-0 type-meta text-muted">
                 {t("qb.ai")}</span>
-              <Select className="!min-h-8 min-w-0 flex-1 !text-xs" value={ai}
+              <Select className="min-w-0 flex-1" value={ai}
                 onChange={(e) => setAi(e.target.value)}>
                 <option value="safe">{t("qb.ai_safe")}</option>
                 <option value="review">{t("qb.ai_review")}</option>
@@ -89,37 +85,37 @@ export function QueryBuilder({ value, onChange, className = "" }: {
               </Select>
               {addBtn(`ai:${ai}`)}
             </div>
-            <div className="flex min-w-0 items-center gap-2 text-sm">
-              <span className="w-24 shrink-0 text-xs text-muted">
+            <div className="flex min-w-0 items-center gap-2 type-body">
+              <span className="w-24 shrink-0 type-meta text-muted">
                 {t("qb.age")}</span>
-              <Input className="!min-h-8 w-14 !text-xs" type="number" min="1"
+              <Input className="w-16" type="number" min="1"
                 value={age} onChange={(e) => setAge(e.target.value)} />
-              <Select className="!min-h-8 min-w-0 flex-1 !text-xs" value={ageUnit}
+              <Select className="min-w-24 flex-1" value={ageUnit}
                 onChange={(e) => setAgeUnit(e.target.value as "m" | "y")}>
                 <option value="m">{t("qb.months")}</option>
                 <option value="y">{t("qb.years")}</option>
               </Select>
               {addBtn(`age:>${+age || 1}${ageUnit}`)}
             </div>
-            <div className="flex min-w-0 items-center gap-2 text-sm">
-              <span className="w-24 shrink-0 text-xs text-muted">
+            <div className="flex min-w-0 items-center gap-2 type-body">
+              <span className="w-24 shrink-0 type-meta text-muted">
                 {t("qb.unread")}</span>
-              <Input className="!min-h-8 w-14 !text-xs" type="number"
+              <Input className="w-16" type="number"
                 min="1" max="100" value={unread}
                 onChange={(e) => setUnread(e.target.value)} />
-              <span className="text-xs text-muted">%</span>
+              <span className="type-meta text-muted">%</span>
               {addBtn(`unread:>${+unread || 1}`)}
             </div>
-            <div className="flex min-w-0 items-center gap-2 text-sm">
-              <span className="w-24 shrink-0 text-xs text-muted">
+            <div className="flex min-w-0 items-center gap-2 type-body">
+              <span className="w-24 shrink-0 type-meta text-muted">
                 {t("qb.att")}</span>
-              <Input className="!min-h-8 w-14 !text-xs" type="number" min="1"
+              <Input className="w-16" type="number" min="1"
                 value={att} onChange={(e) => setAtt(e.target.value)} />
-              <span className="text-xs text-muted">MB</span>
+              <span className="type-meta text-muted">MB</span>
               {addBtn(`att:>${+att || 1}m`)}
             </div>
             <div className="flex flex-wrap items-center gap-1.5">
-              <span className="w-24 shrink-0 text-xs text-muted">
+              <span className="w-24 shrink-0 type-meta text-muted">
                 {t("qb.flags")}</span>
               {flag("is:unsub", t("qb.is_unsub"))}
               {flag("is:unsubscribed", t("qb.is_unsubscribed"))}

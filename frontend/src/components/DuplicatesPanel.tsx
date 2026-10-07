@@ -4,7 +4,7 @@ import { api, fmtSize, mailKey } from "../api";
 import { t } from "../i18n";
 import type { DupSet, Mail } from "../types";
 import { MessageView } from "./MailList";
-import { Button, EmptyState, Loading, Modal, PanelHeader, Tag,
+import { Button, Checkbox, EmptyState, Loading, Modal, PanelHeader, Tag,
   Toolbar } from "./ui";
 
 /** Duplicate finder: same Message-ID anywhere, or identical
@@ -82,7 +82,7 @@ export function DuplicatesPanel({ onClose, onDeleted }: {
       ) : (
         <>
           <Toolbar>
-            <Button variant="ghost" onClick={selectAllButNewest}
+            <Button variant="secondary" onClick={selectAllButNewest}
               disabled={!sets?.length}>
               {t("dups.keep_newest")}
             </Button>
@@ -90,18 +90,18 @@ export function DuplicatesPanel({ onClose, onDeleted }: {
               onClick={trash}>
               {t("Trash selected")}{sel.size > 0 && ` (${sel.size})`}
             </Button>
-            {note && <span className="text-xs text-muted">{note}</span>}
+            {note && <span className="type-meta text-muted">{note}</span>}
           </Toolbar>
           <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-4">
-            {error && <div className="p-4 text-sm text-rose-400">{error}</div>}
+            {error && <div className="p-4 type-body text-danger-fg">{error}</div>}
             {!sets && !error && <Loading />}
             {sets && sets.length === 0 && (
               <EmptyState>{t("dups.none")}</EmptyState>
             )}
             {sets?.map((s, si) => (
               <div key={si}
-                className="my-2 rounded-lg border border-line bg-panel2 p-2">
-                <div className="mb-1 flex items-baseline gap-2 px-1 text-xs
+                className="my-2 rounded-card border border-line bg-panel2 p-2">
+                <div className="mb-1 flex items-baseline gap-2 px-1 type-meta
                   text-muted">
                   <span className="min-w-0 flex-1 truncate">
                     {s.mails[0].subject || t("(no subject)")} -{" "}
@@ -116,22 +116,22 @@ export function DuplicatesPanel({ onClose, onDeleted }: {
                   <div key={mailKey(m)}
                     className="flex flex-wrap items-baseline gap-2 border-t
                       border-line/60 px-1 py-1.5">
-                    <input type="checkbox" checked={sel.has(mailKey(m))}
+                    <Checkbox checked={sel.has(mailKey(m))} className="-my-1 self-center"
                       onChange={() => toggle(mailKey(m))} />
-                    <span className="text-xs whitespace-nowrap text-muted">
+                    <span className="type-meta whitespace-nowrap text-muted">
                       {(m.date || "").slice(0, 16)}
                     </span>
                     <button className="min-w-0 flex-1 cursor-pointer truncate
-                        text-left text-sm hover:underline"
+                        text-left type-body hover:underline"
                       onClick={() => setView(m)}>
                       <Tag>{m.folder}</Tag>{" "}
                       {mi === 0 && (
-                        <Tag className="!bg-emerald-950 !text-emerald-300">
+                        <Tag tone="safe">
                           {t("dups.newest")}
                         </Tag>
                       )}
                     </button>
-                    <span className="text-xs whitespace-nowrap text-faint">
+                    <span className="type-meta whitespace-nowrap text-muted">
                       {fmtSize(m.size)}
                     </span>
                   </div>

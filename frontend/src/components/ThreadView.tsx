@@ -4,7 +4,7 @@ import { api, mailKey } from "../api";
 import { t } from "../i18n";
 import { splitQuoted } from "../quoted";
 import type { ConversationResp, Mail, MessageDetail } from "../types";
-import { Button, Spinner } from "./ui";
+import { Button, LINK, Spinner } from "./ui";
 
 type Body = MessageDetail | "loading" | { error: string };
 
@@ -80,25 +80,25 @@ export function ThreadView({ mail, initial, onBack }: {
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-b
-        border-line px-4 py-3 text-xs text-muted">
+        border-line px-4 py-3 type-meta text-muted">
         <span className="min-w-0 flex-1 truncate font-medium text-body">
           {conv?.label ?? t("thread.title")}
         </span>
         {conv && <span>{t("thread.n_mails", { n: conv.mails.length })}</span>}
         {conv && conv.mails.length > 1 && (
-          <button className="underline hover:text-body"
+          <button className={LINK}
             onClick={() => setOpen(allOpen ? new Set() : new Set(keys))}>
             {allOpen ? t("thread.collapse_all") : t("thread.expand_all")}
           </button>
         )}
       </div>
       {conv?.notes.map((n) => (
-        <p key={n.key} className="px-4 pt-2 text-xs text-muted">
+        <p key={n.key} className="px-4 pt-2 type-meta text-muted">
           {t(`thread.note.${n.key}`, n.params)}
         </p>
       ))}
       <div className="min-h-0 flex-1 overflow-y-auto px-3 py-2">
-        {error && <div className="p-4 text-sm text-rose-400">{error}</div>}
+        {error && <div className="p-4 type-body text-danger-fg">{error}</div>}
         {!conv && !error && (
           <div className="p-6 text-center"><Spinner /></div>
         )}
@@ -108,33 +108,33 @@ export function ThreadView({ mail, initial, onBack }: {
           const body = bodies[k];
           return (
             <div key={k} ref={k === mailKey(mail) ? focusRef : undefined}
-              className={`mb-2 overflow-hidden rounded-md border ${
+              className={`mb-2 overflow-hidden rounded-control border ${
                 m.sent ? "border-accent/40" : "border-line"} bg-panel`}>
               <button
                 className="flex w-full min-w-0 cursor-pointer items-center
                   gap-2 px-3 py-2 text-left hover:bg-chip"
                 aria-expanded={isOpen}
                 onClick={() => toggle(k)}>
-                {isOpen ? <ChevronDown size={15} className="shrink-0" />
-                  : <ChevronRight size={15} className="shrink-0" />}
+                {isOpen ? <ChevronDown size={16} className="shrink-0" />
+                  : <ChevronRight size={16} className="shrink-0" />}
                 {!m.seen && !m.sent && (
                   <span title={t("unread")} className="inline-block size-2
                     shrink-0 rounded-full bg-accent" />
                 )}
-                <span className={`min-w-0 flex-1 truncate text-sm ${
+                <span className={`min-w-0 flex-1 truncate type-body ${
                   !m.seen && !m.sent ? "font-semibold" : ""}`}>
                   {m.sent ? t("thread.you") : m.addr}
-                  <span className="text-faint"> · {m.subject
+                  <span className="text-muted"> · {m.subject
                     || t("(no subject)")}</span>
                 </span>
-                <span className="shrink-0 text-xs whitespace-nowrap
-                  text-faint">{m.date}</span>
+                <span className="shrink-0 type-meta whitespace-nowrap
+                  text-muted">{m.date}</span>
               </button>
               {isOpen && (
                 <div className="border-t border-line px-3 py-2">
                   {body === "loading" || !body ? <Spinner />
                     : "error" in body ? (
-                      <div className="text-sm text-rose-400">{body.error}</div>
+                      <div className="type-body text-danger-fg">{body.error}</div>
                     ) : (
                       <MailText text={body.text}
                         showQuoted={quoted.has(k)}
@@ -151,8 +151,8 @@ export function ThreadView({ mail, initial, onBack }: {
         })}
       </div>
       <div className="border-t border-line px-4 py-2">
-        <Button variant="ghost" onClick={onBack}>
-          <ArrowLeft size={15} className="mr-1 inline align-text-bottom" />
+        <Button variant="secondary" onClick={onBack}>
+          <ArrowLeft size={16} className="mr-1 inline align-text-bottom" />
           {t("back to list")}
         </Button>
       </div>
@@ -166,7 +166,7 @@ function MailText({ text, showQuoted, onToggleQuoted }: {
   const segs = useMemo(() => splitQuoted(text), [text]);
   const hasQuoted = segs.some((s) => s.quoted);
   return (
-    <div className="text-sm leading-relaxed">
+    <div className="type-body leading-relaxed">
       {segs.map((s, i) => (
         s.quoted ? (showQuoted && (
           <pre key={i} className="my-1 whitespace-pre-wrap border-l-2
@@ -176,8 +176,8 @@ function MailText({ text, showQuoted, onToggleQuoted }: {
         )
       ))}
       {hasQuoted && (
-        <button className="mt-1 text-xs text-muted underline
-          hover:text-body" onClick={onToggleQuoted}>
+        <button className={`mt-1 type-meta text-muted ${LINK}`}
+          onClick={onToggleQuoted}>
           {showQuoted ? t("thread.hide_quoted") : t("thread.show_quoted")}
         </button>
       )}

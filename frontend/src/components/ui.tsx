@@ -16,26 +16,48 @@ export function ensureAiAck(): boolean {
   return false;
 }
 
-export function Tag({ children, className = "" }: {
-  children: ReactNode; className?: string;
+/** Shared look of every text link (an underlined button or anchor). The
+ *  colour is inherited; add `text-accent` / `text-muted` where needed. */
+export const LINK = "cursor-pointer underline hover:text-body";
+
+/** Link in the accent colour; stays accent on hover. */
+export const LINK_ACCENT = "cursor-pointer text-accent underline hover:text-accenth";
+
+export type TagTone = "neutral" | "safe" | "review" | "keep" | "info"
+  | "attach" | "new" | "accent";
+
+const TAG_TONE: Record<TagTone, string> = {
+  neutral: "bg-chip text-chiptext",
+  safe: "bg-safe-bg text-safe-fg",
+  review: "bg-review-bg text-review-fg",
+  keep: "bg-keep-bg text-keep-fg",
+  info: "bg-info-bg text-info-fg",
+  attach: "bg-attach-bg text-attach-fg",
+  new: "bg-new-bg text-new-fg",
+  accent: "bg-chip text-accent",
+};
+
+/** Small badge (caption layer). `tone` picks a semantic bg/fg pair. */
+export function Tag({ children, tone = "neutral", className = "" }: {
+  children: ReactNode; tone?: TagTone; className?: string;
 }) {
   return (
-    <span className={`inline-block rounded bg-chip px-1.5 py-0.5
-      text-[0.68rem] leading-4 text-chiptext ${className}`}>
+    <span className={`inline-block rounded-badge px-1.5 py-0.5 type-caption
+      ${TAG_TONE[tone]} ${className}`}>
       {children}
     </span>
   );
 }
 
-const VERDICT_STYLE: Record<string, string> = {
-  delete_safe: "!bg-safe-bg !text-safe-fg",
-  review: "!bg-review-bg !text-review-fg",
-  keep: "!bg-keep-bg !text-keep-fg",
+const VERDICT_TONE: Record<string, TagTone> = {
+  delete_safe: "safe",
+  review: "review",
+  keep: "keep",
 };
 
 export function AiTag({ ai }: { ai: GroupAi }) {
   return (
-    <Tag className={VERDICT_STYLE[ai.verdict] ?? ""}>
+    <Tag tone={VERDICT_TONE[ai.verdict]}>
       <span title={ai.reason}>{ai.verdict.replace("_", " ")}</span>
     </Tag>
   );
@@ -49,7 +71,7 @@ export function RatingChips({ ratings }: {
     ["🟢", ratings.delete_safe], ["🟡", ratings.review], ["🔴", ratings.keep]];
   return (
     <span className="inline-flex gap-1 whitespace-nowrap align-middle
-      text-[0.68rem] text-muted"
+      type-caption text-muted"
       title={t("ratings.title")}>
       {parts.filter(([, n]) => n > 0).map(([icon, n]) => (
         <span key={icon}>{icon}{n}</span>
@@ -67,6 +89,7 @@ export function ProtectButton({ on, onClick, className = "" }: {
   return (
     <button
       title={t(on ? "unprotect.tip" : "protect.tip")}
+      aria-label={t(on ? "unprotect.tip" : "protect.tip")}
       onClick={onClick}
       className={`flex min-h-7 items-center rounded px-1 transition-opacity
         ${on ? "" : "opacity-30 grayscale hover:opacity-70"} ${className}`}>
@@ -88,7 +111,7 @@ export function PinButton({ on, onClick, className = "" }: {
       className={`flex min-h-7 shrink-0 items-center rounded px-1
         transition-opacity ${on ? "text-accent"
           : "opacity-40 hover:opacity-80"} ${className}`}>
-      <Pin size={15} fill={on ? "currentColor" : "none"} />
+      <Pin size={16} fill={on ? "currentColor" : "none"} />
     </button>
   );
 }
@@ -161,9 +184,9 @@ export function EngagementMeter({ g }: {
       {open && (
         <div ref={pop} role="dialog" onClick={(e) => e.stopPropagation()}
           className={`absolute top-full z-(--z-dropdown) mt-1 w-max
-            max-w-[min(18rem,calc(100vw-1rem))] rounded-lg border
-            border-line bg-panel p-2.5 text-left text-xs font-normal
-            shadow-lg ${alignRight ? "right-0" : "left-0"}`}>
+            max-w-[min(18rem,calc(100vw-1rem))] rounded-card border
+            border-line bg-panel p-3 text-left type-meta
+            shadow-popover ${alignRight ? "right-0" : "left-0"}`}>
           <div className="font-semibold text-body">
             {t("eng.popover_title", { score: g.engagement, tier: tierName })}
           </div>
@@ -178,10 +201,10 @@ export function EngagementMeter({ g }: {
 export function PinBadge({ n }: { n: number }) {
   if (n <= 0) return null;
   return (
-    <Tag className="!text-accent whitespace-nowrap">
+    <Tag tone="accent" className="whitespace-nowrap">
       <span title={t("pin.badge_tip", { n })}
         className="inline-flex items-center gap-0.5">
-        <Pin size={11} fill="currentColor" /> {n}
+        <Pin size={14} fill="currentColor" /> {n}
       </span>
     </Tag>
   );
@@ -230,7 +253,7 @@ export function Loading({ label, className = "" }: {
 }) {
   return (
     <div className={`pmc-loading flex flex-col items-center justify-center
-      gap-3 p-8 text-sm text-muted ${className}`}>
+      gap-3 p-8 type-body text-muted ${className}`}>
       <Spinner size="lg" />
       <span>{label ?? t("loading…")}</span>
     </div>
@@ -242,12 +265,11 @@ export function Loading({ label, className = "" }: {
 const DISABLED = "disabled:cursor-not-allowed disabled:bg-chip disabled:text-faint";
 
 type ButtonVariant = "primary" | "secondary" | "quiet" | "danger"
-  | "danger-quiet" | "ghost";   // "ghost" = deprecated alias of secondary
+  | "danger-quiet";
 
 const BUTTON_VARIANT: Record<ButtonVariant, string> = {
   primary: "bg-accent enabled:hover:bg-accenth text-white",
   secondary: "bg-chip enabled:hover:bg-chiph text-body",
-  ghost: "bg-chip enabled:hover:bg-chiph text-body",
   quiet: "bg-transparent enabled:hover:bg-chip text-body",
   danger: "bg-danger enabled:hover:bg-danger-h text-white",
   "danger-quiet":
@@ -336,9 +358,9 @@ export function PanelHeader({ title, sub, actions, onClose }: {
   return (
     <div className="flex items-center gap-3 border-b border-line px-4 py-3">
       <div className="min-w-0 flex-1">
-        <div className="truncate font-semibold">{title}</div>
+        <div className="truncate type-heading">{title}</div>
         {sub != null && sub !== "" && (
-          <div className="truncate text-xs text-muted">{sub}</div>
+          <div className="truncate type-meta text-muted">{sub}</div>
         )}
       </div>
       {actions}
@@ -411,8 +433,8 @@ export function Menu({ trigger, label, children }: {
   }, [open]);
   return (
     <div className="relative" ref={ref}>
-      <button className="flex min-h-8 items-center rounded-md border
-        border-line bg-panel2 px-2 text-sm hover:bg-chip"
+      <button className="flex min-h-8 items-center rounded-control border
+        border-line bg-panel2 px-2 type-body hover:bg-chip"
         title={label} aria-label={label} aria-expanded={open}
         onClick={() => setOpen(!open)}>
         {trigger}
@@ -420,8 +442,8 @@ export function Menu({ trigger, label, children }: {
       {open && (
         <div ref={pop}
           className={`absolute top-full z-(--z-dropdown) mt-1 min-w-52
-            max-w-[calc(100vw-1rem)] rounded-lg border border-line bg-panel
-            p-1 shadow-lg ${alignLeft ? "left-0" : "right-0"}`}
+            max-w-[calc(100vw-1rem)] rounded-card border border-line bg-panel
+            p-1 shadow-popover ${alignLeft ? "left-0" : "right-0"}`}
           onClick={() => setOpen(false)}>
           {children}
         </div>
@@ -487,7 +509,7 @@ const hueOf = (name: string): string => {
 export function Avatar({ name, size = "sm", className = "" }: {
   name: string; size?: "sm" | "md"; className?: string;
 }) {
-  const dims = size === "md" ? "size-8 text-xs" : "size-5 text-[0.65rem]";
+  const dims = size === "md" ? "size-8 type-meta" : "size-5 type-caption";
   return (
     <span className={`inline-flex ${dims} shrink-0 items-center
       justify-center rounded-full font-semibold uppercase
@@ -508,7 +530,7 @@ export function AccountAvatar({ name, className = "" }: {
 export function MenuHeading({ children }: { children: ReactNode }) {
   return (
     <div className="max-w-64 truncate border-b border-line px-3 pb-2 pt-1
-      text-xs text-muted">
+      type-meta text-muted">
       {children}
     </div>
   );
@@ -609,13 +631,14 @@ export function Checkbox({ label, className = "", ...rest }:
   Omit<ComponentProps<"input">, "type"> & { label?: ReactNode }) {
   return (
     <label className={`inline-flex min-h-8 min-w-8 coarse:min-h-11
-      coarse:min-w-11 shrink-0 cursor-pointer items-center justify-center
-      gap-2 type-body ${rest.disabled ? "cursor-not-allowed text-faint" : ""}
+      coarse:min-w-11 cursor-pointer items-center gap-2 type-body
+      ${label != null ? "justify-start" : "shrink-0 justify-center"}
+      ${rest.disabled ? "cursor-not-allowed text-faint" : ""}
       ${className}`}>
       <input type="checkbox"
         className="size-4.5 shrink-0 cursor-[inherit] accent-accent"
         {...rest} />
-      {label != null && <span>{label}</span>}
+      {label != null && <span className="min-w-0">{label}</span>}
     </label>
   );
 }

@@ -17,8 +17,8 @@ const EMPTY = {
 
 function RunSummary({ rule }: { rule: Rule }) {
   const r = rule.last_run;
-  if (!r) return <span className="text-faint">{t("rule.never_ran")}</span>;
-  if (r.error) return <span className="text-rose-400">{r.error}</span>;
+  if (!r) return <span className="text-muted">{t("rule.never_ran")}</span>;
+  if (r.error) return <span className="text-danger-fg">{r.error}</span>;
   return (
     <>
       {new Date(r.ts * 1000).toLocaleString()} -{" "}
@@ -27,16 +27,16 @@ function RunSummary({ rule }: { rule: Rule }) {
       {r.capped > 0 && <> · {t("rule.capped", { n: r.capped })}</>}
       {r.skipped_protected > 0 &&
         <span className="inline-flex items-center gap-1">
-          {" "}· <Shield size={13} />
+          {" "}· <Shield size={14} />
           {t("rule.protected_skipped", { n: r.skipped_protected })}
         </span>}
       {r.skipped_pinned > 0 &&
         <span className="inline-flex items-center gap-1">
-          {" "}· <Pin size={13} />
+          {" "}· <Pin size={14} />
           {t("rule.pinned_skipped", { n: r.skipped_pinned })}
         </span>}
       {r.preview.length > 0 && (
-        <span className="block text-faint">
+        <span className="block text-muted">
           {r.preview.map((p) => `${p.label} (${p.count})`).join(" · ")}
         </span>
       )}
@@ -146,14 +146,14 @@ export function RulesModal({ state, onClose, onChanged }: {
       <PanelHeader title={<span className="inline-flex items-center gap-2">
         <ClipboardList size={18} /> {t("Rules")}
       </span>} onClose={onClose} />
-      <div className="space-y-4 p-5">
-        <p className="text-xs text-muted">{t("rules.help")}</p>
+      <div className="space-y-4 p-4 sm:p-5">
+        <p className="type-meta text-muted">{t("rules.help")}</p>
 
         {rules.map((rule) => (
           <div key={rule.id}
-            className="rounded-lg border border-line bg-panel2 p-3">
+            className="rounded-card border border-line bg-panel2 p-3">
             <div className="flex flex-wrap items-center gap-2">
-              <span className="font-medium">{rule.name}</span>
+              <span className="type-body font-medium">{rule.name}</span>
               <Tag>{t(rule.grouping === "sender" ? "Sender"
                 : rule.grouping === "domain" ? "Domain"
                 : rule.grouping === "thread" ? "Thread" : "Subject")}</Tag>
@@ -167,27 +167,25 @@ export function RulesModal({ state, onClose, onChanged }: {
                 <Tag>{t("retention.tag_older_than_days",
                   { n: rule.older_than_days })}</Tag>
               )}
-              <Tag className={rule.mode === "execute"
-                ? "!bg-rose-950 !text-rose-300"
-                : "!bg-emerald-950 !text-emerald-300"}>
+              <Tag tone={rule.mode === "execute" ? "keep" : "safe"}>
                 {t(`mode.${rule.mode}`)}
               </Tag>
             </div>
             {rule.query && (
-              <code className="mt-1 block text-xs text-chiptext">
+              <code className="mt-1 block type-meta text-chiptext">
                 {rule.query}
               </code>
             )}
-            <div className="mt-1 text-xs text-muted">
+            <div className="mt-1 type-meta text-muted">
               <RunSummary rule={rule} />
             </div>
             <div className="mt-2 flex flex-wrap gap-2">
-              <Button variant="ghost" className="!min-h-7 !px-2 !text-xs"
+              <Button variant="secondary" size="sm"
                 onClick={() => run(rule)} disabled={busyId === rule.id}>
                 {busyId === rule.id ? <Spinner /> : t("rule.run_now")}
               </Button>
-              <Button variant={rule.mode === "report" ? "danger" : "ghost"}
-                className="!min-h-7 !px-2 !text-xs"
+              <Button variant={rule.mode === "report" ? "danger" : "secondary"}
+                size="sm"
                 disabled={rule.mode === "report" && rule.report_runs < 1}
                 title={rule.mode === "report" && rule.report_runs < 1
                   ? t("rule.need_report") : ""}
@@ -195,16 +193,16 @@ export function RulesModal({ state, onClose, onChanged }: {
                 {rule.mode === "report"
                   ? t("rule.enable_execute") : t("rule.back_to_report")}
               </Button>
-              <Button variant="ghost" className="!min-h-7 !px-2 !text-xs"
+              <Button variant="secondary" size="sm"
                 onClick={() => edit(rule)}>{t("Edit")}</Button>
-              <Button variant="ghost" className="!min-h-7 !px-2 !text-xs"
+              <Button variant="secondary" size="sm"
                 onClick={() => del(rule)}>{t("Delete")}</Button>
             </div>
           </div>
         ))}
         {!rules.length && <EmptyState>{t("rules.empty")}</EmptyState>}
 
-        <div className="rounded-lg border border-line p-3">
+        <div className="rounded-card border border-line p-3">
           <SectionLabel className="mb-2">
             {editId ? t("rule.edit_title") : t("rule.new_title")}
           </SectionLabel>
@@ -226,7 +224,7 @@ export function RulesModal({ state, onClose, onChanged }: {
                 <QueryBuilder value={form.query}
                   onChange={(q) => setForm({ ...form, query: q })} />
               </div>
-              <div className="mt-1 text-xs text-muted">
+              <div className="mt-1 type-meta text-muted">
                 {matchCount
                   ? t("rule.match_count", matchCount)
                   : t("rule.match_unknown")}
@@ -273,11 +271,11 @@ export function RulesModal({ state, onClose, onChanged }: {
               {editId ? t("Save") : t("rule.create")}
             </Button>
             {editId && (
-              <Button variant="ghost" onClick={() => {
+              <Button variant="secondary" onClick={() => {
                 setEditId(null); setForm({ ...EMPTY });
               }}>{t("cancel")}</Button>
             )}
-            <span className="text-xs text-muted">{msg}</span>
+            <span className="type-meta text-muted">{msg}</span>
           </div>
         </div>
       </div>

@@ -11,7 +11,7 @@ import {
   isModalOpen, AccountAvatar, Button, Checkbox, Chip, ChipGroup, ChipSegment,
   ConfirmDialog, DialogProvider, EmptyState, MailRow, Menu, MenuDivider,
   MenuHeading, MenuItem, Modal, Notice, ToastProvider, confirmDialog,
-  promptDialog, useToast,
+  LINK, Tag, promptDialog, useToast,
 } from "./components/ui";
 
 afterEach(cleanup);
@@ -147,17 +147,15 @@ test("index.css defines the type layers, semantic pairs, radii and shadows", asy
   expect(css.match(/--shadow-bar:/g)).toHaveLength(2);
 });
 
-test("Button variants render, ghost aliases secondary", () => {
+test("Button variants render", () => {
   render(<>
-    {(["primary", "secondary", "quiet", "danger", "danger-quiet", "ghost"] as const)
+    {(["primary", "secondary", "quiet", "danger", "danger-quiet"] as const)
       .map((v) => <Button key={v} variant={v}>{v}</Button>)}
   </>);
   expect(screen.getByText("primary").className).toContain("bg-accent");
   expect(screen.getByText("quiet").className).toContain("bg-transparent");
   expect(screen.getByText("danger").className).toContain("bg-danger");
   expect(screen.getByText("danger-quiet").className).toContain("text-danger-fg");
-  expect(screen.getByText("ghost").className)
-    .toBe(screen.getByText("secondary").className);
 });
 
 test("Button sizes carry the touch heights; passes aria-* and type through", () => {
@@ -595,4 +593,21 @@ test("focus ring CSS: base outline colour, offset only for text-like fields", as
   expect(base).toMatch(/:where\(\*\) \{[^}]*outline-color: var\(--color-accent\)/);
   expect(base).toMatch(/^  :focus-visible \{/m);
   expect(css).toMatch(/input:not\(\[type="checkbox"\][^{]*\):focus-visible/);
+});
+
+test("Tag tones map to the semantic bg/fg pairs on the caption layer", () => {
+  render(<>
+    <Tag>plain</Tag>
+    <Tag tone="safe">safe</Tag>
+    <Tag tone="attach">attach</Tag>
+  </>);
+  expect(screen.getByText("plain").className).toContain("type-caption");
+  expect(screen.getByText("plain").className).toContain("bg-chip");
+  expect(screen.getByText("safe").className).toContain("bg-safe-bg");
+  expect(screen.getByText("safe").className).toContain("text-safe-fg");
+  expect(screen.getByText("attach").className).toContain("bg-attach-bg");
+});
+
+test("LINK is the shared underline look for text buttons", () => {
+  expect(LINK).toContain("underline");
 });

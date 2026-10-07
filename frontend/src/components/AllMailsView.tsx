@@ -5,8 +5,7 @@ import { t } from "../i18n";
 import { actionVerb, itemsOf, planMailAction } from "../mailActions";
 import type { AppState, Mail } from "../types";
 import { MailRows, MessageView } from "./MailList";
-import { Button, EmptyState, Input, Loading, Modal, Select }
-  from "./ui";
+import { Button, EmptyState, Input, LINK, Loading, Modal, Select } from "./ui";
 
 type MailSort = "date" | "size" | "sender";
 const SORTS: { k: MailSort; label: string }[] = [
@@ -168,7 +167,7 @@ export function AllMailsView({ state, onChanged }: {
   };
 
   const sortControl = () => (
-    <div className="flex shrink-0 items-stretch overflow-hidden rounded-md
+    <div className="flex shrink-0 items-stretch overflow-hidden rounded-control
       border border-line">
       <Select className="min-w-0 flex-1 !rounded-none !border-0"
         value={sortK}
@@ -181,16 +180,15 @@ export function AllMailsView({ state, onChanged }: {
           <option key={o.k} value={o.k}>{t(o.label)}</option>
         ))}
       </Select>
-      <button
-        className="flex w-9 shrink-0 items-center justify-center border-l
-          border-line bg-panel2 text-accent hover:bg-chip"
-        title={t(dir === "desc" ? "sort.desc_tip" : "sort.asc_tip")}
-        aria-label={t(dir === "desc" ? "sort.desc_tip" : "sort.asc_tip")}
+      {/* !rounded-none: the segment's corners belong to the wrapper. */}
+      <Button variant="secondary" size="icon"
+        label={t(dir === "desc" ? "sort.desc_tip" : "sort.asc_tip")}
+        className="shrink-0 !rounded-none border-l border-line"
         onClick={() => setDir(dir === "desc" ? "asc" : "desc")}>
         <ArrowDown aria-hidden size={16}
-          className={`transition-transform duration-200
+          className={`text-accent transition-transform duration-200
             ${dir === "asc" ? "rotate-180" : ""}`} />
-      </button>
+      </Button>
     </div>
   );
 
@@ -198,26 +196,27 @@ export function AllMailsView({ state, onChanged }: {
     <div>
       <div className="mb-2 flex flex-wrap items-center gap-2">
         <div className="relative min-w-0 flex-1">
-          <Input className="w-full pr-8" value={q}
+          <Input className="w-full pr-9 coarse:pr-10" value={q}
             placeholder={t("mails.filter")}
             title={t("mails.filter_tip")}
             onChange={(e) => setQ(e.target.value)} />
           {!!q && (
-            <button className="absolute right-2 top-1/2 -translate-y-1/2
-              text-muted hover:text-body"
-              title={t("Clear filter")} aria-label={t("Clear filter")}
-              onClick={() => setQ("")}>
-              <X size={14} />
-            </button>
+            <span className="absolute inset-y-0 right-0 flex items-center">
+              <Button variant="quiet" size="icon" label={t("Clear filter")}
+                className="text-muted hover:text-body"
+                onClick={() => setQ("")}>
+                <X size={16} />
+              </Button>
+            </span>
           )}
         </div>
         {sortControl()}
       </div>
       <div className="mb-2 flex min-h-5 flex-wrap items-center gap-x-3
-        text-xs text-muted">
+        type-meta text-muted">
         <span>{t("mails.count", { n: mails.length, total })}</span>
         {mails.length > 0 && (
-          <button className="underline hover:text-body"
+          <button className={LINK}
             onClick={() => setSel(sel.size === mails.length
               ? new Set() : new Set(mails.map(mailKey)))}>
             {sel.size === mails.length
@@ -228,12 +227,12 @@ export function AllMailsView({ state, onChanged }: {
         {note && <span>{note}</span>}
       </div>
       {ignored.length > 0 && (
-        <p className="mb-2 text-xs text-muted">
+        <p className="mb-2 type-meta text-muted">
           {t("mails.ignored", { list: ignored.join(" ") })}
         </p>
       )}
 
-      {error && <div className="p-4 text-sm text-rose-400">{error}</div>}
+      {error && <div className="p-4 type-body text-danger-fg">{error}</div>}
       {loading && !mails.length && !error && <Loading />}
       {!loading && !error && mails.length === 0 && (
         <EmptyState>
@@ -244,7 +243,7 @@ export function AllMailsView({ state, onChanged }: {
         onPin={togglePin} detailed paged />
       {mails.length < total && (
         <div className="py-3 text-center">
-          <Button variant="ghost" disabled={more} onClick={loadMore}>
+          <Button variant="secondary" disabled={more} onClick={loadMore}>
             {t("mails.load_more", { n: Math.min(PAGE, total - mails.length) })}
           </Button>
         </div>
@@ -253,13 +252,13 @@ export function AllMailsView({ state, onChanged }: {
 
       {sel.size > 0 && (
         <div className="fixed inset-x-0 bottom-0 z-(--z-bulkbar) border-t border-line
-          bg-panel px-3 py-2 shadow-[0_-4px_16px_rgba(0,0,0,0.3)]"
+          bg-panel px-3 py-2 shadow-bar"
           style={{ paddingBottom:
             "calc(env(safe-area-inset-bottom) + 0.5rem)" }}>
           <div className="mx-auto max-w-6xl">
-            <div className="mb-2 flex items-center gap-2 text-xs text-muted">
+            <div className="mb-2 flex items-center gap-2 type-meta text-muted">
               <span>{t("detail.n_selected", { n: sel.size })}</span>
-              <button className="underline hover:text-body"
+              <button className={LINK}
                 onClick={() => setSel(new Set())}>
                 {t("Clear selection")}
               </button>
@@ -286,9 +285,9 @@ export function AllMailsView({ state, onChanged }: {
                       <option key={f} value={f}>{state.folders[i] ?? f}</option>
                     ))}
                   </Select>
-                  <Button variant="ghost" className="!px-2 shrink-0"
-                    title={t("Cancel")} onClick={() => setMoveDest("")}>
-                    <X size={15} />
+                  <Button variant="secondary" size="icon" label={t("Cancel")}
+                    className="shrink-0" onClick={() => setMoveDest("")}>
+                    <X size={18} />
                   </Button>
                 </>
               )}
