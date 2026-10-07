@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { fmtSize } from "../api";
 import type { Group } from "../types";
 import { t } from "../i18n";
-import { AiTag, Avatar, Button, EngagementMeter, PinBadge, RatingChips, Tag, Select } from "./ui";
+import { AiTag, Avatar, Button, Checkbox, EngagementMeter, PinBadge, RatingChips, Tag, Select, LINK } from "./ui";
 
 export type SortKey = "count" | "size" | "label" | "last" | "unreadPct"
   | "engagement";
@@ -47,21 +47,21 @@ function UnsubBadge({ g, onAck }: { g: Group; onAck: (addr: string) => void }) {
   if (!u) return null;
   if (u.status === "done") {
     return (
-      <Tag className="!bg-emerald-950 !text-emerald-300 whitespace-nowrap">
+      <Tag tone="safe" className="whitespace-nowrap">
         ✓ {t("Unsubscribed")}
       </Tag>
     );
   }
   if (u.status === "failed") {
     return (
-      <Tag className="!bg-rose-950 !text-rose-300 whitespace-nowrap">
+      <Tag tone="keep" className="whitespace-nowrap">
         ⚠ {t("unsub.badge_failed")}
       </Tag>
     );
   }
   if (u.status === "pending") {
     return (
-      <Tag className="!bg-amber-950 !text-amber-300 whitespace-nowrap">
+      <Tag tone="review" className="whitespace-nowrap">
         {t("unsub.badge_pending", { n: u.n, of: u.of })}
       </Tag>
     );
@@ -76,13 +76,12 @@ function UnsubBadge({ g, onAck }: { g: Group; onAck: (addr: string) => void }) {
       <a href={u.link} target="_blank" rel="noopener noreferrer"
         title={t("unsub.open_link")}
         onClick={(e) => e.stopPropagation()}
-        className="whitespace-nowrap rounded !bg-amber-950 px-1.5 py-0.5
-          text-[0.68rem] leading-4 !text-amber-300 underline
-          hover:opacity-80">
+        className={`whitespace-nowrap rounded-badge bg-review-bg px-1.5 py-0.5
+          type-caption text-review-fg hover:opacity-80 ${LINK}`}>
         ✉ {t("unsub.badge_link")}
       </a>
-      <button title={t("unsub.mark_done")}
-        className="rounded bg-chip px-1.5 py-0.5 text-[0.68rem] leading-4
+      <button title={t("unsub.mark_done")} aria-label={t("unsub.mark_done")}
+        className="rounded-badge bg-chip px-1.5 py-0.5 type-caption
           text-chiptext hover:bg-chiph"
         onClick={(e) => { e.stopPropagation(); onAck(u.addr); }}>
         ✓
@@ -101,7 +100,7 @@ function DesktopTable({ slice, baseIdx, selected, focusedKey, onToggle,
   // between directions; inactive sortable columns reserve the space
   // (no layout shift) and reveal a faint hint on hover.
   const arrow = (k: SortKey) => (
-    <ArrowDown aria-hidden size={13}
+    <ArrowDown aria-hidden size={14}
       className={`ml-0.5 inline-block transition-all duration-200 ${
         sortK === k
           ? `text-accent ${sortDir > 0 ? "rotate-180" : ""}`
@@ -112,17 +111,17 @@ function DesktopTable({ slice, baseIdx, selected, focusedKey, onToggle,
       : "ascending" as const) : undefined;
   const allChecked =
     slice.length > 0 && slice.every((g) => selected.has(g.key));
-  const th = "px-2 py-2 font-semibold";
+  const th = "px-2 py-2 type-meta font-semibold";
   const sortableTh = `${th} group/th cursor-pointer select-none
     hover:text-body`;
   // table-fixed: column widths come from the header cells, so they are
   // content-independent and identical in every grouping mode.
   return (
-    <table className="w-full table-fixed border-collapse text-sm">
+    <table className="w-full table-fixed border-collapse type-body">
       <thead>
         <tr className="sticky top-0 z-(--z-sticky) bg-surface text-left text-muted">
           <th className={`${th} w-8`}>
-            <input type="checkbox" checked={allChecked}
+            <Checkbox checked={allChecked} className="-mx-2 -my-1"
               onChange={(e) => onToggleAll(e.target.checked,
                 slice.map((g) => g.key))} />
           </th>
@@ -161,7 +160,7 @@ function DesktopTable({ slice, baseIdx, selected, focusedKey, onToggle,
             className={`border-b border-line hover:bg-panel
               ${g.key === focusedKey ? "bg-panel outline outline-1 -outline-offset-1 outline-accent/60" : ""}`}>
             <td className="px-2 py-2 align-top">
-              <input type="checkbox" checked={selected.has(g.key)}
+              <Checkbox checked={selected.has(g.key)} className="-mx-2 -my-1"
                 onChange={() => onToggle(g.key)} />
             </td>
             <td className="px-2 py-2 align-top">
@@ -170,39 +169,39 @@ function DesktopTable({ slice, baseIdx, selected, focusedKey, onToggle,
             <td className="min-w-0 px-2 py-2">
               <button
                 className="block w-full cursor-pointer truncate text-left
-                  font-medium hover:underline"
+                  type-body font-medium hover:underline"
                 title={g.samples.length ? `e.g. ${g.samples.join(" • ")}` : ""}
                 onClick={() => onOpen(g)}>
                 {g.label}
               </button>
               {g.sub && (
-                <div className="truncate text-xs text-muted">{g.sub}</div>
+                <div className="truncate type-meta text-muted">{g.sub}</div>
               )}
-              <div className="truncate text-[0.7rem] text-faint">
+              <div className="truncate type-meta text-muted">
                 {g.first} → {g.last} · {unreadPct(g)}% {t("unread")}
               </div>
             </td>
             <td className="hidden px-2 py-2 align-top lg:table-cell">
               <div className="flex flex-wrap gap-1 overflow-hidden">
                 {g.new && (
-                  <Tag className="!bg-blue-950 !text-blue-300">
+                  <Tag tone="new">
                     <span title={t("new_sender.tip")}>🆕 {t("New")}</span>
                   </Tag>
                 )}
                 {g.replied && (
-                  <Tag className="!bg-sky-950 !text-sky-300">
+                  <Tag tone="info">
                     <span title={t("replied.tip")}>↩ {t("replied")}</span>
                   </Tag>
                 )}
                 {g.att_size > 0 && (
-                  <Tag className="!bg-orange-950 !text-orange-300">
+                  <Tag tone="attach">
                     📎 {fmtSize(g.att_size)}
                   </Tag>
                 )}
                 <PinBadge n={g.pinned} />
                 <UnsubBadge g={g} onAck={onAckUnsub} />
                 {blockedKeys?.has(g.key) && (
-                  <Tag className="!bg-rose-950 !text-rose-300">
+                  <Tag tone="keep">
                     🚫 {t("Blocked")}
                   </Tag>
                 )}
@@ -230,13 +229,10 @@ function DesktopTable({ slice, baseIdx, selected, focusedKey, onToggle,
               {g.last}
             </td>
             <td className="px-2 py-2 text-right align-top">
-              <button
-                className="inline-flex items-center justify-center rounded
-                  p-1 text-faint hover:bg-chip hover:text-body"
-                title={t("View details")}
+              <Button variant="quiet" size="icon" label={t("View details")}
                 onClick={() => onOpen(g)}>
                 <ChevronRight size={18} />
-              </button>
+              </Button>
             </td>
           </tr>
         ))}
@@ -255,41 +251,41 @@ function MobileCards({ slice, baseIdx, selected, focusedKey, onToggle,
         <div key={g.key} data-gidx={baseIdx + i}
           className={`flex items-center gap-3 border-b border-line px-1
             py-2.5 ${g.key === focusedKey ? "bg-panel" : ""}`}>
-          <input type="checkbox" className="shrink-0"
-            checked={selected.has(g.key)} onChange={() => onToggle(g.key)} />
+          <Checkbox checked={selected.has(g.key)}
+            onChange={() => onToggle(g.key)} />
           <div className="flex min-w-0 flex-1 cursor-pointer items-center
             gap-3" onClick={() => onOpen(g)}>
             <Avatar name={g.label || g.key} size="md" />
             <div className="min-w-0 flex-1">
-              <div className="truncate font-medium">{g.label}</div>
+              <div className="truncate type-body-mobile">{g.label}</div>
               {g.sub && (
-                <div className="truncate text-xs text-muted">{g.sub}</div>
+                <div className="truncate type-meta text-muted">{g.sub}</div>
               )}
-              <div className="text-[0.7rem] text-faint">
+              <div className="type-meta text-muted">
                 {g.count} {t("mails")} · {fmtSize(g.size)} · {unreadPct(g)}%{" "}
                 {t("unread")} · {g.last}
               </div>
               <div className="mt-1 flex flex-wrap items-center gap-1">
                 <EngagementMeter g={g} />
                 {g.new && (
-                  <Tag className="!bg-blue-950 !text-blue-300">
+                  <Tag tone="new">
                     <span title={t("new_sender.tip")}>🆕 {t("New")}</span>
                   </Tag>
                 )}
                 {g.replied && (
-                  <Tag className="!bg-sky-950 !text-sky-300">
+                  <Tag tone="info">
                     <span title={t("replied.tip")}>↩ {t("replied")}</span>
                   </Tag>
                 )}
                 {g.att_size > 0 && (
-                  <Tag className="!bg-orange-950 !text-orange-300">
+                  <Tag tone="attach">
                     📎 {fmtSize(g.att_size)}
                   </Tag>
                 )}
                 <PinBadge n={g.pinned} />
                 <UnsubBadge g={g} onAck={onAckUnsub} />
                 {blockedKeys?.has(g.key) && (
-                  <Tag className="!bg-rose-950 !text-rose-300">
+                  <Tag tone="keep">
                     🚫 {t("Blocked")}
                   </Tag>
                 )}
@@ -341,19 +337,19 @@ export function GroupTable(props: Props) {
       </div>
       {(groups.length > Math.min(perPage, ...PAGE_SIZES)) && (
         <div className="flex flex-wrap items-center justify-center gap-2
-          py-3 text-sm text-muted">
-          <Button variant="secondary" className="!min-h-8 !px-2.5 !py-1"
+          py-3 type-meta text-muted">
+          <Button variant="secondary" size="sm"
               disabled={page === 0} onClick={() => setPage(0)}>«</Button>
-          <Button variant="secondary" className="!min-h-8 !px-2.5 !py-1"
+          <Button variant="secondary" size="sm"
               disabled={page === 0} onClick={() => setPage(page - 1)}>‹</Button>
           <span className="tabular-nums">
             {t("page.of", { p: page + 1, n: maxPage + 1 })}
           </span>
-          <Button variant="secondary" className="!min-h-8 !px-2.5 !py-1"
+          <Button variant="secondary" size="sm"
               disabled={page >= maxPage} onClick={() => setPage(page + 1)}>›</Button>
-          <Button variant="secondary" className="!min-h-8 !px-2.5 !py-1"
+          <Button variant="secondary" size="sm"
               disabled={page >= maxPage} onClick={() => setPage(maxPage)}>»</Button>
-          <Select className="!min-h-8 !py-1"
+          <Select
             value={perPage}
             onChange={(e) => {
               const n = Number(e.target.value);
