@@ -85,10 +85,10 @@ test("All mails swaps the group chrome for the flat list and back",
     await screen.findByText("Flat mail");
     expect(screen.getByPlaceholderText("filter mails…")).toBeTruthy();
     expect(screen.queryByPlaceholderText("filter groups…")).toBeNull();
-    expect(screen.queryByText("Inactive > 6 months")).toBeNull();  // chips
+    expect(screen.queryByText("6 mo")).toBeNull();  // chips
     expect(localStorage.getItem("pmc_view")).toBe("mails");
 
-    fireEvent.click(screen.getByRole("button", { name: "Sender" }));
+    fireEvent.click(screen.getByRole("tab", { name: "Sender" }));
     await screen.findByPlaceholderText("filter groups…");
     expect(screen.queryByText("Flat mail")).toBeNull();
     expect(localStorage.getItem("pmc_view")).toBe("groups");
@@ -116,7 +116,7 @@ test("Thread is a fourth grouping tab with its own groups", async () => {
   await screen.findByPlaceholderText("filter groups…");
   expect(screen.queryByText("Project plan")).toBeNull();     // sender tab
 
-  fireEvent.click(screen.getByRole("button", { name: "Thread" }));
+  fireEvent.click(screen.getByRole("tab", { name: "Thread" }));
   await screen.findAllByText("Project plan");
   expect(screen.getAllByText("3 mails, 2 senders").length).toBeGreaterThan(0);
   // the table's first column is named after the grouping

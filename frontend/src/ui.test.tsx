@@ -10,7 +10,7 @@ import { afterEach, expect, test, vi } from "vitest";
 import {
   isModalOpen, AccountAvatar, Button, Checkbox, Chip, ChipGroup, ChipSegment,
   ConfirmDialog, DialogProvider, EmptyState, MailRow, Menu, MenuDivider,
-  MenuHeading, MenuItem, Modal, Notice, ProgressBar, ToastProvider,
+  MenuHeading, MenuItem, Modal, Notice, ProgressBar, Segmented, ToastProvider,
   confirmDialog,
   LINK, Tag, promptDialog, useToast,
 } from "./components/ui";
@@ -621,4 +621,106 @@ test("ProgressBar: determinate carries its value, indeterminate none", () => {
   rerender(<ProgressBar thin indeterminate value={0} max={0} label="x" />);
   expect(screen.getByRole("progressbar").getAttribute("aria-valuenow"))
     .toBeNull();
+});
+
+test("Segmented marks the current segment and reports a change", () => {
+  const onChange = vi.fn();
+  render(
+    <Segmented label="View" value="b" onChange={onChange}
+      options={[{ value: "a", label: "A" }, { value: "b", label: "B" }]} />);
+  expect(screen.getByRole("tablist", { name: "View" })).toBeTruthy();
+  expect(screen.getByRole("tab", { name: "B" }).getAttribute("aria-selected"))
+    .toBe("true");
+  expect(screen.getByRole("tab", { name: "A" }).getAttribute("aria-selected"))
+    .toBe("false");
+  fireEvent.click(screen.getByRole("tab", { name: "A" }));
+  expect(onChange).toHaveBeenCalledWith("a");
+});
+
+test("a Menu with a variant renders a Button trigger", () => {
+  render(<Menu variant="secondary" trigger={<>Tools</>}>
+    <MenuItem>One</MenuItem></Menu>);
+  const b = screen.getByRole("button", { name: "Tools" });
+  expect(b.className).toContain("bg-chip");
+  fireEvent.click(b);
+  expect(screen.getByText("One")).toBeTruthy();
+});
+
+test("Segmented: roving tabindex, arrows move focus only, Enter activates",
+  () => {
+    const onChange = vi.fn();
+    render(
+      <Segmented label="View" value="b" onChange={onChange}
+        options={[{ value: "a", label: "A" }, { value: "b", label: "B" },
+          { value: "c", label: "C" }]} />);
+    const tab = (n: string) => screen.getByRole("tab", { name: n });
+    expect(tab("B").tabIndex).toBe(0);
+    expect(tab("A").tabIndex).toBe(-1);
+    tab("B").focus();
+    fireEvent.keyDown(tab("B"), { key: "ArrowRight" });
+    expect(document.activeElement).toBe(tab("C"));
+    fireEvent.keyDown(tab("C"), { key: "ArrowRight" });   // wraps
+    expect(document.activeElement).toBe(tab("A"));
+    fireEvent.keyDown(tab("A"), { key: "End" });
+    expect(document.activeElement).toBe(tab("C"));
+    fireEvent.keyDown(tab("C"), { key: "Home" });
+    expect(document.activeElement).toBe(tab("A"));
+    fireEvent.keyDown(tab("A"), { key: "ArrowLeft" });
+    expect(document.activeElement).toBe(tab("C"));
+    expect(onChange).not.toHaveBeenCalled();              // manual activation
+    fireEvent.click(tab("C"));
+    expect(onChange).toHaveBeenCalledWith("c");
+  });
+
+test("Menu: roles, focus on open, arrow keys, Esc / Tab return focus", () => {
+  render(<><Menu label="More" trigger={<>⋯</>}>
+    <MenuItem>One</MenuItem><MenuItem disabled>Two</MenuItem>
+    <MenuItem>Three</MenuItem></Menu><button>after</button></>);
+  const trigger = screen.getByLabelText("More");
+  expect(trigger.getAttribute("aria-haspopup")).toBe("menu");
+  fireEvent.click(trigger);
+  expect(screen.getByRole("menu")).toBeTruthy();
+  const one = screen.getByRole("menuitem", { name: "One" });
+  const three = screen.getByRole("menuitem", { name: "Three" });
+  expect(document.activeElement).toBe(one);
+  fireEvent.keyDown(one, { key: "ArrowDown" });          // skips disabled
+  expect(document.activeElement).toBe(three);
+  fireEvent.keyDown(three, { key: "ArrowDown" });
+  expect(document.activeElement).toBe(one);
+  fireEvent.keyDown(one, { key: "ArrowUp" });
+  expect(document.activeElement).toBe(three);
+  fireEvent.keyDown(three, { key: "Home" });
+  expect(document.activeElement).toBe(one);
+  fireEvent.keyDown(one, { key: "End" });
+  expect(document.activeElement).toBe(three);
+
+  fireEvent.keyDown(three, { key: "Escape" });
+  expect(screen.queryByRole("menu")).toBeNull();
+  expect(document.activeElement).toBe(trigger);
+
+  fireEvent.click(trigger);
+  fireEvent.keyDown(screen.getByRole("menuitem", { name: "One" }),
+    { key: "Tab" });
+  expect(screen.queryByRole("menu")).toBeNull();
+  expect(document.activeElement).toBe(trigger);
+
+  fireEvent.click(trigger);                              // item click closes
+  fireEvent.click(screen.getByRole("menuitem", { name: "One" }));
+  expect(document.activeElement).toBe(trigger);
+});
+
+test("Esc in a Menu inside a Modal closes only the menu; then the Modal", () => {
+  const onClose = vi.fn();
+  render(<Modal onClose={onClose}>
+    <Menu label="More" trigger={<>⋯</>}><MenuItem>One</MenuItem></Menu>
+  </Modal>);
+  const trigger = screen.getByLabelText("More");
+  fireEvent.click(trigger);
+  fireEvent.keyDown(screen.getByRole("menuitem", { name: "One" }),
+    { key: "Escape" });
+  expect(screen.queryByRole("menu")).toBeNull();
+  expect(onClose).not.toHaveBeenCalled();
+  expect(document.activeElement).toBe(trigger);
+  fireEvent.keyDown(trigger, { key: "Escape" });         // no menu open now
+  expect(onClose).toHaveBeenCalledOnce();
 });

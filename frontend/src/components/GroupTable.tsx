@@ -330,10 +330,10 @@ export function GroupTable(props: Props) {
 
   return (
     <>
-      <div className="hidden sm:block">
+      <div className="hidden md:block">
         <DesktopTable {...props} slice={slice} baseIdx={baseIdx} />
       </div>
-      <div className="sm:hidden">
+      <div className="md:hidden">
         <MobileCards {...props} slice={slice} baseIdx={baseIdx} />
       </div>
       {(groups.length > Math.min(perPage, ...PAGE_SIZES)) && (

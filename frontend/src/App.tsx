@@ -1,8 +1,8 @@
-import { ArrowDown, BarChart3, BookmarkPlus, ChevronDown, ClipboardList,
-  Copy, Download, Info, Mail, Moon, MoreHorizontal, Paperclip, Pencil, Plus,
+import { BarChart3, BookmarkPlus, ChevronDown, ClipboardList,
+  Copy, Download, Info, Mail, Moon, Paperclip, Pencil, Plus,
   Power,
   ScrollText, Search, Settings as SettingsIcon, Sparkles, Star, Sun,
-  Trash2, User, Wand2, X }
+  Trash2, User, Wand2, Wrench, X }
   from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api, downloadFile, setAccount as apiSetAccount, withAccount }
@@ -13,6 +13,7 @@ import { Login } from "./components/Login";
 import { AttachmentsPanel } from "./components/AttachmentsPanel";
 import { DuplicatesPanel } from "./components/DuplicatesPanel";
 import { GroupTable, type SortKey } from "./components/GroupTable";
+import { SortControl } from "./components/SortControl";
 import { RulesModal } from "./components/RulesModal";
 import { AllMailsView } from "./components/AllMailsView";
 import { SearchPanel } from "./components/SearchPanel";
@@ -20,9 +21,10 @@ import { SettingsModal } from "./components/SettingsModal";
 import { StatsPanel } from "./components/StatsPanel";
 import { QueryBuilder } from "./components/QueryBuilder";
 import { TrashPanel } from "./components/TrashPanel";
-import { AccountAvatar, applyTheme, Button, Chip, currentTheme, EmptyState,
-  ensureAiAck, Input, isModalOpen, LINK, LINK_ACCENT, Menu, MenuHeading,
-  MenuItem, Notice, ProgressBar, Select, Spinner, useBulkBarHeight, useToast,
+import { AccountAvatar, applyTheme, Button, Chip, ChipGroup, ChipSegment,
+  currentTheme, EmptyState, ensureAiAck, FILTER_ROW, Input, isModalOpen, LINK,
+  LINK_ACCENT, Menu, MenuDivider, MenuHeading, MenuItem, Notice, ProgressBar,
+  Segmented, Select, Spinner, useBulkBarHeight, useToast,
   type ToastVariant } from "./components/ui";
 import { t } from "./i18n";
 import { applyStatus, fmtAgo, fmtSize, fmtUsd, matchGroup, parseFilter,
@@ -53,10 +55,13 @@ const SORT_OPTIONS: { k: SortKey; label: string }[] = [
 // scattered across a long unfiltered list.
 const PRESET_CHIPS: { key: string; label: string }[] = [
   { key: "aisafe", label: "AI-safe groups" },
-  { key: "older6", label: "Inactive > 6 months" },
-  { key: "older12", label: "Inactive > 1 year" },
-  { key: "older24", label: "Inactive > 2 years" },
   { key: "unsub_pending", label: "sel.unsub_pending" },
+];
+// The three "Inactive" presets share one segmented chip between the two.
+const INACTIVE_PRESETS: { key: string; label: string }[] = [
+  { key: "older6", label: "chip.inactive_6m" },
+  { key: "older12", label: "chip.inactive_1y" },
+  { key: "older24", label: "chip.inactive_2y" },
 ];
 
 const sortValue = (g: Group, k: SortKey): number | string => {
@@ -73,6 +78,8 @@ const actionVerb = (a: string): string =>
 
 export default function App() {
   const [state, setState] = useState<AppState | null>(null);
+  // Row B's mount point while All mails is shown (it portals its filter in).
+  const [toolbarSlot, setToolbarSlot] = useState<HTMLElement | null>(null);
   const [cfg, setCfg] = useState<Config | null>(null);
   // null = probing; the app only talks to the API once authed.
   const [auth, setAuth] = useState<AuthProbe | null>(null);
@@ -796,7 +803,12 @@ export default function App() {
       // isModalOpen(): also covers confirm/prompt dialogs, which App's own
       // panel flags don't know about.
       if (anyModal || isModalOpen()
-          || ["INPUT", "SELECT", "TEXTAREA"].includes(el.tagName)) return;
+          || ["INPUT", "SELECT", "TEXTAREA"].includes(el.tagName)
+          // Menus and tablists own their navigation keys while focused
+          // (but not j/k etc., e.g. after a mouse click left focus on a tab).
+          || (el.closest?.('[role="menu"], [role="tablist"]')
+            && ["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "Home",
+              "End", "Enter", " "].includes(e.key))) return;
       if (e.key === "/") {
         e.preventDefault();
         filterRef.current?.focus();
@@ -894,7 +906,7 @@ export default function App() {
   return (
     <div className={`mx-auto max-w-6xl p-3 sm:p-5
       ${selected.size > 0 ? "pb-28 sm:pb-20" : ""}`}>
-      <header className="mb-4 flex items-center gap-3">
+      <header className="mb-2 flex items-center gap-3 md:mb-4">
         <h1 className="type-title">
           Mailbroom
         </h1>
@@ -1003,47 +1015,84 @@ export default function App() {
         </div>
       )}
 
-      {/* Row 1: primary actions - identical in every grouping mode. */}
+      {/* Row A: Scan (the one solid-accent element) · grouping segments ·
+          Search · Tools. On phones the segments take their own full-width
+          line below Scan / Search / Tools. Identical in every mode. */}
       <div className="mb-2 flex flex-wrap items-center gap-2">
         <Button onClick={startScan}
           disabled={scanning || aiRunning || deleting || attsRunning
             || unsubRunning}>
           {scanning ? <Spinner className="text-white" /> : t("Scan")}
         </Button>
-        {/* order-2 + w-full: on phones the grouping toggle gets a full line
-            of its own instead of being shrunk by the icon strip. */}
-        <div className="order-2 flex w-full overflow-hidden rounded-control border
-          border-line sm:order-none sm:w-auto">
-          {(Object.keys(GROUPING_LABEL) as Grouping[]).map((g) => (
-            <button key={g}
-              onClick={() => {
-                setFlat(false); setMode(g); setSelected(new Set());
-                setFocusIdx(-1);
-              }}
-              className={`flex-1 whitespace-nowrap px-2 py-1.5 type-body sm:flex-none sm:px-3 ${
-                !flat && mode === g
-                  ? "bg-accent text-white"
-                  : "bg-panel2 text-body hover:bg-chip"}`}>
-              {t(GROUPING_LABEL[g])}
-            </button>
-          ))}
-          <button
-            onClick={() => {
-              setFlat(true); setSelected(new Set()); setFocusIdx(-1);
-            }}
-            className={`flex-1 whitespace-nowrap px-2 py-1.5 type-body sm:flex-none sm:px-3 ${flat
-              ? "bg-accent text-white"
-              : "bg-panel2 text-body hover:bg-chip"}`}>
-            {t("view.all_mails")}
-          </button>
+        {/* order-last + fill: below 768 the segments get a line of their own. */}
+        <div className="order-last w-full md:order-none md:w-auto">
+          <Segmented label={t("view.group_by")} fill
+            className="md:w-auto"
+            value={flat ? "flat" : mode}
+            options={[
+              ...(Object.keys(GROUPING_LABEL) as Grouping[]).map((g) =>
+                ({ value: g as Grouping | "flat", label: t(GROUPING_LABEL[g]) })),
+              { value: "flat", label: t("view.all_mails") },
+            ]}
+            onChange={(v) => {
+              if (v === "flat") setFlat(true);
+              else { setFlat(false); setMode(v); }
+              setSelected(new Set());
+              setFocusIdx(-1);
+            }} />
         </div>
-        {/* Filter + builder share one flex-wrap unit: the builder toggle
-            sits right next to the input on every width, and the builder
-            panel (w-full) wraps to its own line directly underneath. */}
-        {!flat && (
-        <div className="relative order-last flex w-full flex-wrap
-          items-center gap-2 sm:order-none sm:w-auto sm:min-w-24 sm:flex-1">
-          <div className="relative min-w-0 flex-1">
+        <div className="ml-auto flex items-center gap-2">
+          <Button variant="secondary" size="icon" label={t("Search all mails")}
+            onClick={() => setSearchOpen(true)}><Search size={18} /></Button>
+          <Menu variant="secondary" trigger={<>
+              <Wrench size={16} aria-hidden /> {t("Tools")}
+              <ChevronDown size={16} aria-hidden className="text-muted" />
+            </>}>
+            <MenuItem onClick={() => setRulesOpen(true)}>
+              <ClipboardList size={16} className="mr-1 inline align-text-bottom" />
+              {t("Rules")}
+            </MenuItem>
+            <MenuItem onClick={() => setAttsOpen(true)}>
+              <Paperclip size={16} className="mr-1 inline align-text-bottom" />
+              {t("Attachments")}
+            </MenuItem>
+            <MenuItem disabled={state?.status !== "done"}
+              onClick={() => setDupsOpen(true)}>
+              <Copy size={16} className="mr-1 inline align-text-bottom" />
+              {t("Duplicates")}
+            </MenuItem>
+            <MenuItem onClick={() => setStatsOpen(true)}>
+              <BarChart3 size={16} className="mr-1 inline align-text-bottom" />
+              {t("Statistics")}
+            </MenuItem>
+            <MenuItem onClick={() => setAuditOpen(true)}>
+              <ScrollText size={16} className="mr-1 inline align-text-bottom" />
+              {t("Audit Log")}
+            </MenuItem>
+            <MenuDivider />
+            {aiEnabled && (
+              <MenuItem onClick={() => startAi()}
+                disabled={scanning || aiRunning || state?.status !== "done"}>
+                <Wand2 size={16} className="mr-1 inline align-text-bottom" />
+                {t("AI review")}
+              </MenuItem>
+            )}
+            <MenuItem onClick={() => downloadFile(api.exportUrl(mode))}
+              sub={t("export.csv_tip")}>
+              <Download size={16} className="mr-1 inline align-text-bottom" />
+              {t("export.csv")}
+            </MenuItem>
+          </Menu>
+        </div>
+      </div>
+      {/* Row B: filter + builder + save preset + sort. All mails renders its
+          own filter + sort into the same slot (portal), so nothing moves
+          when switching tabs. */}
+      {flat ? (
+        <div ref={setToolbarSlot} />
+      ) : (
+        <div className={FILTER_ROW}>
+          <div className="relative min-w-0 flex-1 md:min-w-70">
             <Input
               ref={filterRef}
               className="w-full pr-9 coarse:pr-10"
@@ -1071,53 +1120,38 @@ export default function App() {
             onClick={saveFilterPreset}>
             <BookmarkPlus size={18} />
           </Button>
+          <SortControl options={SORT_OPTIONS} value={sortK}
+            dir={sortDir < 0 ? "desc" : "asc"}
+            onValue={(k) => {
+              setSortK(k);
+              setSortDir(k === "label" ? 1 : -1);
+            }}
+            onDir={(d) => setSortDir(d === "asc" ? 1 : -1)} />
         </div>
-        )}
-        {/* One wrap unit; a tight gap on phones (deliberate: the 40 px touch
-            icons would otherwise push the strip onto its own line, UX5
-            reworks this toolbar). */}
-        <div className={`ml-auto flex items-center gap-0.5 sm:gap-2 ${
-          flat ? "" : "sm:ml-0"}`}>
-          <Button variant="secondary" size="icon" label={t("Search all mails")}
-            onClick={() => setSearchOpen(true)}><Search size={18} /></Button>
-          <Button variant="secondary" size="icon" label={t("Rules")}
-            onClick={() => setRulesOpen(true)}>
-            <ClipboardList size={18} />
-          </Button>
-          <Button variant="secondary" size="icon" label={t("Attachments")}
-            onClick={() => setAttsOpen(true)}><Paperclip size={18} /></Button>
-          <Button variant="secondary" size="icon" label={t("Duplicates")}
-            disabled={state?.status !== "done"}
-            onClick={() => setDupsOpen(true)}><Copy size={18} /></Button>
-          <Button variant="secondary" size="icon" label={t("Statistics")}
-            onClick={() => setStatsOpen(true)}><BarChart3 size={18} /></Button>
-          <Button variant="secondary" size="icon" label={t("Audit Log")}
-            onClick={() => setAuditOpen(true)}><ScrollText size={18} /></Button>
-          <Menu label={t("menu.more")} trigger={<MoreHorizontal size={18} />}>
-            {aiEnabled && (
-              <MenuItem onClick={() => startAi()}
-                disabled={scanning || aiRunning || state?.status !== "done"}>
-                <Wand2 size={16} className="mr-1 inline align-text-bottom" />
-                {t("AI review")}
-              </MenuItem>
-            )}
-            <MenuItem onClick={() => downloadFile(api.exportUrl(mode))}
-              sub={t("export.csv_tip")}>
-              <Download size={16} className="mr-1 inline align-text-bottom" />
-              {t("export.csv")}
-            </MenuItem>
-          </Menu>
-        </div>
-      </div>
-      {/* Row 2: quick-select preset chips + sort, as ONE wrapping flex
-          layout - chips wrap onto their own line(s) instead of competing
-          with Sort for a single line or hiding behind a horizontal
-          scroll. No selection-dependent chrome here (that lives in the
-          bottom bar below, which only renders once something is
-          selected). */}
+      )}
+      {/* Row C: quick-select chips (grouping modes only). No
+          selection-dependent chrome here (that lives in the bottom bar,
+          which only renders once something is selected). */}
       {!flat && (
-      <div className="mb-3 flex flex-wrap items-center gap-2">
-        {PRESET_CHIPS.map((p) => (
+      <div className="mb-2 flex flex-wrap items-center gap-2">
+        {PRESET_CHIPS.slice(0, 1).map((p) => (
+          <Chip key={p.key} className="shrink-0"
+            on={filter === presetFilterQuery(p.key)}
+            onClick={() => selectPreset(p.key)}>
+            {t(p.label)}
+          </Chip>
+        ))}
+        {/* One segmented chip, one tap per preset (same toggling as chips). */}
+        <ChipGroup label={t("chip.inactive")} className="shrink-0">
+          {INACTIVE_PRESETS.map((p) => (
+            <ChipSegment key={p.key}
+              on={filter === presetFilterQuery(p.key)}
+              onClick={() => selectPreset(p.key)}>
+              {t(p.label)}
+            </ChipSegment>
+          ))}
+        </ChipGroup>
+        {PRESET_CHIPS.slice(1).map((p) => (
           <Chip key={p.key} className="shrink-0"
             on={filter === presetFilterQuery(p.key)}
             onClick={() => selectPreset(p.key)}>
@@ -1174,35 +1208,6 @@ export default function App() {
             </button>
           </span>
         ))}
-        {/* Sort: field select + direction toggle as one segmented
-            control; the arrow rotates instead of swapping glyphs. No
-            ml-auto: that pushed it flush right whenever it wrapped onto
-            its own line (chips don't reliably fill the row), stranding it
-            with a big empty gap in front - it just flows after the last
-            chip now, like any other item in this row. */}
-        <div className="flex shrink-0 items-stretch overflow-hidden
-          rounded-control border border-line">
-          <Select className="min-w-0 flex-1 !rounded-none !border-0"
-            value={sortK}
-            onChange={(e) => {
-              const k = e.target.value as SortKey;
-              setSortK(k);
-              setSortDir(k === "label" ? 1 : -1);
-            }}>
-            {SORT_OPTIONS.map((o) => (
-              <option key={o.k} value={o.k}>{t(o.label)}</option>
-            ))}
-          </Select>
-          {/* !rounded-none: the segment's corners belong to the wrapper. */}
-          <Button variant="secondary" size="icon"
-            label={t(sortDir < 0 ? "sort.desc_tip" : "sort.asc_tip")}
-            className="shrink-0 !rounded-none border-l border-line"
-            onClick={() => setSortDir(-sortDir)}>
-            <ArrowDown aria-hidden size={16}
-              className={`text-accent transition-transform duration-200
-                ${sortDir > 0 ? "rotate-180" : ""}`} />
-          </Button>
-        </div>
       </div>
       )}
 
@@ -1327,13 +1332,15 @@ export default function App() {
         </div>
       )}
 
-      {/* 2 px strip (space always reserved, no layout jump) under the
-          toolbar while a job runs. */}
-      <div className="mb-1 h-0.5">
+      {/* 2 px strip overlaid on the gap under the toolbar while a job runs
+          (takes no space, so it never shifts the layout). */}
+      <div className="relative h-0">
         {(job || pending) && (
-          <ProgressBar thin label={job?.label ?? pending}
-            value={progress?.done ?? 0} max={progress?.total ?? 0}
-            indeterminate={!progress} />
+          <div className="absolute inset-x-0 -top-1">
+            <ProgressBar thin label={job?.label ?? pending}
+              value={progress?.done ?? 0} max={progress?.total ?? 0}
+              indeterminate={!progress} />
+          </div>
         )}
       </div>
       <div className="mb-1 flex min-h-5 items-center justify-between gap-2
@@ -1416,7 +1423,7 @@ export default function App() {
       {flat ? (
         state && (
           <AllMailsView key={state.account} state={state}
-            onChanged={refresh} />
+            onChanged={refresh} toolbarSlot={toolbarSlot} />
         )
       ) : groups.length > 0 ? (
         <GroupTable

@@ -400,7 +400,7 @@ test("a quick-select chip first narrows the filter box, then (tapped " +
   renderWithOneSenderGroup();
   await waitFor(() => expect(screen.getAllByText("DHL Paket").length)
     .toBeGreaterThan(0));
-  const chip = screen.getByText("Inactive > 6 months");
+  const chip = screen.getByRole("button", { name: "6 mo" });
 
   // Tap 1: filters only, selection untouched.
   fireEvent.click(chip);
@@ -443,12 +443,12 @@ test("a quick-select chip first narrows the filter box, then (tapped " +
   expect(screen.queryByText(/^Trash \d+$/)).toBeNull();
 });
 
-test("the overflow menu exposes CSV export without requiring a selection",
+test("the Tools menu exposes CSV export without requiring a selection",
   async () => {
   renderWithOneSenderGroup();
   await waitFor(() => expect(screen.getAllByText("DHL Paket").length)
     .toBeGreaterThan(0));
-  fireEvent.click(screen.getByLabelText("More"));
+  fireEvent.click(screen.getByText("Tools"));
   fireEvent.click(screen.getByText("Export CSV"));
   expect(downloadFile).toHaveBeenCalledWith("/api/export?grouping=sender");
 });

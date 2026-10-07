@@ -54,7 +54,7 @@ export function QueryBuilder({ value, onChange, className = "" }: {
       {/* z-dropdown: must cover the group table's sticky header (z-sticky). */}
       {open && (
         <div className={`w-full rounded-card border border-line bg-panel2 p-3
-          sm:absolute sm:left-0 sm:right-0 sm:top-full sm:z-(--z-dropdown) sm:mt-1
+          max-sm:order-last sm:absolute sm:left-0 sm:right-0 sm:top-full sm:z-(--z-dropdown) sm:mt-1
           sm:shadow-popover ${className}`}>
           <div className="mb-2 flex items-center gap-2 type-meta text-muted">
             <SectionLabel>{t("qb.title")}</SectionLabel>
