@@ -74,22 +74,24 @@
   text-transform: uppercase; letter-spacing: var(--tracking-wide);
 }
 
-/* Keyboard focus: one accent ring everywhere (3.75:1 on surface). Unlayered
-   on purpose so it also beats the old `outline-none` utilities. Text fields
-   already show an accent border on focus, so their ring hugs the border
-   instead of floating 2px off it. */
-:where(*) {
-  /* Base colour on every element: transition-colors would otherwise fade
-     the ring in from currentColor (a cream flash). */
-  outline-color: var(--color-accent);
-}
-:focus-visible {
-  outline: 2px solid var(--color-accent);
-  outline-offset: 2px;
-}
-input:not([type="checkbox"], [type="radio"], [type="file"]):focus-visible,
-select:focus-visible, textarea:focus-visible {
-  outline-offset: 0;
+/* Keyboard focus: one accent ring everywhere (3.75:1 on surface). In
+   @layer base so utilities can still tune it (focus-visible:-outline-offset-2,
+   outline-accent/60). Text fields already show an accent border on focus, so
+   their ring hugs the border instead of floating 2px off it. */
+@layer base {
+  :where(*) {
+    /* Base colour on every element: transition-colors would otherwise fade
+       the ring in from currentColor (a cream flash). */
+    outline-color: var(--color-accent);
+  }
+  :focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 2px;
+  }
+  input:not([type="checkbox"], [type="radio"], [type="file"]):focus-visible,
+  select:focus-visible, textarea:focus-visible {
+    outline-offset: 0;
+  }
 }
 
 /* Theme-aware shadows. Plain variables + utilities (not @theme): Tailwind

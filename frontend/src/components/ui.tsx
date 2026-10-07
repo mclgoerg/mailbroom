@@ -555,13 +555,20 @@ export function Modal({ children, onClose, full = false, size, label,
 }) {
   const sz = size ?? (full ? "lg" : "md");
   const id = useRef(Symbol("modal")).current;
-  useEffect(() => {
+  // The listener calls the latest onClose; the effect itself depends on
+  // [id] only, so a parent re-render (inline onClose) never re-registers
+  // the modal and reshuffles the stack.
+  const closeRef = useRef(onClose);
+  closeRef.current = onClose;
+  // Layout effect: the stack is current as soon as the modal is in the DOM,
+  // before any key event can arrive.
+  useLayoutEffect(() => {
     openModals.push(id);
     const onKey = (e: KeyboardEvent) => {
       // Only the topmost modal reacts, so Esc on a confirm that sits over
       // a panel closes the confirm and leaves the panel open.
       if (e.key === "Escape" && openModals[openModals.length - 1] === id) {
-        onClose();
+        closeRef.current();
       }
     };
     window.addEventListener("keydown", onKey);
@@ -569,7 +576,7 @@ export function Modal({ children, onClose, full = false, size, label,
       window.removeEventListener("keydown", onKey);
       openModals.splice(openModals.indexOf(id), 1);
     };
-  }, [onClose, id]);
+  }, [id]);
   const shape = sz === "sm"
     ? `max-h-[88dvh] rounded-t-dialog border-t max-sm:pb-[env(safe-area-inset-bottom)]
        sm:rounded-dialog`
@@ -1004,7 +1011,7 @@ export function MailRow({ checked = false, onToggle, unread = false, subject,
           : pinned ? "border-l-accent bg-panel" : "border-l-transparent"}`}>
       {onToggle && (
         <Checkbox checked={checked} onChange={onToggle}
-          className="-my-1.5"
+          className="-my-1.5 coarse:-mt-2.5 coarse:-mb-0.5"
           aria-label={selectLabel ?? t("Select mail")} />
       )}
       {onOpen ? (

@@ -2,8 +2,9 @@
 /* Menu: opens on trigger click, runs the item action and closes, and
  * closes on Escape / outside click. */
 
-import { act, cleanup, fireEvent, render, screen }
+import { act, cleanup, fireEvent, render, screen, waitFor }
   from "@testing-library/react";
+import { useState } from "react";
 import { afterEach, expect, test, vi } from "vitest";
 
 import {
@@ -422,23 +423,30 @@ test("MailRow without onToggle has no checkbox", () => {
   expect(screen.queryByRole("checkbox")).toBeNull();
 });
 
-test("Esc closes only the topmost modal; isModalOpen tracks the stack", async () => {
+test("Esc closes only the topmost modal, even after parent re-renders", async () => {
   const closePanel = vi.fn();
-  render(<DialogProvider>
-    <Modal onClose={closePanel}>panel</Modal>
-  </DialogProvider>);
+  let bump!: () => void;
+  const Parent = () => {
+    const [n, setN] = useState(0);
+    bump = () => setN((x) => x + 1);
+    // inline onClose: a new function identity on every render
+    return <Modal onClose={() => closePanel(n)}>panel</Modal>;
+  };
+  render(<DialogProvider><Parent /></DialogProvider>);
   expect(isModalOpen()).toBe(true);
   let result: boolean | undefined;
   const p = confirmDialog({ title: "Sure?", confirmLabel: "Yes" })
     .then((v) => { result = v; });
   await screen.findByText("Sure?");
+  act(() => bump());                    // must not move the panel above the confirm
   fireEvent.keyDown(window, { key: "Escape" });
   await p;
   expect(result).toBe(false);
   expect(closePanel).not.toHaveBeenCalled();          // panel stays open
   expect(screen.getByText("panel")).toBeTruthy();
+  await waitFor(() => expect(screen.queryByText("Sure?")).toBeNull());
   fireEvent.keyDown(window, { key: "Escape" });       // now it is the top
-  expect(closePanel).toHaveBeenCalledOnce();
+  expect(closePanel).toHaveBeenCalledExactlyOnceWith(1);   // latest onClose
   cleanup();
   expect(isModalOpen()).toBe(false);
 });
@@ -518,10 +526,10 @@ test("DialogProvider returns focus to the opener and settles pending on unmount"
   opener.focus();
   const p = confirmDialog({ title: "Sure?", confirmLabel: "Yes" });
   await screen.findByText("Sure?");
-  expect(document.activeElement).not.toBe(opener);
+  await waitFor(() => expect(document.activeElement).not.toBe(opener));
   fireEvent.click(screen.getByText("Yes"));
   expect(await p).toBe(true);
-  expect(document.activeElement).toBe(opener);
+  await waitFor(() => expect(document.activeElement).toBe(opener));
 
   const pending = confirmDialog({ title: "Again?", confirmLabel: "Yes" });
   const prompt = promptDialog({ title: "New name", label: "Name" });
@@ -579,6 +587,12 @@ test("MailRow: transparent base border, underline on the subject only, compact c
 
 test("focus ring CSS: base outline colour, offset only for text-like fields", async () => {
   const css = await indexCss();
-  expect(css).toMatch(/:where\(\*\) \{[^}]*outline-color: var\(--color-accent\)/);
+  // The ring rules live in @layer base so utilities (-outline-offset-2,
+  // outline-accent/60) can override them. jsdom can't compute cascade
+  // layers, so pin the source structure; the computed values were checked
+  // in headless Chromium (see PR).
+  const base = css.slice(css.indexOf("@layer base {"));
+  expect(base).toMatch(/:where\(\*\) \{[^}]*outline-color: var\(--color-accent\)/);
+  expect(base).toMatch(/^  :focus-visible \{/m);
   expect(css).toMatch(/input:not\(\[type="checkbox"\][^{]*\):focus-visible/);
 });
