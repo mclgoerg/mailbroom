@@ -1,7 +1,7 @@
 import { t } from "./i18n";
 import type {
   AdminTenantStats, AiGroupResult, AppState, AttMail, AuditResp, AuthProbe,
-  Config, DupSet, FilterPreset, FoldersResp, Grouping, Mail, MessageDetail,
+  Config, ConversationResp, DupSet, FilterPreset, FoldersResp, Grouping, Mail, MessageDetail,
   MailsResp, Rule, RuleRun, SearchResp, StatsResp, TrashResp, UnsubBulkResult, UnsubResult,
 } from "./types";
 
@@ -79,6 +79,9 @@ export const api = {
   message: (folder: string, uid: number) =>
     req<MessageDetail>(
       `/api/message?folder=${encodeURIComponent(folder)}&uid=${uid}`),
+  thread: (folder: string, uid: number) =>
+    req<ConversationResp>(
+      `/api/thread?folder=${encodeURIComponent(folder)}&uid=${uid}`),
   deleteGroups: (grouping: Grouping, keys: string[],
                  action = "trash", dest = "", force = false,
                  keepLatest: number | null = null,

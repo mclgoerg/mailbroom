@@ -1,9 +1,10 @@
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, MessagesSquare } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { api, fmtSize, mailKey } from "../api";
 import type { Mail, MessageDetail } from "../types";
 import { t } from "../i18n";
 import { AiTag, Button, PinButton, Spinner } from "./ui";
+import { ThreadView } from "./ThreadView";
 
 const RENDER_CAP = 500;
 
@@ -12,15 +13,21 @@ export function MessageView({ mail, onBack }: {
 }) {
   const [detail, setDetail] = useState<MessageDetail | null>(null);
   const [error, setError] = useState("");
+  const [reading, setReading] = useState(false);
 
   useEffect(() => {
     let alive = true;
+    setReading(false);
     setDetail(null);
     api.message(mail.folder, mail.uid)
       .then((d) => alive && setDetail(d))
       .catch((e) => alive && setError(String(e.message ?? e)));
     return () => { alive = false; };
   }, [mail.folder, mail.uid]);
+
+  if (reading) {
+    return <ThreadView mail={mail} onBack={() => setReading(false)} />;
+  }
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
@@ -34,11 +41,19 @@ export function MessageView({ mail, onBack }: {
         p-4 font-sans text-sm leading-relaxed">
         {detail?.text}
       </pre>
-      <div className="border-t border-line px-4 py-2">
+      <div className="flex flex-wrap items-center gap-2 border-t border-line
+        px-4 py-2">
         <Button variant="ghost" onClick={onBack}>
           <ArrowLeft size={15} className="mr-1 inline align-text-bottom" />
           {t("back to list")}
         </Button>
+        {detail?.thread && (
+          <Button variant="ghost" onClick={() => setReading(true)}>
+            <MessagesSquare size={15}
+              className="mr-1 inline align-text-bottom" />
+            {t("thread.read")}
+          </Button>
+        )}
       </div>
     </div>
   );

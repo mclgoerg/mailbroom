@@ -454,6 +454,17 @@ export const DE: Record<string, string> = {
     + "für Gruppen).",
   "mails.load_more": "{n} weitere laden",
   "mails.none": "Keine Mails passen zu diesem Filter.",
+  "thread.title": "Konversation",
+  "thread.read": "Konversation lesen",
+  "thread.you": "Sie",
+  "thread.n_mails": "{n} Mails",
+  "thread.expand_all": "Alle aufklappen",
+  "thread.collapse_all": "Alle zuklappen",
+  "thread.show_quoted": "Zitierten Text anzeigen",
+  "thread.hide_quoted": "Zitierten Text ausblenden",
+  "thread.note.sent_unavailable":
+    "Ihre eigenen Antworten konnten nicht aus dem Ordner „Gesendet“ geladen "
+    + "werden - es werden nur die empfangenen Mails angezeigt.",
   "no.matches": "Keine Gruppen passen zu diesem Filter.",
   "onboard.title": "Willkommen - in drei Schritten zum sauberen Postfach",
   "onboard.step_bridge":

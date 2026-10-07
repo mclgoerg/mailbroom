@@ -207,7 +207,8 @@ class FakeIMAP:
             if args[-1] == "ALL":
                 hits = msgs
             elif "HEADER" in args:
-                target = args[-1].strip('"')
+                target = (self.literal.decode("utf-8") if self.literal
+                          else args[-1].strip('"'))
                 hits = [m for m in msgs if m["msgid"] == target]
             else:
                 raise AssertionError(f"unexpected SEARCH {args!r}")
@@ -225,7 +226,9 @@ class FakeIMAP:
             if "BODY.PEEK[]" in args[1]:
                 for i, m in enumerate(msgs):
                     if m["uid"] in wanted:
-                        body = self._header_blob(m) + b"Hello mail body\r\n"
+                        body = self._header_blob(m) + (
+                            (m.get("body") or "Hello mail body") + "\r\n"
+                        ).encode()
                         return "OK", [(f"{i+1} (UID {m['uid']} BODY[] "
                                        f"{{{len(body)}}}".encode(), body), b")"]
                 return "OK", [None]

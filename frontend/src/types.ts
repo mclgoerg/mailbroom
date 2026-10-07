@@ -227,6 +227,7 @@ export interface Mail {
   seen: boolean;
   ai: Verdict | null;
   pinned?: boolean;   // absent in search/duplicate/attachment lists
+  sent?: boolean;     // conversation reader: the user's own mail (Sent)
 }
 
 export interface MailsResp {
@@ -242,6 +243,15 @@ export interface MessageDetail {
   date: string;
   subject: string;
   text: string;
+  // Present when the mail belongs to a conversation worth reading as one.
+  thread?: { count: number } | null;
+}
+
+export interface ConversationResp {
+  key: string;
+  label: string;
+  mails: Mail[];           // oldest first, incl. the user's replies from Sent
+  notes: SearchNote[];
 }
 
 export interface AiGroupResult {
