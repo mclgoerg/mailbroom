@@ -41,6 +41,7 @@ const deleteGroups = api.deleteGroups as ReturnType<typeof vi.fn>;
 const groupApi = api.group as ReturnType<typeof vi.fn>;
 
 import App from "./App";
+import { ToastProvider } from "./components/ui";
 import type { AppState, Config, Group } from "./types";
 
 const acctCfg = {
@@ -125,7 +126,7 @@ test("defaults to acting on every mail (no retention)", async () => {
   state = { ...baseState };
   mountReady();
   vi.spyOn(window, "confirm").mockReturnValue(true);
-  render(<App />);
+  render(<ToastProvider><App /></ToastProvider>);
   await selectFirstGroup();
   fireEvent.click(screen.getByText(/^Trash \d+$/));
   await waitFor(() => expect(deleteGroups).toHaveBeenCalledOnce());
@@ -137,7 +138,7 @@ test("keep-latest-N is sent through to the delete call", async () => {
   state = { ...baseState };
   mountReady();
   vi.spyOn(window, "confirm").mockReturnValue(true);
-  render(<App />);
+  render(<ToastProvider><App /></ToastProvider>);
   await selectFirstGroup();
 
   fireEvent.change(screen.getByTitle("Restrict this action to mails " +
@@ -164,7 +165,7 @@ test("the Trash button shows the retention-adjusted number, not the " +
   groupApi.mockResolvedValue(
     Array.from({ length: 12 }, (_, i) => (
       { folder: "INBOX", uid: i + 1, ts: 1000 + i })));
-  render(<App />);
+  render(<ToastProvider><App /></ToastProvider>);
   await selectFirstGroup();
 
   // No retention yet: shows the plain count immediately, button enabled.
@@ -196,7 +197,7 @@ test("an unrelated SSE status tick does not flap the settled count back " +
   groupApi.mockResolvedValue(
     Array.from({ length: 12 }, (_, i) => (
       { folder: "INBOX", uid: i + 1, ts: 1000 + i })));
-  render(<App />);
+  render(<ToastProvider><App /></ToastProvider>);
   await selectFirstGroup();
 
   fireEvent.change(screen.getByTitle("Restrict this action to mails " +
@@ -226,7 +227,7 @@ test("older-than-days is sent through to the delete call", async () => {
   state = { ...baseState };
   mountReady();
   vi.spyOn(window, "confirm").mockReturnValue(true);
-  render(<App />);
+  render(<ToastProvider><App /></ToastProvider>);
   await selectFirstGroup();
 
   fireEvent.change(screen.getByTitle("Restrict this action to mails " +
@@ -247,7 +248,7 @@ test("pinned mails are left out of the Trash count; a fully pinned " +
   state = { ...baseState, groups: { ...baseState.groups,
     sender: { [group.key]: { ...group, count: 12, pinned: 3 } } } };
   mountReady();
-  render(<App />);
+  render(<ToastProvider><App /></ToastProvider>);
   await selectFirstGroup();
   expect(bulkTrashButton().textContent).toBe("Trash 9");
   expect(bulkTrashButton().disabled).toBe(false);
@@ -256,7 +257,7 @@ test("pinned mails are left out of the Trash count; a fully pinned " +
 
   state = { ...baseState, groups: { ...baseState.groups,
     sender: { [group.key]: { ...group, count: 3, pinned: 3 } } } };
-  render(<App />);
+  render(<ToastProvider><App /></ToastProvider>);
   await selectFirstGroup();
   await waitFor(() => expect(bulkTrashButton().textContent).toBe("Trash 0"));
   expect(bulkTrashButton().disabled).toBe(true);

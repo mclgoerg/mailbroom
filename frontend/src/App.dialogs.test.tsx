@@ -41,7 +41,8 @@ const deleteGroups = api.deleteGroups as ReturnType<typeof vi.fn>;
 const groupApi = api.group as ReturnType<typeof vi.fn>;
 
 import App from "./App";
-import { DialogProvider, confirmDialog } from "./components/ui";
+import { DialogProvider, ToastProvider, confirmDialog }
+  from "./components/ui";
 import type { AppState, Config, Group } from "./types";
 
 const acctCfg = {
@@ -107,7 +108,7 @@ test("App shortcuts are ignored while a confirm dialog is open", async () => {
   state = { ...baseState };
   localStorage.setItem("pmc_account", "proton");
   groupApi.mockClear();
-  const { container } = render(<DialogProvider><App /></DialogProvider>);
+  const { container } = render(<ToastProvider><DialogProvider><App /></DialogProvider></ToastProvider>);
   await waitFor(() => expect(container.querySelectorAll("tbody tr").length)
     .toBe(1), { timeout: 5000 });
 

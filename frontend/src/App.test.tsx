@@ -47,6 +47,7 @@ vi.mock("./api", () => ({
 }));
 
 import App from "./App";
+import { ToastProvider } from "./components/ui";
 import type { AppState, Config } from "./types";
 
 const acct = {
@@ -133,7 +134,7 @@ const settleStateCalls = () =>
 test("profile menu lists every account with its address", async () => {
   cfg = multiCfg;
   state = { ...baseState };
-  render(<App />);
+  render(<ToastProvider><App /></ToastProvider>);
   // Wait for config to load (multi-account trigger) before opening the
   // menu - opening too early would still show the single-account menu.
   await waitFor(() => expect(screen.getByLabelText("Profile & settings")
@@ -149,7 +150,7 @@ test("the active account is marked and the trigger shows its name",
   async () => {
     cfg = multiCfg;
     state = { ...baseState };
-    render(<App />);
+    render(<ToastProvider><App /></ToastProvider>);
     await waitFor(() => expect(screen.getByLabelText("Profile & settings")
       .textContent).toContain("proton"));
     await openMenu();
@@ -164,7 +165,7 @@ test("clicking a different account switches; clicking the active one " +
   "does not re-fetch", async () => {
   cfg = multiCfg;
   state = { ...baseState };
-  render(<App />);
+  render(<ToastProvider><App /></ToastProvider>);
   await waitFor(() => expect(screen.getByLabelText("Profile & settings")
     .textContent).toContain("proton"));
   await settleStateCalls();
@@ -188,7 +189,7 @@ test("single account: no Accounts section, header keeps the plain " +
   "profile trigger", async () => {
   cfg = singleCfg;
   state = { ...baseState };
-  render(<App />);
+  render(<ToastProvider><App /></ToastProvider>);
   await openMenu();
   expect(screen.queryByText("Accounts")).toBeNull();
   expect(screen.queryByRole("menuitemradio")).toBeNull();
@@ -198,7 +199,7 @@ test("header has a single account control, not a separate pill strip",
   async () => {
     cfg = multiCfg;
     state = { ...baseState };
-    render(<App />);
+    render(<ToastProvider><App /></ToastProvider>);
     await waitFor(() => expect(screen.getByLabelText("Profile & settings")
       .textContent).toContain("proton"));
     // Before opening the menu, only the trigger mentions account names -
@@ -216,7 +217,7 @@ test("shows an update banner once the server build changes, and " +
   versions = ["v1", "v2"];       // first poll establishes the baseline
   vi.useFakeTimers();
   try {
-    render(<App />);
+    render(<ToastProvider><App /></ToastProvider>);
     await vi.advanceTimersByTimeAsync(0);        // flush the initial check
     expect(screen.queryByText(/new version/i)).toBeNull();
     await vi.advanceTimersByTimeAsync(20_000);   // the next poll tick
@@ -236,7 +237,7 @@ test("profile menu shows the release version and the build this tab " +
     cfg = singleCfg;
     state = { ...baseState };
     versions = ["abc123"];
-    render(<App />);
+    render(<ToastProvider><App /></ToastProvider>);
     await openMenu();
     // package.json's version baked in via vite.config.ts's define, plus
     // the loaded build hash from the (mocked) /api/version poll - async,
@@ -262,7 +263,7 @@ const renderWithOneSenderGroup = () => {
   state = { ...baseState, status: "done",
     groups: { sender: { [groupFixture.key]: groupFixture },
               domain: {}, subject: {}, thread: {} } };
-  return render(<App />);
+  return render(<ToastProvider><App /></ToastProvider>);
 };
 
 // Block/Unblock/Protect moved from the group row into DetailPanel (single-
@@ -311,7 +312,7 @@ const renderWithOneBlockedSenderGroup = () => {
     groups: { sender: { [groupFixture.key]: groupFixture },
               domain: {}, subject: {}, thread: {} },
     rules: [blockRuleFixture] };
-  return render(<App />);
+  return render(<ToastProvider><App /></ToastProvider>);
 };
 
 test("a blocked group shows Unblock (not Block), which confirms and " +
@@ -499,7 +500,7 @@ test("the bar's Action… offers AI review (only when AI is enabled) and " +
   state = { ...baseState, status: "done",
     groups: { sender: { [groupFixture.key]: groupFixture },
               domain: {}, subject: {}, thread: {} } };
-  render(<App />);
+  render(<ToastProvider><App /></ToastProvider>);
   await waitFor(() => expect(screen.getAllByText("DHL Paket").length)
     .toBeGreaterThan(0));
   await selectRowCheckbox();

@@ -1,5 +1,6 @@
 import { ArrowDown, BarChart3, BookmarkPlus, ChevronDown, ClipboardList,
-  Copy, Download, Moon, MoreHorizontal, Paperclip, Pencil, Plus, Power,
+  Copy, Download, Info, Mail, Moon, MoreHorizontal, Paperclip, Pencil, Plus,
+  Power,
   ScrollText, Search, Settings as SettingsIcon, Sparkles, Star, Sun,
   Trash2, User, Wand2, X }
   from "lucide-react";
@@ -19,12 +20,13 @@ import { SettingsModal } from "./components/SettingsModal";
 import { StatsPanel } from "./components/StatsPanel";
 import { QueryBuilder } from "./components/QueryBuilder";
 import { TrashPanel } from "./components/TrashPanel";
-import { AccountAvatar, applyTheme, Button, Chip, currentTheme, ensureAiAck,
-  Input, isModalOpen, LINK, LINK_ACCENT, Menu, MenuHeading, MenuItem, Select, Spinner }
-  from "./components/ui";
+import { AccountAvatar, applyTheme, Button, Chip, currentTheme, EmptyState,
+  ensureAiAck, Input, isModalOpen, LINK, LINK_ACCENT, Menu, MenuHeading,
+  MenuItem, Notice, ProgressBar, Select, Spinner, useBulkBarHeight, useToast,
+  type ToastVariant } from "./components/ui";
 import { t } from "./i18n";
 import { applyStatus, fmtAgo, fmtSize, fmtUsd, matchGroup, parseFilter,
-  retainedMailKeys } from "./lib";
+  parseProgress, retainedMailKeys } from "./lib";
 import type { AppState, AuthProbe, Config, FilterPreset, Group, Grouping,
   StatusMsg } from "./types";
 
@@ -61,6 +63,9 @@ const sortValue = (g: Group, k: SortKey): number | string => {
   if (k === "unreadPct") return g.count ? g.unread / g.count : 0;
   return g[k];
 };
+
+const undoId = (u: { ts: number; count: number; label: string }) =>
+  `${u.ts}|${u.count}|${u.label}`;
 
 const actionVerb = (a: string): string =>
   ({ trash: t("Move to Trash"), archive: t("Archive"), move: t("Move"),
@@ -144,7 +149,15 @@ export default function App() {
     return [null, null];
   };
   const [focusIdx, setFocusIdx] = useState(-1);
-  const [toast, setToast] = useState("");
+  // Transient "doing it now" text shown with the running-job progress until
+  // the backend reports real progress; results and errors are toasts.
+  const [pending, setPending] = useState("");
+  const toast = useToast();
+  const notify = (msg: string, variant: ToastVariant = "info") =>
+    toast.show(msg, { variant });
+  const fail = (e: any, key = "err.generic") =>
+    notify(t(key, { msg: e.message ?? e }), "error");
+  const connToast = useRef<number | null>(null);   // one lost-connection toast
   const [theme, setTheme] = useState<"dark" | "light">(currentTheme());
   const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
   const sse = useRef<EventSource | null>(null);
@@ -161,6 +174,10 @@ export default function App() {
       const st = await api.state();
       stateRef.current = st;
       setState(st);
+      if (connToast.current != null) {
+        toast.dismiss(connToast.current);
+        connToast.current = null;
+      }
       // Polling fallback only drives itself when SSE isn't connected.
       if (!sse.current && (st.status === "scanning"
           || st.ai.status === "running" || st.delete.status === "running"
@@ -169,12 +186,16 @@ export default function App() {
         timer.current = setTimeout(refresh, 1200);
       }
     } catch (e: any) {
-      setToast(`Connection error: ${e.message ?? e}`);
+      // Polling retries every few seconds: show the error once, not per try.
+      if (connToast.current == null) {
+        connToast.current = toast.show(
+          t("err.connection", { msg: e.message ?? e }), { variant: "error" });
+      }
       if (!sse.current) timer.current = setTimeout(refresh, 4000);
     } finally {
       fetching.current = false;
     }
-  }, []);
+  }, [toast]);
 
   // Drop a stale saved account (e.g. deleted meanwhile) once cfg is known.
   useEffect(() => {
@@ -267,6 +288,76 @@ export default function App() {
     prevJobs.current = { d: state.delete.status, a: state.ai.status,
       t: state.atts?.status, u: state.unsub?.status };
   }, [state]);
+
+  /* Job outcomes as toasts. A finished move is detected by NEW undo entries
+     as well as by its status changing: SSE ticks once a second, so a short
+     job can go done -> running -> done between two ticks. Only a change
+     toasts (a page load or account switch that finds an old "done" stays
+     quiet); a scan error is the one exception, nothing else shows it. */
+  const seenJobs = useRef<{ scan?: string; d?: string; a?: string;
+    u?: string; undo: string[] } | null>(null);
+  const startToast = useRef<{ unsub?: number }>({});
+  useEffect(() => {
+    if (!state) { seenJobs.current = null; return; }
+    const prev = seenJobs.current;
+    const { delete: del, ai, unsub } = state;
+    const ids = state.undo.map(undoId);
+    // Undo entries are also recorded mid-job, so while a move runs the
+    // baseline stays what it was before it started.
+    seenJobs.current = { scan: state.status, d: del.status,
+      a: ai.status, u: unsub?.status,
+      undo: del.status === "running" && prev ? prev.undo : ids };
+    if (state.status === "error" && prev?.scan !== "error")
+      notify(t("err.generic", { msg: state.error }), "error");
+    if (!prev) return;
+    const fresh = state.undo.filter((u) => !prev.undo.includes(undoId(u)));
+    if (del.status !== "running" && (del.status !== prev.d || fresh.length)) {
+      if (del.status === "error") {
+        notify(t("err.generic", { msg: del.error }), "error");
+      } else if (fresh.length || del.moved > 0) {
+        const n = fresh.length
+          ? fresh.reduce((a, u) => a + u.count, 0) : del.moved;
+        const entry = fresh.length === 1 ? fresh[0] : undefined;
+        toast.show(fresh.length && fresh.every((u) => u.action === "trash")
+          ? t("toast.moved_trash", { n }) : t("done_moved", { n }), {
+          variant: "success",
+          // Undo targets THIS job's entry by identity (the list may have
+          // shifted by click time), never "the latest".
+          action: entry ? { label: t("Undo"), onClick: () => {
+            const i = stateRef.current?.undo.findIndex(
+              (u) => undoId(u) === undoId(entry)) ?? -1;
+            if (i >= 0) undo(i);
+          } } : undefined,
+        });
+        if (del.error) notify(t("err.generic", { msg: del.error }), "error");
+      }
+    }
+    if (unsub && unsub.status !== "running" && unsub.status !== prev.u) {
+      if (startToast.current.unsub != null) {
+        toast.dismiss(startToast.current.unsub);
+        startToast.current.unsub = undefined;
+      }
+      if (unsub.status === "error")
+        notify(t("err.unsub", { msg: unsub.error }), "error");
+      else if (unsub.status === "done" && unsub.total > 0)
+        notify(t("unsub.done", { done: unsub.done, links: unsub.links,
+          failed: unsub.failed }), "success");
+    }
+    if (ai.status !== prev.a) {
+      if (ai.status === "error") {
+        notify(t("err.ai", { msg: ai.error }), "error");
+      } else if (ai.status === "done" && ai.usage) {
+        const u = ai.usage;
+        notify(t("ai_done", { in: u.input_tokens, out: u.output_tokens,
+          cost: u.cost ? ` ≈ ${fmtUsd(u.cost)}` : "",
+          total: fmtUsd(u.total_cost ?? 0) }), "success");
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state]);
+
+  const bulkBar = useRef<HTMLDivElement>(null);
+  useBulkBarHeight(bulkBar, selected.size > 0);
 
   /* Update check: installed PWAs have no service worker here, so an
      already-open tab can only learn a new build is live by asking the
@@ -391,8 +482,7 @@ export default function App() {
       retentionN]);
 
   // Everything in the selection is pinned: nothing would move. Shown in
-  // the bar itself - the toast lives in the status line far above it,
-  // out of sight behind a long list.
+  // the bar itself, right where the user just acted.
   const selAllPinned = !selCountPending && selected.size > 0 && selCount === 0
     && !retentionParams().some(Boolean)
     && [...selected].some((k) => (state?.groups[mode]?.[k]?.pinned ?? 0) > 0);
@@ -411,9 +501,10 @@ export default function App() {
   const startScan = async () => {
     setSelected(new Set());
     // Instant feedback: the real progress replaces this on the next tick.
-    setToast(t("Starting…"));
-    try { await api.scan(); setToast(""); refresh(); }
-    catch (e: any) { setToast(`Error: ${e.message ?? e}`); }
+    setPending(t("Starting…"));
+    try { await api.scan(); refresh(); }
+    catch (e: any) { fail(e); }
+    setPending("");
   };
 
   // No `keys` = every unrated group in the current grouping (today's
@@ -422,34 +513,39 @@ export default function App() {
   // entry).
   const startAi = async (keys?: string[]) => {
     if (!ensureAiAck()) return;
-    setToast(t("Starting…"));
-    try { await api.aiReview(mode, keys); setToast(""); refresh(); }
-    catch (e: any) { setToast(`AI error: ${e.message ?? e}`); }
+    setPending(t("Starting…"));
+    try {
+      await api.aiReview(mode, keys);
+      if (seenJobs.current) seenJobs.current.a = "running";   // see effect
+      refresh();
+    }
+    catch (e: any) { fail(e, "err.ai"); }
+    setPending("");
   };
 
   const cancel = async () => {
-    const target = scanning ? "scan" : aiRunning ? "ai"
-      : attsRunning ? "atts" : unsubRunning ? "unsub" : "delete";
-    try { await api.cancel(target); refresh(); } catch { /* too late */ }
+    try { await api.cancel(job?.target ?? "delete"); refresh(); } catch { /* too late */ }
   };
 
   const undo = async (index: number) => {
-    const entry = state?.undo[index];
+    const entry = stateRef.current?.undo[index];
     if (!entry) return;
     setUndoOpen(false);
     if (!confirm(t("confirm.restore",
       { count: entry.count, label: entry.label }))) return;
-    setToast(t("Restoring…"));
-    try { await api.undo(index); setToast(""); refresh(); }
-    catch (e: any) { setToast(`Undo error: ${e.message ?? e}`); }
+    setPending(t("Restoring…"));
+    try { await api.undo(index); refresh(); }
+    catch (e: any) { fail(e, "err.undo"); }
+    setPending("");
   };
 
   const emptyTrash = async () => {
     const n = state?.trash_count ?? 0;
     if (!confirm(t("confirm.empty_trash", { n }))) return;
-    setToast(t("Emptying Trash…"));
-    try { await api.emptyTrash(); setToast(""); refresh(); }
-    catch (e: any) { setToast(`Error: ${e.message ?? e}`); }
+    setPending(t("Emptying Trash…"));
+    try { await api.emptyTrash(); refresh(); }
+    catch (e: any) { fail(e); }
+    setPending("");
   };
 
   // The filter-box DSL equivalent of each quick-select preset - the
@@ -521,7 +617,7 @@ export default function App() {
       await api.createPreset(name, filter);
       refresh();
     } catch (e: any) {
-      setToast(`Error: ${e.message ?? e}`);
+      fail(e);
     }
   };
 
@@ -531,7 +627,7 @@ export default function App() {
       await api.deletePreset(id);
       refresh();
     } catch (e: any) {
-      setToast(`Error: ${e.message ?? e}`);
+      fail(e);
     }
   };
 
@@ -543,7 +639,7 @@ export default function App() {
       setEditingPreset(null);
       refresh();
     } catch (e: any) {
-      setToast(`Error: ${e.message ?? e}`);
+      fail(e);
     }
   };
 
@@ -568,7 +664,7 @@ export default function App() {
       } else if (prot.length) {
         effective = keys.filter((k) => !all[k]?.protected);
         if (!effective.length) {
-          setToast(t("toast.all_protected"));
+          notify(t("toast.all_protected"));
           return false;
         }
       }
@@ -579,7 +675,7 @@ export default function App() {
     const n = await retentionAdjustedCount(
       effective, keepLatest, olderThanDays, skipPinned);
     if (n === 0 && pins > 0) {
-      setToast(t("toast.all_pinned"));
+      notify(t("toast.all_pinned"));
       return false;
     }
     const verb = actionVerb(action) + (dest ? ` → ${dest}` : "");
@@ -593,12 +689,12 @@ export default function App() {
     try {
       await api.deleteGroups(mode, effective, action, dest, force,
         keepLatest, olderThanDays);
-      setToast("");
       setSelected(new Set());
+      if (seenJobs.current) seenJobs.current.d = "running";   // see effect
       refresh();   // runs in the background; SSE/polling follows it
       return true;
     } catch (e: any) {
-      setToast(`Error: ${e.message ?? e}`);
+      fail(e);
       return false;
     }
   };
@@ -611,13 +707,18 @@ export default function App() {
     try {
       const r = await api.unsubscribeBulk(mode, [...selected]);
       const skipped = r.skipped_protected + r.skipped_done + r.capped;
-      setToast(r.queued
+      const id = toast.show(r.queued
         ? t("toast.unsub_started", { n: r.queued })
           + (skipped ? " " + t("toast.unsub_skipped", { n: skipped }) : "")
         : t("toast.unsub_nothing"));
+      if (r.queued) {
+        // Replaced by the result toast when the job ends.
+        startToast.current.unsub = id;
+        if (seenJobs.current) seenJobs.current.u = "running";
+      }
       refresh();
     } catch (e: any) {
-      setToast(`Error: ${e.message ?? e}`);
+      fail(e);
     }
   };
 
@@ -630,7 +731,7 @@ export default function App() {
       setCfg((c) => (c ? { ...c, protected: r.protected } : c));
       refresh();
     } catch (e: any) {
-      setToast(`Error: ${e.message ?? e}`);
+      fail(e);
     }
   };
 
@@ -642,10 +743,10 @@ export default function App() {
       && confirm(t("confirm.block_trash_existing", { n: g.count }));
     try {
       await api.block(mode, g.key, g.label, trashExisting);
-      setToast(t("toast.blocked", { label: g.label }));
+      notify(t("toast.blocked", { label: g.label }), "success");
       refresh();
     } catch (e: any) {
-      setToast(`Error: ${e.message ?? e}`);
+      fail(e);
     }
   };
 
@@ -658,16 +759,16 @@ export default function App() {
     if (!confirm(t("confirm.unblock", { label: g.label }))) return;
     try {
       await api.deleteRule(ruleId);
-      setToast(t("toast.unblocked", { label: g.label }));
+      notify(t("toast.unblocked", { label: g.label }), "success");
       refresh();
     } catch (e: any) {
-      setToast(`Error: ${e.message ?? e}`);
+      fail(e);
     }
   };
 
   const ackUnsub = async (addr: string) => {
     try { await api.unsubscribeAck(addr); refresh(); }
-    catch (e: any) { setToast(`Error: ${e.message ?? e}`); }
+    catch (e: any) { fail(e); }
   };
 
   const onAction = (v: string) => {
@@ -731,55 +832,54 @@ export default function App() {
       ?.scrollIntoView({ block: "nearest" });
   }, [focusIdx]);
 
-  const statusLine = () => {
-    if (!state) return <Spinner />;
-    if (scanning)
-      return <>{t("Scanning…")} {state.progress} <Spinner />{" "}
-        <button className={LINK} onClick={cancel}>{t("cancel")}</button></>;
-    if (state.status === "error") return `Error: ${state.error}`;
-    if (deleting)
-      return <>{t("Moving…")} {state.delete.progress} <Spinner />{" "}
-        <button className={LINK} onClick={cancel}>{t("cancel")}</button></>;
-    if (aiRunning)
-      return <>AI ({state.ai.grouping})… {state.ai.progress}{" "}
-        <Spinner /> <button className={LINK} onClick={cancel}>
-        {t("cancel")}</button></>;
-    if (attsRunning)
-      return <>📎 {t("atts.running")} {state.atts.progress} <Spinner />{" "}
-        <button className={LINK} onClick={cancel}>{t("cancel")}</button></>;
-    if (unsubRunning)
-      return <>✉ {t("unsub.running")} {state.unsub.progress} <Spinner />{" "}
-        <button className={LINK} onClick={cancel}>{t("cancel")}</button></>;
-    const parts: string[] = [];
-    if (groups.length) {
+  // The running job (if any): its label, raw progress text and icon. One
+  // source for the status text, the cancel button and the progress strip.
+  const job = !state ? null
+    : scanning ? { target: "scan" as const, label: t("Scanning…"),
+        progress: state.progress }
+    : deleting ? { target: "delete" as const, label: t("Moving…"),
+        progress: state.delete.progress }
+    : aiRunning ? { target: "ai" as const, label: `AI (${state.ai.grouping})…`,
+        progress: state.ai.progress }
+    : attsRunning ? { target: "atts" as const, label: t("atts.running"),
+        progress: state.atts.progress, icon: <Paperclip size={14} /> }
+    : unsubRunning ? { target: "unsub" as const, label: t("unsub.running"),
+        progress: state.unsub.progress, icon: <Mail size={14} /> }
+    : null;
+
+  // Persistent summary only: results and errors are toasts.
+  const summary = (): string => {
+    if (!state) return "";
+    if (filter && !groups.length && allGroups.length)
+      return t("status.filter_none", { n: allGroups.length });
+    if (groups.length || state.scanned_ts) {
       const mails = groups.reduce((n, g) => n + g.count, 0);
       const size = groups.reduce((n, g) => n + g.size, 0);
       const ago = fmtAgo(state.scanned_ts);
-      parts.push(`${groups.length} ${t("groups")} · ${mails} ${t("mails")}`
+      return `${groups.length} ${t("groups")} · ${mails} ${t("mails")}`
         + ` · ${fmtSize(size)}` + (filter ? ` ${t("(filtered)")}` : "")
-        + (ago ? ` · ${t("scan.age", { ago })}` : ""));
+        + (ago ? ` · ${t("scan.age", { ago })}` : "");
     }
-    if (state.delete.status === "error")
-      parts.push(`Error: ${state.delete.error}`);
-    else if (state.delete.status === "done" && state.delete.moved > 0)
-      parts.push(t("done_moved", { n: state.delete.moved }));
-    if (state.unsub?.status === "error")
-      parts.push(`Unsubscribe error: ${state.unsub.error}`);
-    else if (state.unsub?.status === "done" && state.unsub.total > 0) {
-      parts.push(t("unsub.done", { done: state.unsub.done,
-        links: state.unsub.links, failed: state.unsub.failed }));
-    }
-    if (state.ai.status === "error") parts.push(`AI error: ${state.ai.error}`);
-    else if (state.ai.status === "done" && state.ai.usage) {
-      const u = state.ai.usage;
-      parts.push(t("ai_done", {
-        in: u.input_tokens, out: u.output_tokens,
-        cost: u.cost ? ` ≈ ${fmtUsd(u.cost)}` : "",
-        total: fmtUsd(u.total_cost ?? 0) }));
-    }
-    if (toast) parts.push(toast);
-    return parts.join(" - ") || t("No scan yet - hit “Scan”.");
+    return t("No scan yet - hit “Scan”.");
   };
+
+  const statusLine = () => {
+    if (!state) return <Spinner />;
+    const running = job ?? (pending ? { label: pending, progress: "" } : null);
+    if (!running) return summary();
+    return (
+      <span className="inline-flex items-center gap-1.5">
+        {job?.icon}
+        {running.label} {running.progress} <Spinner />
+        {job && (
+          <Button variant="quiet" size="sm" onClick={cancel}>
+            {t("cancel")}
+          </Button>
+        )}
+      </span>
+    );
+  };
+  const progress = job ? parseProgress(job.progress) : null;
 
   if (!auth) {
     return (
@@ -1135,7 +1235,7 @@ export default function App() {
           runs below, labelled instead of relying on a hover-only title
           (useless on touch), (3) the actions themselves. */}
       {selected.size > 0 && (
-        <div className="fixed inset-x-0 bottom-0 z-(--z-bulkbar) border-t border-line
+        <div ref={bulkBar} className="fixed inset-x-0 bottom-0 z-(--z-bulkbar) border-t border-line
           bg-panel px-3 py-2 shadow-bar"
           style={{ paddingBottom: "calc(env(safe-area-inset-bottom) + 0.5rem)" }}>
           <div className="mx-auto flex max-w-6xl flex-col gap-2">
@@ -1227,26 +1327,30 @@ export default function App() {
         </div>
       )}
 
-      <div className="mb-1 min-h-5 type-meta text-muted">{statusLine()}</div>
-      <div className="mb-2 flex flex-wrap items-center gap-2 type-meta">
-        {state?.notice && (
-          <span className="rounded bg-panel2 px-2 py-1 text-chiptext">
-            {t(`notice.${state.notice.key}`, state.notice.params)}{" "}
-            <button className={`text-muted ${LINK}`}
-              onClick={dismissNotice}>{t("dismiss")}</button>
-          </span>
+      {/* 2 px strip (space always reserved, no layout jump) under the
+          toolbar while a job runs. */}
+      <div className="mb-1 h-0.5">
+        {(job || pending) && (
+          <ProgressBar thin label={job?.label ?? pending}
+            value={progress?.done ?? 0} max={progress?.total ?? 0}
+            indeterminate={!progress} />
         )}
+      </div>
+      <div className="mb-1 flex min-h-5 items-center justify-between gap-2
+        type-meta text-muted">
+        <div>{statusLine()}</div>
         {(state?.undo.length ?? 0) > 0 && !deleting && (
-          <span className="relative">
-            <Button variant="secondary" size="sm"
+          <span className="relative shrink-0">
+            <Button variant="quiet" size="sm" className="whitespace-nowrap"
               onClick={() => setUndoOpen(!undoOpen)}>
               {t("Undo")}
               <ChevronDown size={14}
                 className="ml-0.5 inline align-text-bottom" />
             </Button>
             {undoOpen && (
-              <span className="absolute left-0 top-8 z-(--z-dropdown) block w-72
-                rounded-card border border-line bg-panel p-1 shadow-popover">
+              <span className="absolute right-0 top-8 z-(--z-dropdown) block
+                w-72 rounded-card border border-line bg-panel p-1
+                shadow-popover">
                 {[...state!.undo].map((u, i) => ({ u, i })).reverse()
                   .map(({ u, i }) => (
                   <button key={i}
@@ -1262,9 +1366,15 @@ export default function App() {
           </span>
         )}
       </div>
+      {state?.notice && (
+        <Notice className="mb-2" icon={<Info size={14} />}
+          onClose={dismissNotice}>
+          {t(`notice.${state.notice.key}`, state.notice.params)}
+        </Notice>
+      )}
 
       {/* First-run onboarding: no credentials or no scan yet. */}
-      {cfg && state?.status === "idle" && groups.length === 0
+      {cfg && state?.status === "idle" && allGroups.length === 0
         && !scanning && (
         <div className="mx-auto my-10 max-w-md rounded-dialog border border-line
           bg-panel p-4 type-body sm:p-5">
@@ -1285,13 +1395,15 @@ export default function App() {
           <div className="mt-4 flex items-center gap-3">
             {acct?.password_set && (
               <Button variant="secondary" onClick={async () => {
-                setToast(t("onboard.testing"));
+                setPending(t("onboard.testing"));
                 try {
                   const r = await api.testConnection();
-                  setToast(t("onboard.test_ok", { n: r.folders }));
+                  notify(t("onboard.test_ok", { n: r.folders }), "success");
                 } catch (e: any) {
-                  setToast(`${t("onboard.test_fail")}: ${e.message ?? e}`);
+                  notify(`${t("onboard.test_fail")}: ${e.message ?? e}`,
+                    "error");
                 }
+                setPending("");
               }}>{t("onboard.test")}</Button>
             )}
             <Button onClick={startScan} disabled={!acct?.password_set}>
@@ -1334,10 +1446,24 @@ export default function App() {
           resetSignal={`${mode}\u0000${filter}`}
         />
       ) : (
-        !scanning && state?.status === "done" && (
-          <div className="py-16 text-center type-body text-muted">
-            {filter ? t("no.matches") : t("No scan yet - hit “Scan”.")}
-          </div>
+        state && !scanning && (filter && allGroups.length > 0
+            || state.status === "done") && (
+          filter && allGroups.length > 0 ? (
+            <EmptyState icon={<Search size={18} />} title={t("no.matches")}
+              action={
+                <Button variant="secondary" onClick={() => {
+                  setFilter(""); setActiveChip(null);
+                  filterRef.current?.focus();
+                }}>
+                  {t("Clear filter")}
+                </Button>
+              } />
+          ) : (
+            <EmptyState>
+              {state.scanned_ts ? t("status.no_mails")
+                : t("No scan yet - hit “Scan”.")}
+            </EmptyState>
+          )
         )
       )}
 

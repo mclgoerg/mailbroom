@@ -32,6 +32,7 @@ vi.mock("./api", () => ({
 }));
 
 import App from "./App";
+import { ToastProvider } from "./components/ui";
 import type { AppState, Config } from "./types";
 
 const cfg = {
@@ -76,7 +77,7 @@ afterEach(() => {
 test("All mails swaps the group chrome for the flat list and back",
   async () => {
     state = { ...baseState };
-    render(<App />);
+    render(<ToastProvider><App /></ToastProvider>);
     await screen.findByPlaceholderText("filter groups…");
     expect(screen.queryByPlaceholderText("filter mails…")).toBeNull();
 
@@ -96,7 +97,7 @@ test("All mails swaps the group chrome for the flat list and back",
 test("the chosen view is restored on reload", async () => {
   localStorage.setItem("pmc_view", "mails");
   state = { ...baseState };
-  render(<App />);
+  render(<ToastProvider><App /></ToastProvider>);
   await screen.findByText("Flat mail");
   await waitFor(() => expect(mails).toHaveBeenCalled());
 });
@@ -111,7 +112,7 @@ test("Thread is a fourth grouping tab with its own groups", async () => {
   };
   state = { ...baseState, groups: { ...baseState.groups,
     thread: { [thread.key]: thread } } };
-  render(<App />);
+  render(<ToastProvider><App /></ToastProvider>);
   await screen.findByPlaceholderText("filter groups…");
   expect(screen.queryByText("Project plan")).toBeNull();     // sender tab
 

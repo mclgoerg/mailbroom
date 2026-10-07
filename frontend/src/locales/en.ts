@@ -530,7 +530,15 @@ export const EN: Record<string, string> = {
   "thread.note.sent_unavailable":
     "Your own replies could not be loaded from the Sent folder - only the "
     + "received mails are shown.",
-  "no.matches": "No groups match this filter.",
+  "no.matches": "No groups match this filter",
+  "err.generic": "Error: {msg}",
+  "err.ai": "AI error: {msg}",
+  "err.unsub": "Unsubscribe error: {msg}",
+  "err.undo": "Undo error: {msg}",
+  "err.connection": "Connection error: {msg}",
+  "toast.moved_trash": "Moved {n} mails to Trash",
+  "status.filter_none": "0 of {n} groups match",
+  "status.no_mails": "No mails found in the scanned folders.",
   "onboard.title": "Welcome - three steps to a tidy mailbox",
   "onboard.step_bridge":
     "Pick your mail provider (Gmail, iCloud, Fastmail, … - or Proton "

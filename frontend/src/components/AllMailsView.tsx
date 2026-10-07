@@ -5,7 +5,9 @@ import { t } from "../i18n";
 import { actionVerb, itemsOf, planMailAction } from "../mailActions";
 import type { AppState, Mail } from "../types";
 import { MailRows, MessageView } from "./MailList";
-import { Button, EmptyState, Input, LINK, Loading, Modal, Select } from "./ui";
+import { Button, EmptyState, Input, LINK, Loading, Modal, Select,
+  useBulkBarHeight, useToast }
+  from "./ui";
 
 type MailSort = "date" | "size" | "sender";
 const SORTS: { k: MailSort; label: string }[] = [
@@ -45,7 +47,9 @@ export function AllMailsView({ state, onChanged }: {
   const [error, setError] = useState("");
   const [sel, setSel] = useState<Set<string>>(new Set());
   const [view, setView] = useState<Mail | null>(null);
-  const [note, setNote] = useState("");
+  const toast = useToast();
+  const bulkBar = useRef<HTMLDivElement>(null);
+  useBulkBarHeight(bulkBar, sel.size > 0);
   const [busy, setBusy] = useState(false);
   const [moveDest, setMoveDest] = useState("");
   // What the list on screen was loaded for: a rescan/deletion (groups_rev)
@@ -126,7 +130,8 @@ export function AllMailsView({ state, onChanged }: {
         setSel(next);
       }
     } catch (e: any) {
-      setNote(`${t("pin.error")}: ${e.message ?? e}`);
+      toast.show(`${t("pin.error")}: ${e.message ?? e}`,
+        { variant: "error" });
     }
   };
 
@@ -137,7 +142,7 @@ export function AllMailsView({ state, onChanged }: {
     const plan = planMailAction(chosen, action, verb);
     if (plan.kind === "cancelled") return;
     if (plan.kind === "all_pinned") {
-      setNote(t("toast.all_pinned"));
+      toast.show(t("toast.all_pinned"));
       return;
     }
     const { acting, force } = plan;
@@ -153,10 +158,12 @@ export function AllMailsView({ state, onChanged }: {
         setTotal((n) => Math.max(0, n - keys.size));
       }
       setSel(new Set());
-      setNote(t("note.background", { verb }));
+      // Short-lived: the result toast (App) follows when the job ends.
+      toast.show(t("note.background", { verb }), { duration: 3000 });
       onChanged();
     } catch (e: any) {
-      setNote(`Error: ${e.message ?? e}`);
+      toast.show(t("err.generic", { msg: e.message ?? e }),
+        { variant: "error" });
     }
     setBusy(false);
   };
@@ -224,7 +231,6 @@ export function AllMailsView({ state, onChanged }: {
               : t("mails.select_loaded", { n: mails.length })}
           </button>
         )}
-        {note && <span>{note}</span>}
       </div>
       {ignored.length > 0 && (
         <p className="mb-2 type-meta text-muted">
@@ -251,7 +257,7 @@ export function AllMailsView({ state, onChanged }: {
       {sel.size > 0 && <div className="h-28" aria-hidden />}
 
       {sel.size > 0 && (
-        <div className="fixed inset-x-0 bottom-0 z-(--z-bulkbar) border-t border-line
+        <div ref={bulkBar} className="fixed inset-x-0 bottom-0 z-(--z-bulkbar) border-t border-line
           bg-panel px-3 py-2 shadow-bar"
           style={{ paddingBottom:
             "calc(env(safe-area-inset-bottom) + 0.5rem)" }}>
