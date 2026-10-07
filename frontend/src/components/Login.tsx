@@ -28,9 +28,9 @@ export function Login({ mode, onLogin }: {
   };
 
   return (
-    <div className="mx-auto mt-24 max-w-xs rounded-xl border border-line
-      bg-panel p-6 text-sm">
-      <div className="mb-4 text-center text-base font-bold tracking-tight">
+    <div className="mx-auto mt-24 max-w-xs rounded-dialog border border-line
+      bg-panel p-4 type-body sm:p-5">
+      <div className="mb-4 text-center type-title">
         Mailbroom
       </div>
       {mode === "password" && (
@@ -40,20 +40,20 @@ export function Login({ mode, onLogin }: {
             value={password}
             onChange={(e) => setPassword(e.target.value)} />
           <Button className="w-full" disabled={busy || !password}>
-            {busy ? <Spinner size="sm" className="!text-white" />
+            {busy ? <Spinner size="sm" className="text-white" />
               : t("login.submit")}
           </Button>
         </form>
       )}
       {mode === "oidc" && (
         <a href="/api/oidc/login"
-          className="block rounded-md bg-accent px-3 py-2 text-center
-            font-medium text-white hover:bg-accenth">
+          className="block rounded-control bg-accent px-3 py-2 text-center
+            type-body font-medium text-white hover:bg-accenth">
           {t("login.sso")}
         </a>
       )}
       {error && (
-        <div className="mt-3 text-center text-xs text-rose-400">{error}</div>
+        <div className="mt-3 text-center type-meta text-danger-fg">{error}</div>
       )}
     </div>
   );
