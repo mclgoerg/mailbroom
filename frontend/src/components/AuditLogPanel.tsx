@@ -75,7 +75,7 @@ export function AuditLogPanel({ rules, onClose }: {
         </Button>
       </Toolbar>
       <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-4">
-        {error && <div className="p-4 text-sm text-rose-400">{error}</div>}
+        {error && <div className="p-4 type-body text-danger-fg">{error}</div>}
         {!entries && !error && <Loading />}
         {entries && entries.length === 0 && (
           <EmptyState>{t("audit.empty")}</EmptyState>
@@ -83,8 +83,8 @@ export function AuditLogPanel({ rules, onClose }: {
         {entries?.map((e, i) => (
           <div key={`${e.ts}-${i}`}
             className="flex flex-wrap items-baseline gap-2 border-b
-              border-line/60 px-1 py-2 text-sm">
-            <span className="w-36 shrink-0 text-xs whitespace-nowrap
+              border-line/60 px-1 py-2 type-body">
+            <span className="w-36 shrink-0 type-meta whitespace-nowrap
               text-muted">
               {new Date(e.ts * 1000).toLocaleString()}
             </span>
@@ -97,19 +97,19 @@ export function AuditLogPanel({ rules, onClose }: {
                   — {e.label}
                 </span>
               )}
-              <span className="block truncate text-xs text-faint">
+              <span className="block truncate type-meta text-muted">
                 {actorLabel(e.actor, rules)}
               </span>
             </span>
             {e.count > 0 && (
-              <span className="text-xs whitespace-nowrap text-muted">
+              <span className="type-meta whitespace-nowrap text-muted">
                 {e.count} {t("mails")}
                 {e.bytes > 0 ? ` · ${fmtSize(e.bytes)}` : ""}
               </span>
             )}
-            <span className={`text-xs whitespace-nowrap ${
+            <span className={`type-meta whitespace-nowrap ${
               e.outcome === "error" || e.outcome === "failed"
-                ? "text-rose-400" : "text-faint"}`}
+                ? "text-danger-fg" : "text-muted"}`}
               title={e.error || undefined}>
               {tOr("audit.outcome", e.outcome)}
             </span>
