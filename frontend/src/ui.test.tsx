@@ -8,7 +8,7 @@ import { useState } from "react";
 import { afterEach, expect, test, vi } from "vitest";
 
 import {
-  isModalOpen, AccountAvatar, Button, Checkbox, Chip, ChipGroup, ChipSegment,
+  isModalOpen, AccountAvatar, BulkBar, Button, Checkbox, Chip, ChipGroup, ChipSegment,
   ConfirmDialog, DialogProvider, EmptyState, MailRow, Menu, MenuDivider,
   MenuHeading, MenuItem, Modal, Notice, ProgressBar, Segmented, ToastProvider,
   confirmDialog,
@@ -581,7 +581,7 @@ test("MailRow: transparent base border, underline on the subject only, compact c
   expect(screen.getByText("Hi").className).toContain("group-hover:underline");
   expect(screen.getByText("6 Oct").className).not.toContain("underline");
   expect(screen.getByLabelText("Select mail").closest("label")!.className)
-    .toContain("-my-1.5");
+    .toContain("-my-3");
 });
 
 test("focus ring CSS: base outline colour, offset only for text-like fields", async () => {
@@ -723,4 +723,24 @@ test("Esc in a Menu inside a Modal closes only the menu; then the Modal", () => 
   expect(document.activeElement).toBe(trigger);
   fireEvent.keyDown(trigger, { key: "Escape" });         // no menu open now
   expect(onClose).toHaveBeenCalledOnce();
+});
+
+test("BulkBar renders every slot, Clear works, and --bulkbar-h follows its mount", () => {
+  const onClear = vi.fn();
+  const root = document.documentElement.style;
+  const offset = vi.spyOn(HTMLElement.prototype, "offsetHeight", "get")
+    .mockReturnValue(96);
+  const { unmount } = render(
+    <BulkBar summary="2 groups · 5 mails" onClear={onClear}
+      secondary={<button>Export</button>} modifiers={<span>Limit to:</span>}
+      action={<span>Action slot</span>} primary={<button>Trash 5</button>} />);
+  expect(screen.getByRole("region", { name: "Selection actions" })).toBeTruthy();
+  for (const txt of ["2 groups · 5 mails", "Export", "Limit to:",
+    "Action slot", "Trash 5"]) expect(screen.getByText(txt)).toBeTruthy();
+  fireEvent.click(screen.getByRole("button", { name: "Clear selection" }));
+  expect(onClear).toHaveBeenCalled();
+  expect(root.getPropertyValue("--bulkbar-h")).toBe("96px");
+  unmount();
+  expect(root.getPropertyValue("--bulkbar-h")).toBe("");
+  offset.mockRestore();
 });

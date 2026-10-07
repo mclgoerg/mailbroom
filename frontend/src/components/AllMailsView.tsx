@@ -7,8 +7,8 @@ import { actionVerb, itemsOf, planMailAction } from "../mailActions";
 import type { AppState, Mail } from "../types";
 import { MailRows, MessageView } from "./MailList";
 import { SortControl } from "./SortControl";
-import { Button, EmptyState, FILTER_ROW, Input, LINK, Loading, Modal, Select,
-  useBulkBarHeight, useToast }
+import { BulkBar, Button, EmptyState, FILTER_ROW, Input, LINK, Loading, Modal, Select,
+  useToast }
   from "./ui";
 
 type MailSort = "date" | "size" | "sender";
@@ -54,8 +54,6 @@ export function AllMailsView({ state, onChanged, toolbarSlot }: {
   const [sel, setSel] = useState<Set<string>>(new Set());
   const [view, setView] = useState<Mail | null>(null);
   const toast = useToast();
-  const bulkBar = useRef<HTMLDivElement>(null);
-  useBulkBarHeight(bulkBar, sel.size > 0);
   const [busy, setBusy] = useState(false);
   const [moveDest, setMoveDest] = useState("");
   // What the list on screen was loaded for: a rescan/deletion (groups_rev)
@@ -241,56 +239,47 @@ export function AllMailsView({ state, onChanged, toolbarSlot }: {
           </Button>
         </div>
       )}
-      {sel.size > 0 && <div className="h-28" aria-hidden />}
-
       {sel.size > 0 && (
-        <div ref={bulkBar} className="fixed inset-x-0 bottom-0 z-(--z-bulkbar) border-t border-line
-          bg-panel px-3 py-2 shadow-bar"
-          style={{ paddingBottom:
-            "calc(env(safe-area-inset-bottom) + 0.5rem)" }}>
-          <div className="mx-auto max-w-6xl">
-            <div className="mb-2 flex items-center gap-2 type-meta text-muted">
-              <span>{t("detail.n_selected", { n: sel.size })}</span>
-              <button className={LINK}
-                onClick={() => setSel(new Set())}>
-                {t("Clear selection")}
-              </button>
-            </div>
-            <div className="flex flex-wrap items-center gap-2">
-              {/* Action… stays mounted when "Move to folder…" is picked;
-                  the folder picker is a separate control (see DetailPanel). */}
-              <Select value="" className="min-w-0 flex-1" disabled={busy}
-                onChange={(e) => onAction(e.target.value)}>
-                <option value="" disabled>{t("Action…")}</option>
-                <option value="archive">{t("Archive")}</option>
-                <option value="move">{t("Move to folder…")}</option>
-                <option value="mark_read">{t("Mark read")}</option>
-              </Select>
-              {moveDest === "?" && (
-                <>
-                  <Select value="" className="min-w-0 flex-1"
-                    onChange={(e) => {
-                      if (e.target.value) act("move", e.target.value);
-                      setMoveDest("");
-                    }}>
-                    <option value="" disabled>{t("Move to folder…")}</option>
-                    {(state.folders_raw ?? []).map((f, i) => (
-                      <option key={f} value={f}>{state.folders[i] ?? f}</option>
-                    ))}
-                  </Select>
-                  <Button variant="secondary" size="icon" label={t("Cancel")}
-                    className="shrink-0" onClick={() => setMoveDest("")}>
-                    <X size={18} />
-                  </Button>
-                </>
-              )}
-              <Button variant="danger" disabled={busy}
-                className="ml-auto shrink-0" onClick={() => act("trash")}>
-                {t("Trash selected")} ({sel.size})
-              </Button>
-            </div>
-          </div>
-        </div>
+        <BulkBar
+          summary={t("detail.n_selected", { n: sel.size })}
+          onClear={() => setSel(new Set())}
+          /* Action… stays mounted when "Move to folder…" is picked; the
+             folder picker is a separate control (see DetailPanel). */
+          action={<>
+            <Select value=""
+              className="min-w-36 flex-1 md:w-56 md:min-w-0 md:flex-none"
+              disabled={busy} onChange={(e) => onAction(e.target.value)}>
+              <option value="" disabled>{t("Action…")}</option>
+              <option value="archive">{t("Archive")}</option>
+              <option value="move">{t("Move to folder…")}</option>
+              <option value="mark_read">{t("Mark read")}</option>
+            </Select>
+            {moveDest === "?" && (
+              <>
+                <Select value=""
+                  className="min-w-36 flex-1 md:w-56 md:min-w-0 md:flex-none"
+                  onChange={(e) => {
+                    if (e.target.value) act("move", e.target.value);
+                    setMoveDest("");
+                  }}>
+                  <option value="" disabled>{t("Move to folder…")}</option>
+                  {(state.folders_raw ?? []).map((f, i) => (
+                    <option key={f} value={f}>{state.folders[i] ?? f}</option>
+                  ))}
+                </Select>
+                <Button variant="secondary" size="icon" label={t("Cancel")}
+                  className="shrink-0" onClick={() => setMoveDest("")}>
+                  <X size={18} />
+                </Button>
+              </>
+            )}
+          </>}
+          primary={
+            <Button variant="danger" disabled={busy}
+              className="whitespace-nowrap" onClick={() => act("trash")}>
+              {t("Trash selected")} ({sel.size})
+            </Button>
+          } />
       )}
 
       {view && (
