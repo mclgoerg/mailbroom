@@ -68,10 +68,10 @@ export function IndexPanel({ account, savedMode, secretKeySet }: {
   };
 
   if (!secretKeySet) {
-    return <p className="mt-2 text-xs text-muted">{t("index.need_key")}</p>;
+    return <p className="mt-2 type-meta text-muted">{t("index.need_key")}</p>;
   }
   if (savedMode !== "local") {
-    return <p className="mt-2 text-xs text-muted">{t("index.save_first")}</p>;
+    return <p className="mt-2 type-meta text-muted">{t("index.save_first")}</p>;
   }
   if (!info) return <div className="mt-2"><Spinner /></div>;
 
@@ -83,7 +83,7 @@ export function IndexPanel({ account, savedMode, secretKeySet }: {
         <div className="flex flex-col gap-1">
           <ProgressBar value={info.job.done} max={info.job.total}
             label={t("index.building")} />
-          <div className="text-xs text-muted">
+          <div className="type-meta text-muted">
             <Spinner /> {t("index.building")} {info.job.progress}
             {info.job.total > 0 && (
               ` (${Math.round(100 * info.job.done / info.job.total)}%)`
@@ -91,7 +91,7 @@ export function IndexPanel({ account, savedMode, secretKeySet }: {
           </div>
         </div>
       )}
-      <div className="text-xs text-muted">
+      <div className="type-meta text-muted">
         {info.job.status === "running"
           ? null
           : info.usable
@@ -99,17 +99,17 @@ export function IndexPanel({ account, savedMode, secretKeySet }: {
             : info.reason === "index_key"
               ? t("index.key_changed") : t("index.none")}
         {info.job.status === "error" && (
-          <span className="ml-2 text-rose-400">{info.job.error}</span>
+          <span className="ml-2 text-danger-fg">{info.job.error}</span>
         )}
       </div>
       {info.exists && (
-        <div className="text-xs text-muted">
+        <div className="type-meta text-muted">
           {t("index.disk", { size: fmtSize(info.bytes) })}
         </div>
       )}
       {!running && info.estimate.mails > 0 && (
-        <div className={`text-xs ${tight(info.estimate)
-          ? "text-rose-400" : "text-muted"}`}>
+        <div className={`type-meta ${tight(info.estimate)
+          ? "text-danger-fg" : "text-muted"}`}>
           {t("index.estimate", params(info.estimate))}
           {tight(info.estimate) && ` ${t("index.confirm_tight")}`}
         </div>
@@ -135,7 +135,7 @@ export function IndexPanel({ account, savedMode, secretKeySet }: {
           )}
         </>)}
       </div>
-      {error && <div className="text-xs text-rose-400">{error}</div>}
+      {error && <div className="type-meta text-danger-fg">{error}</div>}
     </div>
   );
 }
