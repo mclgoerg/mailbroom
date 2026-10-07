@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { applyStatus, ENGAGEMENT_HIGH_MIN, ENGAGEMENT_LOW_MAX,
   engagementTier, fmtAgo, fmtSize, fmtUsd, mailKey, matchGroup, olderThan,
-  parseFilter, retainedMailKeys, sieveSnippet } from "./lib";
+  parseFilter, parseProgress, retainedMailKeys, sieveSnippet } from "./lib";
 import type { Group } from "./types";
 
 const g = (over: Partial<Group> = {}): Group => ({
@@ -321,5 +321,22 @@ describe("applyStatus (slim SSE merge)", () => {
       { account: "a", groups_rev: 3 } as any)).toBeNull();
     expect(applyStatus(prev,
       { account: "b", groups_rev: 3 } as any)).toBeNull();
+  });
+});
+
+describe("parseProgress", () => {
+  it("reads the backend's done/total formats", () => {
+    expect(parseProgress("5/20")).toEqual({ done: 5, total: 20 });
+    expect(parseProgress("5/20 (+1 job(s) queued)"))
+      .toEqual({ done: 5, total: 20 });
+    expect(parseProgress("3/9 groups")).toEqual({ done: 3, total: 9 });
+    expect(parseProgress("Archive/2023/2024: 120/800"))
+      .toEqual({ done: 120, total: 800 });
+  });
+  it("returns null when it isn't structured", () => {
+    expect(parseProgress("connecting…")).toBeNull();
+    expect(parseProgress("queued…")).toBeNull();
+    expect(parseProgress("0/0")).toBeNull();
+    expect(parseProgress("")).toBeNull();
   });
 });

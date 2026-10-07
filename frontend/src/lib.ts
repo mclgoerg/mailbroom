@@ -216,3 +216,16 @@ export function matchGroup(g: Group, f: ParsedFilter, now = Date.now()): boolean
   }
   return true;
 }
+
+/** done/total out of a backend job's free-text progress, or null when it
+ *  isn't structured ("connecting…", "queued…"). The formats are "5/20",
+ *  "5/20 (+1 job(s) queued)", "5/20 groups" and "INBOX: 5/20" (the folder
+ *  name can itself contain digits and a slash, so the leading form is tried
+ *  first and the folder form only matches at the very end). */
+export function parseProgress(s: string): { done: number; total: number }
+    | null {
+  const m = /^(\d+)\/(\d+)\b/.exec(s) ?? /: (\d+)\/(\d+)$/.exec(s);
+  if (!m) return null;
+  const total = Number(m[2]);
+  return total > 0 ? { done: Number(m[1]), total } : null;
+}

@@ -465,7 +465,15 @@ export const DE: Record<string, string> = {
   "thread.note.sent_unavailable":
     "Ihre eigenen Antworten konnten nicht aus dem Ordner „Gesendet“ geladen "
     + "werden - es werden nur die empfangenen Mails angezeigt.",
-  "no.matches": "Keine Gruppen passen zu diesem Filter.",
+  "no.matches": "Keine Gruppen passen zu diesem Filter",
+  "err.generic": "Fehler: {msg}",
+  "err.ai": "KI-Fehler: {msg}",
+  "err.unsub": "Abbestell-Fehler: {msg}",
+  "err.undo": "Fehler beim Rückgängigmachen: {msg}",
+  "err.connection": "Verbindungsfehler: {msg}",
+  "toast.moved_trash": "{n} Mails in den Papierkorb verschoben",
+  "status.filter_none": "0 von {n} Gruppen passen",
+  "status.no_mails": "In den gescannten Ordnern wurden keine Mails gefunden.",
   "onboard.title": "Willkommen - in drei Schritten zum sauberen Postfach",
   "onboard.step_bridge":
     "Mail-Anbieter wählen (Gmail, iCloud, Fastmail, … - oder Proton über "

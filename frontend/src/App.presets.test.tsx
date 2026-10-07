@@ -34,6 +34,7 @@ vi.mock("./api", () => ({
 }));
 
 import App from "./App";
+import { ToastProvider } from "./components/ui";
 import type { AppState, Config } from "./types";
 
 const acct = {
@@ -88,7 +89,7 @@ test("a saved preset renders as a chip with its name", async () => {
   state = { ...baseState, presets: [
     { id: "p1", name: "Old DHL", query: "from:dhl age:>1y",
       account: "proton" }] };
-  render(<App />);
+  render(<ToastProvider><App /></ToastProvider>);
   await waitFor(() => expect(screen.getByText("Old DHL")).toBeTruthy());
 });
 
@@ -97,7 +98,7 @@ test("tapping a saved preset chip replaces the filter query", async () => {
   state = { ...baseState, presets: [
     { id: "p1", name: "Old DHL", query: "from:dhl age:>1y",
       account: "proton" }] };
-  render(<App />);
+  render(<ToastProvider><App /></ToastProvider>);
   await waitFor(() => expect(screen.getByText("Old DHL")).toBeTruthy());
   const filterInput = screen.getByPlaceholderText(
     "filter groups…") as HTMLInputElement;
@@ -116,7 +117,7 @@ test("deleting a saved preset confirms, then calls api.deletePreset",
     state = { ...baseState, presets: [
       { id: "p1", name: "Old DHL", query: "from:dhl age:>1y",
         account: "proton" }] };
-    render(<App />);
+    render(<ToastProvider><App /></ToastProvider>);
     await waitFor(() => expect(screen.getByText("Old DHL")).toBeTruthy());
     fireEvent.click(screen.getByLabelText("Delete"));
     expect(confirmSpy).toHaveBeenCalledWith(
@@ -132,7 +133,7 @@ test("declining the delete confirmation never calls api.deletePreset",
     state = { ...baseState, presets: [
       { id: "p1", name: "Old DHL", query: "from:dhl age:>1y",
         account: "proton" }] };
-    render(<App />);
+    render(<ToastProvider><App /></ToastProvider>);
     await waitFor(() => expect(screen.getByText("Old DHL")).toBeTruthy());
     fireEvent.click(screen.getByLabelText("Delete"));
     expect(deletePreset).not.toHaveBeenCalled();
@@ -144,7 +145,7 @@ test("the save button is disabled until the filter has text, then " +
   const promptSpy = vi.spyOn(window, "prompt").mockReturnValue("Old DHL");
   localStorage.setItem("pmc_account", "proton");
   state = { ...baseState };
-  render(<App />);
+  render(<ToastProvider><App /></ToastProvider>);
   await waitFor(() => expect(screen.getByPlaceholderText("filter groups…"))
     .toBeTruthy());
   const saveBtn =
@@ -167,7 +168,7 @@ test("declining the save name prompt never calls api.createPreset",
     const promptSpy = vi.spyOn(window, "prompt").mockReturnValue(null);
     localStorage.setItem("pmc_account", "proton");
     state = { ...baseState };
-    render(<App />);
+    render(<ToastProvider><App /></ToastProvider>);
     await waitFor(() => expect(screen.getByPlaceholderText("filter groups…"))
       .toBeTruthy());
     const filterInput = screen.getByPlaceholderText("filter groups…");
@@ -184,7 +185,7 @@ test("editing a preset opens an inline editor prefilled with ITS OWN " +
   state = { ...baseState, presets: [
     { id: "p1", name: "Old DHL", query: "from:dhl age:>1y",
       account: "proton" }] };
-  render(<App />);
+  render(<ToastProvider><App /></ToastProvider>);
   await waitFor(() => expect(screen.getByText("Old DHL")).toBeTruthy());
 
   // Unrelated text sitting in the filter box must NOT leak into the edit.
@@ -213,7 +214,7 @@ test("Cancel closes the inline editor without calling api.updatePreset",
     state = { ...baseState, presets: [
       { id: "p1", name: "Old DHL", query: "from:dhl age:>1y",
         account: "proton" }] };
-    render(<App />);
+    render(<ToastProvider><App /></ToastProvider>);
     await waitFor(() => expect(screen.getByText("Old DHL")).toBeTruthy());
     fireEvent.click(screen.getByLabelText("Edit"));
     expect(screen.getByDisplayValue("from:dhl age:>1y")).toBeTruthy();
@@ -227,7 +228,7 @@ test("a clear button appears once the filter has text and empties it",
   async () => {
     localStorage.setItem("pmc_account", "proton");
     state = { ...baseState };
-    render(<App />);
+    render(<ToastProvider><App /></ToastProvider>);
     await waitFor(() => expect(screen.getByPlaceholderText("filter groups…"))
       .toBeTruthy());
     expect(screen.queryByLabelText("Clear filter")).toBeNull();

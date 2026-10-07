@@ -6,6 +6,7 @@ import { cleanup, fireEvent, render, screen, waitFor }
   from "@testing-library/react";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import { AllMailsView } from "./components/AllMailsView";
+import { ToastProvider } from "./components/ui";
 import type { AppState, Mail, MailsResp } from "./types";
 
 const mails = vi.fn();
@@ -40,7 +41,9 @@ const state = {
 
 const onChanged = vi.fn();
 const renderView = () =>
-  render(<AllMailsView state={state} onChanged={onChanged} />);
+  render(<ToastProvider>
+    <AllMailsView state={state} onChanged={onChanged} />
+  </ToastProvider>);
 
 beforeEach(() => {
   vi.spyOn(window, "confirm").mockReturnValue(true);
@@ -208,8 +211,10 @@ test("a new groups_rev refreshes in place keeping the loaded pages",
     await screen.findByText("Subject 1");
     mails.mockClear();
     mails.mockResolvedValue(resp([mk(2)], 1));
-    rerender(<AllMailsView state={{ ...state, groups_rev: 2 } as AppState}
-      onChanged={onChanged} />);
+    rerender(<ToastProvider>
+      <AllMailsView state={{ ...state, groups_rev: 2 } as AppState}
+        onChanged={onChanged} />
+    </ToastProvider>);
     await waitFor(() => expect(screen.queryByText("Subject 1")).toBeNull());
     expect(mails).toHaveBeenCalledWith(
       { offset: 0, limit: 100, sort: "date", dir: "desc", q: "" });

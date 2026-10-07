@@ -10,7 +10,8 @@ import { afterEach, expect, test, vi } from "vitest";
 import {
   isModalOpen, AccountAvatar, Button, Checkbox, Chip, ChipGroup, ChipSegment,
   ConfirmDialog, DialogProvider, EmptyState, MailRow, Menu, MenuDivider,
-  MenuHeading, MenuItem, Modal, Notice, ToastProvider, confirmDialog,
+  MenuHeading, MenuItem, Modal, Notice, ProgressBar, ToastProvider,
+  confirmDialog,
   LINK, Tag, promptDialog, useToast,
 } from "./components/ui";
 
@@ -610,4 +611,14 @@ test("Tag tones map to the semantic bg/fg pairs on the caption layer", () => {
 
 test("LINK is the shared underline look for text buttons", () => {
   expect(LINK).toContain("underline");
+});
+
+test("ProgressBar: determinate carries its value, indeterminate none", () => {
+  const { rerender } = render(<ProgressBar thin value={3} max={12} label="x" />);
+  const bar = screen.getByRole("progressbar");
+  expect(bar.getAttribute("aria-valuenow")).toBe("3");
+  expect(bar.className).toContain("h-0.5");
+  rerender(<ProgressBar thin indeterminate value={0} max={0} label="x" />);
+  expect(screen.getByRole("progressbar").getAttribute("aria-valuenow"))
+    .toBeNull();
 });

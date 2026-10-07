@@ -26,6 +26,7 @@ vi.mock("./api", () => ({
 }));
 
 import App from "./App";
+import { ToastProvider } from "./components/ui";
 import type { AppState, Config, Group } from "./types";
 
 const acct = {
@@ -85,7 +86,7 @@ test("no New chip renders when nothing is flagged", async () => {
   const a = mkGroup();
   state = { ...baseState,
     groups: { sender: { [a.key]: a }, domain: {}, subject: {}, thread: {} } };
-  render(<App />);
+  render(<ToastProvider><App /></ToastProvider>);
   await waitFor(() => expect(screen.getAllByText("Sender A").length)
     .toBeGreaterThan(0));
   expect(screen.queryByText(/^New \(/)).toBeNull();
@@ -105,7 +106,7 @@ test("the New chip shows a live count; tap 1 filters, tap 2 selects " +
   state = { ...baseState, groups: { sender: {
     [flagged.key]: flagged, [flaggedProtected.key]: flaggedProtected,
     [notFlagged.key]: notFlagged }, domain: {}, subject: {}, thread: {} } };
-  render(<App />);
+  render(<ToastProvider><App /></ToastProvider>);
   await waitFor(() => expect(screen.getAllByText("Sender A").length)
     .toBeGreaterThan(0));
 

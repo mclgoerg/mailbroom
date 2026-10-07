@@ -228,20 +228,28 @@ export function Spinner({ size = "sm", className = "" }: {
   );
 }
 
-/** Determinate progress bar (theme tokens only). `max` 0 = not known yet:
- *  the bar stays empty. */
-export function ProgressBar({ value, max, label, className = "" }: {
+/** Progress bar (theme tokens only). `max` 0 = not known yet: the bar stays
+ *  empty. `indeterminate` = running with no done/total to show (sliding
+ *  segment; static under reduced motion). `thin` = the 2 px strip used under
+ *  the toolbar. */
+export function ProgressBar({ value, max, label, className = "", thin = false,
+  indeterminate = false }: {
   value: number; max: number; label?: string; className?: string;
+  thin?: boolean; indeterminate?: boolean;
 }) {
   const pct = max > 0 ? Math.min(100, Math.round((100 * value) / max)) : 0;
+  const known = !indeterminate;
   return (
     <div role="progressbar" aria-label={label} aria-valuemin={0}
-      aria-valuemax={max > 0 ? max : undefined}
-      aria-valuenow={max > 0 ? value : undefined}
-      className={`h-2 w-full overflow-hidden rounded-full bg-chip
-        ${className}`}>
-      <div className="h-full rounded-full bg-accent transition-[width]
-        duration-300" style={{ width: `${pct}%` }} />
+      aria-valuemax={known && max > 0 ? max : undefined}
+      aria-valuenow={known && max > 0 ? value : undefined}
+      className={`${thin ? "h-0.5" : "h-2"} w-full overflow-hidden
+        rounded-full bg-chip ${className}`}>
+      {indeterminate
+        ? <div className="pmc-indeterminate h-full w-1/3 rounded-full
+            bg-accent" />
+        : <div className="h-full rounded-full bg-accent transition-[width]
+            duration-300" style={{ width: `${pct}%` }} />}
     </div>
   );
 }
