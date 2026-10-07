@@ -130,6 +130,8 @@ def test_build_indexes_every_scanned_mail_and_search_finds_whole_words(
     job = build()
     assert (job["done"], job["total"]) == (5, 5)
     assert bodyindex.info(acc())["docs"] == 5
+    assert bodyindex.info(acc())["bytes"] == bodyindex._path(
+        acc().name).stat().st_size > 0              # shown in Settings
     res = local("biergarten")
     assert uids(res) == [1] and res["notes"] == []
     assert uids(local("foo")) == [2, 3]
