@@ -2646,15 +2646,97 @@ def extract_text(msg) -> str:
     return text.strip()[:BODY_CHAR_LIMIT]
 
 
+def _readable(acc, folder: str, uid: int) -> bool:
+    """May this mail be opened? Scanned mails, plus Trash (never scanned, but
+    the Trash browser opens them) and Sent (the conversation reader shows
+    the user's own replies). Compared against the folder ROLES (trash_list /
+    scans populate acc.folder_roles); the literal "trash" stays a fallback."""
+    return (ikey(folder, uid) in acc.index
+            or folder == acc.folder_roles.get("trash")
+            or folder == acc.folder_roles.get("sent")
+            or folder.lower() == "trash")
+
+
+def _message_detail(msg) -> dict:
+    return {
+        "from": decode_mime(msg.get("From", "")),
+        "to": decode_mime(msg.get("To", "")),
+        "date": msg.get("Date", ""),
+        "subject": decode_mime(msg.get("Subject", "")),
+        "text": extract_text(msg),
+    }
+
+
+MESSAGES_BATCH_MAX = 20
+
+
+def fetch_messages(items: list, acc=None) -> list[dict]:
+    """Up to MESSAGES_BATCH_MAX mails over ONE IMAP connection (one login,
+    one SELECT per folder, one FETCH per folder) - the conversation reader
+    opens many mails at once and a connection per mail made that crawl.
+    Each result is {"folder", "uid", ...detail} or {"folder", "uid",
+    "error"}; unknown mails never abort the batch."""
+    acc = acc or accounts.get()
+    if len(items) > MESSAGES_BATCH_MAX:
+        raise ValueError(f"at most {MESSAGES_BATCH_MAX} mails per request")
+    if not all(isinstance(it, (list, tuple)) and len(it) == 2
+               for it in items):
+        raise ValueError("items must be [folder, uid] pairs")
+    out: dict[tuple[str, int], dict] = {}
+    by_folder: dict[str, list[int]] = {}
+    with acc.lock:
+        for it in items:
+            folder, uid = str(it[0]), int(it[1])
+            if _readable(acc, folder, uid):
+                by_folder.setdefault(folder, []).append(uid)
+            else:
+                out[(folder, uid)] = {"error": "unknown message"}
+    if by_folder:
+        conn = connect(cfgmod.account_imap(acc.name), acc.name)
+        try:
+            for folder, uids in by_folder.items():
+                try:
+                    status, _ = conn.select(quote_folder(folder),
+                                            readonly=True)
+                    if status != "OK":
+                        raise RuntimeError(f"cannot open folder {folder!r}")
+                    status, data = conn.uid(
+                        "FETCH", ",".join(str(u) for u in uids),
+                        "(UID BODY.PEEK[])")
+                    if status != "OK":
+                        raise RuntimeError("fetch failed")
+                except (imaplib.IMAP4.abort, OSError):
+                    raise
+                except Exception as exc:
+                    for u in uids:
+                        out[(folder, u)] = {"error": str(exc)}
+                    continue
+                for item in data or []:
+                    if not isinstance(item, tuple) or len(item) < 2:
+                        continue
+                    mt = _UID_RE.search(item[0])
+                    if not mt:
+                        continue
+                    try:
+                        out[(folder, int(mt.group(1)))] = _message_detail(
+                            email.message_from_bytes(item[1]))
+                    except Exception as exc:
+                        out[(folder, int(mt.group(1)))] = {
+                            "error": f"{type(exc).__name__}: {exc}"}
+                for u in uids:
+                    out.setdefault((folder, u), {"error": "fetch failed"})
+        finally:
+            try:
+                conn.logout()
+            except Exception:
+                pass
+    return [{"folder": f, "uid": u, **out[(f, u)]}
+            for f, u in ((str(i[0]), int(i[1])) for i in items)]
+
+
 def fetch_message(folder: str, uid: int, acc=None) -> dict:
     acc = acc or accounts.get()
-    # Trash mails are never in the index (excluded from scans) but the Trash
-    # browser still needs to open them. Compare against the trash ROLE
-    # (trash_list populated acc.folder_roles); the literal stays as fallback.
-    if ikey(folder, uid) not in acc.index \
-            and folder != acc.folder_roles.get("trash") \
-            and folder != acc.folder_roles.get("sent") \
-            and folder.lower() != "trash":
+    if not _readable(acc, folder, uid):
         raise RuntimeError("unknown message")
     conn = connect(cfgmod.account_imap(acc.name), acc.name)
     try:
@@ -2670,16 +2752,9 @@ def fetch_message(folder: str, uid: int, acc=None) -> dict:
             conn.logout()
         except Exception:
             pass
-    return {
-        "from": decode_mime(msg.get("From", "")),
-        "to": decode_mime(msg.get("To", "")),
-        "date": msg.get("Date", ""),
-        "subject": decode_mime(msg.get("Subject", "")),
-        "text": extract_text(msg),
-        # Only set for scanned mails that belong to a conversation worth
-        # reading as one (UI: "Read conversation").
-        "thread": _thread_hint(acc, folder, uid),
-    }
+    # "thread" is only set for scanned mails that belong to a conversation
+    # worth reading as one (UI: "Read conversation").
+    return {**_message_detail(msg), "thread": _thread_hint(acc, folder, uid)}
 
 
 # ----------------------------------------------------- conversation reading
@@ -2741,7 +2816,14 @@ def thread_conversation(folder: str, uid: int, acc=None,
     if wanted and sent:
         found: list[dict] = []
         try:
-            found = _find_sent_replies(acc, sent, wanted, budget)
+            t0 = time.monotonic()
+            first = min((x["ts"] for x in members if x["ts"]), default=None)
+            found = _find_sent_replies(
+                acc, sent, wanted, budget,
+                since_ts=first - 2 * 86400 if first else None)
+            log.info("[%s] conversation: %d reply ids -> %d in Sent (%.2fs)",
+                     acc.name, len(wanted), len(found),
+                     time.monotonic() - t0)
         except Exception as exc:        # any IMAP/network failure
             log.warning("[%s] conversation: Sent lookup failed: %s",
                         acc.name, exc)
@@ -2754,32 +2836,110 @@ def thread_conversation(folder: str, uid: int, acc=None,
     return {"key": key, "label": label, "mails": rows, "notes": notes}
 
 
-def _find_sent_replies(acc, sent: str, msgids: list[str],
-                       budget: float) -> list[dict]:
-    """Records of the mails in `sent` whose Message-ID is in `msgids`."""
-    deadline = time.monotonic() + budget
+_MONTHS = ("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep",
+           "Oct", "Nov", "Dec")
+SENT_OR_BATCH = 10           # Message-IDs per OR-chained SEARCH
+SENT_CACHE_TTL_S = 300.0
+_SENT_CACHE: dict[tuple, tuple[float, list[dict]]] = {}
+_SENT_CACHE_LOCK = threading.Lock()
+
+
+def _imap_date(ts: float) -> str:
+    """IMAP search date (locale-independent month names)."""
+    t = time.gmtime(ts)
+    return f"{t.tm_mday:02d}-{_MONTHS[t.tm_mon - 1]}-{t.tm_year}"
+
+
+def _quoted_id(msgid: str) -> str | None:
+    """`msgid` as an IMAP quoted string, or None when it cannot be one
+    (non-ASCII / control characters need a literal)."""
+    if not msgid.isascii() or any(ord(c) < 32 or ord(c) == 127
+                                  for c in msgid):
+        return None
+    return '"' + msgid.replace("\\", "\\\\").replace('"', '\\"') + '"'
+
+
+def _or_search_args(quoted: list[str], since_ts: float | None) -> list[str]:
+    """SEARCH keys: [SINCE d] <HEADER Message-ID a OR b OR c ...>. IMAP's OR
+    takes exactly two keys, so n ids nest as OR k1 (OR k2 (... kn))."""
+    keys = [["HEADER", "Message-ID", q] for q in quoted]
+    expr: list[str] = keys[-1]
+    for k in reversed(keys[:-1]):
+        expr = ["OR", *k, *expr]
+    since = ["SINCE", _imap_date(since_ts)] if since_ts else []
+    return [*since, *expr]
+
+
+def _find_sent_replies(acc, sent: str, msgids: list[str], budget: float,
+                       since_ts: float | None = None) -> list[dict]:
+    """Records of the mails in `sent` whose Message-ID is in `msgids`.
+
+    One OR-chained SEARCH per SENT_OR_BATCH ids (one server scan instead of
+    one per id - on iCloud a single header search of Sent already takes
+    ~0.5 s), bounded by SINCE the thread's first mail; ids that cannot be
+    quoted, or a server that rejects the OR form, fall back to one
+    literal-based SEARCH per id. Results are cached for a few minutes."""
+    cache_key = (acc.tenant.id, acc.name, sent, tuple(msgids))
+    now = time.monotonic()
+    with _SENT_CACHE_LOCK:
+        hit = _SENT_CACHE.get(cache_key)
+        if hit and now - hit[0] < SENT_CACHE_TTL_S:
+            return [dict(m) for m in hit[1]]
+    deadline = now + budget
     conn = connect(cfgmod.account_imap(acc.name), acc.name)
     try:
         status, _ = conn.select(quote_folder(sent), readonly=True)
         if status != "OK":
             raise RuntimeError(f"cannot open {decode_mutf7(sent)!r}")
-        uids: list[bytes] = []
-        for msgid in msgids:
+
+        def check_budget() -> None:
             left = deadline - time.monotonic()
             if left <= 0:
                 raise TimeoutError("budget exhausted")
             _set_timeout(conn, left)
+
+        def search_single(msgid: str) -> list[bytes]:
+            check_budget()
             conn.literal = msgid.encode("utf-8")
             try:
-                status, data = conn.uid("SEARCH", "HEADER", "Message-ID")
+                st, data = conn.uid("SEARCH", "HEADER", "Message-ID")
             finally:
                 conn.literal = None
-            if status == "OK" and data and data[0]:
-                uids += data[0].split()
+            return data[0].split() if st == "OK" and data and data[0] else []
+
+        uids: set[bytes] = set()
+        plain = [i for i in msgids if _quoted_id(i) is not None]
+        for i in msgids:
+            if i not in plain:
+                uids.update(search_single(i))
+        for start in range(0, len(plain), SENT_OR_BATCH):
+            batch = plain[start:start + SENT_OR_BATCH]
+            check_budget()
+            try:
+                st, data = conn.uid("SEARCH", *_or_search_args(
+                    [_quoted_id(i) for i in batch], since_ts))
+            except imaplib.IMAP4.abort:
+                raise
+            except imaplib.IMAP4.error:
+                st, data = "NO", None
+            if st == "OK":
+                if data and data[0]:
+                    uids.update(data[0].split())
+            else:                       # server dislikes the OR form
+                for i in batch:
+                    uids.update(search_single(i))
         found: list[dict] = []
-        for start in range(0, len(uids), FETCH_CHUNK):
-            _fetch_full_chunk(conn, sent, uids[start:start + FETCH_CHUNK],
+        ordered = sorted(uids, key=int)
+        for start in range(0, len(ordered), FETCH_CHUNK):
+            check_budget()
+            _fetch_full_chunk(conn, sent, ordered[start:start + FETCH_CHUNK],
                               found, acc)
+        with _SENT_CACHE_LOCK:
+            if len(_SENT_CACHE) >= 200:
+                oldest = min(_SENT_CACHE, key=lambda k: _SENT_CACHE[k][0])
+                _SENT_CACHE.pop(oldest)
+            _SENT_CACHE[cache_key] = (time.monotonic(),
+                                      [dict(m) for m in found])
         return found
     finally:
         try:

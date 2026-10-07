@@ -12,14 +12,19 @@ type Body = MessageDetail | "loading" | { error: string };
  *  thread's scanned mails plus the user's own replies from Sent. Bodies are
  *  fetched live when a mail is expanded (same as the single-mail view) and
  *  their quoted history is folded away. */
-export function ThreadView({ mail, onBack }: {
+const BATCH = 8;                    // mails per request / IMAP connection
+
+export function ThreadView({ mail, initial, onBack }: {
   mail: Mail;                       // the mail the reader was opened from
+  initial?: MessageDetail;          // its text, if the caller already has it
   onBack: () => void;
 }) {
   const [conv, setConv] = useState<ConversationResp | null>(null);
   const [error, setError] = useState("");
   const [open, setOpen] = useState<Set<string>>(new Set([mailKey(mail)]));
-  const [bodies, setBodies] = useState<Record<string, Body>>({});
+  const [bodies, setBodies] = useState<Record<string, Body>>(
+    () => initial ? { [mailKey(mail)]: initial } : {});
+  const [busy, setBusy] = useState(false);
   const [quoted, setQuoted] = useState<Set<string>>(new Set());
   const focusRef = useRef<HTMLDivElement | null>(null);
 
@@ -31,19 +36,33 @@ export function ThreadView({ mail, onBack }: {
     return () => { alive = false; };
   }, [mail.folder, mail.uid]);
 
-  // Fetch the body of every expanded mail once.
+  // Fetch the text of the expanded mails: BATCH at a time, one request (and
+  // one IMAP login on the server) per batch - never one connection per mail.
   useEffect(() => {
-    if (!conv) return;
-    for (const m of conv.mails) {
-      const k = mailKey(m);
-      if (!open.has(k) || bodies[k]) continue;
-      setBodies((b) => ({ ...b, [k]: "loading" }));
-      api.message(m.folder, m.uid)
-        .then((d) => setBodies((b) => ({ ...b, [k]: d })))
-        .catch((e) => setBodies((b) => ({
-          ...b, [k]: { error: String(e.message ?? e) } })));
-    }
-  }, [conv, open, bodies]);
+    if (!conv || busy) return;
+    const todo = conv.mails.filter((m) =>
+      open.has(mailKey(m)) && !bodies[mailKey(m)]).slice(0, BATCH);
+    if (!todo.length) return;
+    setBusy(true);
+    setBodies((b) => ({ ...b, ...Object.fromEntries(
+      todo.map((m) => [mailKey(m), "loading" as const])) }));
+    api.messages(todo.map((m) => [m.folder, m.uid] as [string, number]))
+      .then((r) => setBodies((b) => {
+        const next = { ...b };
+        for (const m of todo) {
+          const got = r.messages.find((x) =>
+            x.folder === m.folder && x.uid === m.uid);
+          next[mailKey(m)] = !got || got.error
+            ? { error: got?.error ?? "fetch failed" }
+            : got as MessageDetail;
+        }
+        return next;
+      }))
+      .catch((e) => setBodies((b) => ({ ...b, ...Object.fromEntries(
+        todo.map((m) => [mailKey(m),
+          { error: String(e.message ?? e) }])) })))
+      .finally(() => setBusy(false));
+  }, [conv, open, bodies, busy]);
 
   // Bring the mail we came from into view once the list is there.
   useEffect(() => {

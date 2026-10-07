@@ -61,6 +61,7 @@ def isolate(tmp_path, monkeypatch):
     verdictstore._mails_cache.clear()
     unsubstore._cache.clear()
     pinstore._cache.clear()
+    mailops._SENT_CACHE.clear()
     accountsmod.reset()
     yield
     # Undo/restore kick off a background scan; let it land before the
@@ -109,6 +110,9 @@ class FakeIMAP:
         # imaplib's single-literal slot: UID SEARCH BODY sends its term here
         self.literal: bytes | None = None
         self.body_searches: list[tuple[tuple, str]] = []   # (args, term)
+        self.body_fetches: list[tuple[str, list[int]]] = []   # (folder, uids)
+        self.message_id_searches: list[tuple] = []
+        self.reject_or = False               # server without nested OR
         self.reject_charset = False          # BAD on CHARSET, like old servers
         self.body_search_error: Exception | None = None   # e.g. TimeoutError
 
@@ -207,9 +211,19 @@ class FakeIMAP:
             if args[-1] == "ALL":
                 hits = msgs
             elif "HEADER" in args:
-                target = (self.literal.decode("utf-8") if self.literal
-                          else args[-1].strip('"'))
-                hits = [m for m in msgs if m["msgid"] == target]
+                # `HEADER Message-ID <id>` (id as literal or quoted string),
+                # also OR-chained: OR HEADER Message-ID a OR HEADER ... z
+                if self.literal:
+                    targets = {self.literal.decode("utf-8")}
+                else:
+                    targets = {args[i + 2].strip('"')
+                               for i in range(len(args) - 2)
+                               if args[i] == "HEADER"
+                               and args[i + 1] == "Message-ID"}
+                self.message_id_searches.append(args)
+                if self.reject_or and "OR" in args:
+                    raise imaplib.IMAP4.error("SEARCH BAD OR not supported")
+                hits = [m for m in msgs if m["msgid"] in targets]
             else:
                 raise AssertionError(f"unexpected SEARCH {args!r}")
             return "OK", [b" ".join(str(m["uid"]).encode() for m in hits)]
@@ -224,14 +238,18 @@ class FakeIMAP:
                                     f"{self._bodystructure(m)})".encode())
                 return "OK", data
             if "BODY.PEEK[]" in args[1]:
+                # Also the index builder's partial form BODY.PEEK[]<0.N>
+                # for several UIDs at once.
+                self.body_fetches.append((self.selected, sorted(wanted)))
+                data = []
                 for i, m in enumerate(msgs):
                     if m["uid"] in wanted:
                         body = self._header_blob(m) + (
                             (m.get("body") or "Hello mail body") + "\r\n"
                         ).encode()
-                        return "OK", [(f"{i+1} (UID {m['uid']} BODY[] "
-                                       f"{{{len(body)}}}".encode(), body), b")"]
-                return "OK", [None]
+                        data += [(f"{i+1} (UID {m['uid']} BODY[] "
+                                  f"{{{len(body)}}}".encode(), body), b")"]
+                return "OK", data or [None]
             if args[1] == "(UID FLAGS)":
                 # No literal attached (flags-only) - imaplib hands back a
                 # plain bytes line per message, not a (meta, literal) tuple.
