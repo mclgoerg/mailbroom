@@ -118,11 +118,8 @@ export function DuplicatesPanel({ onClose, onDeleted }: {
                       border-line/60 px-1 py-1.5">
                     <Checkbox checked={sel.has(mailKey(m))} className="-my-1 self-center"
                       onChange={() => toggle(mailKey(m))} />
-                    <ShortDate iso={m.date || ""}
-                      className="type-meta whitespace-nowrap text-muted" />
-                    <span className="type-meta whitespace-nowrap text-muted">
-                      {(m.date || "").slice(11, 16)}
-                    </span>
+                    <ShortDate iso={m.date || ""} time
+                      className="type-meta text-muted" />
                     <button className="min-w-0 flex-1 cursor-pointer truncate
                         text-left type-body hover:underline"
                       onClick={() => setView(m)}>

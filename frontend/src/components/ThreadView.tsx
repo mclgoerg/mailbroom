@@ -127,8 +127,8 @@ export function ThreadView({ mail, initial, onBack }: {
                   <span className="text-muted"> · {m.subject
                     || t("(no subject)")}</span>
                 </span>
-                <ShortDate iso={m.date}
-                  className="shrink-0 type-meta whitespace-nowrap text-muted" />
+                <ShortDate iso={m.date} time
+                  className="shrink-0 type-meta text-muted" />
               </button>
               {isOpen && (
                 <div className="border-t border-line px-3 py-2">

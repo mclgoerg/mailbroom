@@ -1,6 +1,4 @@
-// @vitest-environment jsdom
 import { describe, expect, it } from "vitest";
-import { setLang } from "./i18n";
 import { applyStatus, fmtDate, ENGAGEMENT_HIGH_MIN, ENGAGEMENT_LOW_MAX,
   engagementTier, fmtAgo, fmtSize, fmtUsd, mailKey, matchGroup, olderThan,
   parseFilter, parseProgress, retainedMailKeys, sieveSnippet } from "./lib";
@@ -346,23 +344,29 @@ describe("parseProgress", () => {
 describe("fmtDate", () => {
   const now = new Date(2026, 9, 7);
   it("omits the year in the current year", () => {
-    setLang("en");
     expect(fmtDate("2026-10-06", now)).toBe("6 Oct");
     expect(fmtDate("2026-10-06 14:32:00+02:00", now)).toBe("6 Oct");
   });
   it("adds the year for other years", () => {
-    setLang("en");
     expect(fmtDate("2024-10-06", now)).toBe("6 Oct 2024");
   });
-  it("follows the app language", () => {
-    setLang("de");
-    expect(fmtDate("2026-10-06", now)).toBe("6. Okt.");
-    expect(fmtDate("2024-10-06", now)).toBe("6. Okt. 2024");
-    setLang("en");
+  it("follows the requested language", () => {
+    expect(fmtDate("2026-10-06", now, { lang: "de" })).toBe("6. Okt.");
+    expect(fmtDate("2024-10-06", now, { lang: "de" })).toBe("6. Okt. 2024");
+  });
+  it("appends the wall-clock time on request", () => {
+    expect(fmtDate("2026-10-06T21:48:00+02:00", now, { time: true }))
+      .toBe("6 Oct, 21:48");
+    expect(fmtDate("2026-10-06 09:05", now, { lang: "de", time: true }))
+      .toBe("6. Okt., 09:05");
+    expect(fmtDate("2026-10-06", now, { time: true })).toBe("6 Oct");
   });
   it("returns empty or invalid input unchanged", () => {
     expect(fmtDate("", now)).toBe("");
     expect(fmtDate("yesterday", now)).toBe("yesterday");
     expect(fmtDate("2026-02-31", now)).toBe("2026-02-31");
+  });
+  it("keeps years below 100 as they are", () => {
+    expect(fmtDate("0050-03-04", now)).toContain("50");
   });
 });

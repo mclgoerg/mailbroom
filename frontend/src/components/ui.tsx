@@ -4,7 +4,7 @@ import { createContext, useCallback, useContext, useEffect, useId,
   useLayoutEffect, useMemo, useRef, useState, type ComponentProps,
   type KeyboardEvent as ReactKeyboardEvent, type ReactNode, type RefObject }
   from "react";
-import { t } from "../i18n";
+import { getLang, t } from "../i18n";
 import { engagementTier, fmtDate } from "../lib";
 import type { GroupAi } from "../types";
 
@@ -1131,18 +1131,17 @@ export function DialogProvider({ children }: { children: ReactNode }) {
   );
 }
 
-/** A date in its short locale form (see fmtDate); the full ISO date is the
- *  `title` and the `<time>` value. Empty input renders nothing. */
-export function ShortDate({ iso, className }: {
-  iso: string; className?: string;
+/** A date in its short locale form (see fmtDate), optionally with the time;
+ *  the full ISO string is the `title` and the `<time>` value. Never wraps.
+ *  Empty input renders nothing. */
+export function ShortDate({ iso, className = "", time = false }: {
+  iso: string; className?: string; time?: boolean;
 }) {
   if (!iso) return null;
-  const day = iso.slice(0, 10);
-  const short = fmtDate(iso);
-  if (short === iso) return <span className={className}>{iso}</span>;
-  return (
-    <time dateTime={day} title={day} className={className}>{short}</time>
-  );
+  const short = fmtDate(iso, new Date(), { lang: getLang(), time });
+  const cls = `whitespace-nowrap ${className}`;
+  if (short === iso) return <span className={cls}>{iso}</span>;
+  return <time dateTime={iso} title={iso} className={cls}>{short}</time>;
 }
 
 /* --------------------------------- mail row -------------------------------- */

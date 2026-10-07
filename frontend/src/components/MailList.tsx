@@ -2,7 +2,7 @@ import { ArrowLeft, MessagesSquare } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { api, fmtSize, mailKey } from "../api";
 import type { Mail, MessageDetail } from "../types";
-import { t } from "../i18n";
+import { getLang, t } from "../i18n";
 import { fmtDate } from "../lib";
 import { AiTag, Button, Checkbox, PinButton, Spinner } from "./ui";
 import { ThreadView } from "./ThreadView";
@@ -89,7 +89,7 @@ export function MailRows({ mails, sel, onToggle, onOpen, onPin, detailed,
   return (
     <>
       {(paged ? mails : mails.slice(0, cap)).map((m) => {
-        const meta = [fmtDate(m.date || "")];
+        const meta = [fmtDate(m.date || "", new Date(), { lang: getLang() })];
         if (multiFolder) meta.push(m.folder);
         if (multiSender) meta.push(m.addr);
         meta.push(fmtSize(m.size));

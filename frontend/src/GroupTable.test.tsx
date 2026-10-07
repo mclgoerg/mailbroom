@@ -347,16 +347,30 @@ describe("GroupTable rows and header", () => {
     expect(sorted[0].textContent).toBe("Mails");
   });
 
-  it("opens the detail from a row click, but not from the checkbox, meter or buttons", () => {
+  it("opens the detail from a row click, but not from the checkbox column, buttons or a text selection", () => {
     const onOpen = vi.fn();
-    const { container } = renderTable({ onOpen, groups: [mk(0)] });
+    const onAckUnsub = vi.fn();
+    const g = { ...mk(0), unsubscribed: { status: "link", link: "https://x.example/u", addr: "s0@x.example" } } as Group;
+    const { container } = renderTable({ onOpen, onAckUnsub, groups: [g] });
     const row = container.querySelector("tbody tr")!;
+    const tds = row.querySelectorAll("td");
     fireEvent.click(row.querySelector("input[type=checkbox]")!);
-    fireEvent.click(row.querySelector("[data-eng]")!);
+    fireEvent.click(tds[0]);                       // checkbox cell, beside the box
+    fireEvent.click(row.querySelector("button[title='unsub.mark_done'], button[aria-label]:not([aria-label='View details'])")!);
     expect(onOpen).not.toHaveBeenCalled();
-    fireEvent.click(row.querySelectorAll("td")[6]);
+    expect(onAckUnsub).toHaveBeenCalledTimes(1);
+    const sel = vi.spyOn(window, "getSelection").mockReturnValue(
+      { toString: () => "some text" } as Selection);
+    fireEvent.click(tds[6]);
+    expect(onOpen).not.toHaveBeenCalled();
+    sel.mockRestore();
+    fireEvent.click(tds[6]);
     expect(onOpen).toHaveBeenCalledTimes(1);
-    fireEvent.click(row.querySelector("button[aria-label='View details']")!);
+    fireEvent.click(tds[5]);                       // Eng cell opens too
     expect(onOpen).toHaveBeenCalledTimes(2);
+    fireEvent.click(row.querySelector("[data-eng]")!);   // meter itself doesn't
+    expect(onOpen).toHaveBeenCalledTimes(2);
+    fireEvent.click(row.querySelector("button[aria-label='View details']")!);
+    expect(onOpen).toHaveBeenCalledTimes(3);
   });
 });

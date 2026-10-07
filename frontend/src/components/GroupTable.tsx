@@ -100,9 +100,9 @@ function DesktopTable({ slice, baseIdx, selected, focusedKey, onToggle,
   // Sort indicator, inline after the label: the active column shows an
   // accent arrow that ROTATES between directions; inactive sortable columns
   // reserve the space (no layout shift) and reveal a faint hint on hover.
-  const arrow = (k: SortKey) => (
+  const arrow = (k: SortKey, before = false) => (
     <ArrowDown aria-hidden size={14}
-      className={`ml-1 shrink-0 transition-all duration-200 ${
+      className={`${before ? "mr-1" : "ml-1"} shrink-0 transition-all duration-200 ${
         sortK === k
           ? `text-accent ${sortDir > 0 ? "rotate-180" : ""}`
           : "opacity-0 group-hover/th:opacity-50 group-focus-within/th:opacity-50"}`} />
@@ -112,24 +112,25 @@ function DesktopTable({ slice, baseIdx, selected, focusedKey, onToggle,
       : "ascending" as const) : undefined;
   // Header cell with a real <button>; the sorted column reads in body
   // colour, the others stay muted.
-  const sortBtn = (k: SortKey, label: string, title?: string) => (
+  // Right-aligned columns put the arrow BEFORE the label, so the label
+  // (not the reserved arrow space) lines up with the values below.
+  const sortBtn = (k: SortKey, label: string, title?: string,
+                   right = false) => (
     <button type="button" title={title} onClick={() => onSort(k)}
       className={`inline-flex cursor-pointer items-center whitespace-nowrap
         font-semibold hover:text-body ${sortK === k ? "text-body" : ""}`}>
-      {label}{arrow(k)}
+      {right && arrow(k, true)}{label}{!right && arrow(k)}
     </button>
   );
   const allChecked =
     slice.length > 0 && slice.every((g) => selected.has(g.key));
-  // The sticky header sits inside body's top padding strip (safe area +
-  // 8px), where scrolled rows would show above it: each cell's ::before
-  // paints the surface colour over that strip.
-  const th = `relative px-2 py-2 align-bottom type-meta font-semibold
-    before:absolute before:inset-x-0 before:bottom-full
-    before:h-[calc(env(safe-area-inset-top)+8px)] before:bg-surface`;
+  // (The strip above the sticky header, inside body's top padding, is
+  // covered by body::before in index.css.)
+  const th = "px-2 py-2 align-bottom type-meta font-semibold";
   const sortableTh = `${th} group/th`;
   // Row click opens the detail, except on things with their own action.
   const rowClick = (g: Group) => (e: MouseEvent<HTMLTableRowElement>) => {
+    if (window.getSelection()?.toString()) return;   // drag-selecting text
     if ((e.target as HTMLElement).closest(
       "button, a, input, label, [data-no-open]")) return;
     onOpen(g);
@@ -151,20 +152,20 @@ function DesktopTable({ slice, baseIdx, selected, focusedKey, onToggle,
           </th>
           <th className={`${th} hidden w-40 lg:table-cell`}>{t("Type")}</th>
           <th className={`${th} w-24`}>{t("AI")}</th>
-          <th className={`${sortableTh} w-20`} aria-sort={ariaSort("engagement")}>
+          <th className={`${sortableTh} w-18`} aria-sort={ariaSort("engagement")}>
             {sortBtn("engagement", t("Eng."), t("eng.col_tip"))}
           </th>
-          <th className={`${sortableTh} w-20 text-right`}
+          <th className={`${sortableTh} w-18 text-right`}
             aria-sort={ariaSort("count")}>
-            {sortBtn("count", t("Mails"))}
+            {sortBtn("count", t("Mails"), undefined, true)}
           </th>
-          <th className={`${sortableTh} w-24 text-right`}
+          <th className={`${sortableTh} w-20 text-right`}
             aria-sort={ariaSort("size")}>
-            {sortBtn("size", t("Size"))}
+            {sortBtn("size", t("Size"), undefined, true)}
           </th>
-          <th className={`${sortableTh} hidden w-28 text-right md:table-cell`}
+          <th className={`${sortableTh} hidden w-26 text-right md:table-cell`}
             aria-sort={ariaSort("last")}>
-            {sortBtn("last", t("Last"))}
+            {sortBtn("last", t("Last"), undefined, true)}
           </th>
           <th className={`${th} w-12`} />
         </tr>
@@ -175,7 +176,7 @@ function DesktopTable({ slice, baseIdx, selected, focusedKey, onToggle,
             onClick={rowClick(g)}
             className={`cursor-pointer border-b border-line hover:bg-panel
               ${g.key === focusedKey ? "bg-panel outline outline-1 -outline-offset-1 outline-accent/60" : ""}`}>
-            <td className="px-2 py-2 align-top">
+            <td className="px-2 py-2 align-top" data-no-open>
               <Checkbox checked={selected.has(g.key)} className="-mx-2 -my-1"
                 onChange={() => onToggle(g.key)} />
             </td>
@@ -230,7 +231,7 @@ function DesktopTable({ slice, baseIdx, selected, focusedKey, onToggle,
                 {g.ratings && <RatingChips ratings={g.ratings} />}
               </div>
             </td>
-            <td className="px-2 py-2 align-top" data-no-open>
+            <td className="px-2 py-2 align-top">
               <EngagementMeter g={g} />
             </td>
             <td className="whitespace-nowrap px-2 py-2 text-right align-top
@@ -278,9 +279,9 @@ function MobileCards({ slice, baseIdx, selected, focusedKey, onToggle,
               {g.sub && (
                 <div className="truncate type-meta text-muted">{g.sub}</div>
               )}
-              <div className="type-meta text-muted">
-                {g.count} {t("mails")} · {fmtSize(g.size)} · {unreadPct(g)}%{" "}
-                {t("unread")} · <ShortDate iso={g.last} />
+              <div className="truncate type-meta text-muted">
+                {g.count} {t("mails")} · <ShortDate iso={g.last} /> ·{" "}
+                {fmtSize(g.size)} · {unreadPct(g)}% {t("unread")}
               </div>
               <div className="mt-1 flex flex-wrap items-center gap-1">
                 <EngagementMeter g={g} />
