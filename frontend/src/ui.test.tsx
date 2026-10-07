@@ -88,3 +88,12 @@ test("menu stays right-aligned when it fits", () => {
   expect(popover.className).toContain("right-0");
   rect.mockRestore();
 });
+
+// jsdom can't hit-test, so pin the stacking layers at class level: the
+// popover must sit on the dropdown layer, above the sticky table header.
+test("menu popover uses the dropdown layer", () => {
+  renderMenu(vi.fn());
+  fireEvent.click(screen.getByLabelText("Profile"));
+  const pop = screen.getByText("Do it").closest("div.absolute")!;
+  expect(pop.className).toContain("z-(--z-dropdown)");
+});

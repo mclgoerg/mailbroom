@@ -120,7 +120,7 @@ function DesktopTable({ slice, baseIdx, selected, focusedKey, onToggle,
   return (
     <table className="w-full table-fixed border-collapse text-sm">
       <thead>
-        <tr className="sticky top-0 z-10 bg-surface text-left text-muted">
+        <tr className="sticky top-0 z-(--z-sticky) bg-surface text-left text-muted">
           <th className={`${th} w-8`}>
             <input type="checkbox" checked={allChecked}
               onChange={(e) => onToggleAll(e.target.checked,

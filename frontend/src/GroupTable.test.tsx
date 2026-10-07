@@ -315,3 +315,13 @@ describe("engagement indicator", () => {
     getByText("Inter.");
   });
 });
+
+describe("GroupTable stacking", () => {
+  afterEach(cleanup);
+
+  it("keeps the sticky header on the sticky layer, below popovers", () => {
+    const { container } = renderTable();
+    const tr = container.querySelector("thead tr")!;
+    expect(tr.className).toContain("z-(--z-sticky)");
+  });
+});

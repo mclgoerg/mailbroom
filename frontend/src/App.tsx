@@ -1149,7 +1149,7 @@ export default function App() {
           runs below, labelled instead of relying on a hover-only title
           (useless on touch), (3) the actions themselves. */}
       {selected.size > 0 && (
-        <div className="fixed inset-x-0 bottom-0 z-10 border-t border-line
+        <div className="fixed inset-x-0 bottom-0 z-(--z-bulkbar) border-t border-line
           bg-panel px-3 py-2 shadow-[0_-4px_16px_rgba(0,0,0,0.3)]"
           style={{ paddingBottom: "calc(env(safe-area-inset-bottom) + 0.5rem)" }}>
           <div className="mx-auto flex max-w-6xl flex-col gap-2">
@@ -1259,7 +1259,7 @@ export default function App() {
                 className="ml-0.5 inline align-text-bottom" />
             </Button>
             {undoOpen && (
-              <span className="absolute left-0 top-8 z-10 block w-72
+              <span className="absolute left-0 top-8 z-(--z-dropdown) block w-72
                 rounded-md border border-line bg-panel p-1 shadow-lg">
                 {[...state!.undo].map((u, i) => ({ u, i })).reverse()
                   .map(({ u, i }) => (

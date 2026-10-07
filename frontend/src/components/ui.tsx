@@ -159,7 +159,7 @@ export function EngagementMeter({ g }: {
       </button>
       {open && (
         <div ref={pop} role="dialog" onClick={(e) => e.stopPropagation()}
-          className={`absolute top-full z-20 mt-1 w-max
+          className={`absolute top-full z-(--z-dropdown) mt-1 w-max
             max-w-[min(18rem,calc(100vw-1rem))] rounded-lg border
             border-line bg-panel p-2.5 text-left text-xs font-normal
             shadow-lg ${alignRight ? "right-0" : "left-0"}`}>
@@ -352,7 +352,7 @@ export function SectionLabel({ children, className = "" }: {
  * of the screen (a trigger that wrapped to the start of a row on a
  * phone). Closes
  * on outside click, Escape, or after any click inside (items just run
- * their onClick). Sits BELOW modals (they are z-20). */
+ * their onClick). Sits BELOW modals (z-modal). */
 export function Menu({ trigger, label, children }: {
   trigger: ReactNode;
   label?: string;                 // accessible name / tooltip
@@ -393,7 +393,7 @@ export function Menu({ trigger, label, children }: {
       </button>
       {open && (
         <div ref={pop}
-          className={`absolute top-full z-10 mt-1 min-w-52
+          className={`absolute top-full z-(--z-dropdown) mt-1 min-w-52
             max-w-[calc(100vw-1rem)] rounded-lg border border-line bg-panel
             p-1 shadow-lg ${alignLeft ? "left-0" : "right-0"}`}
           onClick={() => setOpen(false)}>
@@ -495,7 +495,7 @@ export function Modal({ children, onClose, full = false }: {
   }, [onClose]);
   return (
     <div
-      className="fixed inset-0 z-20 flex items-center justify-center
+      className="fixed inset-0 z-(--z-modal) flex items-center justify-center
         bg-black/60 p-0 sm:p-6"
       onClick={(e) => e.target === e.currentTarget && onClose()}>
       <div className={`flex flex-col overflow-hidden border-line bg-panel

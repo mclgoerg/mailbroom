@@ -252,7 +252,7 @@ export function AllMailsView({ state, onChanged }: {
       {sel.size > 0 && <div className="h-28" aria-hidden />}
 
       {sel.size > 0 && (
-        <div className="fixed inset-x-0 bottom-0 z-10 border-t border-line
+        <div className="fixed inset-x-0 bottom-0 z-(--z-bulkbar) border-t border-line
           bg-panel px-3 py-2 shadow-[0_-4px_16px_rgba(0,0,0,0.3)]"
           style={{ paddingBottom:
             "calc(env(safe-area-inset-bottom) + 0.5rem)" }}>

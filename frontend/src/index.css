@@ -18,6 +18,17 @@
   --color-chiptext: #e5c890;
 }
 
+/* Stacking scale: every z-index in the app comes from here (use
+   z-(--z-dropdown) etc.), never a bare z-10/z-20. Popovers must sit above
+   the sticky table header; modals above everything. --z-toast is reserved. */
+:root {
+  --z-sticky: 10;
+  --z-bulkbar: 20;
+  --z-dropdown: 30;
+  --z-toast: 40;
+  --z-modal: 50;
+}
+
 html {
   color-scheme: dark;
   /* html stays fixed and non-scrolling with its OWN solid background;
