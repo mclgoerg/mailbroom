@@ -291,7 +291,21 @@ export interface DigestSettings {
   minute: number;
 }
 
-export type BodySearchMode = "disabled" | "server";
+export type BodySearchMode = "disabled" | "server" | "local";
+
+// GET /api/index: the account's local mail-text index.
+export interface IndexInfo {
+  mode: BodySearchMode;
+  secret_key_set: boolean;
+  exists: boolean;
+  usable: boolean;
+  reason: "index_missing" | "index_key" | null;
+  docs: number;
+  built_ts: number | null;
+  bytes: number;
+  job: { status: "idle" | "running" | "done" | "error"; progress: string;
+         error: string; done: number; total: number };
+}
 
 // Translatable caveat of a mail-text search (key -> `search.note.<key>`).
 export interface SearchNote {
@@ -408,6 +422,7 @@ export interface Config {
   default_account: string;
   oauth_providers: OauthProvider[];
   oauth_ms_device_available: boolean;
+  secret_key_set?: boolean;   // MAILBROOM_SECRET_KEY configured (local index)
   auth: AuthCfg;
   protected: string[];
   categories: Record<string, string[]>;

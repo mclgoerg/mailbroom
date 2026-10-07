@@ -77,3 +77,17 @@ test("notes are cleared by the next search", async () => {
   await waitFor(() => expect(screen.queryByText(/Not every folder/))
     .toBeNull());
 });
+
+test("local mode explains that it searches whole words and shows index notes",
+  async () => {
+    search.mockResolvedValue(resp([
+      { key: "index_behind", params: { n: 3 } }]));
+    render(<SearchPanel bodySearch bodyMode="local" onClose={() => {}}
+      onDeleted={() => {}} />);
+    fireEvent.click(screen.getByLabelText("Also search mail text"));
+    expect(screen.getByText(/local word index: whole words only/)).toBeTruthy();
+    expect(screen.queryByText(/asks your mail server/)).toBeNull();
+    type("parcel");
+    await waitFor(() => expect(search).toHaveBeenCalledWith("parcel", true));
+    await screen.findByText(/3 newer mails are not in the index yet/);
+  });

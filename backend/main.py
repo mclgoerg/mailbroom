@@ -23,6 +23,7 @@ from . import accounts as accountsmod
 from . import aihelper
 from . import auditlog
 from . import auth as authmod
+from . import bodyindex
 from . import autoscan as autoscanmod
 from . import config as cfgmod
 from . import digest as digestmod
@@ -32,6 +33,7 @@ from . import oauthflow
 from . import pinstore
 from . import presets as presetsmod
 from . import rules as rulesmod
+from . import secretbox
 from . import stats as statsmod
 from . import tenants
 from . import unsub
@@ -505,6 +507,51 @@ def post_messages(body: MessagesBody, account: str | None = Query(None)):
         raise HTTPException(400, str(exc))
     except Exception as exc:
         raise HTTPException(500, f"{type(exc).__name__}: {exc}")
+
+
+class IndexBuildBody(BaseModel):
+    rebuild: bool = False
+
+
+@app.get("/api/index")
+def get_index(account: str | None = Query(None)):
+    """Local body-search index of the account: mode, whether MAILBROOM_
+    SECRET_KEY allows it, persisted facts (docs, built_ts, usable/reason)
+    and the running job's progress."""
+    acc = _acc(account)
+    with acc.lock:
+        job = dict(acc.state["index"])
+    return {"mode": cfgmod.account_imap(acc.name).get("body_search"),
+            "secret_key_set": secretbox.enabled(),
+            **bodyindex.info(acc), "job": job}
+
+
+@app.post("/api/index/build")
+def post_index_build(body: IndexBuildBody,
+                     account: str | None = Query(None)):
+    acc = _acc(account)
+    if cfgmod.account_imap(acc.name).get("body_search") != "local":
+        raise HTTPException(
+            400, "set mail-text search to 'local index' (and save) first")
+    try:
+        bodyindex.start_build(acc, rebuild=body.rebuild)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc))
+    except RuntimeError as exc:
+        raise HTTPException(409, str(exc))
+    return {"ok": True}
+
+
+@app.post("/api/index/delete")
+def post_index_delete(account: str | None = Query(None)):
+    acc = _acc(account)
+    with acc.lock:
+        if acc.state["index"]["status"] == "running":
+            raise HTTPException(409, "the index is being built")
+        acc.state["index"].update(status="idle", progress="", error="",
+                                  done=0, total=0)
+    bodyindex.drop(acc.name, acc.tenant)
+    return {"ok": True}
 
 
 @app.get("/api/thread")
@@ -1027,10 +1074,13 @@ def get_search(q: str = Query(...),
     `body_search` setting)."""
     acc = _acc(account)
     if scope == "body":
-        if cfgmod.account_imap(acc.name).get("body_search") == "disabled":
+        mode = cfgmod.account_imap(acc.name).get("body_search")
+        if mode == "disabled":
             raise HTTPException(
                 400, "body search is disabled for this account")
         try:
+            if mode == "local":
+                return mailops.search_local(q, acc=acc)
             return mailops.search_body(q, acc=acc)
         except HTTPException:
             raise
@@ -1232,9 +1282,14 @@ def post_config(body: dict):
         raise HTTPException(403, str(exc))
     except ValueError as exc:
         raise HTTPException(400, str(exc))
+    # Leaving "local" mode (for the account being edited) wipes its index.
+    imap_in = body.get("imap") if isinstance(body.get("imap"), dict) else {}
+    if imap_in.get("body_search") in ("disabled", "server"):
+        bodyindex.drop(str(body.get("account") or accountsmod.default_name()))
     if body.get("delete_account"):
         accountsmod.drop(str(body["delete_account"]))
         mailops.drop_snapshot(str(body["delete_account"]))
+        bodyindex.drop(str(body["delete_account"]))
         unsubstore.drop_account(str(body["delete_account"]))
         presetsmod.drop_account(str(body["delete_account"]))
         digestmod.drop_account(str(body["delete_account"]))
@@ -1250,6 +1305,7 @@ def post_config(body: dict):
         if old != new:
             accountsmod.rename(old, new)
             mailops.rename_snapshot(old, new)
+            bodyindex.rename(old, new)
             verdictstore.rename_account(old, new)
             unsubstore.rename_account(old, new)
             mailops.rename_replied_account(old, new)

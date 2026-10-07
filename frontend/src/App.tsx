@@ -1378,6 +1378,7 @@ export default function App() {
       {searchOpen && (
         <SearchPanel
           bodySearch={acct?.body_search !== "disabled"}
+          bodyMode={acct?.body_search === "local" ? "local" : "server"}
           onClose={() => { setSearchOpen(false); refresh(); }}
           onDeleted={refresh}
         />

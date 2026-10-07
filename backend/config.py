@@ -67,8 +67,8 @@ ENV_IMAP = {
                  "align_minute": 0},
     # Global mail search may also look INSIDE message bodies: "server"
     # asks the IMAP server (UID SEARCH BODY - nothing is stored locally),
-    # "disabled" keeps search metadata-only. An enum so a later local-index
-    # mode can be added without a format change.
+    # "local" uses an opt-in keyed word index (backend/bodyindex.py; needs
+    # MAILBROOM_SECRET_KEY), "disabled" keeps search metadata-only.
     "body_search": "server",
 }
 
@@ -84,8 +84,8 @@ NEUTRAL_IMAP = {
                  "align_minute": 0},
     # Global mail search may also look INSIDE message bodies: "server"
     # asks the IMAP server (UID SEARCH BODY - nothing is stored locally),
-    # "disabled" keeps search metadata-only. An enum so a later local-index
-    # mode can be added without a format change.
+    # "local" uses an opt-in keyed word index (backend/bodyindex.py; needs
+    # MAILBROOM_SECRET_KEY), "disabled" keeps search metadata-only.
     "body_search": "server",
 }
 
@@ -247,7 +247,7 @@ SMTP_SECURITY = ("auto", "ssl", "starttls")
 PRESETS = ("proton", "gmail", "outlook", "icloud", "fastmail", "gmx",
            "mailbox", "yahoo", "custom")
 DIGEST_SCHEDULES = ("off", "daily", "weekly")
-BODY_SEARCH_MODES = ("disabled", "server")
+BODY_SEARCH_MODES = ("disabled", "server", "local")
 
 
 def normalize_protected(entries) -> list[str]:
@@ -492,6 +492,11 @@ def _apply_imap(block: dict, imap_in: dict) -> None:
                     pass
         block["digest"] = digest
     if imap_in.get("body_search") in BODY_SEARCH_MODES:
+        if imap_in["body_search"] == "local" and not secretbox.enabled():
+            # The local index stores keyed word hashes; the key comes from
+            # MAILBROOM_SECRET_KEY (see backend/bodyindex.py).
+            raise ValueError("the local search index needs "
+                             "MAILBROOM_SECRET_KEY to be set")
         block["body_search"] = imap_in["body_search"]
     if isinstance(imap_in.get("auto_scan"), dict):
         a = imap_in["auto_scan"]
@@ -726,6 +731,7 @@ def masked_config(cfg: dict) -> dict:
             for n, b in cfg["accounts"].items()},
         "default_account": next(iter(cfg["accounts"])),
         "oauth_providers": list(oauthflow.PROVIDERS),
+        "secret_key_set": secretbox.enabled(),
         "oauth_ms_device_available": oauthflow.has_shared_microsoft_client(),
         "protected": normalize_protected(cfg.get("protected")),
         "categories": cfg.get("categories") or {},

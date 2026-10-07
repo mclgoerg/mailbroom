@@ -6,9 +6,12 @@ import type { Mail, SearchNote } from "../types";
 import { MailRows, MessageView } from "./MailList";
 import { Button, EmptyState, Input, Modal, Spinner, Toolbar } from "./ui";
 
-export function SearchPanel({ bodySearch = false, onClose, onDeleted }: {
-  /** The account's body_search mode is "server": offer the mail-text toggle. */
+export function SearchPanel({ bodySearch = false, bodyMode = "server",
+  onClose, onDeleted }: {
+  /** The account's body_search mode is "server" or "local": offer the
+   *  mail-text toggle. */
   bodySearch?: boolean;
+  bodyMode?: "server" | "local";
   onClose: () => void;
   onDeleted: () => void;
 }) {
@@ -109,7 +112,8 @@ export function SearchPanel({ bodySearch = false, onClose, onDeleted }: {
           </Toolbar>
           {bodySearch && inBody && (
             <p className="px-4 pb-1 text-xs text-muted">
-              {t("search.body_hint")}
+              {t(bodyMode === "local"
+                ? "search.body_hint_local" : "search.body_hint")}
             </p>
           )}
           {notes.map((n) => (

@@ -335,3 +335,28 @@ test("mail-text search mode is read from the account being edited", () => {
   expect((screen.getByLabelText("Search inside mail text") as
     HTMLSelectElement).value).toBe("disabled");
 });
+
+test("the local index option needs MAILBROOM_SECRET_KEY on the server", () => {
+  render(<SettingsModal cfg={cfg} account="default" onClose={() => {}}
+    onSaved={() => {}} onAccountsChanged={() => {}} />);
+  const local = screen.getByText(/Local word index/) as HTMLOptionElement;
+  expect(local.disabled).toBe(true);
+});
+
+test("picking the local index saves it and points to the index panel",
+  () => {
+    const withKey: Config = { ...cfg, secret_key_set: true };
+    render(<SettingsModal cfg={withKey} account="default" onClose={() => {}}
+      onSaved={() => {}} onAccountsChanged={() => {}} />);
+    const mode = screen.getByLabelText("Search inside mail text") as
+      HTMLSelectElement;
+    expect((screen.getByText(/Local word index/) as HTMLOptionElement)
+      .disabled).toBe(false);
+    fireEvent.change(mode, { target: { value: "local" } });
+    expect(screen.getByText(/stores NO readable mail text/)).toBeTruthy();
+    // not saved as "local" yet: the build controls wait for the save
+    expect(screen.getByText(/Save the settings first/)).toBeTruthy();
+    saveCalls.length = 0;
+    fireEvent.click(screen.getByText("Save"));
+    expect(saveCalls[0].imap.body_search).toBe("local");
+  });

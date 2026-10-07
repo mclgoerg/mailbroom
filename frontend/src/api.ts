@@ -1,7 +1,8 @@
 import { t } from "./i18n";
 import type {
   AdminTenantStats, AiGroupResult, AppState, AttMail, AuditResp, AuthProbe,
-  Config, ConversationResp, DupSet, FilterPreset, FoldersResp, Grouping, Mail, MessageDetail,
+  Config, ConversationResp, DupSet, FilterPreset, FoldersResp, Grouping, IndexInfo,
+  Mail, MessageDetail,
   MailsResp, Rule, RuleRun, SearchResp, StatsResp, TrashResp, UnsubBulkResult, UnsubResult,
 } from "./types";
 
@@ -124,7 +125,7 @@ export const api = {
     req<{ restored: number; of: number; rescan: boolean }>(
       "/api/undo", { index }),
   emptyTrash: () => req<{ deleted: number }>("/api/empty_trash", {}),
-  cancel: (target: "scan" | "ai" | "delete" | "atts" | "unsub") =>
+  cancel: (target: "scan" | "ai" | "delete" | "atts" | "unsub" | "index") =>
     req<{ ok: boolean }>("/api/cancel", { target }),
   clearNotice: () => req<{ ok: boolean }>("/api/notice/clear", {}),
   mails: (p: { offset: number; limit: number; sort: string; dir: string;
@@ -199,6 +200,18 @@ export const api = {
   oauthDisconnect: (account: string) =>
     req<{ ok: boolean }>(
       `/api/oauth/imap/disconnect?account=${encodeURIComponent(account)}`, {}),
+  indexInfo: (account: string) =>
+    req<IndexInfo>(`/api/index?account=${encodeURIComponent(account)}`),
+  indexBuild: (account: string, rebuild = false) =>
+    req<{ ok: boolean }>(
+      `/api/index/build?account=${encodeURIComponent(account)}`, { rebuild }),
+  indexDelete: (account: string) =>
+    req<{ ok: boolean }>(
+      `/api/index/delete?account=${encodeURIComponent(account)}`, {}),
+  indexCancel: (account: string) =>
+    req<{ ok: boolean }>(
+      `/api/cancel?account=${encodeURIComponent(account)}`,
+      { target: "index" }),
   testDigest: (account: string) =>
     req<{ sent: boolean; demo: boolean }>(
       `/api/digest/test?account=${encodeURIComponent(account)}`, {}),
