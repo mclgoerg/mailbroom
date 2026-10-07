@@ -19,10 +19,13 @@ for changes is: **safe by default, tested, and translated.**
    and [release-please](https://github.com/googleapis/release-please)
    parses that history to compute the next version and `CHANGELOG.md`
    entry. An unconventional title is invisible to both.
-4. CI must be green - it runs the backend tests, the frontend tests
+4. User-facing PRs (`feat`, `fix`, `perf`, or any breaking change) carry
+   a **`## Release notes`** section in the description - see
+   [Release notes](#release-notes) below. A CI check enforces it.
+5. CI must be green - it runs the backend tests, the frontend tests
    **including the TypeScript check**, and a full multi-arch Docker
    build.
-5. External PRs get a maintainer review; @mclgoerg is auto-requested
+6. External PRs get a maintainer review; @mclgoerg is auto-requested
    via CODEOWNERS.
 
 ## Releasing (maintainer)
@@ -34,6 +37,35 @@ Conventional Commit history since the last release - merging it
 (whenever, no fixed schedule) is the entire release process: it tags
 the version, publishes the versioned image to GHCR, and creates the
 GitHub Release.
+
+## Release notes
+
+release-please writes each changelog entry from the PR **title** alone, so
+a one-line title is all the release PR, `CHANGELOG.md` and the GitHub
+Release would show. To give users the real story:
+
+- Put a `## Release notes` section in the PR description: one to four
+  plain-language lines on what changes *for the user* (not how it was
+  built), plus anything to know when upgrading (e.g. "the first scan after
+  this is a full rescan"). Markdown lists are fine; headings inside are
+  flattened to bold; it is capped at ~1200 characters.
+- After every push to `main`, `release-please.yml` copies that text under
+  the PR's entry in the standing release PR's description and in
+  `CHANGELOG.md` on the release branch (`scripts/release_notes.py`;
+  idempotent, nothing is rewritten, only added).
+- `Release Notes Check` fails a `feat`/`fix`/`perf`/breaking PR without the
+  section. Not actually user-facing? Add the `skip-release-notes` label.
+- A PR that ships **several distinct changes** can list them as separate
+  changelog bullets with release-please's own override block at the end of
+  the description (each line is a conventional-commit message; the
+  `## Release notes` text is attached under the first bullet):
+
+  ```
+  BEGIN_COMMIT_OVERRIDE
+  feat: conversation threads as a fourth grouping tab
+  fix: thread keys use SHA-256
+  END_COMMIT_OVERRIDE
+  ```
 
 ## Running everything locally
 
