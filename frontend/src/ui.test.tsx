@@ -11,7 +11,7 @@ import {
   isModalOpen, AccountAvatar, Button, Checkbox, Chip, ChipGroup, ChipSegment,
   ConfirmDialog, DialogProvider, EmptyState, MailRow, Menu, MenuDivider,
   MenuHeading, MenuItem, Modal, Notice, ToastProvider, confirmDialog,
-  promptDialog, useToast,
+  LINK, Tag, promptDialog, useToast,
 } from "./components/ui";
 
 afterEach(cleanup);
@@ -593,4 +593,21 @@ test("focus ring CSS: base outline colour, offset only for text-like fields", as
   expect(base).toMatch(/:where\(\*\) \{[^}]*outline-color: var\(--color-accent\)/);
   expect(base).toMatch(/^  :focus-visible \{/m);
   expect(css).toMatch(/input:not\(\[type="checkbox"\][^{]*\):focus-visible/);
+});
+
+test("Tag tones map to the semantic bg/fg pairs on the caption layer", () => {
+  render(<>
+    <Tag>plain</Tag>
+    <Tag tone="safe">safe</Tag>
+    <Tag tone="attach">attach</Tag>
+  </>);
+  expect(screen.getByText("plain").className).toContain("type-caption");
+  expect(screen.getByText("plain").className).toContain("bg-chip");
+  expect(screen.getByText("safe").className).toContain("bg-safe-bg");
+  expect(screen.getByText("safe").className).toContain("text-safe-fg");
+  expect(screen.getByText("attach").className).toContain("bg-attach-bg");
+});
+
+test("LINK is the shared underline look for text buttons", () => {
+  expect(LINK).toContain("underline");
 });
