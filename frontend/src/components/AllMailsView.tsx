@@ -158,7 +158,8 @@ export function AllMailsView({ state, onChanged }: {
         setTotal((n) => Math.max(0, n - keys.size));
       }
       setSel(new Set());
-      toast.show(t("note.background", { verb }));
+      // Short-lived: the result toast (App) follows when the job ends.
+      toast.show(t("note.background", { verb }), { duration: 3000 });
       onChanged();
     } catch (e: any) {
       toast.show(t("err.generic", { msg: e.message ?? e }),

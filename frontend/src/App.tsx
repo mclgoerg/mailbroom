@@ -1340,8 +1340,8 @@ export default function App() {
         type-meta text-muted">
         <div>{statusLine()}</div>
         {(state?.undo.length ?? 0) > 0 && !deleting && (
-          <span className="relative">
-            <Button variant="quiet" size="sm"
+          <span className="relative shrink-0">
+            <Button variant="quiet" size="sm" className="whitespace-nowrap"
               onClick={() => setUndoOpen(!undoOpen)}>
               {t("Undo")}
               <ChevronDown size={14}
