@@ -381,6 +381,11 @@ export function PanelHeader({ title, sub, actions, onClose }: {
   );
 }
 
+/** The filter-input row of the main toolbar (row B): the group filter and the
+ *  All-mails filter both use it, so switching views never moves anything.
+ *  `relative` anchors the QueryBuilder popover. */
+export const FILTER_ROW = "relative mb-2 flex flex-wrap items-center gap-2";
+
 /** Standard action row under a panel header. */
 export function Toolbar({ children, className = "" }: {
   children: ReactNode; className?: string;
@@ -410,9 +415,14 @@ export function SectionLabel({ children, className = "" }: {
  * phone). Closes
  * on outside click, Escape, or after any click inside (items just run
  * their onClick). Sits BELOW modals (z-modal). */
-export function Menu({ trigger, label, children }: {
+export function Menu({ trigger, label, variant, icon, children }: {
   trigger: ReactNode;
   label?: string;                 // accessible name / tooltip
+  /** Render the trigger as a design-system `Button` of this variant (a
+   *  labelled "Tools ▾" button, or with `icon` a square icon button whose
+   *  `label` is then required). Without it: the compact header trigger. */
+  variant?: ButtonVariant;
+  icon?: boolean;
   children: ReactNode;
 }) {
   const [open, setOpen] = useState(false);
@@ -442,12 +452,26 @@ export function Menu({ trigger, label, children }: {
   }, [open]);
   return (
     <div className="relative" ref={ref}>
-      <button className="flex min-h-8 items-center rounded-control border
-        border-line bg-panel2 px-2 type-body hover:bg-chip"
-        title={label} aria-label={label} aria-expanded={open}
-        onClick={() => setOpen(!open)}>
-        {trigger}
-      </button>
+      {variant && icon ? (
+        <Button variant={variant} size="icon" label={label ?? ""}
+          aria-haspopup="menu" aria-expanded={open}
+          onClick={() => setOpen(!open)}>
+          {trigger}
+        </Button>
+      ) : variant ? (
+        <Button variant={variant} aria-haspopup="menu" aria-expanded={open}
+          className="inline-flex items-center gap-1.5"
+          onClick={() => setOpen(!open)}>
+          {trigger}
+        </Button>
+      ) : (
+        <button className="flex min-h-8 items-center rounded-control border
+          border-line bg-panel2 px-2 type-body hover:bg-chip"
+          title={label} aria-label={label} aria-expanded={open}
+          onClick={() => setOpen(!open)}>
+          {trigger}
+        </button>
+      )}
       {open && (
         <div ref={pop}
           className={`absolute top-full z-(--z-dropdown) mt-1 min-w-52
@@ -704,6 +728,59 @@ export function ChipSegment({ on = false, children, className = "", ...rest }:
       {children}
     </button>
   );
+}
+
+/** Segmented control for mutually exclusive views (tablist). The selected
+ *  segment is the quiet "current" style (chiph + accent inset ring), never
+ *  the solid accent that belongs to the one primary Button. `fill` makes
+ *  the segments equal-width across the full row. */
+export function Segmented<T extends string>({ value, onChange, options,
+  label, fill = false, className = "" }: {
+  value: T | null;
+  onChange: (v: T) => void;
+  options: { value: T; label: ReactNode }[];
+  label: string;
+  fill?: boolean;
+  className?: string;
+}) {
+  return (
+    <div role="tablist" aria-label={label}
+      className={`inline-flex items-stretch overflow-hidden rounded-control
+        border border-line bg-panel2 ${fill ? "w-full" : ""} ${className}`}>
+      {options.map((o, i) => {
+        const on = o.value === value;
+        return (
+          <button key={o.value} type="button" role="tab" aria-selected={on}
+            onClick={() => onChange(o.value)}
+            className={`min-h-9 coarse:min-h-10 min-w-0 whitespace-nowrap
+              px-1.5 transition-colors type-meta md:type-body md:px-3
+              focus-visible:-outline-offset-2 enabled:active:translate-y-px
+              ${fill ? "flex-1" : ""} ${i > 0 ? "border-l border-line" : ""}
+              ${on ? "bg-chiph font-medium text-body ring-1 ring-inset ring-accent"
+                : "text-muted hover:bg-chip"}`}>
+            {o.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+/** Live `matchMedia` flag (false where matchMedia doesn't exist, e.g.
+ *  jsdom: components then render their wide layout). */
+export function useMediaQuery(query: string): boolean {
+  const get = () => typeof window.matchMedia === "function"
+    && window.matchMedia(query).matches;
+  const [match, setMatch] = useState(get);
+  useEffect(() => {
+    if (typeof window.matchMedia !== "function") return;
+    const mq = window.matchMedia(query);
+    const on = () => setMatch(mq.matches);
+    on();
+    mq.addEventListener("change", on);
+    return () => mq.removeEventListener("change", on);
+  }, [query]);
+  return match;
 }
 
 /** Dismissible inline notice (replaces the one-off banners). */

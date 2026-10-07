@@ -279,7 +279,7 @@ describe("engagement indicator", () => {
   it("tapping the meter on a mobile card does not open the group", () => {
     const onOpen = vi.fn();
     const { container } = renderTable({ groups: [eng(50)], onOpen });
-    const cardMeter = container.querySelector(".sm\\:hidden [data-eng]")!;
+    const cardMeter = container.querySelector(".md\\:hidden [data-eng]")!;
     fireEvent.click(cardMeter);
     expect(onOpen).not.toHaveBeenCalled();
   });

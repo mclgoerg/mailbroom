@@ -10,7 +10,7 @@ import { afterEach, expect, test, vi } from "vitest";
 import {
   isModalOpen, AccountAvatar, Button, Checkbox, Chip, ChipGroup, ChipSegment,
   ConfirmDialog, DialogProvider, EmptyState, MailRow, Menu, MenuDivider,
-  MenuHeading, MenuItem, Modal, Notice, ProgressBar, ToastProvider,
+  MenuHeading, MenuItem, Modal, Notice, ProgressBar, Segmented, ToastProvider,
   confirmDialog,
   LINK, Tag, promptDialog, useToast,
 } from "./components/ui";
@@ -621,4 +621,27 @@ test("ProgressBar: determinate carries its value, indeterminate none", () => {
   rerender(<ProgressBar thin indeterminate value={0} max={0} label="x" />);
   expect(screen.getByRole("progressbar").getAttribute("aria-valuenow"))
     .toBeNull();
+});
+
+test("Segmented marks the current segment and reports a change", () => {
+  const onChange = vi.fn();
+  render(
+    <Segmented label="View" value="b" onChange={onChange}
+      options={[{ value: "a", label: "A" }, { value: "b", label: "B" }]} />);
+  expect(screen.getByRole("tablist", { name: "View" })).toBeTruthy();
+  expect(screen.getByRole("tab", { name: "B" }).getAttribute("aria-selected"))
+    .toBe("true");
+  expect(screen.getByRole("tab", { name: "A" }).getAttribute("aria-selected"))
+    .toBe("false");
+  fireEvent.click(screen.getByRole("tab", { name: "A" }));
+  expect(onChange).toHaveBeenCalledWith("a");
+});
+
+test("a Menu with a variant renders a Button trigger", () => {
+  render(<Menu variant="secondary" trigger={<>Tools</>}>
+    <MenuItem>One</MenuItem></Menu>);
+  const b = screen.getByRole("button", { name: "Tools" });
+  expect(b.className).toContain("bg-chip");
+  fireEvent.click(b);
+  expect(screen.getByText("One")).toBeTruthy();
 });

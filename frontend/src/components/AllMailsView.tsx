@@ -1,11 +1,13 @@
-import { ArrowDown, X } from "lucide-react";
+import { X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { api, mailKey } from "../api";
 import { t } from "../i18n";
 import { actionVerb, itemsOf, planMailAction } from "../mailActions";
 import type { AppState, Mail } from "../types";
 import { MailRows, MessageView } from "./MailList";
-import { Button, EmptyState, Input, LINK, Loading, Modal, Select,
+import { SortControl } from "./SortControl";
+import { Button, EmptyState, FILTER_ROW, Input, LINK, Loading, Modal, Select,
   useBulkBarHeight, useToast }
   from "./ui";
 
@@ -25,9 +27,13 @@ const naturalDir = (k: MailSort): "asc" | "desc" =>
  *  traffic). Rows are the search panel's MailRows; selection drives the
  *  same delete_messages actions (with the same pinned-mail confirm flow) as
  *  the group detail view. */
-export function AllMailsView({ state, onChanged }: {
+export function AllMailsView({ state, onChanged, toolbarSlot }: {
   state: AppState;
   onChanged: () => void;
+  /** Where the filter + sort row is rendered (App's row B, so the toolbar
+   *  keeps its place when switching tabs). Inline when omitted; null =
+   *  slot not mounted yet (render nothing). */
+  toolbarSlot?: HTMLElement | null;
 }) {
   const [q, setQ] = useState("");
   const [dq, setDq] = useState("");                 // debounced q
@@ -173,52 +179,33 @@ export function AllMailsView({ state, onChanged }: {
     else if (v) act(v);
   };
 
-  const sortControl = () => (
-    <div className="flex shrink-0 items-stretch overflow-hidden rounded-control
-      border border-line">
-      <Select className="min-w-0 flex-1 !rounded-none !border-0"
-        value={sortK}
-        onChange={(e) => {
-          const k = e.target.value as MailSort;
-          setSortK(k);
-          setDir(naturalDir(k));
-        }}>
-        {SORTS.map((o) => (
-          <option key={o.k} value={o.k}>{t(o.label)}</option>
-        ))}
-      </Select>
-      {/* !rounded-none: the segment's corners belong to the wrapper. */}
-      <Button variant="secondary" size="icon"
-        label={t(dir === "desc" ? "sort.desc_tip" : "sort.asc_tip")}
-        className="shrink-0 !rounded-none border-l border-line"
-        onClick={() => setDir(dir === "desc" ? "asc" : "desc")}>
-        <ArrowDown aria-hidden size={16}
-          className={`text-accent transition-transform duration-200
-            ${dir === "asc" ? "rotate-180" : ""}`} />
-      </Button>
+  const filterRow = (
+    <div className={FILTER_ROW}>
+      <div className="relative min-w-0 flex-1 md:min-w-70">
+        <Input className="w-full pr-9 coarse:pr-10" value={q}
+          placeholder={t("mails.filter")}
+          title={t("mails.filter_tip")}
+          onChange={(e) => setQ(e.target.value)} />
+        {!!q && (
+          <span className="absolute inset-y-0 right-0 flex items-center">
+            <Button variant="quiet" size="icon" label={t("Clear filter")}
+              className="text-muted hover:text-body"
+              onClick={() => setQ("")}>
+              <X size={16} />
+            </Button>
+          </span>
+        )}
+      </div>
+      <SortControl options={SORTS} value={sortK} dir={dir}
+        onValue={(k) => { setSortK(k); setDir(naturalDir(k)); }}
+        onDir={setDir} />
     </div>
   );
 
   return (
     <div>
-      <div className="mb-2 flex flex-wrap items-center gap-2">
-        <div className="relative min-w-0 flex-1">
-          <Input className="w-full pr-9 coarse:pr-10" value={q}
-            placeholder={t("mails.filter")}
-            title={t("mails.filter_tip")}
-            onChange={(e) => setQ(e.target.value)} />
-          {!!q && (
-            <span className="absolute inset-y-0 right-0 flex items-center">
-              <Button variant="quiet" size="icon" label={t("Clear filter")}
-                className="text-muted hover:text-body"
-                onClick={() => setQ("")}>
-                <X size={16} />
-              </Button>
-            </span>
-          )}
-        </div>
-        {sortControl()}
-      </div>
+      {toolbarSlot !== null && (toolbarSlot
+        ? createPortal(filterRow, toolbarSlot) : filterRow)}
       <div className="mb-2 flex min-h-5 flex-wrap items-center gap-x-3
         type-meta text-muted">
         <span>{t("mails.count", { n: mails.length, total })}</span>
