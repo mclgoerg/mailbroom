@@ -4,7 +4,7 @@ import { api, mailKey } from "../api";
 import { t } from "../i18n";
 import { splitQuoted } from "../quoted";
 import type { ConversationResp, Mail, MessageDetail } from "../types";
-import { Button, LINK, Spinner } from "./ui";
+import { Button, LINK, ShortDate, Spinner } from "./ui";
 
 type Body = MessageDetail | "loading" | { error: string };
 
@@ -127,8 +127,8 @@ export function ThreadView({ mail, initial, onBack }: {
                   <span className="text-muted"> · {m.subject
                     || t("(no subject)")}</span>
                 </span>
-                <span className="shrink-0 type-meta whitespace-nowrap
-                  text-muted">{m.date}</span>
+                <ShortDate iso={m.date} time
+                  className="shrink-0 type-meta text-muted" />
               </button>
               {isOpen && (
                 <div className="border-t border-line px-3 py-2">

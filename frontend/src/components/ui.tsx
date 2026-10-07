@@ -4,8 +4,8 @@ import { createContext, useCallback, useContext, useEffect, useId,
   useLayoutEffect, useMemo, useRef, useState, type ComponentProps,
   type KeyboardEvent as ReactKeyboardEvent, type ReactNode, type RefObject }
   from "react";
-import { t } from "../i18n";
-import { engagementTier } from "../lib";
+import { getLang, t } from "../i18n";
+import { engagementTier, fmtDate } from "../lib";
 import type { GroupAi } from "../types";
 
 /** One-time consent: what metadata the AI features transmit. */
@@ -1129,6 +1129,19 @@ export function DialogProvider({ children }: { children: ReactNode }) {
       )}
     </>
   );
+}
+
+/** A date in its short locale form (see fmtDate), optionally with the time;
+ *  the full ISO string is the `title` and the `<time>` value. Never wraps.
+ *  Empty input renders nothing. */
+export function ShortDate({ iso, className = "", time = false }: {
+  iso: string; className?: string; time?: boolean;
+}) {
+  if (!iso) return null;
+  const short = fmtDate(iso, new Date(), { lang: getLang(), time });
+  const cls = `whitespace-nowrap ${className}`;
+  if (short === iso) return <span className={cls}>{iso}</span>;
+  return <time dateTime={iso} title={iso} className={cls}>{short}</time>;
 }
 
 /* --------------------------------- mail row -------------------------------- */

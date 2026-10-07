@@ -158,6 +158,20 @@ html[data-theme="light"] {
   color-scheme: light;
 }
 
+/* Covers body's top padding strip (safe area + 8px): the scroll container
+   is body, so the sticky table header sticks below that strip and rows
+   would show above it. Fixed + click-through, so it never blocks taps; the
+   sticky layer keeps menus/dialogs above it. */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0 0 auto;
+  height: calc(env(safe-area-inset-top) + 8px);
+  background: var(--color-surface);
+  z-index: var(--z-sticky);
+  pointer-events: none;
+}
+
 body {
   @apply bg-surface text-body antialiased;
   /* The real scroll container (html is fixed, see above). overscroll-

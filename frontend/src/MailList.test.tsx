@@ -30,7 +30,7 @@ describe("MailRows", () => {
     + "single-folder list", () => {
     render(<MailRows mails={[mk(1), mk(2)]}
       sel={new Set()} onToggle={noop} onOpen={noop} />);
-    expect(screen.getAllByText("2025-01-01 · 1000 B").length).toBe(2);
+    expect(screen.getAllByText("1 Jan 2025 · 1000 B").length).toBe(2);
   });
 
   it("adds the sender address once the visible mails span more than one "
@@ -38,8 +38,8 @@ describe("MailRows", () => {
     render(<MailRows mails={[
       mk(1, { addr: "a@x.example" }), mk(2, { addr: "b@x.example" }),
     ]} sel={new Set()} onToggle={noop} onOpen={noop} />);
-    expect(screen.getByText("2025-01-01 · a@x.example · 1000 B")).toBeTruthy();
-    expect(screen.getByText("2025-01-01 · b@x.example · 1000 B")).toBeTruthy();
+    expect(screen.getByText("1 Jan 2025 · a@x.example · 1000 B")).toBeTruthy();
+    expect(screen.getByText("1 Jan 2025 · b@x.example · 1000 B")).toBeTruthy();
   });
 
   it("adds the folder once the visible mails span more than one folder",
@@ -47,7 +47,7 @@ describe("MailRows", () => {
     render(<MailRows mails={[
       mk(1, { folder: "INBOX" }), mk(2, { folder: "Archive" }),
     ]} sel={new Set()} onToggle={noop} onOpen={noop} />);
-    expect(screen.getByText("2025-01-01 · INBOX · 1000 B")).toBeTruthy();
-    expect(screen.getByText("2025-01-01 · Archive · 1000 B")).toBeTruthy();
+    expect(screen.getByText("1 Jan 2025 · INBOX · 1000 B")).toBeTruthy();
+    expect(screen.getByText("1 Jan 2025 · Archive · 1000 B")).toBeTruthy();
   });
 });

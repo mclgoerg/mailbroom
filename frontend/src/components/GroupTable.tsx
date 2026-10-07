@@ -1,9 +1,9 @@
 import { ArrowDown, ChevronRight } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useState, type MouseEvent } from "react";
 import { fmtSize } from "../api";
 import type { Group } from "../types";
 import { t } from "../i18n";
-import { AiTag, Avatar, Button, Checkbox, EngagementMeter, PinBadge, RatingChips, Tag, Select } from "./ui";
+import { AiTag, Avatar, Button, Checkbox, EngagementMeter, PinBadge, RatingChips, ShortDate, Tag, Select } from "./ui";
 
 export type SortKey = "count" | "size" | "label" | "last" | "unreadPct"
   | "engagement";
@@ -68,7 +68,7 @@ function UnsubBadge({ g, onAck }: { g: Group; onAck: (addr: string) => void }) {
   }
   // "link": needs a manual confirmation page. Label stays short (unlike
   // the DetailPanel's own button) - the desktop table's Type column is a
-  // fixed w-44, and the full "Open unsubscribe page" text wrapped onto
+  // fixed w-40, and the full "Open unsubscribe page" text wrapped onto
   // two lines there and blew up the row height (390px + 1440px screenshot
   // check against scripts/demo.py, 2026-09-28).
   return (
@@ -97,24 +97,44 @@ function DesktopTable({ slice, baseIdx, selected, focusedKey, onToggle,
   onToggleAll, onOpen, blockedKeys,
   onAckUnsub, sortK, sortDir, onSort, groupLabel
 }: PageProps) {
-  // Sort indicator: the active column shows an accent arrow that ROTATES
-  // between directions; inactive sortable columns reserve the space
-  // (no layout shift) and reveal a faint hint on hover.
-  const arrow = (k: SortKey) => (
+  // Sort indicator, inline after the label: the active column shows an
+  // accent arrow that ROTATES between directions; inactive sortable columns
+  // reserve the space (no layout shift) and reveal a faint hint on hover.
+  const arrow = (k: SortKey, before = false) => (
     <ArrowDown aria-hidden size={14}
-      className={`ml-0.5 inline-block transition-all duration-200 ${
+      className={`${before ? "mr-1" : "ml-1"} shrink-0 transition-all duration-200 ${
         sortK === k
           ? `text-accent ${sortDir > 0 ? "rotate-180" : ""}`
-          : "opacity-0 group-hover/th:opacity-50"}`} />
+          : "opacity-0 group-hover/th:opacity-50 group-focus-within/th:opacity-50"}`} />
   );
   const ariaSort = (k: SortKey) =>
     sortK === k ? (sortDir < 0 ? "descending" as const
       : "ascending" as const) : undefined;
+  // Header cell with a real <button>; the sorted column reads in body
+  // colour, the others stay muted.
+  // Right-aligned columns put the arrow BEFORE the label, so the label
+  // (not the reserved arrow space) lines up with the values below.
+  const sortBtn = (k: SortKey, label: string, title?: string,
+                   right = false) => (
+    <button type="button" title={title} onClick={() => onSort(k)}
+      className={`inline-flex cursor-pointer items-center whitespace-nowrap
+        font-semibold hover:text-body ${sortK === k ? "text-body" : ""}`}>
+      {right && arrow(k, true)}{label}{!right && arrow(k)}
+    </button>
+  );
   const allChecked =
     slice.length > 0 && slice.every((g) => selected.has(g.key));
-  const th = "px-2 py-2 type-meta font-semibold";
-  const sortableTh = `${th} group/th cursor-pointer select-none
-    hover:text-body`;
+  // (The strip above the sticky header, inside body's top padding, is
+  // covered by body::before in index.css.)
+  const th = "px-2 py-2 align-bottom type-meta font-semibold";
+  const sortableTh = `${th} group/th`;
+  // Row click opens the detail, except on things with their own action.
+  const rowClick = (g: Group) => (e: MouseEvent<HTMLTableRowElement>) => {
+    if (window.getSelection()?.toString()) return;   // drag-selecting text
+    if ((e.target as HTMLElement).closest(
+      "button, a, input, label, [data-no-open]")) return;
+    onOpen(g);
+  };
   // table-fixed: column widths come from the header cells, so they are
   // content-independent and identical in every grouping mode.
   return (
@@ -126,52 +146,47 @@ function DesktopTable({ slice, baseIdx, selected, focusedKey, onToggle,
               onChange={(e) => onToggleAll(e.target.checked,
                 slice.map((g) => g.key))} />
           </th>
-          <th className={`${th} w-10`} />
-          <th className={sortableTh} aria-sort={ariaSort("label")}
-            onClick={() => onSort("label")}>
-            {groupLabel}{arrow("label")}
+          <th className="w-10" />
+          <th className={sortableTh} aria-sort={ariaSort("label")}>
+            {sortBtn("label", groupLabel)}
           </th>
-          <th className={`${th} hidden w-44 lg:table-cell`}>{t("Type")}</th>
+          <th className={`${th} hidden w-40 lg:table-cell`}>{t("Type")}</th>
           <th className={`${th} w-24`}>{t("AI")}</th>
-          <th className={`${sortableTh} w-14`} aria-sort={ariaSort("engagement")}
-            title={t("eng.col_tip")} onClick={() => onSort("engagement")}>
-            {t("Eng.")}{arrow("engagement")}
+          <th className={`${sortableTh} w-18`} aria-sort={ariaSort("engagement")}>
+            {sortBtn("engagement", t("Eng."), t("eng.col_tip"))}
           </th>
-          <th className={`${sortableTh} w-16 text-right`}
-            aria-sort={ariaSort("count")}
-            onClick={() => onSort("count")}>
-            {t("Mails")}{arrow("count")}
+          <th className={`${sortableTh} w-18 text-right`}
+            aria-sort={ariaSort("count")}>
+            {sortBtn("count", t("Mails"), undefined, true)}
           </th>
           <th className={`${sortableTh} w-20 text-right`}
-            aria-sort={ariaSort("size")}
-            onClick={() => onSort("size")}>
-            {t("Size")}{arrow("size")}
+            aria-sort={ariaSort("size")}>
+            {sortBtn("size", t("Size"), undefined, true)}
           </th>
-          <th className={`${sortableTh} hidden w-24 text-right md:table-cell`}
-            aria-sort={ariaSort("last")}
-            onClick={() => onSort("last")}>
-            {t("Last")}{arrow("last")}
+          <th className={`${sortableTh} hidden w-30 text-right md:table-cell`}
+            aria-sort={ariaSort("last")}>
+            {sortBtn("last", t("Last"), undefined, true)}
           </th>
-          <th className="w-16" />
+          <th className="w-11" />
         </tr>
       </thead>
       <tbody>
         {slice.map((g, i) => (
           <tr key={g.key} data-gidx={baseIdx + i}
-            className={`border-b border-line hover:bg-panel
+            onClick={rowClick(g)}
+            className={`cursor-pointer border-b border-line hover:bg-panel
               ${g.key === focusedKey ? "bg-panel outline outline-1 -outline-offset-1 outline-accent/60" : ""}`}>
-            <td className="px-2 py-2 align-top">
+            <td className="px-2 py-2 align-top" data-no-open>
               <Checkbox checked={selected.has(g.key)} className="-mx-2 -my-1"
                 onChange={() => onToggle(g.key)} />
             </td>
-            <td className="px-2 py-2 align-top">
+            <td className="py-2 pl-0 pr-2 align-top">
               <Avatar name={g.label || g.key} size="md" />
             </td>
             <td className="min-w-0 px-2 py-2">
               <button
                 className="block w-full cursor-pointer truncate text-left
                   type-body font-medium hover:underline"
-                title={g.samples.length ? `e.g. ${g.samples.join(" • ")}` : ""}
                 onClick={() => onOpen(g)}>
                 {g.label}
               </button>
@@ -179,7 +194,8 @@ function DesktopTable({ slice, baseIdx, selected, focusedKey, onToggle,
                 <div className="truncate type-meta text-muted">{g.sub}</div>
               )}
               <div className="truncate type-meta text-muted">
-                {g.first} → {g.last} · {unreadPct(g)}% {t("unread")}
+                <ShortDate iso={g.first} /> → <ShortDate iso={g.last} /> ·{" "}
+                {unreadPct(g)}% {t("unread")}
               </div>
             </td>
             <td className="hidden px-2 py-2 align-top lg:table-cell">
@@ -218,18 +234,19 @@ function DesktopTable({ slice, baseIdx, selected, focusedKey, onToggle,
             <td className="px-2 py-2 align-top">
               <EngagementMeter g={g} />
             </td>
-            <td className="px-2 py-2 text-right align-top tabular-nums">
+            <td className="whitespace-nowrap px-2 py-2 text-right align-top
+              tabular-nums">
               {g.count}
             </td>
-            <td className="px-2 py-2 text-right align-top tabular-nums
-              text-muted">
+            <td className="whitespace-nowrap px-2 py-2 text-right align-top
+              tabular-nums text-muted">
               {fmtSize(g.size)}
             </td>
-            <td className="hidden px-2 py-2 text-right align-top tabular-nums
-              text-muted md:table-cell">
-              {g.last}
+            <td className="hidden whitespace-nowrap px-2 py-2 text-right align-top
+              tabular-nums text-muted md:table-cell">
+              <ShortDate iso={g.last} />
             </td>
-            <td className="px-2 py-2 text-right align-top">
+            <td className="px-1 py-2 text-right align-top">
               <Button variant="quiet" size="icon" label={t("View details")}
                 className="text-faint" onClick={() => onOpen(g)}>
                 <ChevronRight size={18} />
@@ -263,8 +280,8 @@ function MobileCards({ slice, baseIdx, selected, focusedKey, onToggle,
                 <div className="truncate type-meta text-muted">{g.sub}</div>
               )}
               <div className="truncate type-meta text-muted">
-                {g.count} {t("mails")} · {fmtSize(g.size)} · {unreadPct(g)}%{" "}
-                {t("unread")} · {g.last}
+                {g.count} {t("mails")} · <ShortDate iso={g.last} /> ·{" "}
+                {fmtSize(g.size)} · {unreadPct(g)}% {t("unread")}
               </div>
               <div className="mt-1 flex flex-wrap items-center gap-1">
                 <EngagementMeter g={g} />

@@ -2,7 +2,8 @@ import { ArrowLeft, MessagesSquare } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { api, fmtSize, mailKey } from "../api";
 import type { Mail, MessageDetail } from "../types";
-import { t } from "../i18n";
+import { getLang, t } from "../i18n";
+import { fmtDate } from "../lib";
 import { AiTag, Button, Checkbox, PinButton, Spinner } from "./ui";
 import { ThreadView } from "./ThreadView";
 
@@ -88,7 +89,7 @@ export function MailRows({ mails, sel, onToggle, onOpen, onPin, detailed,
   return (
     <>
       {(paged ? mails : mails.slice(0, cap)).map((m) => {
-        const meta = [(m.date || "").slice(0, 10)];
+        const meta = [fmtDate(m.date || "", new Date(), { lang: getLang() })];
         if (multiFolder) meta.push(m.folder);
         if (multiSender) meta.push(m.addr);
         meta.push(fmtSize(m.size));
@@ -114,7 +115,8 @@ export function MailRows({ mails, sel, onToggle, onOpen, onPin, detailed,
               </button>
               <div className="mt-0.5 flex min-w-0 items-center gap-1.5
                 type-meta text-muted">
-                <span className="min-w-0 truncate">
+                <span className="min-w-0 truncate"
+                  title={(m.date || "").slice(0, 10)}>
                   {meta.join(" · ")}
                 </span>
                 {m.ai && (

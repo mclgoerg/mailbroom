@@ -325,3 +325,52 @@ describe("GroupTable stacking", () => {
     expect(tr.className).toContain("z-(--z-sticky)");
   });
 });
+
+describe("GroupTable rows and header", () => {
+  beforeEach(() => setLang("en"));
+  afterEach(cleanup);
+
+  it("shows a short, non-wrapping date with the ISO date as title", () => {
+    const { container } = renderTable({ groups: [mk(0)] });
+    const td = container.querySelector("tbody tr td:nth-last-child(2)")!;
+    expect(td.className).toContain("whitespace-nowrap");
+    const time = td.querySelector("time")!;
+    expect(time.getAttribute("title")).toBe("2025-01-01");
+    expect(time.textContent).toBe("1 Jan 2025");
+  });
+
+  it("marks only the sorted column with aria-sort", () => {
+    const { container } = renderTable();
+    const sorted = container.querySelectorAll("th[aria-sort]");
+    expect(sorted.length).toBe(1);
+    expect(sorted[0].getAttribute("aria-sort")).toBe("descending");
+    expect(sorted[0].textContent).toBe("Mails");
+  });
+
+  it("opens the detail from a row click, but not from the checkbox column, buttons or a text selection", () => {
+    const onOpen = vi.fn();
+    const onAckUnsub = vi.fn();
+    const g = { ...mk(0), unsubscribed: { status: "link", link: "https://x.example/u", addr: "s0@x.example" } } as Group;
+    const { container } = renderTable({ onOpen, onAckUnsub, groups: [g] });
+    const row = container.querySelector("tbody tr")!;
+    const tds = row.querySelectorAll("td");
+    fireEvent.click(row.querySelector("input[type=checkbox]")!);
+    fireEvent.click(tds[0]);                       // checkbox cell, beside the box
+    fireEvent.click(row.querySelector("button[title='unsub.mark_done'], button[aria-label]:not([aria-label='View details'])")!);
+    expect(onOpen).not.toHaveBeenCalled();
+    expect(onAckUnsub).toHaveBeenCalledTimes(1);
+    const sel = vi.spyOn(window, "getSelection").mockReturnValue(
+      { toString: () => "some text" } as Selection);
+    fireEvent.click(tds[6]);
+    expect(onOpen).not.toHaveBeenCalled();
+    sel.mockRestore();
+    fireEvent.click(tds[6]);
+    expect(onOpen).toHaveBeenCalledTimes(1);
+    fireEvent.click(tds[5]);                       // Eng cell opens too
+    expect(onOpen).toHaveBeenCalledTimes(2);
+    fireEvent.click(row.querySelector("[data-eng]")!);   // meter itself doesn't
+    expect(onOpen).toHaveBeenCalledTimes(2);
+    fireEvent.click(row.querySelector("button[aria-label='View details']")!);
+    expect(onOpen).toHaveBeenCalledTimes(3);
+  });
+});

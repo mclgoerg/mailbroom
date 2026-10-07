@@ -5,7 +5,7 @@ import { t } from "../i18n";
 import type { AppState, Mail, TrashResp } from "../types";
 import { MessageView } from "./MailList";
 import { Button, Checkbox, EmptyState, Input, Loading, Modal, PanelHeader,
-  Select, Spinner, Toolbar } from "./ui";
+  Select, ShortDate, Spinner, Toolbar } from "./ui";
 
 /** Trash browser: live Trash contents (also mail deleted outside the app),
  *  with search and restore-to-folder. */
@@ -114,9 +114,8 @@ export function TrashPanel({ state, onClose, onChanged }: {
                   border-line/60 px-1 py-2">
                 <Checkbox checked={sel.has(mailKey(m))} className="-my-1 self-center"
                   onChange={() => toggle(mailKey(m))} />
-                <span className="type-meta whitespace-nowrap text-muted">
-                  {(m.date || "").slice(0, 10)}
-                </span>
+                <ShortDate iso={m.date || ""}
+                  className="type-meta whitespace-nowrap text-muted" />
                 <button className="min-w-0 flex-1 basis-full cursor-pointer
                     truncate text-left type-body hover:underline sm:basis-0"
                   onClick={() => setView(m)}>

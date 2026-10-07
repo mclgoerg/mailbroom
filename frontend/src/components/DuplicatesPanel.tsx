@@ -5,7 +5,7 @@ import { t } from "../i18n";
 import type { DupSet, Mail } from "../types";
 import { MessageView } from "./MailList";
 import { Button, Checkbox, EmptyState, Loading, Modal, PanelHeader, Tag,
-  Toolbar } from "./ui";
+  ShortDate, Toolbar } from "./ui";
 
 /** Duplicate finder: same Message-ID anywhere, or identical
  *  (sender, subject, size). "Keep newest" selects everything else. */
@@ -118,9 +118,8 @@ export function DuplicatesPanel({ onClose, onDeleted }: {
                       border-line/60 px-1 py-1.5">
                     <Checkbox checked={sel.has(mailKey(m))} className="-my-1 self-center"
                       onChange={() => toggle(mailKey(m))} />
-                    <span className="type-meta whitespace-nowrap text-muted">
-                      {(m.date || "").slice(0, 16)}
-                    </span>
+                    <ShortDate iso={m.date || ""} time
+                      className="type-meta text-muted" />
                     <button className="min-w-0 flex-1 cursor-pointer truncate
                         text-left type-body hover:underline"
                       onClick={() => setView(m)}>

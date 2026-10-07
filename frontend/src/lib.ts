@@ -6,6 +6,32 @@ export const fmtSize = (b: number): string =>
   b >= 1048576 ? `${(b / 1048576).toFixed(1)} MB`
   : b >= 1024 ? `${Math.round(b / 1024)} KB` : `${b} B`;
 
+/** Short locale date for display: "6 Oct" / "6. Okt." this year, with the
+ *  year ("6 Oct 2024") otherwise; `time` appends the wall-clock HH:MM of
+ *  the string ("6 Oct, 21:48") when it has one. Takes the leading
+ *  YYYY-MM-DD of an ISO string; anything else (empty, malformed) is
+ *  returned unchanged. `lang` is passed in (callers use getLang()) so this
+ *  file stays dependency-free. Put the full ISO date in a title - see
+ *  ShortDate in ui.tsx. */
+export function fmtDate(iso: string, now: Date = new Date(),
+                        opts: { lang?: "en" | "de"; time?: boolean } = {}
+): string {
+  const m = /^(\d{4})-(\d{2})-(\d{2})(?:[T ](\d{2}):(\d{2}))?/.exec(iso || "");
+  if (!m) return iso;
+  const [y, mo, d] = [Number(m[1]), Number(m[2]), Number(m[3])];
+  const dt = new Date(0);
+  dt.setUTCFullYear(y, mo - 1, d);   // not Date.UTC: it maps years < 100
+  if (dt.getUTCMonth() !== mo - 1) return iso;   // e.g. 2025-02-31
+  const withTime = opts.time && m[4] !== undefined;
+  if (withTime) dt.setUTCHours(Number(m[4]), Number(m[5]));
+  return new Intl.DateTimeFormat(opts.lang === "de" ? "de-DE" : "en-GB", {
+    day: "numeric", month: "short", timeZone: "UTC",
+    ...(y === now.getFullYear() ? {} : { year: "numeric" }),
+    ...(withTime ? { hour: "2-digit", minute: "2-digit", hourCycle: "h23" }
+      : {}),
+  }).format(dt);
+}
+
 export const fmtUsd = (c: number): string =>
   `$${c < 0.1 ? c.toFixed(4) : c.toFixed(2)}`;
 
