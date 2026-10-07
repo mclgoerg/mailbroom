@@ -88,9 +88,9 @@ export function QueryBuilder({ value, onChange, className = "" }: {
             <div className="flex min-w-0 items-center gap-2 type-body">
               <span className="w-24 shrink-0 type-meta text-muted">
                 {t("qb.age")}</span>
-              <Input className="w-20" type="number" min="1"
+              <Input className="w-16" type="number" min="1"
                 value={age} onChange={(e) => setAge(e.target.value)} />
-              <Select className="min-w-0 flex-1" value={ageUnit}
+              <Select className="min-w-24 flex-1" value={ageUnit}
                 onChange={(e) => setAgeUnit(e.target.value as "m" | "y")}>
                 <option value="m">{t("qb.months")}</option>
                 <option value="y">{t("qb.years")}</option>
@@ -100,7 +100,7 @@ export function QueryBuilder({ value, onChange, className = "" }: {
             <div className="flex min-w-0 items-center gap-2 type-body">
               <span className="w-24 shrink-0 type-meta text-muted">
                 {t("qb.unread")}</span>
-              <Input className="w-20" type="number"
+              <Input className="w-16" type="number"
                 min="1" max="100" value={unread}
                 onChange={(e) => setUnread(e.target.value)} />
               <span className="type-meta text-muted">%</span>
@@ -109,7 +109,7 @@ export function QueryBuilder({ value, onChange, className = "" }: {
             <div className="flex min-w-0 items-center gap-2 type-body">
               <span className="w-24 shrink-0 type-meta text-muted">
                 {t("qb.att")}</span>
-              <Input className="w-20" type="number" min="1"
+              <Input className="w-16" type="number" min="1"
                 value={att} onChange={(e) => setAtt(e.target.value)} />
               <span className="type-meta text-muted">MB</span>
               {addBtn(`att:>${+att || 1}m`)}

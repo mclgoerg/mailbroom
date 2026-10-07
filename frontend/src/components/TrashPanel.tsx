@@ -1,4 +1,4 @@
-import { Trash2 } from "lucide-react";
+import { RefreshCw, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { api, fmtSize, mailKey } from "../api";
 import { t } from "../i18n";
@@ -77,7 +77,8 @@ export function TrashPanel({ state, onClose, onChanged }: {
                ? ` (${t("trash.newest_shown", { n: trash.mails.length })})`
                : "")
           : t("loading…")}
-        actions={<Button variant="secondary" onClick={load}>⟳</Button>}
+        actions={<Button variant="secondary" size="icon" label={t("Refresh")}
+          onClick={load}><RefreshCw size={18} /></Button>}
         onClose={onClose}
       />
 

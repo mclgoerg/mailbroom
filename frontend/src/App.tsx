@@ -20,7 +20,7 @@ import { StatsPanel } from "./components/StatsPanel";
 import { QueryBuilder } from "./components/QueryBuilder";
 import { TrashPanel } from "./components/TrashPanel";
 import { AccountAvatar, applyTheme, Button, Chip, currentTheme, ensureAiAck,
-  Input, isModalOpen, LINK, Menu, MenuHeading, MenuItem, Select, Spinner }
+  Input, isModalOpen, LINK, LINK_ACCENT, Menu, MenuHeading, MenuItem, Select, Spinner }
   from "./components/ui";
 import { t } from "./i18n";
 import { applyStatus, fmtAgo, fmtSize, fmtUsd, matchGroup, parseFilter,
@@ -802,7 +802,7 @@ export default function App() {
           {state?.trash_count != null && state.trash_count > 0 && (
             <Button variant="quiet" size="sm"
               className="inline-flex items-center gap-1 whitespace-nowrap
-                text-muted"
+                text-muted hover:text-body"
               title={t("trash.browse")}
               onClick={() => setTrashOpen(true)}>
               <Trash2 size={14} /> {state.trash_count}
@@ -953,12 +953,15 @@ export default function App() {
               onChange={(e) => setFilter(e.target.value)}
             />
             {!!filter && (
-              <Button variant="quiet" size="icon" label={t("Clear filter")}
-                className="absolute right-0 top-1/2 -translate-y-1/2
-                  text-muted"
-                onClick={() => { setFilter(""); filterRef.current?.focus(); }}>
-                <X size={16} />
-              </Button>
+              <span className="absolute inset-y-0 right-0 flex items-center">
+                {/* The wrapper centres the Button: a transform on the Button
+                    itself is replaced by its pressed translate-y-px. */}
+                <Button variant="quiet" size="icon" label={t("Clear filter")}
+                  className="text-muted hover:text-body"
+                  onClick={() => { setFilter(""); filterRef.current?.focus(); }}>
+                  <X size={16} />
+                </Button>
+              </span>
             )}
           </div>
           <QueryBuilder value={filter} onChange={setFilter} />
@@ -998,7 +1001,8 @@ export default function App() {
                 {t("AI review")}
               </MenuItem>
             )}
-            <MenuItem onClick={() => downloadFile(api.exportUrl(mode))}>
+            <MenuItem onClick={() => downloadFile(api.exportUrl(mode))}
+              sub={t("export.csv_tip")}>
               <Download size={16} className="mr-1 inline align-text-bottom" />
               {t("export.csv")}
             </MenuItem>
@@ -1271,7 +1275,7 @@ export default function App() {
             <li>{t("onboard.step_bridge")}</li>
             <li>
               {t("onboard.step_creds")}{" "}
-              <button className={`text-accent ${LINK}`}
+              <button className={LINK_ACCENT}
                 onClick={() => setSettingsOpen(true)}>
                 {t("Settings")}
               </button>

@@ -201,12 +201,13 @@ export function AllMailsView({ state, onChanged }: {
             title={t("mails.filter_tip")}
             onChange={(e) => setQ(e.target.value)} />
           {!!q && (
-            <Button variant="quiet" size="icon" label={t("Clear filter")}
-              className="absolute right-0 top-1/2 -translate-y-1/2
-                text-muted"
-              onClick={() => setQ("")}>
-              <X size={16} />
-            </Button>
+            <span className="absolute inset-y-0 right-0 flex items-center">
+              <Button variant="quiet" size="icon" label={t("Clear filter")}
+                className="text-muted hover:text-body"
+                onClick={() => setQ("")}>
+                <X size={16} />
+              </Button>
+            </span>
           )}
         </div>
         {sortControl()}

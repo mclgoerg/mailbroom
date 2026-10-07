@@ -20,6 +20,9 @@ export function ensureAiAck(): boolean {
  *  colour is inherited; add `text-accent` / `text-muted` where needed. */
 export const LINK = "cursor-pointer underline hover:text-body";
 
+/** Link in the accent colour; stays accent on hover. */
+export const LINK_ACCENT = "cursor-pointer text-accent underline hover:text-accenth";
+
 export type TagTone = "neutral" | "safe" | "review" | "keep" | "info"
   | "attach" | "new" | "accent";
 

@@ -9,7 +9,7 @@ import { fmtSize, fmtUsd, mailKey, olderThan, sieveSnippet,
 import type { AppState, Group, Grouping, GroupUnsub, Mail } from "../types";
 import { MailRows, MessageView } from "./MailList";
 import { ThreadView } from "./ThreadView";
-import { Button, Chip, ensureAiAck, Input, LINK, Loading, Menu, MenuItem, Modal,
+import { Button, Chip, ensureAiAck, Input, LINK, LINK_ACCENT, Loading, Menu, MenuItem, Modal,
   PanelHeader, ProtectButton, Select, Spinner } from "./ui";
 
 // Rating filter chips: same green/yellow/red/unrated buckets as the
@@ -479,7 +479,7 @@ export function DetailPanel({ grouping, group, aiEnabled, protectedNow,
                       grouping, group.key, sieveAction, sieveFolder));
                     setNote(t("sieve.copied"));
                   }}>{t("Copy")}</Button>
-                  <a className={`type-meta text-accent ${LINK}`}
+                  <a className={`type-meta ${LINK_ACCENT}`}
                     href="https://account.proton.me/mail/filters"
                     target="_blank" rel="noopener">
                     {t("sieve.open_proton")}

@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { fmtSize } from "../api";
 import type { Group } from "../types";
 import { t } from "../i18n";
-import { AiTag, Avatar, Button, Checkbox, EngagementMeter, PinBadge, RatingChips, Tag, Select, LINK } from "./ui";
+import { AiTag, Avatar, Button, Checkbox, EngagementMeter, PinBadge, RatingChips, Tag, Select } from "./ui";
 
 export type SortKey = "count" | "size" | "label" | "last" | "unreadPct"
   | "engagement";
@@ -76,8 +76,9 @@ function UnsubBadge({ g, onAck }: { g: Group; onAck: (addr: string) => void }) {
       <a href={u.link} target="_blank" rel="noopener noreferrer"
         title={t("unsub.open_link")}
         onClick={(e) => e.stopPropagation()}
-        className={`whitespace-nowrap rounded-badge bg-review-bg px-1.5 py-0.5
-          type-caption text-review-fg hover:opacity-80 ${LINK}`}>
+        className="cursor-pointer whitespace-nowrap rounded-badge bg-review-bg
+          px-1.5 py-0.5 type-caption text-review-fg underline
+          hover:opacity-80">
         ✉ {t("unsub.badge_link")}
       </a>
       <button title={t("unsub.mark_done")} aria-label={t("unsub.mark_done")}
@@ -230,7 +231,7 @@ function DesktopTable({ slice, baseIdx, selected, focusedKey, onToggle,
             </td>
             <td className="px-2 py-2 text-right align-top">
               <Button variant="quiet" size="icon" label={t("View details")}
-                onClick={() => onOpen(g)}>
+                className="text-faint" onClick={() => onOpen(g)}>
                 <ChevronRight size={18} />
               </Button>
             </td>
@@ -251,7 +252,7 @@ function MobileCards({ slice, baseIdx, selected, focusedKey, onToggle,
         <div key={g.key} data-gidx={baseIdx + i}
           className={`flex items-center gap-3 border-b border-line px-1
             py-2.5 ${g.key === focusedKey ? "bg-panel" : ""}`}>
-          <Checkbox checked={selected.has(g.key)} className="-ml-2 -mr-1"
+          <Checkbox checked={selected.has(g.key)} className="-ml-2 -mr-1 coarse:-ml-3 coarse:-mr-4"
             onChange={() => onToggle(g.key)} />
           <div className="flex min-w-0 flex-1 cursor-pointer items-center
             gap-3" onClick={() => onOpen(g)}>
@@ -261,7 +262,7 @@ function MobileCards({ slice, baseIdx, selected, focusedKey, onToggle,
               {g.sub && (
                 <div className="truncate type-meta text-muted">{g.sub}</div>
               )}
-              <div className="type-meta text-muted">
+              <div className="truncate type-meta text-muted">
                 {g.count} {t("mails")} · {fmtSize(g.size)} · {unreadPct(g)}%{" "}
                 {t("unread")} · {g.last}
               </div>

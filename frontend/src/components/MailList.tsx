@@ -96,7 +96,7 @@ export function MailRows({ mails, sel, onToggle, onOpen, onPin, detailed,
           <div key={mailKey(m)} data-pinned={m.pinned ? "true" : undefined}
             className={`flex gap-3 border-b border-line/60 px-1 py-2.5 ${
               m.pinned ? "border-l-2 border-l-accent bg-panel" : ""}`}>
-            <Checkbox className="-my-1"
+            <Checkbox className="-my-1 coarse:-ml-3 coarse:-mr-2"
               checked={sel.has(mailKey(m))}
               onChange={() => onToggle(mailKey(m))} />
             <div className="min-w-0 flex-1">

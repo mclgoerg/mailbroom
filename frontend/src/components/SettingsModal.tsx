@@ -8,7 +8,7 @@ import type { AdminTenantStats, AuthMode, AutoScanUnit, BodySearchMode, Config,
   DigestSchedule, FoldersResp, OauthProvider, Preset, Security,
   SmtpSecurity } from "../types";
 import { IndexPanel } from "./IndexPanel";
-import { Button, Checkbox, Field, Input, LINK, Loading, Modal, PanelHeader,
+import { Button, Checkbox, Field, Input, LINK_ACCENT, Loading, Modal, PanelHeader,
   SectionLabel, Select, Spinner, Tag, TextArea } from "./ui";
 
 /* Provider presets only PREFILL the connection fields - everything stays
@@ -641,7 +641,7 @@ export function SettingsModal({ cfg, account, onClose, onSaved,
               <p>{t("oauth.device_instructions")}</p>
               <p className="mt-1">
                 <a href={deviceInfo.verificationUri} target="_blank"
-                  rel="noreferrer" className={`text-accent ${LINK}`}>
+                  rel="noreferrer" className={LINK_ACCENT}>
                   {deviceInfo.verificationUri}
                 </a>
               </p>

@@ -636,6 +636,7 @@ export const EN: Record<string, string> = {
   "Cancel": "Cancel",
   "detail.n_selected": "{n} selected",
   "Dismiss": "Dismiss",
+  "Refresh": "Refresh",
   "OK": "OK",
   "Select mail": "Select mail",
 };
