@@ -20,7 +20,7 @@ import { StatsPanel } from "./components/StatsPanel";
 import { QueryBuilder } from "./components/QueryBuilder";
 import { TrashPanel } from "./components/TrashPanel";
 import { AccountAvatar, applyTheme, Button, currentTheme, ensureAiAck, Input,
-  Menu, MenuHeading, MenuItem, Select, Spinner } from "./components/ui";
+  isModalOpen, Menu, MenuHeading, MenuItem, Select, Spinner } from "./components/ui";
 import { t } from "./i18n";
 import { applyStatus, fmtAgo, fmtSize, fmtUsd, matchGroup, parseFilter,
   retainedMailKeys } from "./lib";
@@ -691,8 +691,10 @@ export default function App() {
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       const el = e.target as HTMLElement;
-      if (anyModal || ["INPUT", "SELECT", "TEXTAREA"].includes(el.tagName))
-        return;
+      // isModalOpen(): also covers confirm/prompt dialogs, which App's own
+      // panel flags don't know about.
+      if (anyModal || isModalOpen()
+          || ["INPUT", "SELECT", "TEXTAREA"].includes(el.tagName)) return;
       if (e.key === "/") {
         e.preventDefault();
         filterRef.current?.focus();

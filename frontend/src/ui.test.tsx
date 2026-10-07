@@ -7,7 +7,7 @@ import { act, cleanup, fireEvent, render, screen }
 import { afterEach, expect, test, vi } from "vitest";
 
 import {
-  AccountAvatar, Button, Checkbox, Chip, ChipGroup, ChipSegment,
+  isModalOpen, AccountAvatar, Button, Checkbox, Chip, ChipGroup, ChipSegment,
   ConfirmDialog, DialogProvider, EmptyState, MailRow, Menu, MenuDivider,
   MenuHeading, MenuItem, Modal, Notice, ToastProvider, confirmDialog,
   promptDialog, useToast,
@@ -328,10 +328,9 @@ test("confirmDialog resolves true on confirm, false on Cancel / Esc / backdrop",
 });
 
 test("danger confirm focuses Cancel, primary confirm focuses the confirm button", async () => {
-  const { rerender } = render(
+  render(
     <ConfirmDialog title="T" confirmLabel="Do" tone="danger" onResult={() => {}} />);
   expect(document.activeElement).toBe(screen.getByText("Cancel"));
-  rerender(<ConfirmDialog title="T" confirmLabel="Do" onResult={() => {}} />);
   cleanup();
   render(<ConfirmDialog title="T" confirmLabel="Do" onResult={() => {}} />);
   expect(document.activeElement).toBe(screen.getByText("Do"));
@@ -351,7 +350,8 @@ test("promptDialog validates, submits the value, and cancels with null", async (
   expect(document.activeElement).toBe(input);
   fireEvent.change(input, { target: { value: "  " } });
   expect(screen.getByRole("alert").textContent).toBe("Name required");
-  expect((screen.getByText("OK") as HTMLButtonElement).disabled).toBe(true);
+  fireEvent.click(screen.getByText("OK"));              // invalid: stays open
+  expect(screen.getByRole("alert")).toBeTruthy();
   fireEvent.change(input, { target: { value: "new" } });
   expect(screen.queryByRole("alert")).toBeNull();
   fireEvent.click(screen.getByText("OK"));
@@ -420,4 +420,165 @@ test("MailRow: checkbox and open are separate targets, unread/selected states", 
 test("MailRow without onToggle has no checkbox", () => {
   render(<MailRow subject="S" onOpen={() => {}} />);
   expect(screen.queryByRole("checkbox")).toBeNull();
+});
+
+test("Esc closes only the topmost modal; isModalOpen tracks the stack", async () => {
+  const closePanel = vi.fn();
+  render(<DialogProvider>
+    <Modal onClose={closePanel}>panel</Modal>
+  </DialogProvider>);
+  expect(isModalOpen()).toBe(true);
+  let result: boolean | undefined;
+  const p = confirmDialog({ title: "Sure?", confirmLabel: "Yes" })
+    .then((v) => { result = v; });
+  await screen.findByText("Sure?");
+  fireEvent.keyDown(window, { key: "Escape" });
+  await p;
+  expect(result).toBe(false);
+  expect(closePanel).not.toHaveBeenCalled();          // panel stays open
+  expect(screen.getByText("panel")).toBeTruthy();
+  fireEvent.keyDown(window, { key: "Escape" });       // now it is the top
+  expect(closePanel).toHaveBeenCalledOnce();
+  cleanup();
+  expect(isModalOpen()).toBe(false);
+});
+
+test("Modal is always a labelled dialog (labelledBy / describedBy)", () => {
+  render(<Modal onClose={() => {}} labelledBy="h" describedBy="d">
+    <h2 id="h">Heading</h2><p id="d">Details</p></Modal>);
+  const dlg = screen.getByRole("dialog");
+  expect(dlg.getAttribute("aria-modal")).toBe("true");
+  expect(screen.getByRole("dialog", { name: "Heading" })).toBe(dlg);
+  expect(dlg.getAttribute("aria-describedby")).toBe("d");
+});
+
+test("ConfirmDialog is named by its heading and described by its body", () => {
+  render(<ConfirmDialog title="Delete 3?" body="Cannot be undone"
+    bullets={["a"]} confirmLabel="Delete" onResult={() => {}} />);
+  const dlg = screen.getByRole("dialog", { name: "Delete 3?" });
+  const desc = document.getElementById(dlg.getAttribute("aria-describedby")!)!;
+  expect(desc.textContent).toContain("Cannot be undone");
+  expect(desc.textContent).toContain("a");
+});
+
+test("a toast's timer is not restarted by re-renders or other toasts", () => {
+  vi.useFakeTimers();
+  try {
+    let api!: ReturnType<typeof useToast>;
+    const Grab = () => { api = useToast(); return null; };
+    const { rerender } = render(<ToastProvider><Grab /></ToastProvider>);
+    act(() => { api.show("first"); });
+    act(() => { vi.advanceTimersByTime(7000); });
+    act(() => { api.show("second"); });               // provider re-renders
+    rerender(<ToastProvider><Grab /></ToastProvider>);
+    act(() => { vi.advanceTimersByTime(1100); });     // first is now 8.1 s old
+    expect(screen.queryByText("first")).toBeNull();
+    expect(screen.getByText("second")).toBeTruthy();
+    // parent re-rendering every 3 s must not keep a toast alive either
+    for (let i = 0; i < 3; i++) {
+      rerender(<ToastProvider><Grab /></ToastProvider>);
+      act(() => { vi.advanceTimersByTime(3000); });
+    }
+    expect(screen.queryByText("second")).toBeNull();
+  } finally { vi.useRealTimers(); }
+});
+
+test("toast variants carry an icon; errors are role=alert, others are not", () => {
+  let api!: ReturnType<typeof useToast>;
+  const Grab = () => { api = useToast(); return null; };
+  render(<ToastProvider><Grab /></ToastProvider>);
+  act(() => {
+    api.show("fine", { variant: "success" });
+    api.show("info!");
+    api.show("broke", { variant: "error" });
+  });
+  for (const v of ["info", "success", "error"]) {
+    const el = document.querySelector(`[data-variant=${v}]`)!;
+    expect(el.querySelector("svg")).toBeTruthy();
+  }
+  expect(screen.getByRole("alert").textContent).toContain("broke");
+  expect(document.querySelectorAll("[role=alert]")).toHaveLength(1);
+});
+
+test("ChipGroup is named by its label; segments keep their ring inside the pill", () => {
+  render(<ChipGroup label="Inactive:">
+    <ChipSegment>6 mo</ChipSegment></ChipGroup>);
+  expect(screen.getByRole("group", { name: "Inactive:" })).toBeTruthy();
+  const seg = screen.getByText("6 mo");
+  expect(seg.className).toContain("focus-visible:-outline-offset-2");
+  expect(seg.className).toContain("whitespace-nowrap");
+  render(<Chip>One</Chip>);
+  expect(screen.getByText("One").className).toContain("whitespace-nowrap");
+});
+
+test("DialogProvider returns focus to the opener and settles pending on unmount", async () => {
+  const { unmount } = render(<DialogProvider>
+    <button>opener</button></DialogProvider>);
+  const opener = screen.getByText("opener");
+  opener.focus();
+  const p = confirmDialog({ title: "Sure?", confirmLabel: "Yes" });
+  await screen.findByText("Sure?");
+  expect(document.activeElement).not.toBe(opener);
+  fireEvent.click(screen.getByText("Yes"));
+  expect(await p).toBe(true);
+  expect(document.activeElement).toBe(opener);
+
+  const pending = confirmDialog({ title: "Again?", confirmLabel: "Yes" });
+  const prompt = promptDialog({ title: "New name", label: "Name" });
+  await screen.findByText("Again?");
+  unmount();
+  expect(await pending).toBe(false);
+  expect(await prompt).toBeNull();
+});
+
+test("queued dialogs are removed by id and shown one after another", async () => {
+  render(<DialogProvider><span>app</span></DialogProvider>);
+  const a = confirmDialog({ title: "First", confirmLabel: "Yes" });
+  const b = confirmDialog({ title: "Second", confirmLabel: "Yes" });
+  await screen.findByText("First");
+  expect(screen.queryByText("Second")).toBeNull();
+  fireEvent.click(screen.getByText("Yes"));
+  expect(await a).toBe(true);
+  await screen.findByText("Second");
+  fireEvent.click(screen.getByText("Cancel"));
+  expect(await b).toBe(false);
+});
+
+test("PromptDialog with an invalid initial value shows the error on submit", async () => {
+  render(<DialogProvider><span>app</span></DialogProvider>);
+  const p = promptDialog({ title: "New name", label: "Name", initial: "",
+    validate: (v) => (v ? null : "Required") });
+  const input = await screen.findByLabelText("Name");
+  expect(screen.queryByRole("alert")).toBeNull();
+  fireEvent.submit(input.closest("form")!);           // Enter
+  expect(screen.getByRole("alert").textContent).toBe("Required");
+  fireEvent.click(screen.getByText("Cancel"));
+  expect(await p).toBeNull();
+});
+
+test("ConfirmDialog body scrolls; sm Modal is capped in height", () => {
+  render(<ConfirmDialog title="T" bullets={Array.from({ length: 80 }, (_, i) => `m${i}`)}
+    confirmLabel="Go" onResult={() => {}} />);
+  const dlg = screen.getByRole("dialog");
+  expect(dlg.className).toContain("max-h-[88dvh]");
+  expect(screen.getByText("T").parentElement!.className)
+    .toContain("overflow-y-auto");
+});
+
+test("MailRow: transparent base border, underline on the subject only, compact checkbox", () => {
+  const { container } = render(
+    <MailRow subject="Hi" meta="6 Oct" onToggle={() => {}} onOpen={() => {}} />);
+  const row = container.firstChild as HTMLElement;
+  expect(row.className).toContain("border-l-2");
+  expect(row.className).toContain("border-l-transparent");
+  expect(screen.getByText("Hi").className).toContain("group-hover:underline");
+  expect(screen.getByText("6 Oct").className).not.toContain("underline");
+  expect(screen.getByLabelText("Select mail").closest("label")!.className)
+    .toContain("-my-1.5");
+});
+
+test("focus ring CSS: base outline colour, offset only for text-like fields", async () => {
+  const css = await indexCss();
+  expect(css).toMatch(/:where\(\*\) \{[^}]*outline-color: var\(--color-accent\)/);
+  expect(css).toMatch(/input:not\(\[type="checkbox"\][^{]*\):focus-visible/);
 });

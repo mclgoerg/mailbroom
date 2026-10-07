@@ -1,6 +1,7 @@
-import { Check, Pin, Shield, X } from "lucide-react";
-import { createContext, useCallback, useContext, useEffect, useLayoutEffect,
-  useMemo, useRef, useState, type ComponentProps, type ReactNode } from "react";
+import { AlertCircle, Check, CheckCircle2, Info, Pin, Shield, X }
+  from "lucide-react";
+import { createContext, useCallback, useContext, useEffect, useId,
+  useLayoutEffect, useMemo, useRef, useState, type ComponentProps, type ReactNode } from "react";
 import { t } from "../i18n";
 import { engagementTier } from "../lib";
 import type { GroupAi } from "../types";
@@ -372,7 +373,6 @@ export function SectionLabel({ children, className = "" }: {
   );
 }
 
-/** Standard "nothing here" message for empty lists/results. */
 /** Dropdown menu: a trigger button plus a popover - right-aligned by
  * default, flipped to left-aligned when that would run off the left edge
  * of the screen (a trigger that wrapped to the start of a row on a
@@ -534,22 +534,42 @@ export function EmptyState({ children, icon, title, hint, action }: {
   );
 }
 
+// Open modals, oldest first (module-level: dialogs opened from anywhere).
+const openModals: symbol[] = [];
+
+/** True while any Modal (panel or confirm/prompt dialog) is mounted. Global
+ *  keyboard shortcuts must stay quiet then. */
+export const isModalOpen = (): boolean => openModals.length > 0;
+
 const MODAL_WIDTH = { sm: "sm:max-w-md", md: "sm:max-w-2xl",
   lg: "sm:max-w-3xl" };   // 448 / 672 / 768 px
 
 /** Dialog shell. `sm` (448) is a bottom sheet on phones, `md` (672) /
  *  `lg` (768) are full-screen there. `full` = `lg` at a fixed 88vh; other
- *  modals shrink to their content. `label` names the dialog for AT. */
-export function Modal({ children, onClose, full = false, size, label }: {
+ *  modals shrink to their content. `label` / `labelledBy` / `describedBy` name it for AT. */
+export function Modal({ children, onClose, full = false, size, label,
+  labelledBy, describedBy }: {
   children: ReactNode; onClose: () => void; full?: boolean;
   size?: "sm" | "md" | "lg"; label?: string;
+  labelledBy?: string; describedBy?: string;
 }) {
   const sz = size ?? (full ? "lg" : "md");
+  const id = useRef(Symbol("modal")).current;
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
+    openModals.push(id);
+    const onKey = (e: KeyboardEvent) => {
+      // Only the topmost modal reacts, so Esc on a confirm that sits over
+      // a panel closes the confirm and leaves the panel open.
+      if (e.key === "Escape" && openModals[openModals.length - 1] === id) {
+        onClose();
+      }
+    };
     window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [onClose]);
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      openModals.splice(openModals.indexOf(id), 1);
+    };
+  }, [onClose, id]);
   const shape = sz === "sm"
     ? `max-h-[88dvh] rounded-t-dialog border-t max-sm:pb-[env(safe-area-inset-bottom)]
        sm:rounded-dialog`
@@ -562,8 +582,8 @@ export function Modal({ children, onClose, full = false, size, label }: {
         p-0 sm:p-6 ${sz === "sm" ? "items-end sm:items-center"
           : "items-center"}`}
       onClick={(e) => e.target === e.currentTarget && onClose()}>
-      <div role={label ? "dialog" : undefined}
-        aria-modal={label ? true : undefined} aria-label={label}
+      <div role="dialog" aria-modal="true" aria-label={label}
+        aria-labelledby={labelledBy} aria-describedby={describedBy}
         data-size={sz}
         className={`flex w-full flex-col overflow-hidden border-line bg-panel
         sm:rounded-dialog sm:border ${MODAL_WIDTH[sz]} ${shape}`}>
@@ -599,7 +619,7 @@ export function Chip({ on = false, children, className = "", ...rest }:
   return (
     <button type="button" aria-pressed={on} {...rest}
       className={`inline-flex min-h-8 coarse:min-h-9 items-center gap-1.5
-        rounded-full border px-3 type-meta transition-colors
+        whitespace-nowrap rounded-full border px-3 type-meta transition-colors
         enabled:active:translate-y-px disabled:cursor-not-allowed
         disabled:border-line disabled:bg-chip disabled:text-faint
         ${on ? "border-accent bg-chiph text-body"
@@ -616,12 +636,15 @@ export function Chip({ on = false, children, className = "", ...rest }:
 export function ChipGroup({ label, children, className = "" }: {
   label?: ReactNode; children: ReactNode; className?: string;
 }) {
+  const labelId = useId();
   return (
-    <div role="group" className={`inline-flex min-h-8 coarse:min-h-9
+    <div role="group" aria-labelledby={label != null ? labelId : undefined}
+      className={`inline-flex min-h-8 coarse:min-h-9
       items-stretch overflow-hidden rounded-full border border-line
       bg-panel2 type-meta ${className}`}>
       {label != null && (
-        <span className="flex items-center pl-3 pr-1.5 text-muted">
+        <span id={labelId}
+          className="flex items-center pl-3 pr-1.5 text-muted">
           {label}
         </span>
       )}
@@ -634,8 +657,8 @@ export function ChipSegment({ on = false, children, className = "", ...rest }:
   Omit<ComponentProps<"button">, "type"> & { on?: boolean }) {
   return (
     <button type="button" aria-pressed={on} {...rest}
-      className={`flex items-center border-l border-line px-3
-        transition-colors enabled:active:translate-y-px
+      className={`flex items-center whitespace-nowrap border-l border-line
+        px-3 transition-colors focus-visible:-outline-offset-2 enabled:active:translate-y-px
         disabled:cursor-not-allowed disabled:bg-chip disabled:text-faint
         ${on ? "bg-chiph text-body ring-1 ring-inset ring-accent"
           : "text-muted enabled:hover:bg-chip"} ${className}`}>
@@ -695,20 +718,30 @@ export function useToast(): ToastApi {
   return api;
 }
 
-function ToastView({ toast, onDismiss }: {
-  toast: ToastItem; onDismiss: () => void;
+const TOAST_ICON = { info: Info, success: CheckCircle2, error: AlertCircle };
+
+// `dismiss` is stable and the timer depends only on [ms, id, dismiss], so a
+// re-render (another toast arriving, parent updates) never restarts it.
+function ToastView({ toast, dismiss }: {
+  toast: ToastItem; dismiss: (id: number) => void;
 }) {
-  const { variant = "info", action, duration } = toast;
+  const { variant = "info", action, duration, id } = toast;
   const ms = duration ?? (variant === "error" ? 0 : TOAST_MS);
+  const onDismiss = () => dismiss(id);
   useEffect(() => {
     if (ms <= 0) return;
-    const timer = setTimeout(onDismiss, ms);
+    const timer = setTimeout(() => dismiss(id), ms);
     return () => clearTimeout(timer);
-  }, [ms, onDismiss]);
+  }, [ms, id, dismiss]);
+  const Icon = TOAST_ICON[variant];
   return (
-    <div data-variant={variant} className={`pointer-events-auto flex
+    <div data-variant={variant}
+      role={variant === "error" ? "alert" : undefined}
+      className={`pointer-events-auto flex
       w-full max-w-120 items-center gap-2 rounded-card border py-1.5 pl-3
       pr-1.5 shadow-bar type-body ${TOAST_STYLE[variant]}`}>
+      <Icon size={16} aria-hidden className={`shrink-0 ${variant === "error"
+        ? "text-danger-fg" : ""}`} />
       <div className="min-w-0 flex-1 py-1">{toast.message}</div>
       {action && (
         <Button variant="quiet" size="sm" className="shrink-0 !text-inherit"
@@ -744,7 +777,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
         z-(--z-toast) flex flex-col items-center gap-2 px-3"
         style={{ bottom: "calc(var(--bulkbar-h, 0px) + env(safe-area-inset-bottom) + 1rem)" }}>
         {items.map((x) => (
-          <ToastView key={x.id} toast={x} onDismiss={() => dismiss(x.id)} />
+          <ToastView key={x.id} toast={x} dismiss={dismiss} />
         ))}
       </div>
     </ToastContext.Provider>
@@ -770,18 +803,27 @@ export function ConfirmDialog({ title, body, bullets, confirmLabel,
 }) {
   const safe = useRef<HTMLButtonElement>(null);
   const ok = useRef<HTMLButtonElement>(null);
+  const titleId = useId();
+  const bodyId = useId();
+  const hasBody = body != null || (bullets?.length ?? 0) > 0;
   useEffect(() => {
     (tone === "danger" ? safe : ok).current?.focus();
   }, [tone]);
   return (
-    <Modal size="sm" label={title} onClose={() => onResult(false)}>
-      <div className="space-y-3 p-4 sm:p-5">
-        <div className="type-heading">{title}</div>
-        {body != null && <div className="type-body text-muted">{body}</div>}
-        {bullets && bullets.length > 0 && (
-          <ul className="list-disc space-y-1 pl-5 type-body text-muted">
-            {bullets.map((b, i) => <li key={i}>{b}</li>)}
-          </ul>
+    <Modal size="sm" labelledBy={titleId}
+      describedBy={hasBody ? bodyId : undefined}
+      onClose={() => onResult(false)}>
+      <div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-4 sm:p-5">
+        <div id={titleId} className="type-heading">{title}</div>
+        {hasBody && (
+          <div id={bodyId} className="space-y-3 type-body text-muted">
+            {body != null && <div>{body}</div>}
+            {bullets && bullets.length > 0 && (
+              <ul className="list-disc space-y-1 pl-5">
+                {bullets.map((b, i) => <li key={i}>{b}</li>)}
+              </ul>
+            )}
+          </div>
         )}
       </div>
       <div className="flex justify-end gap-2 border-t border-line px-4 py-3
@@ -795,8 +837,9 @@ export function ConfirmDialog({ title, body, bullets, confirmLabel,
   );
 }
 
-/** Single-field prompt. The confirm button stays disabled while `validate`
- *  returns a message; the message shows once the user has typed. */
+/** Single-field prompt. Submit stays enabled: with an invalid value it shows
+ *  the `validate` message instead of closing (also for the initial value,
+ *  and when Enter is pressed). */
 export function PromptDialog({ title, label, initial = "", confirmLabel,
   validate, onResult }: PromptOptions & {
   onResult: (value: string | null) => void;
@@ -804,16 +847,17 @@ export function PromptDialog({ title, label, initial = "", confirmLabel,
   const [value, setValue] = useState(initial);
   const [touched, setTouched] = useState(false);
   const input = useRef<HTMLInputElement>(null);
+  const titleId = useId();
   useEffect(() => { input.current?.focus(); input.current?.select(); }, []);
   const error = validate?.(value) ?? null;
   return (
-    <Modal size="sm" label={title} onClose={() => onResult(null)}>
-      <form onSubmit={(e) => {
+    <Modal size="sm" labelledBy={titleId} onClose={() => onResult(null)}>
+      <form className="flex min-h-0 flex-1 flex-col" onSubmit={(e) => {
         e.preventDefault();
         if (error) setTouched(true); else onResult(value);
       }}>
-        <div className="space-y-3 p-4 sm:p-5">
-          <div className="type-heading">{title}</div>
+        <div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-4 sm:p-5">
+          <div id={titleId} className="type-heading">{title}</div>
           <Field label={label}>
             <Input ref={input} value={value} className="w-full"
               aria-invalid={touched && !!error}
@@ -827,9 +871,7 @@ export function PromptDialog({ title, label, initial = "", confirmLabel,
           sm:px-5">
           <Button type="button" variant="secondary"
             onClick={() => onResult(null)}>{t("Cancel")}</Button>
-          <Button type="submit" disabled={!!error}>
-            {confirmLabel ?? t("OK")}
-          </Button>
+          <Button type="submit">{confirmLabel ?? t("OK")}</Button>
         </div>
       </form>
     </Modal>
@@ -861,27 +903,54 @@ export const promptDialog = (opts: PromptOptions): Promise<string | null> =>
     ? new Promise((resolve) => pushDialog!({ kind: "prompt", opts, resolve }))
     : needProvider();
 
-/** Mount once at the app root. Dialogs queue if several are requested. */
+const cancelRequest = (r: DialogRequest) =>
+  r.kind === "confirm" ? r.resolve(false) : r.resolve(null);
+
+/** Mount once at the app root (main.tsx). Dialogs queue if several are
+ *  requested; pending ones settle as cancelled on unmount, and focus goes
+ *  back to where it was when a dialog closes. */
 export function DialogProvider({ children }: { children: ReactNode }) {
   const [queue, setQueue] = useState<DialogRequest[]>([]);
+  const live = useRef<DialogRequest[]>([]);
+  live.current = queue;
+  const opener = useRef<HTMLElement | null>(null);
   useEffect(() => {
-    const push = (r: DialogRequest) =>
+    const push = (r: DialogRequest) => {
+      // Remember the opener now, before the dialog's autofocus moves focus.
+      if (!live.current.length) {
+        opener.current = document.activeElement as HTMLElement | null;
+      }
       setQueue((q) => [...q, { ...r, id: nextDialogId++ }]);
+    };
     pushDialog = push;
-    return () => { if (pushDialog === push) pushDialog = null; };
+    return () => {
+      if (pushDialog === push) pushDialog = null;
+      live.current.forEach(cancelRequest);
+    };
   }, []);
   const cur = queue[0];
-  const done = (fn: () => void) => { fn(); setQueue((q) => q.slice(1)); };
+  const hadCur = useRef(false);
+  useEffect(() => {
+    if (!cur && hadCur.current) {
+      opener.current?.focus?.();
+      opener.current = null;
+    }
+    hadCur.current = !!cur;
+  }, [cur]);
+  const done = (r: DialogRequest, fn: () => void) => {
+    fn();
+    setQueue((q) => q.filter((x) => x.id !== r.id));
+  };
   return (
     <>
       {children}
       {cur?.kind === "confirm" && (
         <ConfirmDialog key={cur.id} {...cur.opts}
-          onResult={(ok) => done(() => cur.resolve(ok))} />
+          onResult={(ok) => done(cur, () => cur.resolve(ok))} />
       )}
       {cur?.kind === "prompt" && (
         <PromptDialog key={cur.id} {...cur.opts}
-          onResult={(v) => done(() => cur.resolve(v))} />
+          onResult={(v) => done(cur, () => cur.resolve(v))} />
       )}
     </>
   );
@@ -912,7 +981,8 @@ export function MailRow({ checked = false, onToggle, unread = false, subject,
             <span className="sr-only">{t("unread")}</span>
           </>
         )}
-        <span className={`truncate type-body-mobile md:type-body ${unread
+        <span className={`truncate type-body-mobile md:type-body
+          group-hover:underline ${unread
           ? "font-semibold md:font-semibold"
           : "font-medium md:font-medium"}`}>{subject}</span>
       </span>
@@ -928,20 +998,21 @@ export function MailRow({ checked = false, onToggle, unread = false, subject,
   return (
     <div data-pinned={pinned ? "true" : undefined}
       data-selected={selected ? "true" : undefined}
-      className={`flex items-start gap-1 border-b border-line/60 px-3 py-3
-        md:px-2 md:py-2.5 ${selected ? "border-l-2 border-l-accent bg-panel2"
-          : pinned ? "border-l-2 border-l-accent bg-panel" : ""}`}>
+      className={`flex items-start gap-1 border-b border-l-2 border-b-line/60
+        px-3 py-3 md:px-2 md:py-2.5 ${selected
+          ? "border-l-accent bg-panel2"
+          : pinned ? "border-l-accent bg-panel" : "border-l-transparent"}`}>
       {onToggle && (
         <Checkbox checked={checked} onChange={onToggle}
+          className="-my-1.5"
           aria-label={selectLabel ?? t("Select mail")} />
       )}
       {onOpen ? (
         <button type="button" onClick={onOpen}
-          className="min-w-0 flex-1 cursor-pointer py-1 text-left
-            hover:underline">
+          className="group min-w-0 flex-1 cursor-pointer text-left">
           {text}
         </button>
-      ) : <div className="min-w-0 flex-1 py-1">{text}</div>}
+      ) : <div className="min-w-0 flex-1">{text}</div>}
       {trailing != null && (
         <div className="flex shrink-0 items-center gap-1 self-start pt-0.5">
           {trailing}
