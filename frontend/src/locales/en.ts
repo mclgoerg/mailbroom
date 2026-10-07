@@ -635,4 +635,7 @@ export const EN: Record<string, string> = {
   "bar.limit_to": "Limit to:",
   "Cancel": "Cancel",
   "detail.n_selected": "{n} selected",
+  "Dismiss": "Dismiss",
+  "OK": "OK",
+  "Select mail": "Select mail",
 };

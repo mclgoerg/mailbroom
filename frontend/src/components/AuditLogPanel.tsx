@@ -56,10 +56,9 @@ export function AuditLogPanel({ rules, onClose }: {
               to: Math.min(offset + PAGE_SIZE, total), total })
           : t("loading…")}
         actions={
-          <button onClick={() => downloadFile(api.auditExportUrl())}
-            className="min-h-9 rounded-md bg-chip px-3 py-1.5 text-sm
-              font-medium text-body hover:bg-chiph"
-            title={t("audit.export")}>CSV</button>}
+          <Button variant="secondary"
+            onClick={() => downloadFile(api.auditExportUrl())}
+            title={t("audit.export")}>CSV</Button>}
         onClose={onClose}
       />
       <Toolbar>

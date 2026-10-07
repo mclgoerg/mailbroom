@@ -2,10 +2,16 @@
 /* Menu: opens on trigger click, runs the item action and closes, and
  * closes on Escape / outside click. */
 
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen }
+  from "@testing-library/react";
 import { afterEach, expect, test, vi } from "vitest";
 
-import { AccountAvatar, Menu, MenuHeading, MenuItem } from "./components/ui";
+import {
+  AccountAvatar, Button, Checkbox, Chip, ChipGroup, ChipSegment,
+  ConfirmDialog, DialogProvider, EmptyState, MailRow, Menu, MenuDivider,
+  MenuHeading, MenuItem, Modal, Notice, ToastProvider, confirmDialog,
+  promptDialog, useToast,
+} from "./components/ui";
 
 afterEach(cleanup);
 
@@ -108,4 +114,310 @@ test("z-index scale is strictly ordered sticky < bulkbar < dropdown < toast < mo
   expect(order.every(Number.isFinite)).toBe(true);
   expect([...order].sort((a, b) => a - b)).toEqual(order);
   expect(new Set(order).size).toBe(order.length);
+});
+
+// vitest blanks CSS imports (even ?raw), so read the file from disk.
+async function indexCss(): Promise<string> {
+  // @ts-expect-error node builtins have no types in this project
+  const { readFileSync } = await import("node:fs");
+  return readFileSync("src/index.css", "utf8");
+}
+
+test("index.css defines the type layers, semantic pairs, radii and shadows", async () => {
+  const css = await indexCss();
+  for (const l of ["title", "heading", "body", "body-mobile", "meta",
+    "caption", "section"]) expect(css).toContain(`@utility type-${l} `);
+  for (const k of ["safe", "review", "keep", "info", "attach", "new"]) {
+    expect(css).toContain(`--color-${k}-bg:`);
+    expect(css).toContain(`--color-${k}-fg:`);
+  }
+  for (const k of ["danger:", "danger-h:", "danger-fg:", "overlay:"]) {
+    expect(css).toContain(`--color-${k}`);
+  }
+  for (const r of ["badge", "control", "card", "dialog"]) {
+    expect(css).toContain(`--radius-${r}:`);
+  }
+  expect(css).toContain("@custom-variant coarse (@media (pointer: coarse))");
+  expect(css).toContain("--color-faint: #9a8a70");
+  expect(css).toContain("--color-faint: #7a6a50");
+  expect(css).toMatch(/:focus-visible \{\s*outline: 2px solid var\(--color-accent\)/);
+  // shadows have a dark default and a light override
+  expect(css.match(/--shadow-popover:/g)).toHaveLength(2);
+  expect(css.match(/--shadow-bar:/g)).toHaveLength(2);
+});
+
+test("Button variants render, ghost aliases secondary", () => {
+  render(<>
+    {(["primary", "secondary", "quiet", "danger", "danger-quiet", "ghost"] as const)
+      .map((v) => <Button key={v} variant={v}>{v}</Button>)}
+  </>);
+  expect(screen.getByText("primary").className).toContain("bg-accent");
+  expect(screen.getByText("quiet").className).toContain("bg-transparent");
+  expect(screen.getByText("danger").className).toContain("bg-danger");
+  expect(screen.getByText("danger-quiet").className).toContain("text-danger-fg");
+  expect(screen.getByText("ghost").className)
+    .toBe(screen.getByText("secondary").className);
+});
+
+test("Button sizes carry the touch heights; passes aria-* and type through", () => {
+  render(<>
+    <Button>md</Button>
+    <Button size="sm" type="submit" aria-describedby="x">sm</Button>
+  </>);
+  expect(screen.getByText("md").className).toContain("min-h-9");
+  expect(screen.getByText("md").className).toContain("coarse:min-h-10");
+  const sm = screen.getByText("sm");
+  expect(sm.className).toContain("min-h-8");
+  expect(sm.className).toContain("coarse:min-h-9");
+  expect(sm.getAttribute("type")).toBe("submit");
+  expect(sm.getAttribute("aria-describedby")).toBe("x");
+});
+
+test("icon Button requires a label and renders it as aria-label + title", () => {
+  render(<Button size="icon" label="Close"><span>x</span></Button>);
+  const b = screen.getByLabelText("Close");
+  expect(b.getAttribute("title")).toBe("Close");
+  expect(b.className).toContain("size-9");
+  // @ts-expect-error an icon button without a label does not type-check
+  render(<Button size="icon">y</Button>);
+});
+
+test("disabled Button is flat chip/faint with no opacity and does not fire", () => {
+  const onClick = vi.fn();
+  render(<Button variant="danger" disabled onClick={onClick}>go</Button>);
+  const b = screen.getByText("go");
+  fireEvent.click(b);
+  expect(onClick).not.toHaveBeenCalled();
+  expect(b.className).toContain("disabled:bg-chip");
+  expect(b.className).toContain("disabled:text-faint");
+  expect(b.className).toContain("disabled:cursor-not-allowed");
+  expect(b.className).not.toContain("opacity");
+  expect(b.className).toContain("enabled:hover:bg-danger-h");  // no hover when disabled
+});
+
+test("MenuItem danger and disabled styles, MenuDivider separator", () => {
+  render(
+    <Menu label="M" trigger={<>m</>}>
+      <MenuItem danger>Empty</MenuItem>
+      <MenuDivider />
+      <MenuItem disabled>Nope</MenuItem>
+    </Menu>,
+  );
+  fireEvent.click(screen.getByLabelText("M"));
+  expect(screen.getByText("Empty").closest("button")!.className)
+    .toContain("text-danger-fg");
+  expect(screen.getByRole("separator")).toBeTruthy();
+  const nope = screen.getByText("Nope").closest("button")!;
+  expect(nope.className).toContain("disabled:text-faint");
+  expect(nope.className).not.toContain("opacity");
+});
+
+test("Checkbox toggles, forwards aria-label/disabled, label is the hit area", () => {
+  const onChange = vi.fn();
+  const { rerender } = render(
+    <Checkbox checked={false} onChange={onChange} aria-label="pick" />);
+  const box = screen.getByLabelText("pick") as HTMLInputElement;
+  expect(box.type).toBe("checkbox");
+  fireEvent.click(box);
+  expect(onChange).toHaveBeenCalledOnce();
+  expect(box.closest("label")!.className).toContain("coarse:min-h-11");
+  rerender(<Checkbox checked onChange={onChange} disabled label="Mine" />);
+  const labelled = screen.getByLabelText("Mine") as HTMLInputElement;
+  expect(labelled.checked).toBe(true);
+  expect(labelled.disabled).toBe(true);
+});
+
+test("Chip toggles aria-pressed and shows the on style; ChipGroup segments", () => {
+  const onClick = vi.fn();
+  const { rerender } = render(<Chip on={false} onClick={onClick}>AI</Chip>);
+  const chip = screen.getByRole("button", { name: "AI" });
+  expect(chip.getAttribute("aria-pressed")).toBe("false");
+  expect(chip.className).toContain("bg-panel2");
+  fireEvent.click(chip);
+  expect(onClick).toHaveBeenCalledOnce();
+  rerender(<Chip on onClick={onClick}>AI</Chip>);
+  expect(chip.getAttribute("aria-pressed")).toBe("true");
+  expect(chip.className).toContain("border-accent");
+  expect(chip.className).toContain("rounded-full");
+
+  const pick = vi.fn();
+  render(
+    <ChipGroup label="Inactive:">
+      <ChipSegment onClick={() => pick("6")}>6 mo</ChipSegment>
+      <ChipSegment on onClick={() => pick("12")}>1 yr</ChipSegment>
+    </ChipGroup>);
+  expect(screen.getByRole("group")).toBeTruthy();
+  fireEvent.click(screen.getByText("6 mo"));
+  expect(pick).toHaveBeenCalledWith("6");
+  expect(screen.getByText("1 yr").getAttribute("aria-pressed")).toBe("true");
+});
+
+test("Notice shows its text and icon and can be dismissed", () => {
+  const onClose = vi.fn();
+  render(<Notice icon={<i data-testid="ic" />} onClose={onClose}>Heads up</Notice>);
+  expect(screen.getByText("Heads up")).toBeTruthy();
+  expect(screen.getByTestId("ic")).toBeTruthy();
+  fireEvent.click(screen.getByLabelText("Dismiss"));
+  expect(onClose).toHaveBeenCalledOnce();
+});
+
+function ToastHarness({ opts }: { opts?: Parameters<ReturnType<typeof useToast>["show"]>[1] }) {
+  const toast = useToast();
+  return <button onClick={() => toast.show("Saved", opts)}>fire</button>;
+}
+
+test("Toast auto-dismisses after 8s, errors stay, close button and action work", () => {
+  vi.useFakeTimers();
+  try {
+    const undo = vi.fn();
+    const { rerender } = render(
+      <ToastProvider><ToastHarness /></ToastProvider>);
+    fireEvent.click(screen.getByText("fire"));
+    expect(screen.getByText("Saved")).toBeTruthy();
+    expect(document.querySelector("[aria-live=polite]")).toBeTruthy();
+    act(() => { vi.advanceTimersByTime(7900); });
+    expect(screen.getByText("Saved")).toBeTruthy();
+    act(() => { vi.advanceTimersByTime(200); });
+    expect(screen.queryByText("Saved")).toBeNull();
+
+    rerender(<ToastProvider>
+      <ToastHarness opts={{ variant: "error" }} /></ToastProvider>);
+    fireEvent.click(screen.getByText("fire"));
+    act(() => { vi.advanceTimersByTime(60_000); });
+    expect(screen.getByText("Saved")).toBeTruthy();          // errors persist
+    fireEvent.click(screen.getByLabelText("Dismiss"));
+    expect(screen.queryByText("Saved")).toBeNull();
+
+    rerender(<ToastProvider>
+      <ToastHarness opts={{ action: { label: "Undo", onClick: undo } }} />
+    </ToastProvider>);
+    fireEvent.click(screen.getByText("fire"));
+    fireEvent.click(screen.getByText("Undo"));
+    expect(undo).toHaveBeenCalledOnce();
+    expect(screen.queryByText("Saved")).toBeNull();
+  } finally { vi.useRealTimers(); }
+});
+
+test("toast stack sits on the toast layer above the bulk bar", () => {
+  render(<ToastProvider><ToastHarness /></ToastProvider>);
+  fireEvent.click(screen.getByText("fire"));
+  const stack = document.querySelector("[aria-live=polite]") as HTMLElement;
+  expect(stack.className).toContain("z-(--z-toast)");
+  expect(stack.style.bottom).toContain("var(--bulkbar-h, 0px)");
+});
+
+test("confirmDialog resolves true on confirm, false on Cancel / Esc / backdrop", async () => {
+  render(<DialogProvider><span>app</span></DialogProvider>);
+  const opts = { title: "Delete?", body: "Gone", bullets: ["3 mails"],
+    confirmLabel: "Delete", tone: "danger" as const };
+  const ask = async (act2: () => void) => {
+    let result: boolean | undefined;
+    const p = confirmDialog(opts).then((v) => { result = v; });
+    await screen.findByText("Delete?");
+    expect(screen.getByText("3 mails")).toBeTruthy();
+    act2();
+    await p;
+    expect(screen.queryByText("Delete?")).toBeNull();
+    return result;
+  };
+  expect(await ask(() => fireEvent.click(screen.getByText("Delete")))).toBe(true);
+  expect(await ask(() => fireEvent.click(screen.getByText("Cancel")))).toBe(false);
+  expect(await ask(() => fireEvent.keyDown(window, { key: "Escape" }))).toBe(false);
+  expect(await ask(() => fireEvent.click(
+    screen.getByRole("dialog").parentElement!))).toBe(false);
+});
+
+test("danger confirm focuses Cancel, primary confirm focuses the confirm button", async () => {
+  const { rerender } = render(
+    <ConfirmDialog title="T" confirmLabel="Do" tone="danger" onResult={() => {}} />);
+  expect(document.activeElement).toBe(screen.getByText("Cancel"));
+  rerender(<ConfirmDialog title="T" confirmLabel="Do" onResult={() => {}} />);
+  cleanup();
+  render(<ConfirmDialog title="T" confirmLabel="Do" onResult={() => {}} />);
+  expect(document.activeElement).toBe(screen.getByText("Do"));
+});
+
+test("confirmDialog rejects without a provider (the action must not proceed)", async () => {
+  await expect(confirmDialog({ title: "x", confirmLabel: "y" }))
+    .rejects.toThrow(/DialogProvider/);
+});
+
+test("promptDialog validates, submits the value, and cancels with null", async () => {
+  render(<DialogProvider><span>app</span></DialogProvider>);
+  const validate = (v: string) => (v.trim() ? null : "Name required");
+  let p = promptDialog({ title: "Rename", label: "Name", initial: "old", validate });
+  const input = (await screen.findByLabelText("Name")) as HTMLInputElement;
+  expect(input.value).toBe("old");
+  expect(document.activeElement).toBe(input);
+  fireEvent.change(input, { target: { value: "  " } });
+  expect(screen.getByRole("alert").textContent).toBe("Name required");
+  expect((screen.getByText("OK") as HTMLButtonElement).disabled).toBe(true);
+  fireEvent.change(input, { target: { value: "new" } });
+  expect(screen.queryByRole("alert")).toBeNull();
+  fireEvent.click(screen.getByText("OK"));
+  expect(await p).toBe("new");
+
+  p = promptDialog({ title: "Rename", label: "Name" });
+  await screen.findByLabelText("Name");
+  fireEvent.click(screen.getByText("Cancel"));
+  expect(await p).toBeNull();
+});
+
+test("Modal sizes map to 448 / 672 / 768 px, full = lg at fixed height", () => {
+  const panel = () => screen.getByText("body");
+  const sizes: [Parameters<typeof Modal>[0]["size"], string][] = [
+    ["sm", "sm:max-w-md"], ["md", "sm:max-w-2xl"], ["lg", "sm:max-w-3xl"]];
+  for (const [size, cls] of sizes) {
+    render(<Modal size={size} onClose={() => {}}>body</Modal>);
+    expect(panel().className).toContain(cls);
+    cleanup();
+  }
+  render(<Modal full onClose={() => {}}>body</Modal>);
+  expect(panel().className).toContain("sm:max-w-3xl");
+  expect(panel().className).toContain("sm:h-[88vh]");
+  expect(panel().className).toContain("h-dvh");     // full-screen on phones
+  cleanup();
+  render(<Modal onClose={() => {}}>body</Modal>);   // default md, shrinks to content
+  expect(panel().className).toContain("sm:max-w-2xl");
+  expect(panel().className).toContain("sm:h-auto");
+  cleanup();
+  render(<Modal size="sm" onClose={() => {}}>body</Modal>);   // phone bottom sheet
+  expect(panel().className).not.toContain("h-dvh");
+  expect(panel().parentElement!.className).toContain("items-end");
+  expect(panel().parentElement!.className).toContain("bg-overlay");
+});
+
+test("EmptyState keeps children usage and adds icon/title/hint/action", () => {
+  const { rerender } = render(<EmptyState>nothing</EmptyState>);
+  expect(screen.getByText("nothing")).toBeTruthy();
+  rerender(<EmptyState icon={<i data-testid="i" />} title="No mails"
+    hint="Try a scan" action={<button>Scan</button>} />);
+  for (const x of ["No mails", "Try a scan", "Scan"]) {
+    expect(screen.getByText(x)).toBeTruthy();
+  }
+  expect(screen.getByTestId("i")).toBeTruthy();
+});
+
+test("MailRow: checkbox and open are separate targets, unread/selected states", () => {
+  const onToggle = vi.fn();
+  const onOpen = vi.fn();
+  const { container } = render(
+    <MailRow checked={false} onToggle={onToggle} unread subject="Hello"
+      meta="6 Oct · me@x" trailing={<button>pin</button>} onOpen={onOpen}
+      selected />);
+  fireEvent.click(screen.getByLabelText("Select mail"));
+  expect(onToggle).toHaveBeenCalledOnce();
+  expect(onOpen).not.toHaveBeenCalled();
+  fireEvent.click(screen.getByText("Hello"));
+  expect(onOpen).toHaveBeenCalledOnce();
+  expect(screen.getByText("6 Oct · me@x")).toBeTruthy();
+  expect(screen.getByText("unread")).toBeTruthy();   // not only a coloured dot
+  expect((container.firstChild as HTMLElement).dataset.selected).toBe("true");
+  fireEvent.click(screen.getByText("pin"));
+  expect(onOpen).toHaveBeenCalledOnce();
+});
+
+test("MailRow without onToggle has no checkbox", () => {
+  render(<MailRow subject="S" onOpen={() => {}} />);
+  expect(screen.queryByRole("checkbox")).toBeNull();
 });

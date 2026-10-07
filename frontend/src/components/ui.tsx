@@ -1,6 +1,6 @@
-import { Pin, Shield, X } from "lucide-react";
-import { useEffect, useLayoutEffect, useRef, useState,
-  type ComponentProps, type ReactNode } from "react";
+import { Check, Pin, Shield, X } from "lucide-react";
+import { createContext, useCallback, useContext, useEffect, useLayoutEffect,
+  useMemo, useRef, useState, type ComponentProps, type ReactNode } from "react";
 import { t } from "../i18n";
 import { engagementTier } from "../lib";
 import type { GroupAi } from "../types";
@@ -27,9 +27,9 @@ export function Tag({ children, className = "" }: {
 }
 
 const VERDICT_STYLE: Record<string, string> = {
-  delete_safe: "!bg-emerald-950 !text-emerald-300",
-  review: "!bg-amber-950 !text-amber-300",
-  keep: "!bg-rose-950 !text-rose-300",
+  delete_safe: "!bg-safe-bg !text-safe-fg",
+  review: "!bg-review-bg !text-review-fg",
+  keep: "!bg-keep-bg !text-keep-fg",
 };
 
 export function AiTag({ ai }: { ai: GroupAi }) {
@@ -236,24 +236,51 @@ export function Loading({ label, className = "" }: {
   );
 }
 
-export function Button({ children, onClick, disabled, variant = "primary",
-  className = "", title }: {
-  children: ReactNode; onClick?: () => void; disabled?: boolean;
-  variant?: "primary" | "ghost" | "danger"; className?: string; title?: string;
-}) {
-  const styles = {
-    primary: "bg-accent hover:bg-accenth text-white",
-    ghost: "bg-chip hover:bg-chiph text-body",
-    danger: "bg-red-700 hover:bg-red-600 text-white",
-  }[variant];
+/** Shared disabled look for Button / controls / MenuItem: flat chip fill,
+ *  faint text, no opacity (a disabled red button must not read as an alarm). */
+const DISABLED = "disabled:cursor-not-allowed disabled:bg-chip disabled:text-faint";
+
+type ButtonVariant = "primary" | "secondary" | "quiet" | "danger"
+  | "danger-quiet" | "ghost";   // "ghost" = deprecated alias of secondary
+
+const BUTTON_VARIANT: Record<ButtonVariant, string> = {
+  primary: "bg-accent enabled:hover:bg-accenth text-white",
+  secondary: "bg-chip enabled:hover:bg-chiph text-body",
+  ghost: "bg-chip enabled:hover:bg-chiph text-body",
+  quiet: "bg-transparent enabled:hover:bg-chip text-body",
+  danger: "bg-danger enabled:hover:bg-danger-h text-white",
+  "danger-quiet":
+    "bg-transparent enabled:hover:bg-keep-bg text-danger-fg",
+};
+
+// sm: 32 / 36 px visual on touch, the ::after extends the hit area to 44.
+const BUTTON_SIZE = {
+  md: "min-h-9 coarse:min-h-10 px-3 py-1.5 type-body font-medium",
+  sm: `relative min-h-8 coarse:min-h-9 px-2.5 py-1 type-meta font-medium
+    after:absolute after:inset-x-0 after:inset-y-0 after:content-['']
+    coarse:after:-inset-y-1`,
+  icon: `inline-flex size-9 coarse:size-10 items-center justify-center p-0
+    type-body`,
+};
+
+export type ButtonProps = Omit<ComponentProps<"button">, "title"> & {
+  variant?: ButtonVariant;
+} & (
+  | { size?: "md" | "sm"; title?: string; label?: never }
+  // Icon-only buttons must say what they do: rendered as aria-label + title.
+  | { size: "icon"; label: string; title?: never }
+);
+
+export function Button({ variant = "primary", size = "md", label, title,
+  className = "", children, ...rest }: ButtonProps) {
   return (
     <button
-      onClick={onClick}
-      disabled={disabled}
-      title={title}
-      className={`min-h-9 rounded-md px-3 py-1.5 text-sm font-medium
-        transition-colors disabled:cursor-default disabled:opacity-40
-        ${styles} ${className}`}>
+      {...rest}
+      aria-label={size === "icon" ? label : rest["aria-label"]}
+      title={size === "icon" ? label : title}
+      className={`rounded-control transition-colors enabled:active:translate-y-px
+        ${DISABLED} ${BUTTON_SIZE[size]} ${BUTTON_VARIANT[variant]}
+        ${className}`}>
       {children}
     </button>
   );
@@ -263,9 +290,8 @@ export function Button({ children, onClick, disabled, variant = "primary",
  * Every input/select/textarea in the app uses these - never restyle them
  * locally. They accept all native props incl. ref (React 19). */
 
-const CONTROL = `min-h-9 rounded-md border border-line bg-panel2 px-3 py-1.5
-  text-sm outline-none focus:border-accent
-  disabled:cursor-default disabled:opacity-40`;
+const CONTROL = `min-h-9 coarse:min-h-10 rounded-control border border-line
+  bg-panel2 px-3 py-1.5 text-left type-body focus:border-accent ${DISABLED}`;
 
 export function Input({ className = "", ...rest }:
   ComponentProps<"input">) {
@@ -292,7 +318,7 @@ export function Field({ label, children }: {
 }) {
   return (
     <label className="block">
-      <span className="mb-1 block text-xs text-muted">{label}</span>
+      <span className="mb-1 block type-meta text-muted">{label}</span>
       {children}
     </label>
   );
@@ -315,8 +341,9 @@ export function PanelHeader({ title, sub, actions, onClose }: {
         )}
       </div>
       {actions}
-      <Button variant="ghost" onClick={onClose} title={t("Close")}>
-        <X size={17} />
+      <Button variant="secondary" size="icon" label={t("Close")}
+        onClick={onClose}>
+        <X size={18} />
       </Button>
     </div>
   );
@@ -339,8 +366,7 @@ export function SectionLabel({ children, className = "" }: {
   children: ReactNode; className?: string;
 }) {
   return (
-    <div className={`text-xs font-semibold uppercase tracking-wide
-      text-muted ${className}`}>
+    <div className={`type-section text-muted ${className}`}>
       {children}
     </div>
   );
@@ -404,29 +430,38 @@ export function Menu({ trigger, label, children }: {
   );
 }
 
-export function MenuItem({ children, onClick, disabled, active, sub }: {
+export function MenuItem({ children, onClick, disabled, active, sub,
+  danger }: {
   children: ReactNode;
   onClick?: () => void;
   disabled?: boolean;
   active?: boolean;    // renders a trailing check, role=menuitemradio
   sub?: ReactNode;     // muted second line (e.g. an account's address)
+  danger?: boolean;    // destructive entry (quiet red text)
 }) {
   return (
     <button
       role={active === undefined ? undefined : "menuitemradio"}
       aria-checked={active}
-      className="flex w-full items-center gap-2 rounded-md px-3 py-2
-        text-left text-sm text-body hover:bg-chip disabled:opacity-50"
+      className={`flex w-full items-center gap-2 rounded-control px-3 py-2
+        text-left type-body enabled:hover:bg-chip
+        disabled:cursor-not-allowed disabled:text-faint
+        ${danger ? "text-danger-fg" : "text-body"}`}
       onClick={onClick} disabled={disabled}>
       <span className="min-w-0 flex-1 truncate">
         {children}
         {sub != null && sub !== "" && (
-          <span className="block truncate text-xs text-muted">{sub}</span>
+          <span className="block truncate type-meta text-muted">{sub}</span>
         )}
       </span>
       {active && <span className="text-accent">✓</span>}
     </button>
   );
+}
+
+/** Hairline between groups of MenuItems. */
+export function MenuDivider() {
+  return <div role="separator" className="my-1 border-t border-line" />;
 }
 
 /* Non-semantic identity hues (never emerald/amber/rose/sky/orange - those
@@ -479,32 +514,439 @@ export function MenuHeading({ children }: { children: ReactNode }) {
   );
 }
 
-export function EmptyState({ children }: { children: ReactNode }) {
+/** "Nothing here" message. Plain children still work; `icon`/`title`/
+ *  `hint`/`action` give it the fuller illustrated shape. */
+export function EmptyState({ children, icon, title, hint, action }: {
+  children?: ReactNode; icon?: ReactNode; title?: ReactNode;
+  hint?: ReactNode; action?: ReactNode;
+}) {
   return (
-    <div className="p-6 text-center text-sm text-muted">{children}</div>
+    <div className="flex flex-col items-center gap-2 p-6 text-center
+      type-body text-muted">
+      {icon != null && <span className="text-faint">{icon}</span>}
+      {title != null && (
+        <div className="type-heading text-body">{title}</div>
+      )}
+      {children}
+      {hint != null && <div className="type-meta">{hint}</div>}
+      {action != null && <div className="pt-1">{action}</div>}
+    </div>
   );
 }
 
-export function Modal({ children, onClose, full = false }: {
+const MODAL_WIDTH = { sm: "sm:max-w-md", md: "sm:max-w-2xl",
+  lg: "sm:max-w-3xl" };   // 448 / 672 / 768 px
+
+/** Dialog shell. `sm` (448) is a bottom sheet on phones, `md` (672) /
+ *  `lg` (768) are full-screen there. `full` = `lg` at a fixed 88vh; other
+ *  modals shrink to their content. `label` names the dialog for AT. */
+export function Modal({ children, onClose, full = false, size, label }: {
   children: ReactNode; onClose: () => void; full?: boolean;
+  size?: "sm" | "md" | "lg"; label?: string;
 }) {
+  const sz = size ?? (full ? "lg" : "md");
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose]);
+  const shape = sz === "sm"
+    ? `max-h-[88dvh] rounded-t-dialog border-t max-sm:pb-[env(safe-area-inset-bottom)]
+       sm:rounded-dialog`
+    : full
+      ? "h-dvh sm:h-[88vh]"
+      : "h-dvh overflow-y-auto sm:h-auto sm:max-h-[88vh]";
   return (
     <div
-      className="fixed inset-0 z-(--z-modal) flex items-center justify-center
-        bg-black/60 p-0 sm:p-6"
+      className={`fixed inset-0 z-(--z-modal) flex justify-center bg-overlay
+        p-0 sm:p-6 ${sz === "sm" ? "items-end sm:items-center"
+          : "items-center"}`}
       onClick={(e) => e.target === e.currentTarget && onClose()}>
-      <div className={`flex flex-col overflow-hidden border-line bg-panel
-        sm:rounded-xl sm:border
-        ${full
-          ? "h-dvh w-full sm:h-[88vh] sm:max-w-3xl"
-          : "max-h-dvh w-full overflow-y-auto sm:max-h-[88vh] sm:max-w-2xl"}`}>
+      <div role={label ? "dialog" : undefined}
+        aria-modal={label ? true : undefined} aria-label={label}
+        data-size={sz}
+        className={`flex w-full flex-col overflow-hidden border-line bg-panel
+        sm:rounded-dialog sm:border ${MODAL_WIDTH[sz]} ${shape}`}>
         {children}
       </div>
+    </div>
+  );
+}
+
+/* ------------------------- checkbox, chips, notice ------------------------ */
+
+/** The one checkbox. The <label> is the hit area (32 px, 44 px on touch);
+ *  the box itself is 18 px in the accent colour. Without `label` text give
+ *  it an `aria-label`. All native input props are forwarded. */
+export function Checkbox({ label, className = "", ...rest }:
+  Omit<ComponentProps<"input">, "type"> & { label?: ReactNode }) {
+  return (
+    <label className={`inline-flex min-h-8 min-w-8 coarse:min-h-11
+      coarse:min-w-11 shrink-0 cursor-pointer items-center justify-center
+      gap-2 type-body ${rest.disabled ? "cursor-not-allowed text-faint" : ""}
+      ${className}`}>
+      <input type="checkbox"
+        className="size-4.5 shrink-0 cursor-[inherit] accent-accent"
+        {...rest} />
+      {label != null && <span>{label}</span>}
+    </label>
+  );
+}
+
+/** Toggle chip (quick filters / presets). On = accent border + check. */
+export function Chip({ on = false, children, className = "", ...rest }:
+  Omit<ComponentProps<"button">, "type"> & { on?: boolean }) {
+  return (
+    <button type="button" aria-pressed={on} {...rest}
+      className={`inline-flex min-h-8 coarse:min-h-9 items-center gap-1.5
+        rounded-full border px-3 type-meta transition-colors
+        enabled:active:translate-y-px disabled:cursor-not-allowed
+        disabled:border-line disabled:bg-chip disabled:text-faint
+        ${on ? "border-accent bg-chiph text-body"
+          : "border-line bg-panel2 text-muted enabled:hover:bg-chip"}
+        ${className}`}>
+      {on && <Check size={14} aria-hidden />}
+      {children}
+    </button>
+  );
+}
+
+/** Segmented chip: one pill holding several one-tap `ChipSegment`s, with an
+ *  optional leading `label` (e.g. "Inactive:"). */
+export function ChipGroup({ label, children, className = "" }: {
+  label?: ReactNode; children: ReactNode; className?: string;
+}) {
+  return (
+    <div role="group" className={`inline-flex min-h-8 coarse:min-h-9
+      items-stretch overflow-hidden rounded-full border border-line
+      bg-panel2 type-meta ${className}`}>
+      {label != null && (
+        <span className="flex items-center pl-3 pr-1.5 text-muted">
+          {label}
+        </span>
+      )}
+      {children}
+    </div>
+  );
+}
+
+export function ChipSegment({ on = false, children, className = "", ...rest }:
+  Omit<ComponentProps<"button">, "type"> & { on?: boolean }) {
+  return (
+    <button type="button" aria-pressed={on} {...rest}
+      className={`flex items-center border-l border-line px-3
+        transition-colors enabled:active:translate-y-px
+        disabled:cursor-not-allowed disabled:bg-chip disabled:text-faint
+        ${on ? "bg-chiph text-body ring-1 ring-inset ring-accent"
+          : "text-muted enabled:hover:bg-chip"} ${className}`}>
+      {children}
+    </button>
+  );
+}
+
+/** Dismissible inline notice (replaces the one-off banners). */
+export function Notice({ children, icon, onClose, className = "" }: {
+  children: ReactNode; icon?: ReactNode; onClose?: () => void;
+  className?: string;
+}) {
+  return (
+    <div role="status" className={`flex items-start gap-2 rounded-card
+      bg-panel2 px-3 py-2 type-meta text-body ${className}`}>
+      {icon != null && <span className="mt-0.5 shrink-0 text-muted">{icon}</span>}
+      <div className="min-w-0 flex-1 py-0.5">{children}</div>
+      {onClose && (
+        <Button variant="quiet" size="icon" label={t("Dismiss")}
+          className="-my-1.5 -mr-2" onClick={onClose}>
+          <X size={18} />
+        </Button>
+      )}
+    </div>
+  );
+}
+
+/* --------------------------------- toasts --------------------------------- */
+
+export type ToastVariant = "info" | "success" | "error";
+export type ToastOptions = {
+  variant?: ToastVariant;
+  action?: { label: string; onClick: () => void };
+  /** ms before auto-dismiss; 0 = stay until closed. Default 8000, and
+   *  errors stay by default. */
+  duration?: number;
+};
+type ToastItem = ToastOptions & { id: number; message: ReactNode };
+
+const TOAST_MS = 8000;
+const TOAST_STYLE: Record<ToastVariant, string> = {
+  info: "border-line bg-panel2 text-body",
+  success: "border-transparent bg-safe-bg text-safe-fg",
+  error: "border-transparent bg-keep-bg text-keep-fg",
+};
+
+type ToastApi = {
+  show: (message: ReactNode, opts?: ToastOptions) => number;
+  dismiss: (id: number) => void;
+};
+const ToastContext = createContext<ToastApi | null>(null);
+
+export function useToast(): ToastApi {
+  const api = useContext(ToastContext);
+  if (!api) throw new Error("useToast needs a <ToastProvider>");
+  return api;
+}
+
+function ToastView({ toast, onDismiss }: {
+  toast: ToastItem; onDismiss: () => void;
+}) {
+  const { variant = "info", action, duration } = toast;
+  const ms = duration ?? (variant === "error" ? 0 : TOAST_MS);
+  useEffect(() => {
+    if (ms <= 0) return;
+    const timer = setTimeout(onDismiss, ms);
+    return () => clearTimeout(timer);
+  }, [ms, onDismiss]);
+  return (
+    <div data-variant={variant} className={`pointer-events-auto flex
+      w-full max-w-120 items-center gap-2 rounded-card border py-1.5 pl-3
+      pr-1.5 shadow-bar type-body ${TOAST_STYLE[variant]}`}>
+      <div className="min-w-0 flex-1 py-1">{toast.message}</div>
+      {action && (
+        <Button variant="quiet" size="sm" className="shrink-0 !text-inherit"
+          onClick={() => { action.onClick(); onDismiss(); }}>
+          {action.label}
+        </Button>
+      )}
+      <Button variant="quiet" size="icon" label={t("Dismiss")}
+        className="shrink-0 !text-inherit" onClick={onDismiss}>
+        <X size={18} />
+      </Button>
+    </div>
+  );
+}
+
+/** Mount once at the app root; `useToast()` anywhere below. Toasts stack
+ *  bottom-centre above the bulk bar (`--bulkbar-h`) and the safe area. */
+export function ToastProvider({ children }: { children: ReactNode }) {
+  const [items, setItems] = useState<ToastItem[]>([]);
+  const nextId = useRef(1);
+  const dismiss = useCallback((id: number) =>
+    setItems((xs) => xs.filter((x) => x.id !== id)), []);
+  const show = useCallback((message: ReactNode, opts: ToastOptions = {}) => {
+    const id = nextId.current++;
+    setItems((xs) => [...xs, { ...opts, id, message }]);
+    return id;
+  }, []);
+  const api = useMemo(() => ({ show, dismiss }), [show, dismiss]);
+  return (
+    <ToastContext.Provider value={api}>
+      {children}
+      <div aria-live="polite" className="pointer-events-none fixed inset-x-0
+        z-(--z-toast) flex flex-col items-center gap-2 px-3"
+        style={{ bottom: "calc(var(--bulkbar-h, 0px) + env(safe-area-inset-bottom) + 1rem)" }}>
+        {items.map((x) => (
+          <ToastView key={x.id} toast={x} onDismiss={() => dismiss(x.id)} />
+        ))}
+      </div>
+    </ToastContext.Provider>
+  );
+}
+
+/* -------------------------- confirm / prompt dialogs ----------------------- */
+
+export type ConfirmOptions = {
+  title: string; body?: ReactNode; bullets?: ReactNode[];
+  confirmLabel: string; tone?: "danger" | "primary";
+};
+export type PromptOptions = {
+  title: string; label: string; initial?: string; confirmLabel?: string;
+  /** Return an error message, or null when the value is acceptable. */
+  validate?: (value: string) => string | null;
+};
+
+/** Confirm sheet. Danger dialogs focus Cancel, the safe choice. */
+export function ConfirmDialog({ title, body, bullets, confirmLabel,
+  tone = "primary", onResult }: ConfirmOptions & {
+  onResult: (ok: boolean) => void;
+}) {
+  const safe = useRef<HTMLButtonElement>(null);
+  const ok = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    (tone === "danger" ? safe : ok).current?.focus();
+  }, [tone]);
+  return (
+    <Modal size="sm" label={title} onClose={() => onResult(false)}>
+      <div className="space-y-3 p-4 sm:p-5">
+        <div className="type-heading">{title}</div>
+        {body != null && <div className="type-body text-muted">{body}</div>}
+        {bullets && bullets.length > 0 && (
+          <ul className="list-disc space-y-1 pl-5 type-body text-muted">
+            {bullets.map((b, i) => <li key={i}>{b}</li>)}
+          </ul>
+        )}
+      </div>
+      <div className="flex justify-end gap-2 border-t border-line px-4 py-3
+        sm:px-5">
+        <Button ref={safe} variant="secondary"
+          onClick={() => onResult(false)}>{t("Cancel")}</Button>
+        <Button ref={ok} variant={tone === "danger" ? "danger" : "primary"}
+          onClick={() => onResult(true)}>{confirmLabel}</Button>
+      </div>
+    </Modal>
+  );
+}
+
+/** Single-field prompt. The confirm button stays disabled while `validate`
+ *  returns a message; the message shows once the user has typed. */
+export function PromptDialog({ title, label, initial = "", confirmLabel,
+  validate, onResult }: PromptOptions & {
+  onResult: (value: string | null) => void;
+}) {
+  const [value, setValue] = useState(initial);
+  const [touched, setTouched] = useState(false);
+  const input = useRef<HTMLInputElement>(null);
+  useEffect(() => { input.current?.focus(); input.current?.select(); }, []);
+  const error = validate?.(value) ?? null;
+  return (
+    <Modal size="sm" label={title} onClose={() => onResult(null)}>
+      <form onSubmit={(e) => {
+        e.preventDefault();
+        if (error) setTouched(true); else onResult(value);
+      }}>
+        <div className="space-y-3 p-4 sm:p-5">
+          <div className="type-heading">{title}</div>
+          <Field label={label}>
+            <Input ref={input} value={value} className="w-full"
+              aria-invalid={touched && !!error}
+              onChange={(e) => { setValue(e.target.value); setTouched(true); }} />
+          </Field>
+          {touched && error && (
+            <div role="alert" className="type-meta text-danger-fg">{error}</div>
+          )}
+        </div>
+        <div className="flex justify-end gap-2 border-t border-line px-4 py-3
+          sm:px-5">
+          <Button type="button" variant="secondary"
+            onClick={() => onResult(null)}>{t("Cancel")}</Button>
+          <Button type="submit" disabled={!!error}>
+            {confirmLabel ?? t("OK")}
+          </Button>
+        </div>
+      </form>
+    </Modal>
+  );
+}
+
+type DialogRequest = { id?: number } & (
+  | { kind: "confirm"; opts: ConfirmOptions; resolve: (ok: boolean) => void }
+  | { kind: "prompt"; opts: PromptOptions;
+      resolve: (v: string | null) => void });
+
+// The mounted DialogProvider's queue push; the functions below are plain
+// module exports so non-component code (mailActions, handlers) can await them.
+let pushDialog: ((r: DialogRequest) => void) | null = null;
+let nextDialogId = 1;
+
+const needProvider = () =>
+  Promise.reject(new Error("confirmDialog/promptDialog need a <DialogProvider>"));
+
+/** Resolves true on confirm; false on Cancel, Esc or backdrop. */
+export const confirmDialog = (opts: ConfirmOptions): Promise<boolean> =>
+  pushDialog
+    ? new Promise((resolve) => pushDialog!({ kind: "confirm", opts, resolve }))
+    : needProvider();
+
+/** Resolves the entered text, or null when cancelled. */
+export const promptDialog = (opts: PromptOptions): Promise<string | null> =>
+  pushDialog
+    ? new Promise((resolve) => pushDialog!({ kind: "prompt", opts, resolve }))
+    : needProvider();
+
+/** Mount once at the app root. Dialogs queue if several are requested. */
+export function DialogProvider({ children }: { children: ReactNode }) {
+  const [queue, setQueue] = useState<DialogRequest[]>([]);
+  useEffect(() => {
+    const push = (r: DialogRequest) =>
+      setQueue((q) => [...q, { ...r, id: nextDialogId++ }]);
+    pushDialog = push;
+    return () => { if (pushDialog === push) pushDialog = null; };
+  }, []);
+  const cur = queue[0];
+  const done = (fn: () => void) => { fn(); setQueue((q) => q.slice(1)); };
+  return (
+    <>
+      {children}
+      {cur?.kind === "confirm" && (
+        <ConfirmDialog key={cur.id} {...cur.opts}
+          onResult={(ok) => done(() => cur.resolve(ok))} />
+      )}
+      {cur?.kind === "prompt" && (
+        <PromptDialog key={cur.id} {...cur.opts}
+          onResult={(v) => done(() => cur.resolve(v))} />
+      )}
+    </>
+  );
+}
+
+/* --------------------------------- mail row -------------------------------- */
+
+/** The two-line per-mail row: `[checkbox] [unread dot] subject … trailing`,
+ *  then `meta` (date · folder · sender · size). Clicking the text area
+ *  calls `onOpen`; the checkbox and `trailing` (pin, badge) are their own
+ *  targets, so `meta` must not contain interactive elements. Omit `onToggle`
+ *  for rows without selection. */
+export function MailRow({ checked = false, onToggle, unread = false, subject,
+  meta, trailing, onOpen, selected = false, pinned = false,
+  selectLabel }: {
+  checked?: boolean; onToggle?: () => void; unread?: boolean;
+  subject: ReactNode; meta?: ReactNode; trailing?: ReactNode;
+  onOpen?: () => void; selected?: boolean; pinned?: boolean;
+  selectLabel?: string;
+}) {
+  const text = (
+    <>
+      <span className="flex min-w-0 items-center gap-1.5">
+        {unread && (
+          <>
+            <span aria-hidden className="inline-block size-2 shrink-0
+              rounded-full bg-accent" />
+            <span className="sr-only">{t("unread")}</span>
+          </>
+        )}
+        <span className={`truncate type-body-mobile md:type-body ${unread
+          ? "font-semibold md:font-semibold"
+          : "font-medium md:font-medium"}`}>{subject}</span>
+      </span>
+      {meta != null && meta !== "" && (
+        <span className="mt-0.5 flex min-w-0 items-center gap-1.5 type-meta
+          text-muted">
+          {typeof meta === "string"
+            ? <span className="min-w-0 truncate">{meta}</span> : meta}
+        </span>
+      )}
+    </>
+  );
+  return (
+    <div data-pinned={pinned ? "true" : undefined}
+      data-selected={selected ? "true" : undefined}
+      className={`flex items-start gap-1 border-b border-line/60 px-3 py-3
+        md:px-2 md:py-2.5 ${selected ? "border-l-2 border-l-accent bg-panel2"
+          : pinned ? "border-l-2 border-l-accent bg-panel" : ""}`}>
+      {onToggle && (
+        <Checkbox checked={checked} onChange={onToggle}
+          aria-label={selectLabel ?? t("Select mail")} />
+      )}
+      {onOpen ? (
+        <button type="button" onClick={onOpen}
+          className="min-w-0 flex-1 cursor-pointer py-1 text-left
+            hover:underline">
+          {text}
+        </button>
+      ) : <div className="min-w-0 flex-1 py-1">{text}</div>}
+      {trailing != null && (
+        <div className="flex shrink-0 items-center gap-1 self-start pt-0.5">
+          {trailing}
+        </div>
+      )}
     </div>
   );
 }

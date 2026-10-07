@@ -806,4 +806,7 @@ export const DE: Record<string, string> = {
   "bar.limit_to": "Beschränken auf:",
   "Cancel": "Abbrechen",
   "detail.n_selected": "{n} ausgewählt",
+  "Dismiss": "Schließen",
+  "OK": "OK",
+  "Select mail": "Mail auswählen",
 };

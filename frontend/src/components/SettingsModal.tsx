@@ -1161,10 +1161,9 @@ export function SettingsModal({ cfg, account, onClose, onSaved,
       <div className="flex flex-wrap items-center gap-3 border-t border-line
         px-5 py-3">
         <Button onClick={() => save()}>{t("Save")}</Button>
-        <button onClick={() => downloadFile("/api/export_config")}
-          className="min-h-9 rounded-md bg-chip px-3 py-1.5 text-sm
-            font-medium text-body hover:bg-chiph"
-          title={t("export.tip")}>{t("Export")}</button>
+        <Button variant="secondary"
+          onClick={() => downloadFile("/api/export_config")}
+          title={t("export.tip")}>{t("Export")}</Button>
         <label className="min-h-9 cursor-pointer rounded-md bg-chip px-3
           py-1.5 text-sm font-medium text-body hover:bg-chiph">
           {t("Import…")}
