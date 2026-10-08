@@ -987,7 +987,16 @@ function ToastView({ toast, dismiss }: {
 }) {
   const { variant = "info", action, duration, id } = toast;
   const ms = duration ?? (variant === "error" ? 0 : TOAST_MS);
-  const onDismiss = () => dismiss(id);
+  const box = useRef<HTMLDivElement>(null);
+  // The toast is about to unmount: if the user had focused one of its
+  // buttons, hand focus to the open dialog instead of dropping it on <body>.
+  const handBack = () => {
+    if (!box.current?.contains(document.activeElement)) return;
+    const dlgs = document.querySelectorAll<HTMLElement>(
+      '[role="dialog"][aria-modal="true"]');
+    dlgs[dlgs.length - 1]?.focus();
+  };
+  const onDismiss = () => { handBack(); dismiss(id); };
   useEffect(() => {
     if (ms <= 0) return;
     const timer = setTimeout(() => dismiss(id), ms);
@@ -995,7 +1004,7 @@ function ToastView({ toast, dismiss }: {
   }, [ms, id, dismiss]);
   const Icon = TOAST_ICON[variant];
   return (
-    <div data-variant={variant}
+    <div ref={box} data-variant={variant}
       role={variant === "error" ? "alert" : undefined}
       className={`pointer-events-auto flex
       w-full max-w-120 items-center gap-2 rounded-card border py-1.5 pl-3

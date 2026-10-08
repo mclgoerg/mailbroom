@@ -939,3 +939,26 @@ test("RatingChips: a labelled button whose popover explains the counts", () => {
   fireEvent.keyDown(document, { key: "Escape" });
   expect(screen.queryByRole("dialog")).toBeNull();
 });
+
+test("using a toast's button while a panel is open returns focus to that panel, not <body>", () => {
+  let show!: ReturnType<typeof useToast>["show"];
+  const Grab = () => { show = useToast().show; return null; };
+  render(<ToastProvider><Grab />
+    <Modal onClose={() => {}}><button>inside</button></Modal></ToastProvider>);
+  const dlg = screen.getByRole("dialog");
+  const ran = vi.fn();
+  act(() => { show("Moved", { action: { label: "Undo", onClick: ran } }); });
+  const undo = screen.getByRole("button", { name: "Undo" });
+  undo.focus();                                    // what a click does
+  expect(document.activeElement).toBe(undo);
+  fireEvent.click(undo);
+  expect(ran).toHaveBeenCalled();
+  expect(screen.queryByText("Moved")).toBeNull();  // toast gone ...
+  expect(document.activeElement).toBe(dlg);        // ... focus is not
+  // Dismiss (X) behaves the same.
+  act(() => { show("Again"); });
+  const x = screen.getByRole("button", { name: "Dismiss" });
+  x.focus();
+  fireEvent.click(x);
+  expect(document.activeElement).toBe(dlg);
+});

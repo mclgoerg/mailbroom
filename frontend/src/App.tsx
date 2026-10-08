@@ -560,7 +560,15 @@ export default function App() {
   const emptyTrash = async (known?: number): Promise<boolean> => {
     let n: number | null = known ?? null;
     if (n === null) {
+      // On real IMAP the live count can take seconds: say so.
+      setPending(t("trash.counting"));
       try { n = (await api.trash()).total; } catch { n = null; }
+      setPending("");
+    }
+    if (n === 0) {
+      toast.show(t("trash.already_empty"));
+      refresh();      // the cached count behind the menu entry was stale
+      return false;
     }
     if (!await confirmDialog({ title: t("confirm.empty_trash_title"),
       body: n === null ? t("confirm.empty_trash_body_nocount")
@@ -1043,7 +1051,7 @@ export default function App() {
                 <MenuDivider />
                 <MenuItem danger onClick={() => emptyTrash()}>
                   <Trash2 size={16} className="mr-1 inline align-text-bottom" />
-                  {t("Empty Trash")} ({state.trash_count})…
+                  {t("Empty Trash")}…
                 </MenuItem>
               </>
             )}

@@ -719,6 +719,8 @@ export const EN: Record<string, string> = {
   "audit.act.rule_execute": "Rule executed",
   "audit.act.unsubscribe": "Unsubscribe",
   "audit.act.undo": "Undo",
+  "trash.counting": "Counting…",
+  "trash.already_empty": "Trash is empty.",
   "audit.act.empty_trash": "Trash emptied",
   "audit.outcome.ok": "ok",
   "audit.outcome.error": "error",

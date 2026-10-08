@@ -199,6 +199,8 @@ export const DE: Record<string, string> = {
   "Scanning…": "Scanne…",
   "Moving…": "Verschiebe…",
   "Restoring…": "Stelle wieder her…",
+  "trash.counting": "Zähle…",
+  "trash.already_empty": "Der Papierkorb ist leer.",
   "Emptying Trash…": "Leere Papierkorb…",
   "loading…": "lade…",
   "cancel": "abbrechen",
