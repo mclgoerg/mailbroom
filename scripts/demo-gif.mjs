@@ -2,16 +2,18 @@
  * a condition added, filtered list, select, confirm, result toast with Undo,
  * group in the split pane - assembled with ffmpeg at 1280 px wide.
  *
- * Same demo/capture setup as screenshots.mjs (see its header for the demo
+ * Same demo setup as screenshots.mjs (see its header for the demo
  * container). This script really trashes mails in the demo, so use a FRESH
  * demo container for each run (docker rm -f mb-docs-demo; start it again).
  *
  *   docker run --rm --network mb-docs-net -v "$PWD":/repo -w /tmp node:26 \
- *     bash -c "apt-get update -q && apt-get install -yq chromium ffmpeg \
- *       fonts-noto-color-emoji fonts-noto-core && mkdir rig && cd rig \
- *       && npm i -s puppeteer-core && cp /repo/scripts/*.mjs . \
- *       && node demo-gif.mjs http://mb-docs-demo:8765 \
- *       && cp out/demo.gif /repo/docs/screenshots/"
+ *     bash -c "apt-get update -q && apt-get install -yq --no-install-recommends \
+ *       chromium ffmpeg fonts-noto-color-emoji fonts-noto-core || exit 1; \
+ *       mkdir rig && cd rig && npm i -s puppeteer-core \
+ *       && cp /repo/scripts/*.mjs . && node demo-gif.mjs \
+ *            http://mb-docs-demo:8765 \
+ *       && cp out/demo.gif /repo/docs/screenshots/ \
+ *       && chown $(id -u):$(id -g) /repo/docs/screenshots/demo.gif"
  *
  * Frames are captured at 1280x800 with deviceScaleFactor 2 and scaled down
  * to 1280 px wide by ffmpeg (crisper text than a 1x capture). Optional
@@ -49,16 +51,19 @@ await click(page, "button", "Build a filter - click conditions together");
 await byRole(page, "button", "Done");
 await shot("2 filter builder");
 
-// Category select defaults to "newsletter": its Add button is the first one.
-const add = (await page.$$("button")).filter(Boolean);
-const adds = [];
-for (const b of add) {
-  if ((await b.evaluate((e) => e.textContent.trim())) === "Add") adds.push(b);
-}
-await adds[0].click();
+// The builder's "Category" row (newsletter is preselected): its Add button.
+const addCategory = await page.evaluateHandle(() => {
+  const isAdd = (b) => b.textContent.trim() === "Add";
+  let row = [...document.querySelectorAll("select")]
+    .find((sel) => [...sel.options].some((o) => o.value === "newsletter"));
+  while (row && ![...row.querySelectorAll("button")].some(isAdd))
+    row = row.parentElement;
+  return [...row.querySelectorAll("button")].find(isAdd);
+});
+await addCategory.asElement().click();
 await page.waitForFunction(
-  () => document.querySelector('input[type="text"], input:not([type])')
-    ?.value.includes("newsletter"), { timeout: 10000 });
+  (ph) => document.querySelector(`input[placeholder="${ph}"]`)
+    ?.value.includes("newsletter"), { timeout: 10000 }, "filter groups…");
 await settle(page);
 await shot("3 condition added, list filtered");
 
@@ -87,6 +92,7 @@ await click(page, "button", "Clear filter");
 await settle(page);
 await shot("7 result toast with undo");
 
+await click(page, "button", "Dismiss");  // keep the toast off the pane footer
 await openGroup(page, "PayBank");       // beside the list (>= 1280 px)
 await shot("8 group in the split pane");
 await browser.close();

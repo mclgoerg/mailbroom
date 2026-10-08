@@ -19,11 +19,11 @@ including your own replies from Sent), and move whole groups or single
 mails to Trash - with optional AI assistance (Anthropic API or Microsoft
 Foundry) that suggests what's safe to delete and tracks its own cost.
 
-![Mailbroom group view](docs/screenshots/groups-dark.png)
+![The group list (dark theme): senders with mail counts, sizes, AI verdicts and quick filters](docs/screenshots/groups-dark.png)
 
 **In action** - click a filter together, select the matches, confirm the
-move to Trash (with the count spelled out), undo it from the toast, then
-open a group beside the list:
+move to Trash (with the count spelled out), undo with the Undo button in the result
+toast, then open a group beside the list:
 
 ![Build a filter, select, move to Trash with confirmation and Undo, open a group in the split pane](docs/screenshots/demo.gif)
 
@@ -84,10 +84,12 @@ presets.
 - **Grouping tabs** - switch between Sender, Domain (catches `noreply@`,
   `news@`, … of the same company), Subject (normalized: merges
   `Order 123` / `Order 456`, strips Re:/Fwd:), Thread (whole
-  conversations) and a flat "All mails" list. The choice is remembered.
+  conversations) and a flat "All mails" list. The All mails view is
+  remembered; the grouping starts at Sender.
 - **Cleanup signals** - mail count, total size (find attachment hogs),
-  unread percentage, first→last date range (short dates, e.g. "7 Oct"), category tags (shipping,
-  finance, shopping, social, travel, newsletters, automated…).
+  unread percentage, first→last date range (short dates, e.g. "7 Oct"), category tags
+  (shipping, finance, shopping, social, travel, newsletters,
+  automated…).
 - **Drill-down** - every mail of a group with date/size/unread, full-text
   reader (HTML mails rendered as plain text - no remote content, no
   tracking pixels), per-mail selection and deletion ("Trash this mail",
@@ -107,9 +109,9 @@ presets.
   names, adds a 📎 aggregate to groups, and enables the `att:>10m` filter.
   Proton IMAP can't strip single attachments, so cleanup means deleting
   the whole mail (reversible as always).
-- **Statistics** (Tools → Statistics) - mails-per-year histogram, top domains by size, scan
-  history and per-month cleanup tallies ("freed this month"), persisted
-  across restarts.
+- **Statistics** (Tools → Statistics) - mails-per-year histogram, top
+  domains by size, scan history and per-month cleanup tallies ("freed
+  this month"), persisted across restarts.
 - **Duplicate finder** - mails with the same Message-ID (e.g. copies
   across folders) or identical sender + subject + size, grouped into sets
   with one click to select everything but the newest copy.
@@ -170,7 +172,7 @@ presets.
   knows: the share of its mails you read (the backbone), a strong boost if
   you have written to its senders, a damping factor for newsletters/bulk
   mail, and a fade for senders that have been silent for months. It shows
-  as a small three-step meter on each row (hover for the breakdown), sorts
+  as a small three-step meter on each row (tap or hover for the breakdown), sorts
   via "Sort: engagement", and filters with `eng:low` / `eng:medium` /
   `eng:high` (tiers <=33 / 34-66 / >=67) - usable in rules and saved
   presets, e.g. `eng:low age:>1y`. The score is never sent to the AI.
@@ -187,12 +189,13 @@ presets.
   button, so future mail never clutters the mailbox again.
 - **Undo** - every move to Trash ends in a toast ("Moved 618 mails to
   Trash") with an **Undo** button; older deletions can be restored from
-  the Undo list in the toolbar (matched by Message-ID).
-- **Trash browser** - the Trash button in the header (with the live count)
-  opens the real Trash (also mail deleted outside the app): search it,
-  restore selected mails to any folder, or empty it. "Empty Trash…" is
-  also in the profile menu and always asks first, naming how many mails
-  will be deleted permanently.
+  the Undo list in the status line above the list (matched by Message-ID).
+- **Trash browser** - the Trash button in the header (shown while the
+  Trash has mail; the count is as of the last scan) opens the real Trash
+  (also mail deleted outside the app): search it, restore selected mails
+  to any folder, or empty it. "Empty Trash…" is also in the profile menu
+  while the Trash isn't empty, and always asks first, naming how many
+  mails will be deleted permanently.
 - **Persistent audit log** - every mailbox action (trash/archive/move/
   mark-read, incl. rule-triggered ones, rule runs, unsubscribes, undo,
   empty-trash) is recorded with a timestamp, actor, outcome and bytes
@@ -201,10 +204,10 @@ presets.
   selected, showing how many groups and mails you picked, with Clear
   selection, Export CSV, the retention limiter ("Limit to:"), an
   "Action…" picker (Archive/Move/Mark read/Unsubscribe/AI review) and the
-  red **Trash N** button. Every destructive action opens an in-app
-  confirmation that names the scope and count ("618 mails from 6 groups
-  will be affected"), mentions skipped protected senders and mails, and
-  focuses Cancel; on a phone it is a bottom sheet.
+  red **Trash N** button. Destructive actions ask first in an in-app
+  confirmation that names what they affect (e.g. "618 mails from 6
+  groups will be affected"), mentions skipped protected senders and
+  mails, and focuses Cancel; on a phone it is a bottom sheet.
 - **Quick chips** - one-tap chips under the filter box: AI-safe groups,
   **Inactive: 6 mo | 1 yr | 2 yr**, and Not yet unsubscribed (plus
   new senders when there are any). A chip narrows the list down to its
@@ -216,9 +219,10 @@ presets.
   with"); on phones it opens as a bottom sheet. It writes the same
   filter syntax you can type, and the result can be saved as a preset.
 - **Tools menu** - Rules, Attachments, Duplicates, Statistics, Audit Log,
-  AI review and Export CSV live under one Tools button. AI review and CSV
-  export scope to the current selection once something is selected; the
-  Tools versions (nothing selected) act on everything, as before.
+  AI review (once AI is set up) and Export CSV live under one Tools
+  button. AI review and CSV export scope to the current selection once
+  something is selected; the Tools versions (nothing selected) act on
+  everything, as before.
 - **Bulk workflows** - background deletion queue with live progress and
   cancel, global mail search (optionally inside the message text, a
   per-account setting: your mail server does that search per query and
@@ -230,9 +234,9 @@ presets.
   Bridge + Gmail). Every account is strictly separate: its own scans,
   groups, rules, saved presets, digest settings, statistics, folder
   exclusions and replied/verdict/known-senders caches - nothing is ever
-  mixed or aggregated. The profile menu (top right) switches the whole view
-  between accounts; accounts can be added, renamed (all their data follows) and
-  removed in settings, and each has its own folder-discovery picker.
+  mixed or aggregated. The profile menu (top right) switches the whole
+  view between accounts; accounts can be added, renamed (all their data
+  follows) and removed in settings, and each has its own folder-discovery picker.
 - **Fast to open** - each account's last scan is cached on disk and shown
   instantly after a restart or account switch (with its age); a rescan
   refreshes it. Live updates stream only small status deltas - the full
@@ -240,10 +244,11 @@ presets.
 - **Safe by design** - deletions are IMAP `MOVE` to Trash (reversible),
   UIDVALIDITY checked before every move, read-only scans, UID bookkeeping
   stays server-side, non-root container.
-- **Keyboard shortcuts** - `j`/`k` (or the arrow keys) move through the
-  list, `Enter` or `o` opens the group, `x` selects it, `#` trashes the
+- **Keyboard shortcuts** - in the grouped views, `j`/`k` (or ↑/↓) move
+  through the list, `Enter` or `o` opens the group, `x` selects it, `#` trashes the
   selection (or the focused group; it still asks first), `/` jumps to the
-  filter box and `Esc` closes the side pane.
+  filter box and `Esc` closes the side pane. In the All mails view only
+  `/` and `Esc` apply.
 - **Light and dark theme** - toggle in the profile menu; remembered per
   browser.
 - **Phone layout** - the same app on a small screen: touch-sized

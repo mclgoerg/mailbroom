@@ -3,22 +3,23 @@
  * Run from the repo root. The demo needs a writable /data and read access to
  * the checkout (repo files are mode 600), hence --user and the tmpfs; build
  * the frontend first if you want your working tree's UI instead of the
- * release image's bundle (drop the STATIC_DIR line to use the image's).
+ * release image's bundle (use `-e STATIC_DIR=/app/static` for the image's).
  *
  *   (cd frontend && npm ci && npx vite build)
- *   docker network create mb-docs-net
+ *   docker network create mb-docs-net || true
  *   docker run -d --name mb-docs-demo --network mb-docs-net \
  *     --user "$(id -u):$(id -g)" -e HOME=/tmp \
  *     --tmpfs /data:uid=$(id -u),gid=$(id -g) \
  *     -v "$PWD":/repo:ro -e STATIC_DIR=/repo/frontend/dist \
  *     ghcr.io/mclgoerg/mailbroom:latest python /repo/scripts/demo.py
  *   docker run --rm --network mb-docs-net -v "$PWD":/repo -w /tmp node:26 \
- *     bash -c "apt-get update -q && apt-get install -yq chromium \
- *       fonts-noto-color-emoji fonts-noto-core \
- *       && mkdir rig && cd rig && npm i -s puppeteer-core \
+ *     bash -c "apt-get update -q && apt-get install -yq --no-install-recommends \
+ *       chromium fonts-noto-color-emoji fonts-noto-core || exit 1; \
+ *       mkdir rig && cd rig && npm i -s puppeteer-core \
  *       && cp /repo/scripts/*.mjs . && node screenshots.mjs \
  *            http://mb-docs-demo:8765 \
- *       && cp /tmp/rig/out/*.png /repo/docs/screenshots/"
+ *       && cp out/*.png /repo/docs/screenshots/ \
+ *       && chown -R $(id -u):$(id -g) /repo/docs/screenshots"
  *   docker rm -f mb-docs-demo
  *
  * The colour-emoji font is required: without it the emoji in the rows
