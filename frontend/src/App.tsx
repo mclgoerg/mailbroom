@@ -1429,7 +1429,7 @@ export default function App() {
       {/* First-run onboarding: no credentials or no scan yet. */}
       {cfg && state?.status === "idle" && allGroups.length === 0
         && !scanning && (
-        <div className="mx-auto my-10 max-w-md rounded-dialog border border-line
+        <div className="mx-auto my-10 max-w-md rounded-card border border-line
           bg-panel p-4 type-body sm:p-5">
           <div className="mb-3 type-heading">
             {t("onboard.title")}
