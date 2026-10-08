@@ -18,17 +18,35 @@ export const EN: Record<string, string> = {
   "confirm.unsubscribe":
     "Unsubscribe from the senders of {k} selected group(s)?",
   "confirm.restore": "Restore {count} mails ({label})?",
-  "confirm.clear_verdicts": "Clear all cached AI verdicts?",
-  "confirm.reset_spend": "Reset the AI spend counter?",
+  "ai.usage": "Usage",
+  "ai.reset_spend": "Reset spend…",
+  "ai.clear_verdicts": "Clear AI verdict cache…",
+  "confirm.clear_verdicts": "Clear all cached AI verdicts",
+  "confirm.clear_verdicts_body":
+    "Groups are evaluated again by the next AI review, which uses tokens.",
+  "confirm.clear_verdicts_confirm": "Clear cache",
+  "confirm.reset_spend": "Reset the AI spend counter",
+  "confirm.reset_spend_confirm": "Reset spend",
   "account.label": "Account to edit",
   "account.add": "Add account",
   "account.hint":
     "Each account is scanned and cleaned separately - views never mix. "
     + "Switch accounts in the header once more than one is set up.",
   "account.new_prompt": "Name for the new account (e.g. \"gmail\"):",
-  "account.confirm_delete":
-    'Remove account "{name}"? Its rules keep their account name and stop '
-    + "running; mails on the server are untouched.",
+  "account.new_title": "Add account",
+  "account.rename_title": "Rename account",
+  "account.rename_confirm": "Rename",
+  "account.err_empty": "Enter a name.",
+  "account.err_dup": 'An account named "{name}" already exists.',
+  "account.remove_title": "Remove account",
+  "account.remove_help":
+    "Removes this account from Mailbroom. Mails on the server are untouched.",
+  "account.delete": 'Delete account "{name}"…',
+  "account.delete_title": 'Delete account "{name}"',
+  "account.delete_rules":
+    "Its rules keep the account name but stop running.",
+  "account.delete_mails": "Mails on the server are untouched.",
+  "account.delete_confirm": "Delete account",
   "menu.accounts": "Accounts",
   "update.available": "A new version of Mailbroom is available.",
   "update.reload": "Reload",
@@ -60,6 +78,10 @@ export const EN: Record<string, string> = {
   "login.logout": "Logout",
   "login.admin_tip": "admin - owns the server settings",
   "menu.profile": "Profile & settings",
+  "tab.account_short": "Account",
+  "tab.general_short": "General",
+  "tab.ai_short": "AI",
+  "tab.server_short": "Server",
   "tab.account": "Mail account",
   "tab.general": "General",
   "tab.ai": "AI",
@@ -103,7 +125,7 @@ export const EN: Record<string, string> = {
   "sort.desc_tip": "Sorted descending - click for ascending",
   "sort.asc_tip": "Sorted ascending - click for descending",
   "qb.tip": "Build a filter - click conditions together",
-  "qb.title": "Filter builder",
+  "qb.title": "Build a filter",
   "qb.hint": "every condition you add must ALSO match (AND)",
   "qb.add": "Add",
   "qb.clear": "Clear",
@@ -225,19 +247,23 @@ export const EN: Record<string, string> = {
   "index.update": "Update now",
   "index.rebuild": "Rebuild",
   "index.delete": "Delete index",
-  "index.confirm":
-    "Mailbroom will now read the text of {n} scanned mails of this account "
-    + "from your mail server (the first ~256 KB of each) and store only keyed "
-    + "word hashes locally - no readable text.\n\nThis will take roughly "
-    + "{size} of disk space (up to {max} for text-heavy mail); {free} are "
-    + "free on the data volume. It can take a while.\n\nDo you want to "
-    + "proceed?",
+  "index.confirm_read":
+    "Reads the text of {n} scanned mails of this account from your mail "
+    + "server (the first ~256 KB of each) and stores only keyed word hashes "
+    + "locally - no readable text.",
+  "index.confirm_disk":
+    "Takes roughly {size} of disk space (up to {max} for text-heavy mail); "
+    + "{free} are free on the data volume.",
+  "index.confirm_time": "This can take a while.",
   "index.estimate":
     "Estimated disk space: about {size} for {n} mails (up to {max} for "
     + "text-heavy mail); {free} free on the data volume.",
   "index.confirm_tight":
     "Warning: that may not fit on the data volume.",
-  "index.confirm_delete": "Delete the local index of this account?",
+  "index.delete_title": "Delete the local index",
+  "index.delete_body":
+    "The word index of this account is removed. You can build it again "
+    + "at any time.",
   "notice.index_cancelled": "Indexing cancelled - what was indexed is kept.",
   "search.body_hint_local":
     "Searches the local word index: whole words only, all must appear.",
@@ -512,10 +538,17 @@ export const EN: Record<string, string> = {
   "export.tip":
     "Download settings, rules, AI verdicts and the replied cache "
     + "(passwords and API keys are never exported)",
-  "import.confirm":
-    "Import this backup? Settings are overwritten, rules are replaced "
-    + "(back in report mode), verdicts and replied data are merged. "
-    + "Passwords/API keys are never imported.",
+  "backup.title": "Backup & restore",
+  "backup.help":
+    "Export downloads your settings, rules, AI verdicts and the replied "
+    + "cache as a file; import restores such a file. Passwords and API keys "
+    + "are never part of a backup.",
+  "import.title": "Import this backup",
+  "import.settings": "Settings are overwritten.",
+  "import.rules": "Rules are replaced (back in report mode).",
+  "import.merged": "AI verdicts and replied data are merged.",
+  "import.secrets": "Passwords and API keys are never imported.",
+  "import.confirm": "Import backup",
   "import.done": "Imported: {rules} rules, {verdicts} verdicts.",
   "view.all_mails": "All mails",
   "mails.sort_date": "Date",
@@ -596,7 +629,10 @@ export const EN: Record<string, string> = {
     "Outlook connects via OAuth only here (below) - register your own "
     + "OAuth client in Entra ID, see the install guide.",
   "imap.security": "IMAP security",
-  "smtp.host": "SMTP host (unsubscribe mails)",
+  "smtp.host": "SMTP host",
+  "smtp.help":
+    "SMTP is only used to send unsubscribe mails; the SMTP host defaults to "
+    + "the IMAP host.",
   "smtp.host_placeholder": "empty = IMAP host",
   "smtp.security": "SMTP security",
   "sec.auto": "auto",
@@ -620,8 +656,8 @@ export const EN: Record<string, string> = {
   "oauth.connect_device": "Connect with a device code",
   "oauth.connected": "Connected",
   "oauth.disconnect": "Disconnect",
-  "oauth.confirm_disconnect":
-    "Disconnect this account from OAuth? You can reconnect anytime.",
+  "oauth.disconnect_title": "Disconnect this account from OAuth",
+  "oauth.disconnect_body": "You can reconnect anytime.",
   "oauth.device_instructions":
     "Open the link below on any device and enter this code:",
   "folder.role_excluded":

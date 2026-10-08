@@ -19,8 +19,16 @@ export const DE: Record<string, string> = {
   "confirm.unsubscribe":
     "Von den Absendern in {k} ausgewählten Gruppe(n) abbestellen?",
   "confirm.restore": "{count} Mails wiederherstellen ({label})?",
-  "confirm.clear_verdicts": "Alle gespeicherten KI-Bewertungen löschen?",
-  "confirm.reset_spend": "KI-Kostenzähler zurücksetzen?",
+  "ai.usage": "Nutzung",
+  "ai.reset_spend": "Kosten zurücksetzen…",
+  "ai.clear_verdicts": "KI-Bewertungscache leeren…",
+  "confirm.clear_verdicts": "Alle gespeicherten KI-Bewertungen löschen",
+  "confirm.clear_verdicts_body":
+    "Die Gruppen werden beim nächsten KI-Review neu bewertet - das "
+    + "verbraucht Tokens.",
+  "confirm.clear_verdicts_confirm": "Cache leeren",
+  "confirm.reset_spend": "KI-Kostenzähler zurücksetzen",
+  "confirm.reset_spend_confirm": "Kosten zurücksetzen",
   "confirm.switch_profile":
     "Zum Kontoprofil „{name}“ wechseln? Danach neu scannen.",
   "note.ai_selected": "{note} - {n}/{of} ausgewählt",
@@ -183,7 +191,6 @@ export const DE: Record<string, string> = {
   "Date": "Datum",
   "Language": "Sprache",
   "Theme": "Design",
-  "Clear AI verdict cache": "KI-Bewertungscache leeren",
   "ai.rate": "KI: Mails bewerten",
   "sel.ai_safe": "KI: sicher löschbar",
   "sel.ai_review": "KI: prüfen",
@@ -206,10 +213,9 @@ export const DE: Record<string, string> = {
   "AI verdict cache cleared.": "KI-Bewertungscache geleert.",
   "Account profile": "Kontoprofil",
   "New": "Neu",
-  "Delete…": "Löschen…",
   "Host": "Host",
   "IMAP port": "IMAP-Port",
-  "SMTP port (unsubscribe mails)": "SMTP-Port (Abbestell-Mails)",
+  "SMTP port": "SMTP-Port",
   "User": "Benutzer",
   "Password": "Passwort",
   "(unchanged)": "(unverändert)",
@@ -221,7 +227,6 @@ export const DE: Record<string, string> = {
   "Model": "Modell",
   "API key": "API-Schlüssel",
   "(no key - AI features hidden)": "(kein Schlüssel - KI ausgeblendet)",
-  "Reset": "Zurücksetzen",
   "runs": "Läufe",
   "AI spend": "KI-Kosten",
   "Mail server (IMAP)": "Mailserver (IMAP)",
@@ -403,11 +408,17 @@ export const DE: Record<string, string> = {
   "export.tip":
     "Einstellungen, Regeln, KI-Bewertungen und Antwort-Cache "
     + "herunterladen (Passwörter und API-Schlüssel nie enthalten)",
-  "import.confirm":
-    "Dieses Backup importieren? Einstellungen werden überschrieben, "
-    + "Regeln ersetzt (wieder im Bericht-Modus), Bewertungen und "
-    + "Antwortdaten zusammengeführt. Passwörter/API-Schlüssel werden nie "
-    + "importiert.",
+  "backup.title": "Sichern & Wiederherstellen",
+  "backup.help":
+    "Der Export lädt Einstellungen, Regeln, KI-Bewertungen und den "
+    + "Antwort-Cache als Datei herunter; der Import spielt eine solche Datei "
+    + "wieder ein. Passwörter und API-Schlüssel sind nie Teil eines Backups.",
+  "import.title": "Dieses Backup importieren",
+  "import.settings": "Einstellungen werden überschrieben.",
+  "import.rules": "Regeln werden ersetzt (wieder im Bericht-Modus).",
+  "import.merged": "Bewertungen und Antwortdaten werden zusammengeführt.",
+  "import.secrets": "Passwörter und API-Schlüssel werden nie importiert.",
+  "import.confirm": "Backup importieren",
   "import.done": "Importiert: {rules} Regeln, {verdicts} Bewertungen.",
   "view.all_mails": "Alle Mails",
   "mails.sort_date": "Datum",
@@ -491,7 +502,10 @@ export const DE: Record<string, string> = {
     + "OAuth-Client in Entra ID registrieren, siehe "
     + "Installationsanleitung.",
   "imap.security": "IMAP-Verschlüsselung",
-  "smtp.host": "SMTP-Host (Abbestell-Mails)",
+  "smtp.host": "SMTP-Host",
+  "smtp.help":
+    "SMTP wird nur zum Senden von Abbestell-Mails genutzt; der SMTP-Host "
+    + "ist standardmäßig der IMAP-Host.",
   "smtp.host_placeholder": "leer = IMAP-Host",
   "smtp.security": "SMTP-Verschlüsselung",
   "sec.auto": "automatisch",
@@ -517,9 +531,8 @@ export const DE: Record<string, string> = {
   "oauth.connect_device": "Mit Ger\u00e4tecode verbinden",
   "oauth.connected": "Verbunden",
   "oauth.disconnect": "Trennen",
-  "oauth.confirm_disconnect":
-    "Dieses Konto von OAuth trennen? Eine erneute Verbindung ist "
-    + "jederzeit m\u00f6glich.",
+  "oauth.disconnect_title": "Dieses Konto von OAuth trennen",
+  "oauth.disconnect_body": "Eine erneute Verbindung ist jederzeit möglich.",
   "oauth.device_instructions":
     "Den folgenden Link auf einem beliebigen Ger\u00e4t \u00f6ffnen und diesen "
     + "Code eingeben:",
@@ -531,9 +544,21 @@ export const DE: Record<string, string> = {
     "Jedes Konto wird getrennt gescannt und aufgeräumt - Ansichten "
     + "vermischen sich nie. Bei mehreren Konten oben im Kopf umschalten.",
   "account.new_prompt": "Name für das neue Konto (z. B. \"gmail\"):",
-  "account.confirm_delete":
-    'Konto "{name}" entfernen? Seine Regeln behalten den Kontonamen und '
-    + "laufen nicht mehr; Mails auf dem Server bleiben unangetastet.",
+  "account.new_title": "Konto hinzufügen",
+  "account.rename_title": "Konto umbenennen",
+  "account.rename_confirm": "Umbenennen",
+  "account.err_empty": "Bitte einen Namen eingeben.",
+  "account.err_dup": 'Ein Konto namens "{name}" gibt es schon.',
+  "account.remove_title": "Konto entfernen",
+  "account.remove_help":
+    "Entfernt dieses Konto aus Mailbroom. Mails auf dem Server bleiben "
+    + "unangetastet.",
+  "account.delete": 'Konto "{name}" löschen…',
+  "account.delete_title": 'Konto "{name}" löschen',
+  "account.delete_rules":
+    "Seine Regeln behalten den Kontonamen, laufen aber nicht mehr.",
+  "account.delete_mails": "Mails auf dem Server bleiben unangetastet.",
+  "account.delete_confirm": "Konto löschen",
   "menu.accounts": "Konten",
   "update.available": "Eine neue Version von Mailbroom ist verfügbar.",
   "update.reload": "Neu laden",
@@ -567,6 +592,10 @@ export const DE: Record<string, string> = {
   "login.logout": "Abmelden",
   "login.admin_tip": "Admin - verwaltet die Server-Einstellungen",
   "menu.profile": "Profil & Einstellungen",
+  "tab.account_short": "Konto",
+  "tab.general_short": "Allgemein",
+  "tab.ai_short": "AI",
+  "tab.server_short": "Server",
   "tab.account": "Mail-Konto",
   "tab.general": "Allgemein",
   "tab.ai": "AI",
@@ -613,7 +642,7 @@ export const DE: Record<string, string> = {
   "sort.desc_tip": "Absteigend sortiert - Klick für aufsteigend",
   "sort.asc_tip": "Aufsteigend sortiert - Klick für absteigend",
   "qb.tip": "Filter zusammenklicken statt Syntax merken",
-  "qb.title": "Filter-Baukasten",
+  "qb.title": "Filter erstellen",
   "qb.hint": "jede hinzugefügte Bedingung muss AUCH zutreffen (UND)",
   "qb.add": "Hinzufügen",
   "qb.clear": "Leeren",
@@ -740,19 +769,23 @@ export const DE: Record<string, string> = {
   "index.update": "Jetzt aktualisieren",
   "index.rebuild": "Neu aufbauen",
   "index.delete": "Index löschen",
-  "index.confirm":
-    "Mailbroom liest jetzt den Text von {n} gescannten Mails dieses Kontos "
-    + "von Ihrem Mailserver (je die ersten ~256 KB) und speichert lokal nur "
-    + "geschlüsselte Wort-Hashes - keinen lesbaren Text.\n\nDas belegt "
-    + "etwa {size} Speicherplatz (bis zu {max} bei textlastigen Mails); auf "
-    + "dem Datenträger sind {free} frei. Das kann dauern.\n\nMöchten Sie "
-    + "fortfahren?",
+  "index.confirm_read":
+    "Liest den Text von {n} gescannten Mails dieses Kontos von Ihrem "
+    + "Mailserver (je die ersten ~256 KB) und speichert lokal nur "
+    + "geschlüsselte Wort-Hashes - keinen lesbaren Text.",
+  "index.confirm_disk":
+    "Belegt etwa {size} Speicherplatz (bis zu {max} bei textlastigen "
+    + "Mails); auf dem Datenträger sind {free} frei.",
+  "index.confirm_time": "Das kann dauern.",
   "index.estimate":
     "Geschätzter Speicherplatz: etwa {size} für {n} Mails (bis zu {max} bei "
     + "textlastigen Mails); {free} frei auf dem Datenträger.",
   "index.confirm_tight":
     "Achtung: das passt möglicherweise nicht auf den Datenträger.",
-  "index.confirm_delete": "Den lokalen Index dieses Kontos löschen?",
+  "index.delete_title": "Den lokalen Index löschen",
+  "index.delete_body":
+    "Der Wortindex dieses Kontos wird entfernt. Sie können ihn jederzeit "
+    + "neu aufbauen.",
   "notice.index_cancelled":
     "Indexierung abgebrochen - bereits Indexiertes bleibt erhalten.",
   "search.body_hint_local":

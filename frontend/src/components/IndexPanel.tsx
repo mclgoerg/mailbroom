@@ -7,7 +7,7 @@ import { fmtSize as fmtSmall } from "../lib";
 const fmtSize = (b: number): string =>
   b >= 1073741824 ? `${(b / 1073741824).toFixed(1)} GB` : fmtSmall(b);
 import type { BodySearchMode, IndexEstimate, IndexInfo } from "../types";
-import { Button, ProgressBar, Spinner } from "./ui";
+import { Button, confirmDialog, ProgressBar, Spinner } from "./ui";
 
 /** Settings -> mail-text search = "local index": status of the account's
  *  keyed word index plus build / update / rebuild / cancel / delete. The
@@ -58,12 +58,22 @@ export function IndexPanel({ account, savedMode, secretKeySet }: {
   const tight = (est: IndexEstimate) =>
     est.free > 0 && est.bytes_max > est.free * 0.9;
 
-  const build = (rebuild: boolean) => {
+  const build = async (rebuild: boolean) => {
     const est = rebuild ? info!.estimate_full : info!.estimate;
     // Nothing to read (e.g. an up-to-date index): nothing to consent to.
-    if (est.mails > 0 && !confirm(
-      t("index.confirm", params(est))
-        + (tight(est) ? "\n\n" + t("index.confirm_tight") : ""))) return;
+    if (est.mails > 0 && !await confirmDialog({
+      title: t(!info!.usable ? "index.build"
+        : rebuild ? "index.rebuild" : "index.update"),
+      bullets: [
+        t("index.confirm_read", params(est)),
+        t("index.confirm_disk", params(est)),
+        t("index.confirm_time"),
+        ...(tight(est) ? [<span className="text-danger-fg">
+          {t("index.confirm_tight")}</span>] : []),
+      ],
+      confirmLabel: t(!info!.usable ? "index.build"
+        : rebuild ? "index.rebuild" : "index.update"),
+    })) return;
     act(() => api.indexBuild(account, rebuild));
   };
 
@@ -128,9 +138,12 @@ export function IndexPanel({ account, savedMode, secretKeySet }: {
             </Button>
           )}
           {info.exists && (
-            <Button variant="secondary" onClick={() => {
-              if (confirm(t("index.confirm_delete")))
-                act(() => api.indexDelete(account));
+            <Button variant="secondary" onClick={async () => {
+              if (await confirmDialog({
+                title: t("index.delete_title"),
+                body: t("index.delete_body"),
+                confirmLabel: t("index.delete"), tone: "danger",
+              })) act(() => api.indexDelete(account));
             }}>{t("index.delete")}</Button>
           )}
         </>)}

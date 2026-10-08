@@ -2,7 +2,8 @@
 /* Provider presets: selecting one prefills the connection fields but
  * keeps everything editable; "custom" changes nothing. */
 
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within }
+  from "@testing-library/react";
 import { afterEach, expect, test, vi } from "vitest";
 
 const foldersCalls: (string | undefined)[] = [];
@@ -24,6 +25,7 @@ vi.mock("./api", () => ({
       testDigestCalls.push(account);
       return Promise.resolve(testDigestResult);
     },
+    getConfig: () => Promise.resolve({}),
     adminStats: () => Promise.resolve({ tenants: [{
       id: "alice_x.example_ab12cd34", label: "", is_admin_workspace: false,
       accounts: 1, mails: 42, size: 1048576, scans: 3,
@@ -39,6 +41,9 @@ vi.mock("./api", () => ({
 }));
 
 import { SettingsModal } from "./components/SettingsModal";
+import { DialogProvider } from "./components/ui";
+import { cancelDialog, expectNoDialog, findDialog, pressDialog }
+  from "./dialogTestUtils";
 import type { Config } from "./types";
 
 const acct = {
@@ -136,16 +141,149 @@ test("folder discovery follows the account being edited", () => {
   expect(foldersCalls).toEqual(["default", "icloud", "icloud"]);
 });
 
-test("rename sends rename_account for the edited account", () => {
+const renderWithDialogs = (over: Partial<Parameters<typeof SettingsModal>[0]>
+  = {}) => render(<DialogProvider><SettingsModal cfg={cfg} account="default"
+  onClose={() => {}} onSaved={() => {}} onAccountsChanged={() => {}}
+  {...over} /></DialogProvider>);
+
+test("rename sends rename_account for the edited account", async () => {
   saveCalls.length = 0;
-  vi.stubGlobal("prompt", () => "bridge");
-  render(<SettingsModal cfg={cfg} account="default" onClose={() => {}}
-    onSaved={() => {}} onAccountsChanged={() => {}} />);
+  renderWithDialogs();
   fireEvent.click(screen.getByText("Rename…"));
-  expect(saveCalls).toEqual(
-    [{ rename_account: { from: "default", to: "bridge" } }]);
+  const dlg = await findDialog();
+  fireEvent.change(within(dlg).getByRole("textbox"),
+    { target: { value: "bridge" } });
+  await pressDialog("Rename");
+  await waitFor(() => expect(saveCalls).toEqual(
+    [{ rename_account: { from: "default", to: "bridge" } }]));
+});
+
+test("rename validates: empty and duplicate names are refused", async () => {
+  saveCalls.length = 0;
+  renderWithDialogs();
+  fireEvent.click(screen.getByText("Rename…"));
+  const dlg = await findDialog();
+  const box = within(dlg).getByRole("textbox");
+  fireEvent.change(box, { target: { value: "  " } });
+  expect(within(dlg).getByRole("alert").textContent).toBe("Enter a name.");
+  fireEvent.change(box, { target: { value: "icloud" } });
+  expect(within(dlg).getByRole("alert").textContent)
+    .toContain('"icloud" already exists');
+  await pressDialog("Rename");               // refused: dialog stays open
+  expect(await findDialog()).toBe(dlg);
+  expect(saveCalls).toEqual([]);
+  await cancelDialog();
+  await expectNoDialog();
+  expect(saveCalls).toEqual([]);
+});
+
+test("a new account is named in a prompt and sent as add_account",
+  async () => {
+    saveCalls.length = 0;
+    renderWithDialogs();
+    fireEvent.click(screen.getByText("Add account"));
+    const dlg = await findDialog();
+    fireEvent.change(within(dlg).getByRole("textbox"),
+      { target: { value: " gmail " } });
+    await pressDialog("Add account");
+    await waitFor(() => expect(saveCalls).toEqual([{ add_account: "gmail" }]));
+  });
+
+test("deleting an account names it in a danger dialog; Cancel keeps it",
+  async () => {
+    saveCalls.length = 0;
+    renderWithDialogs();
+    fireEvent.click(screen.getByText('Delete account "default"…'));
+    const dlg = await findDialog();
+    expect(dlg.textContent).toContain('Delete account "default"');
+    expect(dlg.textContent).toContain("Mails on the server are untouched.");
+    await cancelDialog();
+    await expectNoDialog();
+    expect(saveCalls).toEqual([]);
+    fireEvent.click(screen.getByText('Delete account "default"…'));
+    await pressDialog("Delete account");
+    await waitFor(() => expect(saveCalls).toEqual(
+      [{ delete_account: "default" }]));
+  });
+
+test("a single account cannot be deleted (no Remove section)", () => {
+  renderWithDialogs({ cfg: { ...cfg, accounts: { default: acct } } });
+  expect(screen.queryByText("Remove account")).toBeNull();
+});
+
+test("tabs switch the visible section", () => {
+  renderWithDialogs();
+  expect(screen.getByRole("tab", { name: "Mail account" })
+    .getAttribute("aria-selected")).toBe("true");
+  fireEvent.click(screen.getByRole("tab", { name: "General" }));
+  expect(screen.getByText("Backup & restore")).toBeTruthy();
+  expect(screen.queryByLabelText("Host")).toBeNull();
+  fireEvent.click(screen.getByRole("tab", { name: "AI" }));
+  expect(screen.getByText("Usage")).toBeTruthy();
+  expect(screen.queryByText("Backup & restore")).toBeNull();
+});
+
+test("Cancel closes without saving; Save saves and stays open", () => {
+  saveCalls.length = 0;
+  const onClose = vi.fn();
+  renderWithDialogs({ onClose });
+  fireEvent.change(hostInput(), { target: { value: "imap.edited.example" } });
+  fireEvent.click(screen.getByText("Cancel"));
+  expect(onClose).toHaveBeenCalledTimes(1);
+  expect(saveCalls).toEqual([]);
+  fireEvent.click(screen.getByText("Save"));
+  expect(saveCalls).toHaveLength(1);
+  expect(onClose).toHaveBeenCalledTimes(1);
+});
+
+test("Export and Import live in General > Backup & restore", async () => {
+  vi.stubGlobal("fetch", vi.fn(() => Promise.resolve(
+    { ok: true, json: () => Promise.resolve({ rules: 2, verdicts: 3 }) })));
+  const onSaved = vi.fn();
+  const { container } = renderWithDialogs({ onSaved });
+  expect(screen.queryByText("Export")).toBeNull();
+  fireEvent.click(screen.getByRole("tab", { name: "General" }));
+  expect(screen.getByText("Export")).toBeTruthy();
+  const input = container.querySelector('input[type="file"]') as HTMLInputElement;
+  const pick = () => fireEvent.change(input, { target: { files: [
+    new File(['{"rules":[]}'], "backup.json", { type: "application/json" })] } });
+  // declining the import confirm sends nothing
+  pick();
+  await cancelDialog();
+  await expectNoDialog();
+  expect(fetch).not.toHaveBeenCalled();
+  // confirming imports and refreshes the config
+  pick();
+  const dlg = await findDialog();
+  expect(dlg.textContent).toContain("Settings are overwritten.");
+  await pressDialog("Import backup");
+  await waitFor(() => expect(onSaved).toHaveBeenCalled());
+  expect(fetch).toHaveBeenCalledWith("/api/import_config",
+    expect.objectContaining({ method: "POST" }));
+  await screen.findByText("Imported: 2 rules, 3 verdicts.");
   vi.unstubAllGlobals();
 });
+
+test("resetting AI spend and clearing verdicts need a confirmation",
+  async () => {
+    saveCalls.length = 0;
+    renderWithDialogs();
+    fireEvent.click(screen.getByRole("tab", { name: "AI" }));
+    fireEvent.click(screen.getByText("Reset spend…"));
+    await cancelDialog();
+    fireEvent.click(screen.getByText("Clear AI verdict cache…"));
+    await cancelDialog();
+    await expectNoDialog();
+    expect(saveCalls).toEqual([]);
+    fireEvent.click(screen.getByText("Reset spend…"));
+    await pressDialog("Reset spend");
+    await waitFor(() => expect(saveCalls).toEqual(
+      [{ reset_ai_stats: true }]));
+    fireEvent.click(screen.getByText("Clear AI verdict cache…"));
+    await pressDialog("Clear cache");
+    await waitFor(() => expect(saveCalls.at(-1)).toEqual(
+      { clear_ai_verdicts: true }));
+  });
 
 test("server settings (login + shared AI) are admin-only", () => {
   saveCalls.length = 0;
