@@ -148,6 +148,20 @@ def test_send_digest_sends_and_records_last_sent_and_audit(monkeypatch):
         is None
 
 
+def test_send_digest_logs_the_recipient_masked(monkeypatch, caplog):
+    monkeypatch.setattr(smtpout, "send",
+                        lambda im, to, subj, text, html=None,
+                        account_name=None: None)
+    _configure_account(recipient="digest@elsewhere.example")
+    auditlog.record("trash", account="default", count=1, size=100)
+    with caplog.at_level("INFO", logger="pmc.digest"):
+        digestmod.send_digest("default")
+    text = caplog.text
+    assert "d***@elsewhere.example" in text
+    assert "digest@elsewhere.example" not in text
+    assert digestmod._masked("no-at-sign") == "***"
+
+
 def test_send_digest_falls_back_to_the_accounts_own_address(monkeypatch):
     calls = []
     monkeypatch.setattr(smtpout, "send",

@@ -38,6 +38,14 @@ from . import tenants
 
 log = logging.getLogger("pmc.digest")
 
+
+def _masked(addr: str) -> str:
+    """'jane@example.com' -> 'j***@example.com' for log lines: enough to
+    tell which recipient was used, without writing the full address to the
+    server log (the audit log keeps it for the account owner)."""
+    local, at, domain = addr.partition("@")
+    return f"{local[:1]}***{at}{domain}" if at else "***"
+
 DIGEST_PATH = Path(os.environ.get("DIGEST_PATH", "/data/digest.json"))
 CHECK_INTERVAL = int(os.environ.get("DIGEST_INTERVAL", "1800"))  # seconds
 
@@ -433,7 +441,8 @@ def send_digest(account: str, test: bool = False) -> dict:
         _record_sent(account, now)
     auditlog.record("digest_sent", account=account, label=recipient,
                     outcome="ok")
-    log.info("[%s] activity digest sent to %s%s%s", account, recipient,
+    log.info("[%s] activity digest sent to %s%s%s", account,
+             _masked(recipient),
              " (test)" if test else "", " (demo data)" if demo else "")
     return {"sent": True, "demo": demo}
 
