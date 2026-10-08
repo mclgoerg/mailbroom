@@ -302,32 +302,40 @@ export default function App() {
      toasts (a page load or account switch that finds an old "done" stays
      quiet); a scan error is the one exception, nothing else shows it. */
   const seenJobs = useRef<{ scan?: string; d?: string; a?: string;
-    u?: string; undo: string[]; seq?: number } | null>(null);
+    u?: string; undo: string[]; seq?: number; maxSeq?: number } | null>(null);
   const startToast = useRef<{ unsub?: number }>({});
   useEffect(() => {
     if (!state) { seenJobs.current = null; return; }
     const prev = seenJobs.current;
     const { delete: del, ai, unsub } = state;
     const ids = state.undo.map(undoId);
+    // `seq` only grows. A response carrying a LOWER one is older than what
+    // we already saw (a slow full-state fetch landing after newer ticks):
+    // its delete state and undo list are ignored, never toasted.
+    const staleDel = prev?.maxSeq != null && del.seq != null
+      && del.seq < prev.maxSeq;
+    const maxSeq = Math.max(prev?.maxSeq ?? -Infinity, del.seq ?? -Infinity);
     // Undo entries are also recorded mid-job, so while a move runs the
     // baseline stays what it was before it started.
-    seenJobs.current = { scan: state.status, d: del.status,
-      a: ai.status, u: unsub?.status,
-      undo: del.status === "running" && prev ? prev.undo : ids,
+    seenJobs.current = { scan: state.status,
+      d: staleDel ? prev!.d : del.status,
+      a: ai.status, u: unsub?.status, maxSeq,
+      undo: staleDel || (del.status === "running" && prev) ? prev!.undo : ids,
       // Job sequence number BEFORE the current job (backend `delete.seq`,
       // bumped when a job starts). The baseline is set to "running" right
       // after a start call succeeds, so a stale tick still in flight from
       // before it (status done, the OLD seq) would otherwise look like the
       // new job finishing; counts can't tell them apart (mark-read x3).
       // Held while running; a page loaded mid-job counts as "this job".
-      seq: del.status === "running"
+      seq: staleDel || del.status === "running"
         ? (prev ? prev.seq : (del.seq ?? 0) - 1) : del.seq };
     if (state.status === "error" && prev?.scan !== "error")
       notify(t("err.generic", { msg: state.error }), "error");
     if (!prev) return;
-    const fresh = state.undo.filter((u) => !prev.undo.includes(undoId(u)));
-    const newJob = del.seq != null && del.seq !== prev.seq;
-    if (del.status !== "running" && (fresh.length || newJob
+    const fresh = staleDel ? []
+      : state.undo.filter((u) => !prev.undo.includes(undoId(u)));
+    const newJob = del.seq != null && prev.seq != null && del.seq > prev.seq;
+    if (!staleDel && del.status !== "running" && (fresh.length || newJob
         || (del.seq == null && del.status !== prev.d))) {
       if (del.status === "error") {
         notify(t("err.generic", { msg: del.error }), "error");

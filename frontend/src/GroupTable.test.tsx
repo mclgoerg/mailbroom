@@ -453,7 +453,7 @@ describe("localizedSub", () => {
 
 describe("GroupTable focus", () => {
   afterEach(cleanup);
-  it("parks focus on the list when the focused row disappears", () => {
+  it("moves focus to the replacement row, or the list when none is left", () => {
     const { container, rerender } = renderTable({ groups: [mk(0), mk(1)] });
     const row = container.querySelector("tbody tr button") as HTMLElement;
     row.focus();
@@ -462,7 +462,12 @@ describe("GroupTable focus", () => {
       onToggle={noop} onToggleAll={noop} onOpen={noop} onAckUnsub={noop}
       sortK="count" sortDir={-1} onSort={noop} groupLabel="Sender" resetSignal="a" />);
     expect(row.isConnected).toBe(false);
-    expect(document.activeElement)
+    expect(document.activeElement!.textContent).toBe("Sender 1");  // took its place
+    document.querySelector<HTMLElement>("tbody tr button")!.focus();
+    rerender(<GroupTable groups={[]} selected={new Set()} focusedKey={null}
+      onToggle={noop} onToggleAll={noop} onOpen={noop} onAckUnsub={noop}
+      sortK="count" sortDir={-1} onSort={noop} groupLabel="Sender" resetSignal="a" />);
+    expect(document.activeElement)                    // no rows left: the list
       .toBe(container.querySelector("[data-focus-return]"));
   });
 
@@ -472,5 +477,26 @@ describe("GroupTable focus", () => {
       onToggle={noop} onToggleAll={noop} onOpen={noop} onAckUnsub={noop}
       sortK="count" sortDir={-1} onSort={noop} groupLabel="Sender" resetSignal="a" />);
     expect(document.activeElement).toBe(document.body);
+  });
+});
+
+describe("GroupTable focus lands on the row that took the place", () => {
+  afterEach(cleanup);
+  const re = (groups: Group[]) => (<GroupTable groups={groups} selected={new Set()}
+    focusedKey={null} onToggle={noop} onToggleAll={noop} onOpen={noop}
+    onAckUnsub={noop} sortK="count" sortDir={-1} onSort={noop}
+    groupLabel="Sender" resetSignal="a" />);
+  it("focuses the next row, or the previous when the last one was removed", () => {
+    const { container, rerender } = render(re([mk(0), mk(1), mk(2)]));
+    const title = (i: number) => container.querySelectorAll("tbody tr")[i]
+      .querySelector("button") as HTMLElement;
+    title(1).focus();
+    rerender(re([mk(0), mk(2)]));                    // row 1 trashed
+    expect(document.activeElement).toBe(title(1));   // now Sender 2's button
+    expect(document.activeElement!.textContent).toBe("Sender 2");
+    rerender(re([mk(0), mk(2)].slice(0, 2)));
+    title(1).focus();
+    rerender(re([mk(0)]));                           // the last one trashed
+    expect(document.activeElement!.textContent).toBe("Sender 0");
   });
 });

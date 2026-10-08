@@ -101,7 +101,9 @@ const RULES: Rule[] = [
     }
     return bad;
   } },
-  { name: "!important utility", custom: (src) => {
+  { name: "!important utility", custom: (full) => {
+    // Prose inside t("…") is text, not classes.
+    const src = full.replace(/\bt\(\s*(["'`])(?:(?!\1)[^\\]|\\.)*\1/g, 't("")');
     // Prefix (`!px-2`) and Tailwind v4 suffix (`px-2!`) forms; the suffix is
     // normalised so one allowlist covers both.
     const util = "(?:min-|max-|[hw]-|[pm][xytrbl]?-|bg-|text-|rounded|border|"
@@ -111,7 +113,10 @@ const RULES: Rule[] = [
     // assertions (`ref!.current`, `outlineEl!`) and prose ("...ring!") pass.
     const suf = new RegExp(
       `(?<=[\\s"'\`:])${util}[a-z0-9./\\[\\]-]*!(?![\\w=.])`, "g");
-    return [...src.matchAll(pre), ...[...src.matchAll(suf)].filter((m) => m[0].includes("-"))]
+    // Bare Tailwind roots have no `-` to go by, so they are listed.
+    const bare = /(?<=[\s"'`:])(?:border|shadow|rounded|ring|outline)!(?![\w=.])/g;
+    return [...src.matchAll(pre), ...src.matchAll(bare),
+      ...[...src.matchAll(suf)].filter((m) => m[0].includes("-"))]
       .map((m) => m[0].endsWith("!") ? "!" + m[0].slice(0, -1) : m[0])
       .filter((t) => !BANG_ALLOWED.has(t));
   } },
@@ -187,6 +192,9 @@ test("the guard flags known-bad snippets", () => {
     ["!important", '<p className="min-h-7!">'],
     ["!important", '<p className="px-2!">'],
     ["!important", '<p className="sm:px-2! text-muted">'],
+    ["!important", '<p className="border!">'],
+    ["!important", '<p className="rounded! shadow! ring! outline!">'],
+    ["!important", '<p className="sm:ring!">'],
     ["!important", '<p className={`rounded-md! ${x}`}>'],
     ["transform", '<Button className="sm:-translate-y-1/2">x</Button>'],
     ["transform", '<Chip className="md:rotate-45">x</Chip>'],
@@ -225,6 +233,7 @@ test("the guard accepts the sanctioned patterns", () => {
     // non-null assertions, prose, and variable sizes on non-icon components
     "const el = ref!.current; outlineEl!.focus(); ringEl!;",
     't("Almost there, keep going - ring!")',
+    't("This is text-heavy!") + t(`Very border! px-2! indeed`)',
     '<Modal size={sz}>x</Modal> <Button size={s}>x</Button> <Avatar size={sz} /> <Spinner size={sp} />',
     'import { X } from "lucide-react"; <X size={16} /> <Spinner size={s} />',
   ];

@@ -787,12 +787,12 @@ export function Modal({ children, onClose, full = false, size, label,
         data-size={sz}
         className={`flex w-full flex-col overflow-hidden border-line bg-panel outline-none
         sm:rounded-dialog sm:border ${MODAL_WIDTH[sz]} ${shape}${inset}`}>
-        {scrolls ? (
-          <div className="flex min-h-0 flex-1 flex-col overflow-y-auto
-            sm:flex-initial">
-            {children}
-          </div>
-        ) : children}
+        {/* Always rendered (`contents` when not scrolling): `full` can flip
+            while open, and a changing tree would remount the content. */}
+        <div className={scrolls ? `flex min-h-0 flex-1 flex-col
+          overflow-y-auto sm:flex-initial` : "contents"}>
+          {children}
+        </div>
       </div>
     </div>
   );

@@ -1,5 +1,7 @@
 """API-level tests via FastAPI's TestClient (no server, no network)."""
 
+import time
+
 import pytest
 from fastapi.testclient import TestClient
 
@@ -102,7 +104,7 @@ def test_scan_group_delete_via_api(bridge):
     assert st["delete"]["moved"] == 3
     assert len(st["undo"]) == 1
     seq1 = st["delete"]["seq"]
-    assert seq1 >= 1
+    assert seq1 >= int(time.time()) - 3600   # clock-seeded, survives restarts
 
     # Every new job gets a new sequence number (the UI uses it to tell a
     # finished job from a stale tick of the previous one, even when the

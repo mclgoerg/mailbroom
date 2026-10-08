@@ -374,17 +374,32 @@ export function GroupTable(props: Props) {
   // the rows change under it, park focus on the list itself.
   const root = useRef<HTMLDivElement>(null);
   const focusInside = useRef(false);
+  const focusIdx = useRef(-1);     // absolute index of the row focus was in
   useEffect(() => {
     const onIn = (e: FocusEvent) => {
-      focusInside.current = !!root.current?.contains(e.target as Node);
+      const el = e.target as HTMLElement;
+      focusInside.current = !!root.current?.contains(el);
+      const row = focusInside.current ? el.closest("[data-gidx]") : null;
+      if (row) focusIdx.current = Number(row.getAttribute("data-gidx"));
     };
     document.addEventListener("focusin", onIn);
     return () => document.removeEventListener("focusin", onIn);
   }, []);
   useEffect(() => {
     const a = document.activeElement;
-    if (focusInside.current && (!a || a === document.body) && !isModalOpen())
-      root.current?.focus({ preventScroll: true });
+    if (!focusInside.current || (a && a !== document.body) || isModalOpen())
+      return;
+    // The row that took the removed row's place (the previous one if it was
+    // the last); the list itself if there is no visible row to land on.
+    const want = Math.min(focusIdx.current, groups.length - 1);
+    const rows = want < 0 ? [] : [...root.current!.querySelectorAll(
+      `[data-gidx="${want}"]`)] as HTMLElement[];
+    // (the table and card twins: only one is laid out; jsdom has no layout)
+    const laidOut = document.documentElement.getClientRects().length > 0;
+    const row = laidOut ? rows.find((r) => r.getClientRects().length > 0)
+      : rows[0];
+    (row?.querySelector<HTMLElement>("button") ?? root.current)
+      ?.focus({ preventScroll: true });
   }, [groups]);
   const [perPage, setPerPage] = useState(() =>
     Number(localStorage.getItem("pmc_page_size")) || 50);

@@ -297,3 +297,29 @@ test("a short job that skips the running state still toasts (new seq, no undo)",
     tick({ delete: job("done", { moved: 5, seq: 2 }) as any });
     expect(await screen.findByText("Done: 5 mails processed.")).toBeTruthy();
   });
+
+test("a higher seq after running still toasts (positive control)",
+  async () => {
+    await mount({ ...baseState, delete: job("done", { moved: 5, seq: 10 }) as any });
+    tick({ delete: job("running", { seq: 11 }) as any });
+    tick({ delete: job("done", { moved: 64, seq: 11 }) as any,
+      undo: [{ ts: 5, label: "Shop News", count: 64, action: "trash" }] });
+    expect(await screen.findByText("Moved 64 mails to Trash")).toBeTruthy();
+    cleanup();
+  });
+
+test("lower seq after a higher one: no toast now and no duplicate later", async () => {
+  await mount({ ...baseState, delete: job("done", { moved: 5, seq: 10 }) as any });
+  tick({ delete: job("done", { moved: 64, seq: 11 }) as any,
+    undo: [{ ts: 5, label: "Shop News", count: 64, action: "trash" }] });
+  await screen.findByText("Moved 64 mails to Trash");
+  const count = () => document.querySelectorAll("[data-variant]").length;
+  const before = count();
+  // A slow full-state fetch of the PREVIOUS state lands now (seq 10, old undo).
+  tick({ delete: job("done", { moved: 5, seq: 10 }) as any, undo: [] });
+  tick({ delete: job("done", { moved: 64, seq: 11 }) as any,
+    undo: [{ ts: 5, label: "Shop News", count: 64, action: "trash" }] });
+  expect(count()).toBe(before);                     // no false or duplicate toast
+  expect(screen.queryByText(/Done: /)).toBeNull();
+});
+

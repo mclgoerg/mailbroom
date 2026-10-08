@@ -49,10 +49,16 @@ describe("i18n", () => {
     for (const [k, v] of [...Object.entries(EN), ...Object.entries(DE)]) {
       expect(v, k).not.toMatch(/\((s|n|e|en)\)/);
     }
-    // A _one entry's base key must exist and use the same placeholders.
-    for (const k of ones(EN)) {
-      expect(EN[k.slice(0, -4)], k).toBeTruthy();
-      expect(DE[k.slice(0, -4)], k).toBeTruthy();
+    // A _one entry's base key must exist and use the same placeholders; only
+    // the count itself ({n} / {count}) may be spelled out ("1 mail").
+    const ph = (s: string) => new Set(s.match(/\{\w+\}/g) ?? []);
+    for (const dict of [EN, DE]) for (const k of ones(dict)) {
+      const base = dict[k.slice(0, -4)];
+      expect(base, k).toBeTruthy();
+      const [many, one] = [ph(base), ph(dict[k])];
+      expect([...one].filter((p) => !many.has(p)), k).toEqual([]);
+      expect([...many].filter((p) => !one.has(p)
+        && p !== "{n}" && p !== "{count}"), k).toEqual([]);
     }
   });
 });

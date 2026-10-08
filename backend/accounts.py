@@ -9,6 +9,7 @@ are created lazily from the configured account names.
 from __future__ import annotations
 
 import threading
+import time
 
 from . import config as cfgmod
 from . import tenants
@@ -23,7 +24,10 @@ def _initial_state() -> dict:
         "ai": {"status": "idle", "grouping": "", "progress": "", "error": "",
                "usage": None},
         "delete": {"status": "idle", "progress": "", "error": "", "moved": 0,
-                   "seq": 0},
+                   # Job sequence, seeded from the clock so it never goes
+                   # backwards across a server restart (a client that stayed
+                   # open compares it monotonically).
+                   "seq": int(time.time())},
         "atts": {"status": "idle", "progress": "", "error": "",
                  "mails": 0, "size": 0},   # attachment analysis (lazy)
         "unsub": {"status": "idle", "progress": "", "error": "", "total": 0,
