@@ -1,8 +1,8 @@
-import { ArrowDown, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight }
-  from "lucide-react";
+import { ArrowDown, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight,
+  MessagesSquare } from "lucide-react";
 import { useEffect, useState, type MouseEvent } from "react";
 import { fmtSize } from "../api";
-import type { Group } from "../types";
+import type { Group, Grouping } from "../types";
 import { t } from "../i18n";
 import { AiTag, Avatar, Button, Checkbox, EngagementMeter, PinBadge, RatingChips, ShortDate, Tag, Select } from "./ui";
 
@@ -27,7 +27,24 @@ interface Props {
   sortDir: number;
   onSort: (k: SortKey) => void;
   groupLabel: string;
+  grouping?: Grouping;   // "thread" rows show a sender / neutral avatar
   resetSignal: string;   // page resets to 1 when this changes (mode/filter)
+}
+
+/** The row's avatar. A thread's label is its subject, and a subject's
+ *  first letter says nothing - so thread rows show their first sender, or a
+ *  neutral icon avatar when there is none. */
+function RowAvatar({ g, grouping }: { g: Group; grouping?: Grouping }) {
+  if (grouping !== "thread") {
+    return <Avatar name={g.label || g.key} size="md" />;
+  }
+  const first = g.samples[0];
+  return first ? <Avatar name={first} size="md" /> : (
+    <span aria-hidden className="inline-flex size-8 shrink-0 items-center
+      justify-center rounded-full bg-chip text-faint">
+      <MessagesSquare size={16} />
+    </span>
+  );
 }
 
 interface PageProps extends Props {
@@ -96,7 +113,7 @@ function UnsubBadge({ g, onAck }: { g: Group; onAck: (addr: string) => void }) {
    grouping mode (and with it the content) changes. */
 function DesktopTable({ slice, baseIdx, selected, focusedKey, onToggle,
   onToggleAll, onOpen, blockedKeys,
-  onAckUnsub, sortK, sortDir, onSort, groupLabel
+  onAckUnsub, sortK, sortDir, onSort, groupLabel, grouping
 }: PageProps) {
   // Sort indicator, inline after the label: the active column shows an
   // accent arrow that ROTATES between directions; inactive sortable columns
@@ -183,7 +200,7 @@ function DesktopTable({ slice, baseIdx, selected, focusedKey, onToggle,
                 onChange={() => onToggle(g.key)} />
             </td>
             <td className="py-2 pl-0 pr-2 align-top">
-              <Avatar name={g.label || g.key} size="md" />
+              <RowAvatar g={g} grouping={grouping} />
             </td>
             <td className="min-w-0 px-2 py-2">
               <button
@@ -263,7 +280,7 @@ function DesktopTable({ slice, baseIdx, selected, focusedKey, onToggle,
 
 /* Mobile: a card list - no table semantics, no horizontal squeeze. */
 function MobileCards({ slice, baseIdx, selected, focusedKey, onToggle,
-  onOpen, blockedKeys, onAckUnsub
+  onOpen, blockedKeys, onAckUnsub, grouping
 }: PageProps) {
   return (
     <div>
@@ -281,7 +298,7 @@ function MobileCards({ slice, baseIdx, selected, focusedKey, onToggle,
               real <button>, so keyboard and screen-reader users can too. */}
           <div className="flex min-w-0 flex-1 cursor-pointer items-center
             gap-3 py-2.5 pr-1" onClick={() => onOpen(g)}>
-            <Avatar name={g.label || g.key} size="md" />
+            <RowAvatar g={g} grouping={grouping} />
             <div className="min-w-0 flex-1">
               <button type="button" data-no-open
                 className="block w-full cursor-pointer truncate text-left

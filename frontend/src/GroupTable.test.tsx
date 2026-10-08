@@ -393,3 +393,47 @@ describe("GroupTable rows and header", () => {
     expect(onOpen).toHaveBeenCalledTimes(3);
   });
 });
+
+describe("GroupTable avatars and phone cards", () => {
+  beforeEach(() => setLang("en"));
+  afterEach(cleanup);
+
+  const avatars = (c: HTMLElement) =>
+    [...c.querySelectorAll("tbody tr td:nth-child(2) > *")];
+
+  it("thread rows use the first sender's avatar, never the subject letter", () => {
+    const g = { ...mk(0), label: "Re: Quarterly plan", samples: ["news@x.example"] };
+    const { container } = renderTable({ groups: [g], grouping: "thread" });
+    expect(avatars(container)[0].textContent).toBe("n");
+    const letters = [...container.querySelectorAll("span.rounded-full")]
+      .map((a) => a.textContent);
+    expect(letters).toEqual(["n", "n"]);                // table + card, no "R"
+  });
+
+  it("a thread without a known sender gets a neutral icon avatar", () => {
+    const g = { ...mk(0), label: "Quarterly plan", samples: [] };
+    const { container } = renderTable({ groups: [g], grouping: "thread" });
+    const av = avatars(container)[0];
+    expect(av.textContent).toBe("");                    // no letter at all
+    expect(av.querySelector("svg")).toBeTruthy();
+    expect(av.className).toContain("bg-chip");
+  });
+
+  it("other groupings keep the letter avatar", () => {
+    const { container } = renderTable({ groups: [mk(0)], grouping: "sender" });
+    expect(avatars(container)[0].textContent).toBe("S");
+  });
+
+  it("a phone card's title is a real button that opens the detail once", () => {
+    const onOpen = vi.fn();
+    const { container } = renderTable({ groups: [mk(0)], onOpen });
+    const card = container.querySelector(".md\\:hidden")!;
+    const title = card.querySelector("button[data-no-open]") as HTMLElement;
+    expect(title.textContent).toBe("Sender 0");
+    fireEvent.click(title);
+    expect(onOpen).toHaveBeenCalledTimes(1);            // not twice (bubbling)
+    fireEvent.click(card.querySelector(".cursor-pointer.gap-3")!);
+    expect(onOpen).toHaveBeenCalledTimes(2);            // the card body still works
+  });
+});
+

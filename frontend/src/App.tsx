@@ -1496,6 +1496,7 @@ export default function App() {
             else { setSortK(k); setSortDir(k === "label" ? 1 : -1); }
           }}
           groupLabel={t(GROUPING_LABEL[mode])}
+          grouping={mode}
           resetSignal={`${mode}\u0000${filter}`}
         />
       ) : (
