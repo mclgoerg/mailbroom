@@ -55,15 +55,15 @@ describe("GroupTable pagination", () => {
   });
 
   it("navigates with next / last / first", () => {
-    const { container, getByText } = renderTable();
-    fireEvent.click(getByText("›"));
+    const { container, getByText, getByRole } = renderTable();
+    fireEvent.click(getByRole("button", { name: "Next page" }));
     getByText("Page 2 / 3");
     expect(container.querySelector("tbody tr")!.textContent)
       .toContain("Sender 50");
-    fireEvent.click(getByText("»"));
+    fireEvent.click(getByRole("button", { name: "Last page" }));
     getByText("Page 3 / 3");
     expect(rows(container)).toBe(20);
-    fireEvent.click(getByText("«"));
+    fireEvent.click(getByRole("button", { name: "First page" }));
     getByText("Page 1 / 3");
   });
 

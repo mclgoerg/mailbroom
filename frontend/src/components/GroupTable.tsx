@@ -1,4 +1,5 @@
-import { ArrowDown, ChevronRight } from "lucide-react";
+import { ArrowDown, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight }
+  from "lucide-react";
 import { useEffect, useState, type MouseEvent } from "react";
 import { fmtSize } from "../api";
 import type { Group } from "../types";
@@ -276,11 +277,18 @@ function MobileCards({ slice, baseIdx, selected, focusedKey, onToggle,
             className="w-11 shrink-0 self-stretch coarse:min-h-0"
             aria-label={t("Select {label}", { label: g.label || g.key })}
             onChange={() => onToggle(g.key)} />
+          {/* Taps anywhere on the card open the detail; the title is the
+              real <button>, so keyboard and screen-reader users can too. */}
           <div className="flex min-w-0 flex-1 cursor-pointer items-center
             gap-3 py-2.5 pr-1" onClick={() => onOpen(g)}>
             <Avatar name={g.label || g.key} size="md" />
             <div className="min-w-0 flex-1">
-              <div className="truncate type-body-mobile">{g.label}</div>
+              <button type="button" data-no-open
+                className="block w-full cursor-pointer truncate text-left
+                  type-body-mobile"
+                onClick={(e) => { e.stopPropagation(); onOpen(g); }}>
+                {g.label}
+              </button>
               {g.sub && (
                 <div className="truncate type-meta text-muted">{g.sub}</div>
               )}
@@ -362,16 +370,28 @@ export function GroupTable(props: Props) {
         <div className="flex flex-wrap items-center justify-center gap-2
           py-3 type-meta text-muted">
           <Button variant="secondary" size="sm"
-              disabled={page === 0} onClick={() => setPage(0)}>«</Button>
+              aria-label={t("page.first")} title={t("page.first")}
+              disabled={page === 0} onClick={() => setPage(0)}>
+            <ChevronsLeft size={16} />
+          </Button>
           <Button variant="secondary" size="sm"
-              disabled={page === 0} onClick={() => setPage(page - 1)}>‹</Button>
+              aria-label={t("page.prev")} title={t("page.prev")}
+              disabled={page === 0} onClick={() => setPage(page - 1)}>
+            <ChevronLeft size={16} />
+          </Button>
           <span className="tabular-nums">
             {t("page.of", { p: page + 1, n: maxPage + 1 })}
           </span>
           <Button variant="secondary" size="sm"
-              disabled={page >= maxPage} onClick={() => setPage(page + 1)}>›</Button>
+              aria-label={t("page.next")} title={t("page.next")}
+              disabled={page >= maxPage} onClick={() => setPage(page + 1)}>
+            <ChevronRight size={16} />
+          </Button>
           <Button variant="secondary" size="sm"
-              disabled={page >= maxPage} onClick={() => setPage(maxPage)}>»</Button>
+              aria-label={t("page.last")} title={t("page.last")}
+              disabled={page >= maxPage} onClick={() => setPage(maxPage)}>
+            <ChevronsRight size={16} />
+          </Button>
           <Select
             value={perPage}
             onChange={(e) => {

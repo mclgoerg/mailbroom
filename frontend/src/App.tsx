@@ -958,6 +958,7 @@ export default function App() {
               className="inline-flex items-center gap-1 whitespace-nowrap
                 text-muted hover:text-body"
               title={t("trash.browse")}
+              aria-label={t("trash.open_label", { n: state.trash_count })}
               onClick={() => setTrashOpen(true)}>
               <Trash2 size={14} /> {state.trash_count}
             </Button>
@@ -967,7 +968,7 @@ export default function App() {
               elements on one min-h-8 baseline on phones. */}
           <Menu label={t("menu.profile")}
             trigger={multiAccount
-              ? <>
+              ? <span className="inline-flex items-center gap-1.5">
                   <AccountAvatar name={account} />
                   <span className="max-w-24 truncate" title={account}>
                     {account}
@@ -975,7 +976,7 @@ export default function App() {
                   {auth.is_admin && auth.mode === "oidc"
                     ? <Star size={14} className="shrink-0" /> : null}
                   <ChevronDown size={14} className="shrink-0 text-faint" />
-                </>
+                </span>
               : <span className="inline-flex items-center gap-0.5">
                   <User size={18} />
                   {auth.is_admin && auth.mode === "oidc"
@@ -1409,8 +1410,8 @@ export default function App() {
                     className="block w-full rounded px-2 py-1.5 text-left
                       hover:bg-panel2"
                     onClick={() => undo(i)}>
-                    {actionVerb(u.action)}: {u.count}{" "}
-                    {t("mails")} - <span className="text-muted">{u.label}</span>
+                    {actionVerb(u.action)}: {t("n.mails", { n: u.count })}
+                    {" "}- <span className="text-muted">{u.label}</span>
                   </button>
                 ))}
               </span>

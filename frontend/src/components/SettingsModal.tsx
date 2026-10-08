@@ -1,4 +1,4 @@
-import { RefreshCw, Settings as SettingsIcon, Shield, Star, X }
+import { Check, RefreshCw, Settings as SettingsIcon, Shield, Star, X }
   from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { api, downloadFile, fmtUsd } from "../api";
@@ -675,8 +675,9 @@ export function SettingsModal({ cfg, account, onClose, onSaved,
 
           <div className="mt-3 flex flex-wrap items-center gap-2">
             {f.oauthConnected ? (<>
-              <span className="type-body text-safe-fg">
-                ✓ {t("oauth.connected")}
+              <span className="inline-flex items-center gap-1.5 type-body
+                text-safe-fg">
+                <Check size={16} /> {t("oauth.connected")}
               </span>
               <Button variant="secondary" onClick={disconnectOauth}>
                 {t("oauth.disconnect")}

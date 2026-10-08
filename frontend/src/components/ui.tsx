@@ -551,7 +551,7 @@ export function MenuItem({ children, onClick, disabled, active, sub,
           <span className="block truncate type-meta text-muted">{sub}</span>
         )}
       </span>
-      {active && <span className="text-accent">✓</span>}
+      {active && <Check size={16} aria-hidden className="text-accent" />}
     </button>
   );
 }

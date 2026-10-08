@@ -1,4 +1,5 @@
-import { MessagesSquare, MoreHorizontal, Pin, PinOff, Shield, Wand2, X }
+import { Ban, Check, MessagesSquare, MoreHorizontal, Pin, PinOff, Shield, Wand2,
+  X }
   from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { api } from "../api";
@@ -341,7 +342,11 @@ export function DetailPanel({ grouping, group, aiEnabled, protectedNow,
               {" "}· <Shield size={14} /> {t("protected")}
             </span>
           )}
-          {blocked && <> · 🚫 {t("Blocked")}</>}
+          {blocked && (
+            <span className="inline-flex items-center gap-1">
+              {" "}· <Ban size={14} /> {t("Blocked")}
+            </span>
+          )}
         </>}
         actions={onProtect && (
           <ProtectButton showLabel on={protectedNow}
@@ -405,9 +410,9 @@ export function DetailPanel({ grouping, group, aiEnabled, protectedNow,
               </Select>
               {group.unsub && (
                 unsubscribedNow?.status === "done" ? (
-                  <span className="rounded-badge bg-chip px-2 py-1 type-meta
-                    text-chiptext">
-                    ✓ {t("Unsubscribed")}
+                  <span className="inline-flex items-center gap-1
+                    rounded-badge bg-chip px-2 py-1 type-meta text-chiptext">
+                    <Check size={14} /> {t("Unsubscribed")}
                   </span>
                 ) : unsubscribedNow?.status === "link" ? (
                   <>
