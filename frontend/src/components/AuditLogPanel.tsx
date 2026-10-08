@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { api, downloadFile, fmtSize } from "../api";
 import { t } from "../i18n";
 import type { AuditEntry, Rule } from "../types";
-import { Button, EmptyState, Loading, PanelHeader, Modal, Toolbar } from "./ui";
+import { Button, EmptyState, Loading, PanelHeader, Modal } from "./ui";
 
 const PAGE_SIZE = 50;
 
@@ -45,40 +45,25 @@ export function AuditLogPanel({ rules, onClose }: {
   useEffect(() => load(offset), [offset]);
 
   return (
-    <Modal onClose={onClose} full>
+    <Modal onClose={onClose} full={!entries || entries.length > 0}>
       <PanelHeader
         title={<span className="inline-flex items-center gap-2">
           <ScrollText size={18} /> {t("Audit Log")}
         </span>}
-        sub={total != null
-          ? t("audit.page", {
-              from: total ? offset + 1 : 0,
-              to: Math.min(offset + PAGE_SIZE, total), total })
-          : t("loading…")}
-        actions={
+        sub={total == null ? t("loading…") : total === 0 ? "" : t("audit.page", {
+          from: offset + 1, to: Math.min(offset + PAGE_SIZE, total), total })}
+        actions={!!total && (
           <Button variant="secondary"
             onClick={() => downloadFile(api.auditExportUrl())}
-            title={t("audit.export")}>CSV</Button>}
+            title={t("audit.export")}>CSV</Button>)}
         onClose={onClose}
       />
-      <Toolbar>
-        <Button variant="secondary" disabled={offset === 0}
-          onClick={() => setOffset(Math.max(0, offset - PAGE_SIZE))}>
-          <ChevronLeft size={16} className="mr-1 inline align-text-bottom" />
-          {t("Previous")}
-        </Button>
-        <Button variant="secondary"
-          disabled={total == null || offset + PAGE_SIZE >= total}
-          onClick={() => setOffset(offset + PAGE_SIZE)}>
-          {t("Next")}
-          <ChevronRight size={16} className="ml-1 inline align-text-bottom" />
-        </Button>
-      </Toolbar>
       <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-4">
         {error && <div className="p-4 type-body text-danger-fg">{error}</div>}
         {!entries && !error && <Loading />}
         {entries && entries.length === 0 && (
-          <EmptyState>{t("audit.empty")}</EmptyState>
+          <EmptyState icon={<ScrollText size={18} />}
+            title={t("audit.empty")} hint={t("audit.empty_hint")} />
         )}
         {entries?.map((e, i) => (
           <div key={`${e.ts}-${i}`}
@@ -116,6 +101,21 @@ export function AuditLogPanel({ rules, onClose }: {
           </div>
         ))}
       </div>
+      {!!total && (
+        <div className="flex justify-end gap-2 border-t border-line px-4 py-2">
+          <Button variant="secondary" size="sm" disabled={offset === 0}
+            onClick={() => setOffset(Math.max(0, offset - PAGE_SIZE))}>
+            <ChevronLeft size={16} className="mr-1 inline align-text-bottom" />
+            {t("Previous")}
+          </Button>
+          <Button variant="secondary" size="sm"
+            disabled={offset + PAGE_SIZE >= total}
+            onClick={() => setOffset(offset + PAGE_SIZE)}>
+            {t("Next")}
+            <ChevronRight size={16} className="ml-1 inline align-text-bottom" />
+          </Button>
+        </div>
+      )}
     </Modal>
   );
 }

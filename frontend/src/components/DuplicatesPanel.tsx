@@ -1,11 +1,12 @@
 import { Copy } from "lucide-react";
 import { useEffect, useState } from "react";
 import { api, fmtSize, mailKey } from "../api";
-import { t } from "../i18n";
+import { getLang, t } from "../i18n";
+import { fmtDate } from "../lib";
 import type { DupSet, Mail } from "../types";
 import { MessageView } from "./MailList";
-import { Button, Checkbox, EmptyState, Loading, Modal, PanelHeader, Tag,
-  ShortDate, Toolbar } from "./ui";
+import { Button, confirmTrashMails, EmptyState, Loading, MailRow, Modal,
+  PanelHeader, Tag, Toolbar } from "./ui";
 
 /** Duplicate finder: same Message-ID anywhere, or identical
  *  (sender, subject, size). "Keep newest" selects everything else. */
@@ -45,8 +46,7 @@ export function DuplicatesPanel({ onClose, onDeleted }: {
 
   const trash = async () => {
     if (!sets || sel.size === 0) return;
-    if (!confirm(t("confirm.act_mails", {
-      verb: t("Move to Trash"), n: sel.size }))) return;
+    if (!await confirmTrashMails(sel.size)) return;
     try {
       const items: [string, number][] = [];
       sets.forEach((s) => s.mails.forEach((m) => {
@@ -66,7 +66,7 @@ export function DuplicatesPanel({ onClose, onDeleted }: {
   };
 
   return (
-    <Modal onClose={onClose} full>
+    <Modal onClose={onClose} full={!!view || !sets || sets.length > 0}>
       <PanelHeader
         title={<span className="inline-flex items-center gap-2">
           <Copy size={18} /> {t("Duplicates")}
@@ -81,22 +81,27 @@ export function DuplicatesPanel({ onClose, onDeleted }: {
         <MessageView mail={view} onBack={() => setView(null)} />
       ) : (
         <>
-          <Toolbar>
-            <Button variant="secondary" onClick={selectAllButNewest}
-              disabled={!sets?.length}>
-              {t("dups.keep_newest")}
-            </Button>
-            <Button variant="danger" disabled={sel.size === 0}
-              onClick={trash}>
-              {t("Trash selected")}{sel.size > 0 && ` (${sel.size})`}
-            </Button>
-            {note && <span className="type-meta text-muted">{note}</span>}
-          </Toolbar>
+          {(!!sets?.length || note) && (
+            <Toolbar>
+              {!!sets?.length && (
+                <Button variant="secondary" onClick={selectAllButNewest}>
+                  {t("dups.keep_newest")}
+                </Button>
+              )}
+              {sel.size > 0 && (
+                <Button variant="danger" onClick={trash}>
+                  {t("Trash selected")} ({sel.size})
+                </Button>
+              )}
+              {note && <span className="type-meta text-muted">{note}</span>}
+            </Toolbar>
+          )}
           <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-4">
             {error && <div className="p-4 type-body text-danger-fg">{error}</div>}
             {!sets && !error && <Loading />}
             {sets && sets.length === 0 && (
-              <EmptyState>{t("dups.none")}</EmptyState>
+              <EmptyState icon={<Copy size={18} />} title={t("dups.none")}
+                hint={t("dups.none_hint")} />
             )}
             {sets?.map((s, si) => (
               <div key={si}
@@ -104,7 +109,6 @@ export function DuplicatesPanel({ onClose, onDeleted }: {
                 <div className="mb-1 flex items-baseline gap-2 px-1 type-meta
                   text-muted">
                   <span className="min-w-0 flex-1 truncate">
-                    {s.mails[0].subject || t("(no subject)")} -{" "}
                     {s.mails[0].addr}
                   </span>
                   <span className="whitespace-nowrap">
@@ -113,27 +117,15 @@ export function DuplicatesPanel({ onClose, onDeleted }: {
                   </span>
                 </div>
                 {s.mails.map((m, mi) => (
-                  <div key={mailKey(m)}
-                    className="flex flex-wrap items-baseline gap-2 border-t
-                      border-line/60 px-1 py-1.5">
-                    <Checkbox checked={sel.has(mailKey(m))} className="-my-1 self-center"
-                      onChange={() => toggle(mailKey(m))} />
-                    <ShortDate iso={m.date || ""} time
-                      className="type-meta text-muted" />
-                    <button className="min-w-0 flex-1 cursor-pointer truncate
-                        text-left type-body hover:underline"
-                      onClick={() => setView(m)}>
-                      <Tag>{m.folder}</Tag>{" "}
-                      {mi === 0 && (
-                        <Tag tone="safe">
-                          {t("dups.newest")}
-                        </Tag>
-                      )}
-                    </button>
-                    <span className="type-meta whitespace-nowrap text-muted">
-                      {fmtSize(m.size)}
-                    </span>
-                  </div>
+                  <MailRow key={mailKey(m)} checked={sel.has(mailKey(m))}
+                    onToggle={() => toggle(mailKey(m))}
+                    onOpen={() => setView(m)}
+                    subject={m.subject || t("(no subject)")}
+                    meta={[fmtDate(m.date || "", new Date(),
+                      { lang: getLang(), time: true }), m.folder,
+                    fmtSize(m.size)].filter(Boolean).join(" · ")}
+                    trailing={mi === 0
+                      ? <Tag tone="safe">{t("dups.newest")}</Tag> : undefined} />
                 ))}
               </div>
             ))}

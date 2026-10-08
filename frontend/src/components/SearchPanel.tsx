@@ -1,10 +1,11 @@
-import { X } from "lucide-react";
+import { Search } from "lucide-react";
 import { useState } from "react";
 import { api, mailKey } from "../api";
 import { t } from "../i18n";
 import type { Mail, SearchNote } from "../types";
 import { MailRows, MessageView } from "./MailList";
-import { Button, Checkbox, EmptyState, Input, Modal, Spinner, Toolbar } from "./ui";
+import { Button, Checkbox, confirmTrashMails, EmptyState, Input, Modal,
+  PanelHeader, Spinner, Toolbar } from "./ui";
 
 export function SearchPanel({ bodySearch = false, bodyMode = "server",
   onClose, onDeleted }: {
@@ -50,7 +51,7 @@ export function SearchPanel({ bodySearch = false, bodyMode = "server",
 
   const trashSelected = async () => {
     if (!mails || sel.size === 0) return;
-    if (!confirm(t("confirm.act_mails", { verb: t("Move to Trash"), n: sel.size }))) return;
+    if (!await confirmTrashMails(sel.size)) return;
     try {
       const items = mails.filter((m) => sel.has(mailKey(m)))
         .map((m) => [m.folder, m.uid] as [string, number]);
@@ -65,69 +66,75 @@ export function SearchPanel({ bodySearch = false, bodyMode = "server",
   };
 
   return (
-    <Modal onClose={onClose} full>
-      <div className="flex items-center gap-2 border-b border-line px-4 py-3">
-        <Input
-          autoFocus
-          className="flex-1"
-          placeholder={bodySearch && inBody
-            ? t("search.placeholder_body")
-            : t("search all scanned mails (subject / sender)…")}
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && run()}
-        />
-        <Button onClick={run} disabled={busy || q.trim().length < 2}>
-          {busy ? <Spinner className="text-white" /> : t("Search")}
-        </Button>
-        <Button variant="secondary" size="icon" label={t("Close")}
-          onClick={onClose}>
-          <X size={18} />
-        </Button>
-      </div>
+    <Modal onClose={onClose} full={!!view || !!mails?.length}>
+      <PanelHeader
+        title={<span className="inline-flex items-center gap-2">
+          <Search size={18} /> {t("Search")}
+        </span>}
+        sub={mails !== null ? `${mails.length} ${t("matches")}` : ""}
+        onClose={onClose}
+      />
 
       {view ? (
         <MessageView mail={view} onBack={() => setView(null)} />
       ) : (
         <>
           <Toolbar>
-            <Button variant="secondary" disabled={!mails?.length}
-              onClick={() => setSel(sel.size === (mails?.length ?? 0)
-                ? new Set() : new Set((mails ?? []).map(mailKey)))}>
-              {t("Select all")}
-            </Button>
-            <Button variant="danger" onClick={trashSelected}
-              disabled={sel.size === 0}>
-              {t("Trash selected")}{sel.size > 0 && ` (${sel.size})`}
+            <Input
+              autoFocus
+              className="w-full sm:w-auto sm:min-w-32 sm:flex-1"
+              placeholder={bodySearch && inBody
+                ? t("search.placeholder_body") : t("search.placeholder")}
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && run()}
+            />
+            <Button onClick={run} disabled={busy || q.trim().length < 2}>
+              {busy ? <Spinner className="text-white" /> : t("Search")}
             </Button>
             {bodySearch && (
               <Checkbox className="type-meta text-muted" checked={inBody}
                 onChange={(e) => setInBody(e.target.checked)}
                 label={t("search.body_toggle")} />
             )}
-            <span className="type-meta text-muted">
-              {mails !== null && `${mails.length} ${t("matches")}`} {note}
-            </span>
+            {!!mails?.length && (
+              <Button variant="secondary"
+                onClick={() => setSel(sel.size === mails.length
+                  ? new Set() : new Set(mails.map(mailKey)))}>
+                {t("Select all")}
+              </Button>
+            )}
+            {sel.size > 0 && (
+              <Button variant="danger" onClick={trashSelected}>
+                {t("Trash selected")} ({sel.size})
+              </Button>
+            )}
+            {note && <span className="type-meta text-muted">{note}</span>}
           </Toolbar>
           {bodySearch && inBody && (
-            <p className="px-4 pb-1 type-meta text-muted">
+            <p className="px-4 pt-2 type-meta text-muted">
               {t(bodyMode === "local"
                 ? "search.body_hint_local" : "search.body_hint")}
             </p>
           )}
           {notes.map((n) => (
             <p key={n.key + JSON.stringify(n.params)}
-              className="px-4 pb-1 type-meta text-muted">
+              className="px-4 pt-2 type-meta text-muted">
               {t(`search.note.${n.key}`, n.params)}
             </p>
           ))}
           <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-4">
             {mails === null && (
-              <EmptyState>
-                {t("Search every scanned mail by subject or sender.")}
-              </EmptyState>
+              <EmptyState icon={<Search size={18} />}
+                title={t("search.empty_title")}
+                hint={t(bodySearch
+                  ? "search.empty_hint_body" : "search.empty_hint")} />
             )}
-            {mails && (
+            {mails?.length === 0 && (
+              <EmptyState icon={<Search size={18} />}
+                title={t("search.none")} hint={t("search.none_hint")} />
+            )}
+            {!!mails?.length && (
               <MailRows mails={mails} sel={sel} onToggle={toggle}
                 onOpen={setView} />
             )}

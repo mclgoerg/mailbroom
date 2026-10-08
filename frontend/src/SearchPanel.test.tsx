@@ -11,9 +11,10 @@ import { setLang } from "./i18n";
 import type { SearchResp } from "./types";
 
 const search = vi.fn();
+const deleteMessages = vi.fn();
 
 vi.mock("./api", () => ({
-  api: { search: (...a: unknown[]) => search(...a), deleteMessages: vi.fn() },
+  api: { search: (...a: unknown[]) => search(...a), deleteMessages: (...a: unknown[]) => deleteMessages(...a) },
   fmtSize: () => "1 KB",
   mailKey: (m: { folder: string; uid: number }) => `${m.folder}\0${m.uid}`,
 }));
@@ -21,6 +22,7 @@ vi.mock("./api", () => ({
 afterEach(() => {
   cleanup();
   search.mockReset();
+  deleteMessages.mockReset();
   setLang("en");
 });
 
@@ -91,3 +93,64 @@ test("local mode explains that it searches whole words and shows index notes",
     await waitFor(() => expect(search).toHaveBeenCalledWith("parcel", true));
     await screen.findByText(/3 newer mails are not in the index yet/);
   });
+
+/* ---- list rows, toolbar relevance, empty states, confirm flow ---- */
+
+import { DialogProvider } from "./components/ui";
+import { cancelDialog, expectNoDialog, pressDialog } from "./dialogTestUtils";
+
+const mail = (uid: number) => ({ uid, folder: "INBOX", date: "2026-01-02",
+  ts: 1, subject: `Parcel ${uid}`, addr: "shop@x.example", size: 10,
+  seen: true, ai: null });
+
+const withDialogs = (ui: React.ReactElement) =>
+  render(<DialogProvider>{ui}</DialogProvider>);
+
+test("before a query: header, empty state, no selection actions", () => {
+  withDialogs(<SearchPanel bodySearch onClose={() => {}}
+    onDeleted={() => {}} />);
+  expect(screen.getByText("Search your mailbox")).toBeTruthy();
+  expect(screen.getByText(/Tick “Also search mail text”/)).toBeTruthy();
+  expect(screen.queryByRole("button", { name: "Select all" })).toBeNull();
+  expect(screen.queryByRole("button", { name: /Trash selected/ })).toBeNull();
+});
+
+test("without body search the empty state says so", () => {
+  withDialogs(<SearchPanel onClose={() => {}} onDeleted={() => {}} />);
+  expect(screen.getByText(/mail text is switched off/)).toBeTruthy();
+});
+
+test("no matches shows an empty state and no selection actions", async () => {
+  search.mockResolvedValue(resp());
+  withDialogs(<SearchPanel onClose={() => {}} onDeleted={() => {}} />);
+  type("parcel");
+  await screen.findByText("No matches");
+  expect(screen.queryByRole("button", { name: "Select all" })).toBeNull();
+});
+
+test("results are MailRows; the danger button needs a selection, "
+  + "and a cancelled confirm trashes nothing", async () => {
+  search.mockResolvedValue({ mails: [mail(1), mail(2)], notes: [] });
+  const onDeleted = vi.fn();
+  withDialogs(<SearchPanel onClose={() => {}} onDeleted={onDeleted} />);
+  type("parcel");
+  await screen.findByText("Parcel 1");
+  expect(screen.getByText("2 matches")).toBeTruthy();
+  expect(screen.getByRole("button", { name: "Select all" })).toBeTruthy();
+  expect(screen.queryByRole("button", { name: /Trash selected/ })).toBeNull();
+
+  fireEvent.click(screen.getAllByRole("checkbox")[0]);
+  const trash = screen.getByRole("button", { name: "Trash selected (1)" });
+  fireEvent.click(trash);
+  await cancelDialog();
+  await expectNoDialog();
+  expect(deleteMessages).not.toHaveBeenCalled();
+  expect(screen.getByText("Parcel 1")).toBeTruthy();
+
+  fireEvent.click(screen.getByRole("button", { name: "Trash selected (1)" }));
+  await pressDialog(/Move to Trash \(1\)/);
+  await waitFor(() => expect(deleteMessages)
+    .toHaveBeenCalledWith([["INBOX", 1]]));
+  await waitFor(() => expect(onDeleted).toHaveBeenCalled());
+  expect(screen.queryByText("Parcel 1")).toBeNull();
+});

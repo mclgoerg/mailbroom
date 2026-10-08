@@ -39,7 +39,7 @@ test("renders entries newest-fetched-order with actor/outcome", async () => {
 test("empty state shows when there is nothing to show", async () => {
   audit.mockResolvedValueOnce({ total: 0, entries: [] });
   render(<AuditLogPanel rules={[]} onClose={() => {}} />);
-  await waitFor(() => screen.getByText("Nothing recorded yet."));
+  await waitFor(() => screen.getByText("Nothing recorded yet"));
 });
 
 test("Next/Previous page through results", async () => {
@@ -70,3 +70,25 @@ test("CSV export fetches and saves a blob instead of navigating", async () => {
   fireEvent.click(screen.getByText("CSV"));
   expect(downloadFile).toHaveBeenCalledWith("/api/audit/export");
 });
+
+test("an empty log hides the pager, the CSV button and the 0-0 summary",
+  async () => {
+    audit.mockResolvedValueOnce({ total: 0, entries: [] });
+    render(<AuditLogPanel rules={[]} onClose={() => {}} />);
+    await waitFor(() => screen.getByText("Nothing recorded yet"));
+    expect(screen.queryByText(/Next/)).toBeNull();
+    expect(screen.queryByText(/Previous/)).toBeNull();
+    expect(screen.queryByText("CSV")).toBeNull();
+    expect(screen.queryByText(/of 0/)).toBeNull();
+  });
+
+test("with entries the pager sits below the list as small buttons",
+  async () => {
+    render(<AuditLogPanel rules={[]} onClose={() => {}} />);
+    await waitFor(() => screen.getByText(/item 0/));
+    const list = screen.getByText(/item 0/);
+    const prev = screen.getByText(/Previous/).closest("button")!;
+    expect(prev.compareDocumentPosition(list)
+      & Node.DOCUMENT_POSITION_PRECEDING).toBeTruthy();
+    expect(screen.getByText("CSV")).toBeTruthy();
+  });

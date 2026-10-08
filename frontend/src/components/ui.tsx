@@ -1160,6 +1160,14 @@ export const confirmDialog = (opts: ConfirmOptions): Promise<boolean> =>
     ? new Promise((resolve) => pushDialog!({ kind: "confirm", opts, resolve }))
     : needProvider();
 
+/** The one confirmation for "move the selected mails to Trash" in the list
+ *  panels (Search, Attachments, Duplicates). */
+export const confirmTrashMails = (n: number): Promise<boolean> =>
+  confirmDialog({
+    title: t("confirm.act_mails", { verb: t("Move to Trash"), n }),
+    tone: "danger",
+    confirmLabel: t("confirm.btn_n", { verb: t("Move to Trash"), n }) });
+
 /** Resolves the entered text, or null when cancelled. */
 export const promptDialog = (opts: PromptOptions): Promise<string | null> =>
   pushDialog

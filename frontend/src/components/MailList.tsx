@@ -4,7 +4,7 @@ import { api, fmtSize, mailKey } from "../api";
 import type { Mail, MessageDetail } from "../types";
 import { getLang, t } from "../i18n";
 import { fmtDate } from "../lib";
-import { AiTag, Button, Checkbox, PinButton, Spinner } from "./ui";
+import { AiTag, Button, MailRow, PinButton, Spinner } from "./ui";
 import { ThreadView } from "./ThreadView";
 
 const RENDER_CAP = 500;
@@ -100,43 +100,20 @@ export function MailRows({ mails, sel, onToggle, onOpen, onPin, detailed,
         if (multiFolder) meta.push(m.folder);
         if (multiSender) meta.push(m.addr);
         meta.push(fmtSize(m.size));
-        return (
-          <div key={mailKey(m)} data-pinned={m.pinned ? "true" : undefined}
-            className={`flex gap-3 border-b border-line/60 px-1 py-2.5 ${
-              m.pinned ? "border-l-2 border-l-accent bg-panel" : ""}`}>
-            <Checkbox className="-my-1 coarse:-ml-3 coarse:-mr-2"
-              checked={sel.has(mailKey(m))}
-              onChange={() => onToggle(mailKey(m))} />
-            <div className="min-w-0 flex-1">
-              <button
-                className="flex w-full min-w-0 cursor-pointer items-center
-                  gap-1.5 text-left type-body hover:underline"
-                onClick={() => onOpen(m)}>
-                {!m.seen && (
-                  <span title={t("unread")} className="inline-block size-2
-                    shrink-0 rounded-full bg-accent" />
-                )}
-                <span className={`truncate ${!m.seen ? "font-semibold" : ""}`}>
-                  {m.subject || t("(no subject)")}
-                </span>
-              </button>
-              <div className="mt-0.5 flex min-w-0 items-center gap-1.5
-                type-meta text-muted">
-                <span className="min-w-0 truncate"
-                  title={(m.date || "").slice(0, 10)}>
-                  {meta.join(" · ")}
-                </span>
-                {m.ai && (
-                  <span className="shrink-0">
-                    <AiTag ai={{ verdict: m.ai, reason: "" }} />
-                  </span>
-                )}
-              </div>
-            </div>
+        const trailing = (m.ai || onPin) ? (
+          <>
+            {m.ai && <AiTag ai={{ verdict: m.ai, reason: "" }} />}
             {onPin && (
-              <PinButton on={!!m.pinned} onClick={() => onPin(m)} />
+              <PinButton on={!!m.pinned} onClick={() => onPin(m)}
+                className="justify-center coarse:min-h-11 coarse:min-w-11" />
             )}
-          </div>
+          </>
+        ) : undefined;
+        return (
+          <MailRow key={mailKey(m)} checked={sel.has(mailKey(m))}
+            onToggle={() => onToggle(mailKey(m))} unread={!m.seen}
+            subject={m.subject || t("(no subject)")} meta={meta.join(" · ")}
+            pinned={!!m.pinned} onOpen={() => onOpen(m)} trailing={trailing} />
         );
       })}
       {!paged && mails.length > cap && (

@@ -1,11 +1,12 @@
 import { Paperclip } from "lucide-react";
 import { useEffect, useState } from "react";
 import { api, fmtSize, mailKey } from "../api";
-import { t } from "../i18n";
+import { getLang, t } from "../i18n";
+import { fmtDate } from "../lib";
 import type { AppState, AttMail, Mail } from "../types";
 import { MessageView } from "./MailList";
-import { Button, Checkbox, EmptyState, Loading, Modal, PanelHeader, Spinner,
-  ShortDate, Tag, Toolbar } from "./ui";
+import { Button, confirmTrashMails, EmptyState, Loading, MailRow, Modal,
+  PanelHeader, Spinner, Tag, Toolbar } from "./ui";
 
 /** Attachment explorer: lazy BODYSTRUCTURE analysis, then the mailbox's
  *  attachment-heaviest mails. Proton IMAP cannot strip attachments, so the
@@ -53,8 +54,7 @@ export function AttachmentsPanel({ state, onClose, onDeleted }: {
 
   const act = async (action: string) => {
     if (!mails || sel.size === 0) return;
-    if (!confirm(t("confirm.act_mails", {
-      verb: t("Move to Trash"), n: sel.size }))) return;
+    if (!await confirmTrashMails(sel.size)) return;
     try {
       const items = mails.filter((m) => sel.has(mailKey(m)))
         .map((m) => [m.folder, m.uid] as [string, number]);
@@ -74,8 +74,13 @@ export function AttachmentsPanel({ state, onClose, onDeleted }: {
     setSel(next);
   };
 
+  // An empty panel (nothing analyzed yet / nothing found) shrinks to its
+  // message; a list keeps the fixed height.
+  const emptyPanel = mails?.length === 0
+    || (!mails && atts?.status !== "done");
+
   return (
-    <Modal onClose={onClose} full>
+    <Modal onClose={onClose} full={!!view || running || !emptyPanel}>
       <PanelHeader
         title={<span className="inline-flex items-center gap-2">
           <Paperclip size={18} /> {t("Attachments")}
@@ -101,19 +106,23 @@ export function AttachmentsPanel({ state, onClose, onDeleted }: {
         <MessageView mail={view} onBack={() => setView(null)} />
       ) : (
         <>
-          <Toolbar>
-            <Button variant="danger" disabled={sel.size === 0}
-              onClick={() => act("trash")}>
-              {t("Trash selected")}{sel.size > 0 && ` (${sel.size})`}
-            </Button>
-            {atts?.status === "error" && (
-              <span className="type-meta text-danger-fg">{atts.error}</span>
-            )}
-            {note && <span className="type-meta text-muted">{note}</span>}
-          </Toolbar>
+          {(sel.size > 0 || atts?.status === "error" || note) && (
+            <Toolbar>
+              {sel.size > 0 && (
+                <Button variant="danger" onClick={() => act("trash")}>
+                  {t("Trash selected")} ({sel.size})
+                </Button>
+              )}
+              {atts?.status === "error" && (
+                <span className="type-meta text-danger-fg">{atts.error}</span>
+              )}
+              {note && <span className="type-meta text-muted">{note}</span>}
+            </Toolbar>
+          )}
           <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-4">
             {!mails && !running && atts?.status !== "done" && (
-              <EmptyState>{t("atts.intro")}</EmptyState>
+              <EmptyState icon={<Paperclip size={18} />}
+                title={t("atts.not_analyzed")} hint={t("atts.intro")} />
             )}
             {running && (
               <Loading label={starting ? t("Starting…") : atts.progress} />
@@ -122,30 +131,17 @@ export function AttachmentsPanel({ state, onClose, onDeleted }: {
               <Loading />
             )}
             {mails && mails.length === 0 && (
-              <EmptyState>{t("atts.none")}</EmptyState>
+              <EmptyState icon={<Paperclip size={18} />}
+                title={t("atts.none")} hint={t("atts.none_hint")} />
             )}
             {mails?.map((m) => (
-              <div key={mailKey(m)}
-                className="flex flex-wrap items-baseline gap-2 border-b
-                  border-line/60 px-1 py-2">
-                <Checkbox checked={sel.has(mailKey(m))} className="-my-1 self-center"
-                  onChange={() => toggle(mailKey(m))} />
-                <ShortDate iso={m.date || ""}
-                  className="type-meta whitespace-nowrap text-muted" />
-                <button className="min-w-0 flex-1 basis-full cursor-pointer
-                    truncate text-left type-body hover:underline sm:basis-0"
-                  title={m.addr}
-                  onClick={() => setView(m)}>
-                  {m.subject || t("(no subject)")}
-                  <span className="block truncate type-meta text-muted">
-                    {m.addr} · {m.atts.map((a) =>
-                      `${a.name} (${fmtSize(a.size)})`).join(", ")}
-                  </span>
-                </button>
-                <Tag tone="attach">
-                  📎 {fmtSize(m.att_size)}
-                </Tag>
-              </div>
+              <MailRow key={mailKey(m)} checked={sel.has(mailKey(m))}
+                onToggle={() => toggle(mailKey(m))} onOpen={() => setView(m)}
+                subject={m.subject || t("(no subject)")}
+                meta={[fmtDate(m.date || "", new Date(), { lang: getLang() }),
+                  m.addr, m.atts.map((a) => `${a.name} (${fmtSize(a.size)})`)
+                    .join(", ")].filter(Boolean).join(" · ")}
+                trailing={<Tag tone="attach">📎 {fmtSize(m.att_size)}</Tag>} />
             ))}
           </div>
         </>
