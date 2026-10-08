@@ -450,3 +450,27 @@ describe("localizedSub", () => {
     expect(localizedSub("1 mail, 3 senders")).toBe("1 mail, 3 senders");
   });
 });
+
+describe("GroupTable focus", () => {
+  afterEach(cleanup);
+  it("parks focus on the list when the focused row disappears", () => {
+    const { container, rerender } = renderTable({ groups: [mk(0), mk(1)] });
+    const row = container.querySelector("tbody tr button") as HTMLElement;
+    row.focus();
+    expect(document.activeElement).toBe(row);
+    rerender(<GroupTable groups={[mk(1)]} selected={new Set()} focusedKey={null}
+      onToggle={noop} onToggleAll={noop} onOpen={noop} onAckUnsub={noop}
+      sortK="count" sortDir={-1} onSort={noop} groupLabel="Sender" resetSignal="a" />);
+    expect(row.isConnected).toBe(false);
+    expect(document.activeElement)
+      .toBe(container.querySelector("[data-focus-return]"));
+  });
+
+  it("does not steal focus when it was never in the list", () => {
+    const { rerender } = renderTable({ groups: [mk(0)] });
+    rerender(<GroupTable groups={[mk(1)]} selected={new Set()} focusedKey={null}
+      onToggle={noop} onToggleAll={noop} onOpen={noop} onAckUnsub={noop}
+      sortK="count" sortDir={-1} onSort={noop} groupLabel="Sender" resetSignal="a" />);
+    expect(document.activeElement).toBe(document.body);
+  });
+});

@@ -1,10 +1,10 @@
 import { ArrowDown, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight,
   MessagesSquare } from "lucide-react";
-import { useEffect, useState, type MouseEvent } from "react";
+import { useEffect, useRef, useState, type MouseEvent } from "react";
 import { fmtSize } from "../api";
 import type { Group, Grouping } from "../types";
 import { t } from "../i18n";
-import { AiTag, Avatar, Button, Checkbox, EngagementMeter, PinBadge, RatingChips, ShortDate, Tag, Select } from "./ui";
+import { AiTag, Avatar, Button, Checkbox, EngagementMeter, PinBadge, RatingChips, ShortDate, Tag, Select, isModalOpen } from "./ui";
 
 export type SortKey = "count" | "size" | "label" | "last" | "unreadPct"
   | "engagement";
@@ -369,6 +369,23 @@ function MobileCards({ slice, baseIdx, selected, focusedKey, onToggle,
 export function GroupTable(props: Props) {
   const { groups, focusedKey, resetSignal } = props;
   const [page, setPage] = useState(0);
+  // Focus that sat on a row which then vanished (Trash all removes it) would
+  // drop to <body>: remember whether focus was last inside the list and, when
+  // the rows change under it, park focus on the list itself.
+  const root = useRef<HTMLDivElement>(null);
+  const focusInside = useRef(false);
+  useEffect(() => {
+    const onIn = (e: FocusEvent) => {
+      focusInside.current = !!root.current?.contains(e.target as Node);
+    };
+    document.addEventListener("focusin", onIn);
+    return () => document.removeEventListener("focusin", onIn);
+  }, []);
+  useEffect(() => {
+    const a = document.activeElement;
+    if (focusInside.current && (!a || a === document.body) && !isModalOpen())
+      root.current?.focus({ preventScroll: true });
+  }, [groups]);
   const [perPage, setPerPage] = useState(() =>
     Number(localStorage.getItem("pmc_page_size")) || 50);
 
@@ -392,7 +409,8 @@ export function GroupTable(props: Props) {
 
   return (
     // Focus falls back here when a dialog's opener row is gone (Modal).
-    <div data-focus-return tabIndex={-1} className="outline-none">
+    <div ref={root} data-focus-return tabIndex={-1}
+      className="outline-none">
       <div className="hidden md:block">
         <DesktopTable {...props} slice={slice} baseIdx={baseIdx} />
       </div>
