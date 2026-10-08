@@ -1095,7 +1095,7 @@ export function BulkBar({ summary, onClear, secondary, modifiers, action,
         bg-panel pt-1.5 shadow-bar"
       style={{ paddingBottom:
         "calc(env(safe-area-inset-bottom) + 0.375rem)" }}>
-      <div className="mx-auto flex max-w-6xl flex-col gap-1.5 px-3 sm:px-5
+      <div className="mx-auto flex max-w-6xl flex-col gap-1.5 px-3 sm:px-5 xl:max-w-360
         md:flex-row md:flex-wrap md:items-center md:gap-x-2">
         <div className="flex items-center gap-2 md:contents">
           <span className="min-w-0 flex-1 truncate type-meta text-muted

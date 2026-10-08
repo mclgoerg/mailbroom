@@ -27,7 +27,7 @@ const RATING_FILTERS: { key: string; label: string }[] = [
 
 export function DetailPanel({ grouping, group, aiEnabled, protectedNow,
   unsubscribedNow, onTrash, onProtect, onBlock, onUnblock, blocked, folders,
-  sieve = true, onClose, onDeleted }: {
+  sieve = true, onClose, onEmptied, onDeleted, variant = "modal" }: {
   grouping: Grouping;
   group: Group;
   aiEnabled: boolean;
@@ -45,7 +45,14 @@ export function DetailPanel({ grouping, group, aiEnabled, protectedNow,
   folders: AppState["folders_raw"];
   sieve?: boolean;                       // Sieve export is Proton-only
   onClose: () => void;
+  // The group has been emptied by an action in here (Trash all, or every
+  // mail trashed one by one). Defaults to closing; the split pane moves on
+  // to the next group instead.
+  onEmptied?: () => void;
   onDeleted: () => void;
+  // "pane": the same content as a sticky column beside the list (>= 1280 px),
+  // with no overlay, focus trap or modal-stack entry.
+  variant?: "modal" | "pane";
 }) {
   const [mails, setMails] = useState<Mail[] | null>(null);
   const [error, setError] = useState("");
@@ -283,7 +290,7 @@ export function DetailPanel({ grouping, group, aiEnabled, protectedNow,
       if (wholeGroup) {
         // The group will be empty - go straight back to the overview.
         onDeleted();
-        onClose();
+        (onEmptied ?? onClose)();
         return;
       }
       if (action !== "mark_read") {
@@ -333,8 +340,8 @@ export function DetailPanel({ grouping, group, aiEnabled, protectedNow,
     ? mails.filter((m) => !m.pinned).length
     : group.count - (group.pinned ?? 0);
 
-  return (
-    <Modal onClose={onClose} full>
+  const content = (
+    <>
       <PanelHeader
         title={group.label}
         sub={<>
@@ -657,13 +664,28 @@ export function DetailPanel({ grouping, group, aiEnabled, protectedNow,
             {groupCount > 0 && (
               <Button variant="danger" className="ml-auto"
                 title={t("trash_all.tip", { n: groupCount })}
-                onClick={async () => { if (await onTrash(group)) onClose(); }}>
+                onClick={async () => {
+                  if (await onTrash(group)) (onEmptied ?? onClose)();
+                }}>
                 {t("trash_all.btn", { n: groupCount })}
               </Button>
             )}
           </div>}
         </>
       )}
-    </Modal>
+    </>
+  );
+
+  // Pane: `h-full` fills the sticky wrapper App sizes to the viewport.
+  // `relative` + overflow-hidden also clip the checkboxes' absolutely
+  // positioned inputs, which would otherwise stretch the page itself.
+  return variant === "pane" ? (
+    <section aria-label={group.label} data-split-pane
+      className="relative flex h-full min-h-0 flex-col overflow-hidden border-l
+        border-line bg-panel">
+      {content}
+    </section>
+  ) : (
+    <Modal onClose={onClose} full>{content}</Modal>
   );
 }

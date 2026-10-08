@@ -27,6 +27,7 @@ import { AccountAvatar, applyTheme, BAR_ICON_BTN, BulkBar, Button, Chip, ChipGro
   promptDialog, Segmented, Select, Spinner, useToast,
   type ToastVariant } from "./components/ui";
 import { t } from "./i18n";
+import { usePaneHeight, useSplitPane } from "./splitPane";
 import { applyStatus, fmtAgo, fmtSize, fmtUsd, matchGroup, parseFilter,
   parseProgress, retainedMailKeys } from "./lib";
 import type { AppState, AuthProbe, Config, FilterPreset, Group, Grouping,
@@ -517,7 +518,71 @@ export default function App() {
   const aiEnabled = !!cfg?.ai.available;
   const acct = cfg?.accounts[account] ?? null;
   const multiAccount = !!cfg && Object.keys(cfg.accounts).length > 1;
-  const anyModal = !!detail || searchOpen || settingsOpen || rulesOpen
+  // >= 1280 px: the group detail is a pane beside the list. It is not a
+  // modal - the list stays keyboard-navigable and nothing traps focus.
+  const splitPane = useSplitPane();
+  const paneOpen = splitPane && !!detail;
+  const paneRef = useRef<HTMLDivElement>(null);
+  usePaneHeight(paneRef, paneOpen);
+  const followTimer = useRef<number | undefined>(undefined);
+  const focusRef = useRef(focusIdx);   // latest focusIdx, for key repeat
+  focusRef.current = focusIdx;
+  const cancelFollow = () => {
+    window.clearTimeout(followTimer.current);
+    followTimer.current = undefined;
+  };
+  useEffect(() => cancelFollow, []);
+  useEffect(() => { if (!paneOpen) cancelFollow(); }, [paneOpen]);
+  const openGroup = (g: Group) => {
+    cancelFollow();
+    setDetail(g);
+    // In the pane the focused row is the open row, so j/k continue from it.
+    if (splitPane) setFocusIdx(groups.findIndex((x) => x.key === g.key));
+  };
+  const closePane = () => {
+    cancelFollow();
+    setDetail(null);
+    refresh();
+    // The pane held focus; hand it back to the list (a modal does this itself).
+    document.querySelector<HTMLElement>("[data-focus-return]")?.focus();
+  };
+  // The open group is gone (Trash all, Block + trash): show the next one in
+  // the list, else the previous, else close - the modal just closes.
+  const advancePane = (gone: Group) => {
+    const i = groups.findIndex((g) => g.key === gone.key);
+    const next = i < 0 ? undefined : groups[i + 1] ?? groups[i - 1];
+    if (next) {
+      cancelFollow();
+      setDetail(next);
+      setFocusIdx(groups.indexOf(next));
+    } else closePane();
+  };
+  // The pane follows the focused row, after a short pause so key-repeat
+  // doesn't fetch every row it passes.
+  const followFocus = (g: Group | undefined) => {
+    if (!paneOpen || !g) return;
+    cancelFollow();
+    followTimer.current = window.setTimeout(() => {
+      followTimer.current = undefined;
+      setDetail((cur) => cur && cur.key !== g.key ? g : cur);
+    }, 150);
+  };
+  // Keep the focus outline on the open group when the list changes under
+  // it (rows removed, re-sorted) - but never fight a pending j/k.
+  useEffect(() => {
+    if (!paneOpen || !detail || followTimer.current !== undefined) return;
+    const i = groups.findIndex((g) => g.key === detail.key);
+    if (i >= 0 && i !== focusIdx) setFocusIdx(i);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [groups, paneOpen]);
+  // The open group vanished from the mailbox itself (not merely filtered
+  // out): same as after Trash all.
+  useEffect(() => {
+    if (paneOpen && detail && state && !state.groups[mode]?.[detail.key])
+      advancePane(detail);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state?.groups_rev]);
+  const anyModal = (!!detail && !splitPane) || searchOpen || settingsOpen || rulesOpen
     || attsOpen || dupsOpen || statsOpen || auditOpen || trashOpen;
 
   const startScan = async () => {
@@ -864,6 +929,11 @@ export default function App() {
   };
 
   /* Keyboard shortcuts: j/k move, x select, Enter open, # trash, / filter. */
+  const move = (to: number) => {
+    focusRef.current = to;
+    setFocusIdx(to);
+    followFocus(groups[to]);
+  };
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       const el = e.target as HTMLElement;
@@ -876,6 +946,14 @@ export default function App() {
           || (el.closest?.('[role="menu"], [role="tablist"]')
             && ["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "Home",
               "End", "Enter", " "].includes(e.key))) return;
+      const inPane = !!el.closest?.("[data-split-pane]");
+      if (e.key === "Escape") {
+        if (paneOpen) closePane();
+        return;
+      }
+      // Focus inside the pane (a button, a mail row): only list navigation
+      // carries over - Enter, x, # and / belong to what has focus.
+      if (inPane && !["j", "k"].includes(e.key)) return;
       if (e.key === "/") {
         e.preventDefault();
         filterRef.current?.focus();
@@ -884,17 +962,17 @@ export default function App() {
       if (flat || !groups.length) return;
       if (e.key === "j" || e.key === "ArrowDown") {
         e.preventDefault();
-        setFocusIdx((i) => Math.min(i + 1, groups.length - 1));
+        move(Math.min(focusRef.current + 1, groups.length - 1));
       } else if (e.key === "k" || e.key === "ArrowUp") {
         e.preventDefault();
-        setFocusIdx((i) => Math.max(i - 1, 0));
+        move(Math.max(focusRef.current - 1, 0));
       } else if (e.key === "x" && focusIdx >= 0) {
         const key = groups[focusIdx].key;
         const next = new Set(selected);
         next.has(key) ? next.delete(key) : next.add(key);
         setSelected(next);
       } else if ((e.key === "Enter" || e.key === "o") && focusIdx >= 0) {
-        setDetail(groups[focusIdx]);
+        openGroup(groups[focusIdx]);
       } else if (e.key === "#") {
         if (selected.size) act([...selected], "trash", "", ...retentionParams());
         else if (focusIdx >= 0)
@@ -970,8 +1048,35 @@ export default function App() {
       onLogin={() => setAuth({ ...auth, authed: true })} />;
   }
 
+  const renderDetail = (variant: "modal" | "pane") => detail && (
+    <DetailPanel
+      // The pane swaps groups in place: remount so selection, filters and an
+      // open message never leak from one group into the next.
+      key={variant === "pane" ? detail.key : undefined}
+      variant={variant}
+      grouping={mode}
+      group={detail}
+      aiEnabled={aiEnabled}
+      protectedNow={state?.groups[mode][detail.key]?.protected
+        ?? detail.protected}
+      unsubscribedNow={state?.groups[mode][detail.key]?.unsubscribed
+        ?? detail.unsubscribed}
+      onTrash={(g) => act([g.key], "trash")}
+      onProtect={toggleProtect}
+      onBlock={blockGroup}
+      onUnblock={unblockGroup}
+      blocked={blockedRules.has(detail.key)}
+      folders={state?.folders_raw ?? []}
+      sieve={(acct?.preset ?? "proton") === "proton"}
+      onClose={variant === "pane" ? closePane
+        : () => { setDetail(null); refresh(); }}
+      onEmptied={variant === "pane" ? () => advancePane(detail) : undefined}
+      onDeleted={refresh}
+    />
+  );
+
   return (
-    <div className="mx-auto max-w-6xl p-3 pb-[calc(var(--bulkbar-h,0px)+0.75rem)]
+    <div className="mx-auto max-w-6xl p-3 xl:max-w-360 pb-[calc(var(--bulkbar-h,0px)+0.75rem)]
       sm:p-5 sm:pb-[calc(var(--bulkbar-h,0px)+1.25rem)]">
       <header className="mb-2 flex items-center gap-3 md:mb-4">
         <h1 className="type-title">
@@ -1110,6 +1215,8 @@ export default function App() {
               else { setFlat(false); setMode(v); }
               setSelected(new Set());
               setFocusIdx(-1);
+              cancelFollow();
+              setDetail(null);   // a pane would otherwise keep the old grouping's group
             }} />
         </div>
         <div className="ml-auto flex items-center gap-2">
@@ -1497,9 +1604,13 @@ export default function App() {
             onChanged={refresh} toolbarSlot={toolbarSlot} />
         )
       ) : groups.length > 0 ? (
+        <div className={paneOpen ? "grid grid-cols-[minmax(0,11fr)_minmax(0,9fr)]" : ""}>
+        <div className="min-w-0">
         <GroupTable
           groups={groups}
           selected={selected}
+          compact={paneOpen}
+          openKey={paneOpen ? detail.key : null}
           focusedKey={focusIdx >= 0 ? groups[focusIdx]?.key ?? null : null}
           onToggle={(k) => {
             const next = new Set(selected);
@@ -1511,7 +1622,7 @@ export default function App() {
             keys.forEach((k) => checked ? next.add(k) : next.delete(k));
             setSelected(next);
           }}
-          onOpen={setDetail}
+          onOpen={openGroup}
           blockedKeys={blockedRules}
           onAckUnsub={ackUnsub}
           sortK={sortK}
@@ -1524,6 +1635,17 @@ export default function App() {
           grouping={mode}
           resetSignal={`${mode}\u0000${filter}`}
         />
+        </div>
+        {paneOpen && (
+          <div className="min-w-0">
+            {/* Sticky to the top of the scroll container (body). Height:
+                what usePaneHeight measured, minus the bulk bar / safe area. */}
+            <div ref={paneRef} className="sticky top-0 h-[calc(var(--pane-avail,100dvh)-max(var(--bulkbar-h,0px),env(safe-area-inset-bottom)))]">
+              {renderDetail("pane")}
+            </div>
+          </div>
+        )}
+        </div>
       ) : (
         state && !scanning && (filter && allGroups.length > 0
             || state.status === "done") && (
@@ -1546,26 +1668,7 @@ export default function App() {
         )
       )}
 
-      {detail && (
-        <DetailPanel
-          grouping={mode}
-          group={detail}
-          aiEnabled={aiEnabled}
-          protectedNow={state?.groups[mode][detail.key]?.protected
-            ?? detail.protected}
-          unsubscribedNow={state?.groups[mode][detail.key]?.unsubscribed
-            ?? detail.unsubscribed}
-          onTrash={(g) => act([g.key], "trash")}
-          onProtect={toggleProtect}
-          onBlock={blockGroup}
-          onUnblock={unblockGroup}
-          blocked={blockedRules.has(detail.key)}
-          folders={state?.folders_raw ?? []}
-          sieve={(acct?.preset ?? "proton") === "proton"}
-          onClose={() => { setDetail(null); refresh(); }}
-          onDeleted={refresh}
-        />
-      )}
+      {detail && !splitPane && renderDetail("modal")}
       {searchOpen && (
         <SearchPanel
           bodySearch={acct?.body_search !== "disabled"}
