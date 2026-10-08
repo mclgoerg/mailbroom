@@ -872,6 +872,7 @@ export function ChipSegment({ on = false, children, className = "", ...rest }:
     <button type="button" aria-pressed={on} {...rest}
       className={`flex items-center whitespace-nowrap border-l border-line
         px-2 transition-colors focus-visible:-outline-offset-2 sm:px-3
+        first:rounded-l-full last:rounded-r-full
         enabled:active:translate-y-px
         disabled:cursor-not-allowed disabled:bg-chip disabled:text-faint
         ${on ? "bg-chiph text-body ring-1 ring-inset ring-accent"
@@ -928,6 +929,7 @@ export function Segmented<T extends string>({ value, onChange, options,
             className={`min-h-9 coarse:min-h-10 min-w-0 whitespace-nowrap
               px-1.5 transition-colors type-meta md:type-body md:px-2 lg:px-3
               focus-visible:-outline-offset-2 enabled:active:translate-y-px
+              first:rounded-l-control last:rounded-r-control
               ${fill ? "flex-auto" : ""} ${i > 0 ? "border-l border-line" : ""}
               ${on ? "bg-chiph font-medium text-body ring-1 ring-inset ring-accent"
                 : "text-muted hover:bg-chip"}`}>

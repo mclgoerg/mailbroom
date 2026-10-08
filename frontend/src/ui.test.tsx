@@ -618,6 +618,20 @@ test("ChipGroup is named by its label; segments keep their ring inside the pill"
   expect(screen.getByText("One").className).toContain("whitespace-nowrap");
 });
 
+// The selected segment's inset ring follows its own corners; the end
+// segments must round like the pill, or the ring shows square and clipped.
+test("end segments round with their group so the selected ring isn't clipped", () => {
+  render(<ChipGroup label="Inactive:">
+    <ChipSegment>6 mo</ChipSegment><ChipSegment on>2 yr</ChipSegment></ChipGroup>);
+  expect(screen.getByText("2 yr").className).toContain("last:rounded-r-full");
+  expect(screen.getByText("6 mo").className).toContain("first:rounded-l-full");
+  render(<Segmented label="View" value="b" onChange={() => {}}
+    options={[{ value: "a", label: "A" }, { value: "b", label: "B" }]} />);
+  const tab = screen.getByRole("tab", { name: "B" });
+  expect(tab.className).toContain("last:rounded-r-control");
+  expect(tab.className).toContain("first:rounded-l-control");
+});
+
 test("DialogProvider returns focus to the opener and settles pending on unmount", async () => {
   const { unmount } = render(<DialogProvider>
     <button>opener</button></DialogProvider>);
