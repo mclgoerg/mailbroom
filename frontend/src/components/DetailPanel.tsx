@@ -215,7 +215,7 @@ export function DetailPanel({ grouping, group, aiEnabled, protectedNow,
       setNote(t("Marked as unsubscribed."));
       onDeleted();
     } catch (e: any) {
-      setNote(`Error: ${e.message ?? e}`);
+      setNote(t("err.generic", { msg: e.message ?? e }));
     }
     setBusy(false);
   };
@@ -307,7 +307,7 @@ export function DetailPanel({ grouping, group, aiEnabled, protectedNow,
       setNote(t("note.background", { verb }));
       onDeleted();
     } catch (e: any) {
-      setNote(`Error: ${e.message ?? e}`);
+      setNote(t("err.generic", { msg: e.message ?? e }));
     }
   };
 

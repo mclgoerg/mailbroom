@@ -421,7 +421,7 @@ export function SettingsModal({ cfg, account, onClose, onSaved,
         } else if (r.status === "error") {
           clearInterval(id);
           setDeviceInfo(null);
-          setOauthMsg(`Error: ${r.error}`);
+          setOauthMsg(t("err.generic", { msg: r.error ?? "" }));
         }
       } catch {
         /* transient network error - keep polling until it expires */
@@ -473,7 +473,7 @@ export function SettingsModal({ cfg, account, onClose, onSaved,
       onSaved(await api.getConfig());
       setMsg(t("import.done", { rules: r.rules, verdicts: r.verdicts }));
     } catch (err: any) {
-      setMsg(`Error: ${err.message ?? err}`);
+      setMsg(t("err.generic", { msg: err.message ?? err }));
     }
   };
 

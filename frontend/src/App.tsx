@@ -302,7 +302,7 @@ export default function App() {
      toasts (a page load or account switch that finds an old "done" stays
      quiet); a scan error is the one exception, nothing else shows it. */
   const seenJobs = useRef<{ scan?: string; d?: string; a?: string;
-    u?: string; undo: string[]; moved?: number } | null>(null);
+    u?: string; undo: string[]; seq?: number } | null>(null);
   const startToast = useRef<{ unsub?: number }>({});
   useEffect(() => {
     if (!state) { seenJobs.current = null; return; }
@@ -314,21 +314,24 @@ export default function App() {
     seenJobs.current = { scan: state.status, d: del.status,
       a: ai.status, u: unsub?.status,
       undo: del.status === "running" && prev ? prev.undo : ids,
-      // Moved count BEFORE the job: -1 once a running tick was seen (then
-      // any count is this job's). The baseline is set to "running" right
+      // Job sequence number BEFORE the current job (backend `delete.seq`,
+      // bumped when a job starts). The baseline is set to "running" right
       // after a start call succeeds, so a stale tick still in flight from
-      // before it (status done, the OLD count) would otherwise look like
-      // the new job finishing.
-      moved: del.status === "running" ? -1 : del.moved };
+      // before it (status done, the OLD seq) would otherwise look like the
+      // new job finishing; counts can't tell them apart (mark-read x3).
+      // Held while running; a page loaded mid-job counts as "this job".
+      seq: del.status === "running"
+        ? (prev ? prev.seq : (del.seq ?? 0) - 1) : del.seq };
     if (state.status === "error" && prev?.scan !== "error")
       notify(t("err.generic", { msg: state.error }), "error");
     if (!prev) return;
     const fresh = state.undo.filter((u) => !prev.undo.includes(undoId(u)));
-    if (del.status !== "running" && (del.status !== prev.d || fresh.length)) {
+    const newJob = del.seq != null && del.seq !== prev.seq;
+    if (del.status !== "running" && (fresh.length || newJob
+        || (del.seq == null && del.status !== prev.d))) {
       if (del.status === "error") {
         notify(t("err.generic", { msg: del.error }), "error");
-      } else if (fresh.length
-          || (del.moved > 0 && del.moved !== prev.moved)) {
+      } else if (fresh.length || del.moved > 0) {
         const n = fresh.length
           ? fresh.reduce((a, u) => a + u.count, 0) : del.moved;
         const entry = fresh.length === 1 ? fresh[0] : undefined;
@@ -572,8 +575,7 @@ export default function App() {
     }
     if (!await confirmDialog({ title: t("confirm.empty_trash_title"),
       body: n === null ? t("confirm.empty_trash_body_nocount")
-        : t(n === 1 ? "confirm.empty_trash_body_1"
-          : "confirm.empty_trash_body", { n }),
+        : t("confirm.empty_trash_body", { n }),
       tone: "danger",
       confirmLabel: n === null ? t("confirm.empty_trash_btn_nocount")
         : t("confirm.empty_trash_btn", { n }) })) return false;

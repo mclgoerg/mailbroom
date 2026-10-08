@@ -20,7 +20,7 @@ export const EN: Record<string, string> = {
   "confirm.unsubscribe":
     "Unsubscribe from the senders of {n} selected groups?",
   "confirm.unsubscribe_one":
-    "Unsubscribe from the sender of the selected group?",
+    "Unsubscribe from the senders of the selected group?",
   "confirm.restore": "Restore {count} mails ({label})?",
   "confirm.restore_one": "Restore 1 mail ({label})?",
   "ai.usage": "Usage",
@@ -533,6 +533,8 @@ export const EN: Record<string, string> = {
   "stats.ai": "AI verdicts (sender groups)",
   "stats.rated_mails":
     "· {n} mails rated individually ({safe} safe to delete)",
+  "stats.rated_mails_one":
+    "· 1 mail rated individually ({safe} safe to delete)",
   "stats.top_domains": "Top domains by size",
   "stats.cleanup": "Cleanup by month",
   "stats.actions_line":
@@ -549,8 +551,11 @@ export const EN: Record<string, string> = {
   "Copy": "Copy",
   "notice.trash_restored":
     "Restored {n} mails from Trash to {dest}.",
+  "notice.trash_restored_one": "Restored 1 mail from Trash to {dest}.",
   "notice.trash_restored_rescan":
     "Restored {n} mails from Trash to {dest} - rescan to see them again.",
+  "notice.trash_restored_rescan_one":
+    "Restored 1 mail from Trash to {dest} - rescan to see it again.",
   "trash.browse": "Browse Trash",
   "trash.restore_to": "Restore to…",
   "trash.restored": "Restored {n} mails - rescan to see them in the views.",
@@ -626,6 +631,7 @@ export const EN: Record<string, string> = {
   "toast.moved_trash": "Moved {n} mails to Trash",
   "toast.moved_trash_one": "Moved 1 mail to Trash",
   "status.filter_none": "0 of {n} groups match",
+  "status.filter_none_one": "0 of 1 group matches",
   "status.no_mails": "No mails found in the scanned folders.",
   "onboard.title": "Welcome - three steps to a tidy mailbox",
   "onboard.step_bridge":
@@ -757,7 +763,7 @@ export const EN: Record<string, string> = {
     + "explicitly overrides its protection.",
   "confirm.empty_trash_body":
     "{n} mails in Trash will be permanently deleted. This cannot be undone.",
-  "confirm.empty_trash_body_1":
+  "confirm.empty_trash_body_one":
     "The 1 mail in Trash will be permanently deleted. This cannot be undone.",
   "confirm.empty_trash_body_nocount":
     "All mails in Trash will be permanently deleted. This cannot be undone.",

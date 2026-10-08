@@ -1303,7 +1303,7 @@ def start_scan(acc=None, notice: dict | None = None) -> None:
                      notice=notice, scanned_ts=None)
         acc.state["groups_rev"] += 1
         acc.state["delete"] = {"status": "idle", "progress": "", "error": "",
-                           "moved": 0}
+                           "moved": 0, "seq": acc.state["delete"].get("seq", 0)}
         # Last bulk unsubscribe's counters belong to the previous scan; the
         # senders themselves stay recorded in unsubstore.
         acc.state["unsub"] = {"status": "idle", "progress": "", "error": "",
@@ -1612,8 +1612,12 @@ def _start_delete(by_folder: dict[str, set[int]], label: str, acc,
     acc.delete_pending.append({"by_folder": by_folder, "label": label,
                             "action": action, "dest": dest, "actor": actor})
     if acc.state["delete"]["status"] != "running":
+        # `seq` identifies the job: the UI compares it to the value it saw
+        # at start, so a stale "done" tick of an earlier job is not mistaken
+        # for this one finishing (counts can't tell them apart).
         acc.state["delete"] = {"status": "running", "progress": "queued…",
-                           "error": "", "moved": 0}
+                           "error": "", "moved": 0,
+                           "seq": acc.state["delete"].get("seq", 0) + 1}
         acc.cancel["delete"] = False
         threading.Thread(target=tenants.call_in,
                          args=(acc.tenant, _delete_worker, acc),

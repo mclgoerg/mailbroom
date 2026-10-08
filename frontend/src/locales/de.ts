@@ -21,7 +21,7 @@ export const DE: Record<string, string> = {
   "confirm.unsubscribe":
     "Von den Absendern in {n} ausgewählten Gruppen abbestellen?",
   "confirm.unsubscribe_one":
-    "Vom Absender der ausgewählten Gruppe abbestellen?",
+    "Von den Absendern der ausgewählten Gruppe abbestellen?",
   "confirm.restore": "{count} Mails wiederherstellen ({label})?",
   "confirm.restore_one": "1 Mail wiederherstellen ({label})?",
   "ai.usage": "Nutzung",
@@ -122,8 +122,9 @@ export const DE: Record<string, string> = {
   "rule.pinned_skipped_one": "1 geschützte Mail übersprungen",
   "qb.has_pinned": "mit geschützten Mails",
   "confirm.block_trash_existing":
-    "Auch die {n} vorhandene(n) Mail(s) jetzt in den Papierkorb "
-    + "verschieben?",
+    "Auch die {n} vorhandenen Mails jetzt in den Papierkorb verschieben?",
+  "confirm.block_trash_existing_one":
+    "Auch die 1 vorhandene Mail jetzt in den Papierkorb verschieben?",
   "toast.blocked": "„{label}“ blockiert.",
   "block.tip":
     "Diesen Absender/diese Domain blockieren: legt eine dauerhafte Regel "
@@ -360,6 +361,8 @@ export const DE: Record<string, string> = {
   "toast.unsub_started_one": "Bestelle bei 1 Absender ab…",
   "toast.unsub_skipped":
     "({n} bereits erledigt, geschützt oder über dem Limit pro Lauf.)",
+  "toast.unsub_skipped_one":
+    "(1 bereits erledigt, geschützt oder über dem Limit pro Lauf.)",
   "toast.unsub_nothing":
     "Nichts abzubestellen - alle Absender sind bereits erledigt oder "
     + "geschützt.",
@@ -390,6 +393,8 @@ export const DE: Record<string, string> = {
   "stats.ai": "KI-Bewertungen (Absender-Gruppen)",
   "stats.rated_mails":
     "· {n} Mails einzeln bewertet ({safe} sicher löschbar)",
+  "stats.rated_mails_one":
+    "· 1 Mail einzeln bewertet ({safe} sicher löschbar)",
   "stats.top_domains": "Top-Domains nach Größe",
   "stats.cleanup": "Aufräumen pro Monat",
   "stats.actions_line":
@@ -408,8 +413,12 @@ export const DE: Record<string, string> = {
   "Copy": "Kopieren",
   "notice.trash_restored":
     "{n} Mails aus dem Papierkorb nach {dest} wiederhergestellt.",
+  "notice.trash_restored_one":
+    "1 Mail aus dem Papierkorb nach {dest} wiederhergestellt.",
   "notice.trash_restored_rescan":
     "{n} Mails aus dem Papierkorb nach {dest} wiederhergestellt - zum Anzeigen neu scannen.",
+  "notice.trash_restored_rescan_one":
+    "1 Mail aus dem Papierkorb nach {dest} wiederhergestellt - zum Anzeigen neu scannen.",
   "trash.browse": "Papierkorb durchsuchen",
   "trash.restore_to": "Wiederherstellen nach…",
   "trash.restored": "{n} Mails wiederhergestellt - zum Anzeigen neu scannen.",
@@ -491,6 +500,7 @@ export const DE: Record<string, string> = {
   "toast.moved_trash": "{n} Mails in den Papierkorb verschoben",
   "toast.moved_trash_one": "1 Mail in den Papierkorb verschoben",
   "status.filter_none": "0 von {n} Gruppen passen",
+  "status.filter_none_one": "0 von 1 Gruppe passt",
   "status.no_mails": "In den gescannten Ordnern wurden keine Mails gefunden.",
   "onboard.title": "Willkommen - in drei Schritten zum sauberen Postfach",
   "onboard.step_bridge":
@@ -915,7 +925,7 @@ export const DE: Record<string, string> = {
   "confirm.empty_trash_body":
     "{n} Mails im Papierkorb werden endgültig gelöscht. Das lässt sich "
     + "nicht rückgängig machen.",
-  "confirm.empty_trash_body_1":
+  "confirm.empty_trash_body_one":
     "Die 1 Mail im Papierkorb wird endgültig gelöscht. Das lässt sich nicht "
     + "rückgängig machen.",
   "confirm.empty_trash_body_nocount":

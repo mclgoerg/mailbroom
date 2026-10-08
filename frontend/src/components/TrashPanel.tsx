@@ -63,7 +63,7 @@ export function TrashPanel({ state, onClose, onChanged, onEmptyTrash }: {
       setSel(new Set());
       onChanged();
     } catch (e: any) {
-      setNote(`Error: ${e.message ?? e}`);
+      setNote(t("err.generic", { msg: e.message ?? e }));
     }
     setBusy(false);
   };

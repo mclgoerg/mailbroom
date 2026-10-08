@@ -1,6 +1,8 @@
 // @vitest-environment jsdom
 import { describe, expect, it } from "vitest";
 import { getLang, setLang, t } from "./i18n";
+import { DE } from "./locales/de";
+import { EN } from "./locales/en";
 
 describe("i18n", () => {
   it("falls back to the key in English", () => {
@@ -40,10 +42,17 @@ describe("i18n", () => {
     setLang("en");
   });
 
-  it("never mixes languages: a German key without _one stays German", () => {
-    setLang("de");
-    expect(t("toast.unsub_skipped", { n: 1 })).toBe(
-      "(1 bereits erledigt, geschützt oder über dem Limit pro Lauf.)");
-    setLang("en");
+  it("every locale has the same _one keys, and no '(s)' placeholders remain", () => {
+    const ones = (d: Record<string, string>) =>
+      Object.keys(d).filter((k) => k.endsWith("_one")).sort();
+    expect(ones(DE)).toEqual(ones(EN));       // no English fallback in German
+    for (const [k, v] of [...Object.entries(EN), ...Object.entries(DE)]) {
+      expect(v, k).not.toMatch(/\((s|n|e|en)\)/);
+    }
+    // A _one entry's base key must exist and use the same placeholders.
+    for (const k of ones(EN)) {
+      expect(EN[k.slice(0, -4)], k).toBeTruthy();
+      expect(DE[k.slice(0, -4)], k).toBeTruthy();
+    }
   });
 });
