@@ -28,6 +28,7 @@ vi.mock("./api", async (importOriginal) => ({
     exportUrl: (mode: string) => `/api/export?grouping=${mode}`,
     version: () => Promise.resolve({ build: "v1" }),
     undo: vi.fn().mockResolvedValue({ ok: true }),
+    deleteGroups: vi.fn().mockResolvedValue({ ok: true, queued: 1, skipped: 0 }),
   },
   setAccount: () => {},
   withAccount: (p: string) => p,
@@ -255,4 +256,31 @@ test("a zero-match filter after a failed rescan still offers Clear filter",
     tick({ status: "error", error: "x" } as any);
     expect(await screen.findByText("No groups match this filter")).toBeTruthy();
     expect(screen.queryByText(/Welcome/)).toBeNull();
+  });
+
+test("a stale pre-start tick (old job, old count) does not toast the new job's result",
+  async () => {
+    // A finished job from earlier: done, 5 moved, nothing new in the undo list.
+    await mount({ ...baseState, delete: job("done", { moved: 5 }) as any });
+    fireEvent.click(screen.getAllByLabelText("Select Shop News")[0]);
+    fireEvent.click(screen.getByRole("button", { name: /^Trash \d+/ }));
+    await pressDialog(/Move to Trash/);
+    await waitFor(() => expect(api.deleteGroups).toHaveBeenCalled());
+    // An SSE tick that was already in flight before the start call arrives:
+    // it still carries the OLD "done / 5". It must stay quiet.
+    tick({ delete: job("done", { moved: 5 }) as any });
+    expect(screen.queryByText(/Moved|processed/)).toBeNull();
+    // The real job: running, then done with an Undo entry -> exactly one toast.
+    tick({ delete: job("running", { progress: "1/12" }) as any });
+    tick({ delete: job("done", { moved: 12 }) as any,
+      undo: [{ ts: 9, label: "Shop News", count: 12, action: "trash" }] });
+    expect(await screen.findByText("Moved 12 mails to Trash")).toBeTruthy();
+  });
+
+test("a finished job with a count after seeing it run still toasts without undo entries",
+  async () => {
+    await mount({ ...baseState, delete: job("done", { moved: 5 }) as any });
+    tick({ delete: job("running") as any });
+    tick({ delete: job("done", { moved: 5 }) as any });  // same count, new job
+    expect(await screen.findByText("Done: 5 mails processed.")).toBeTruthy();
   });

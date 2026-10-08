@@ -302,7 +302,7 @@ export default function App() {
      toasts (a page load or account switch that finds an old "done" stays
      quiet); a scan error is the one exception, nothing else shows it. */
   const seenJobs = useRef<{ scan?: string; d?: string; a?: string;
-    u?: string; undo: string[] } | null>(null);
+    u?: string; undo: string[]; moved?: number } | null>(null);
   const startToast = useRef<{ unsub?: number }>({});
   useEffect(() => {
     if (!state) { seenJobs.current = null; return; }
@@ -313,7 +313,13 @@ export default function App() {
     // baseline stays what it was before it started.
     seenJobs.current = { scan: state.status, d: del.status,
       a: ai.status, u: unsub?.status,
-      undo: del.status === "running" && prev ? prev.undo : ids };
+      undo: del.status === "running" && prev ? prev.undo : ids,
+      // Moved count BEFORE the job: -1 once a running tick was seen (then
+      // any count is this job's). The baseline is set to "running" right
+      // after a start call succeeds, so a stale tick still in flight from
+      // before it (status done, the OLD count) would otherwise look like
+      // the new job finishing.
+      moved: del.status === "running" ? -1 : del.moved };
     if (state.status === "error" && prev?.scan !== "error")
       notify(t("err.generic", { msg: state.error }), "error");
     if (!prev) return;
@@ -321,7 +327,8 @@ export default function App() {
     if (del.status !== "running" && (del.status !== prev.d || fresh.length)) {
       if (del.status === "error") {
         notify(t("err.generic", { msg: del.error }), "error");
-      } else if (fresh.length || del.moved > 0) {
+      } else if (fresh.length
+          || (del.moved > 0 && del.moved !== prev.moved)) {
         const n = fresh.length
           ? fresh.reduce((a, u) => a + u.count, 0) : del.moved;
         const entry = fresh.length === 1 ? fresh[0] : undefined;
