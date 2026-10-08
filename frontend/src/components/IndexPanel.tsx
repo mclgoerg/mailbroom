@@ -141,7 +141,7 @@ export function IndexPanel({ account, savedMode, secretKeySet }: {
             <Button variant="secondary" onClick={async () => {
               if (await confirmDialog({
                 title: t("index.delete_title"),
-                body: t("index.delete_body"),
+                body: t("index.delete_body", { name: account }),
                 confirmLabel: t("index.delete"), tone: "danger",
               })) act(() => api.indexDelete(account));
             }}>{t("index.delete")}</Button>

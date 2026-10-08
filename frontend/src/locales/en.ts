@@ -26,6 +26,9 @@ export const EN: Record<string, string> = {
     "Groups are evaluated again by the next AI review, which uses tokens.",
   "confirm.clear_verdicts_confirm": "Clear cache",
   "confirm.reset_spend": "Reset the AI spend counter",
+  "confirm.reset_spend_body":
+    "Total AI spend ({cost}) and this month's spend ({month}), which counts "
+    + "against your monthly budget, start again at zero.",
   "confirm.reset_spend_confirm": "Reset spend",
   "account.label": "Account to edit",
   "account.add": "Add account",
@@ -43,6 +46,10 @@ export const EN: Record<string, string> = {
     "Removes this account from Mailbroom. Mails on the server are untouched.",
   "account.delete": 'Delete account "{name}"…',
   "account.delete_title": 'Delete account "{name}"',
+  "account.delete_data":
+    "Its connection settings, scan results, local search index, saved "
+    + "filters, pins, digest and auto-scan settings are deleted from "
+    + "Mailbroom.",
   "account.delete_rules":
     "Its rules keep the account name but stop running.",
   "account.delete_mails": "Mails on the server are untouched.",
@@ -262,7 +269,7 @@ export const EN: Record<string, string> = {
     "Warning: that may not fit on the data volume.",
   "index.delete_title": "Delete the local index",
   "index.delete_body":
-    "The word index of this account is removed. You can build it again "
+    "The word index of account \"{name}\" is removed. You can build it again "
     + "at any time.",
   "notice.index_cancelled": "Indexing cancelled - what was indexed is kept.",
   "search.body_hint_local":

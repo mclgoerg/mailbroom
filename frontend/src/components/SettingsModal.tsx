@@ -309,7 +309,7 @@ export function SettingsModal({ cfg, account, onClose, onSaved,
   const accountNameError = (own?: string) => (value: string) => {
     const name = value.trim();
     if (!name) return t("account.err_empty");
-    if (name !== own && name in cfg.accounts) {
+    if (name !== own && Object.hasOwn(cfg.accounts, name)) {
       return t("account.err_dup", { name });
     }
     return null;
@@ -353,7 +353,8 @@ export function SettingsModal({ cfg, account, onClose, onSaved,
   const deleteAccount = async () => {
     if (!await confirmDialog({
       title: t("account.delete_title", { name: editAcct }),
-      bullets: [t("account.delete_rules"), t("account.delete_mails")],
+      bullets: [t("account.delete_data"), t("account.delete_rules"),
+        t("account.delete_mails")],
       confirmLabel: t("account.delete_confirm"), tone: "danger",
     })) return;
     try {
@@ -433,6 +434,8 @@ export function SettingsModal({ cfg, account, onClose, onSaved,
   const resetStats = async () => {
     if (!await confirmDialog({
       title: t("confirm.reset_spend"),
+      body: t("confirm.reset_spend_body", { cost: fmtUsd(s.cost),
+        month: fmtUsd(cfg.ai.month_cost ?? 0) }),
       confirmLabel: t("confirm.reset_spend_confirm"), tone: "danger",
     })) return;
     onSaved(await api.saveConfig({ reset_ai_stats: true }));
@@ -1236,7 +1239,7 @@ export function SettingsModal({ cfg, account, onClose, onSaved,
         </>)}
       </div>
       <div className="flex items-center gap-3 border-t border-line px-4 py-3
-        sm:px-5">
+        sm:px-5 max-sm:pb-[calc(0.75rem+env(safe-area-inset-bottom))]">
         <span className="min-w-0 flex-1 type-meta text-muted">{msg}</span>
         <Button variant="secondary" onClick={onClose}>{t("Cancel")}</Button>
         <Button onClick={() => save()}>{t("Save")}</Button>

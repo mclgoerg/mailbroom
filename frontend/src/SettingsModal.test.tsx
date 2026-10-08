@@ -9,6 +9,7 @@ import { afterEach, expect, test, vi } from "vitest";
 const foldersCalls: (string | undefined)[] = [];
 const saveCalls: any[] = [];
 const testDigestCalls: string[] = [];
+const oauthDisconnectCalls: string[] = [];
 let testDigestResult: { sent: boolean; demo: boolean } =
   { sent: true, demo: false };
 vi.mock("./api", () => ({
@@ -25,7 +26,9 @@ vi.mock("./api", () => ({
       testDigestCalls.push(account);
       return Promise.resolve(testDigestResult);
     },
-    getConfig: () => Promise.resolve({}),
+    getConfig: () => Promise.resolve(cfg),
+    oauthDisconnect: (a: string) => { oauthDisconnectCalls.push(a);
+      return Promise.resolve({}); },
     adminStats: () => Promise.resolve({ tenants: [{
       id: "alice_x.example_ab12cd34", label: "", is_admin_workspace: false,
       accounts: 1, mails: 42, size: 1048576, scans: 3,
@@ -498,3 +501,61 @@ test("picking the local index saves it and points to the index panel",
     fireEvent.click(screen.getByText("Save"));
     expect(saveCalls[0].imap.body_search).toBe("local");
   });
+
+test("deleting sends delete_account for the account selected, not the active one",
+  async () => {
+    saveCalls.length = 0;
+    renderWithDialogs();
+    fireEvent.change(screen.getByLabelText(/Account to edit/),
+      { target: { value: "icloud" } });
+    fireEvent.click(screen.getByText('Delete account "icloud"…'));
+    await pressDialog("Delete account");
+    await waitFor(() => expect(saveCalls).toEqual(
+      [{ delete_account: "icloud" }]));
+  });
+
+test("the delete dialog lists the data that goes with the account",
+  async () => {
+    renderWithDialogs();
+    fireEvent.click(screen.getByText('Delete account "default"…'));
+    const dlg = await findDialog();
+    expect(dlg.textContent).toContain("scan results, local search index");
+    await cancelDialog();
+  });
+
+test("account names like 'constructor' are valid, real duplicates are not",
+  async () => {
+    saveCalls.length = 0;
+    renderWithDialogs();
+    fireEvent.click(screen.getByText("Add account"));
+    const dlg = await findDialog();
+    fireEvent.change(within(dlg).getByRole("textbox"),
+      { target: { value: "constructor" } });
+    expect(within(dlg).queryByRole("alert")).toBeNull();
+    await pressDialog("Add account");
+    await waitFor(() => expect(saveCalls).toEqual(
+      [{ add_account: "constructor" }]));
+  });
+
+test("OAuth disconnect asks first; Cancel disconnects nothing", async () => {
+  oauthDisconnectCalls.length = 0;
+  const oauthCfg: Config = { ...cfg, accounts: { ...cfg.accounts,
+    default: { ...acct, preset: "gmail", oauth: { provider: "google",
+      client_id: "id", client_secret_set: true, connected: true } as any } } };
+  renderWithDialogs({ cfg: oauthCfg });
+  fireEvent.click(screen.getByText("Disconnect"));
+  await cancelDialog();
+  await expectNoDialog();
+  expect(oauthDisconnectCalls).toEqual([]);
+  fireEvent.click(screen.getByText("Disconnect"));
+  await pressDialog("Disconnect");
+  await waitFor(() => expect(oauthDisconnectCalls).toEqual(["default"]));
+});
+
+test("resetting spend names the amounts it clears", async () => {
+  renderWithDialogs();
+  fireEvent.click(screen.getByRole("tab", { name: "AI" }));
+  fireEvent.click(screen.getByText("Reset spend…"));
+  expect((await findDialog()).textContent).toContain("this month's spend");
+  await cancelDialog();
+});

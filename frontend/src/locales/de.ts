@@ -28,6 +28,9 @@ export const DE: Record<string, string> = {
     + "verbraucht Tokens.",
   "confirm.clear_verdicts_confirm": "Cache leeren",
   "confirm.reset_spend": "KI-Kostenzähler zurücksetzen",
+  "confirm.reset_spend_body":
+    "Die KI-Gesamtkosten ({cost}) und die Kosten dieses Monats ({month}), "
+    + "die auf Ihr Monatsbudget angerechnet werden, beginnen wieder bei null.",
   "confirm.reset_spend_confirm": "Kosten zurücksetzen",
   "confirm.switch_profile":
     "Zum Kontoprofil „{name}“ wechseln? Danach neu scannen.",
@@ -555,6 +558,10 @@ export const DE: Record<string, string> = {
     + "unangetastet.",
   "account.delete": 'Konto "{name}" löschen…',
   "account.delete_title": 'Konto "{name}" löschen',
+  "account.delete_data":
+    "Seine Verbindungseinstellungen, Scan-Ergebnisse, der lokale "
+    + "Suchindex, gespeicherte Filter, Pins, Digest und Auto-Scan-"
+    + "Einstellungen werden aus Mailbroom gelöscht.",
   "account.delete_rules":
     "Seine Regeln behalten den Kontonamen, laufen aber nicht mehr.",
   "account.delete_mails": "Mails auf dem Server bleiben unangetastet.",
@@ -784,7 +791,7 @@ export const DE: Record<string, string> = {
     "Achtung: das passt möglicherweise nicht auf den Datenträger.",
   "index.delete_title": "Den lokalen Index löschen",
   "index.delete_body":
-    "Der Wortindex dieses Kontos wird entfernt. Sie können ihn jederzeit "
+    "Der Wortindex des Kontos \"{name}\" wird entfernt. Sie können ihn jederzeit "
     + "neu aufbauen.",
   "notice.index_cancelled":
     "Indexierung abgebrochen - bereits Indexiertes bleibt erhalten.",

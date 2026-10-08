@@ -124,10 +124,14 @@ test("on phones it opens as a bottom sheet and Done / Esc close it", () => {
     expect(sheet.getAttribute("data-size")).toBe("sm");
     expect(sheet.textContent).toContain("Build a filter");
     expect(sheet.textContent).toContain("tag:social");   // current query
-    fireEvent.click(screen.getAllByText("Add")[0]);
+    // phones get icon-only Add buttons (named for AT)
+    expect(screen.queryByText("Add")).toBeNull();
+    expect(document.activeElement).toBe(screen.getByText("Build a filter"));
+    fireEvent.click(screen.getAllByRole("button", { name: "Add" })[0]);
     expect(s.get()).toBe("tag:social tag:newsletter");
     fireEvent.click(screen.getByText("Done"));
     expect(screen.queryByRole("dialog")).toBeNull();
+    expect(document.activeElement).toBe(screen.getByTitle(/Build a filter/));
     fireEvent.click(screen.getByTitle(/Build a filter/));
     expect(screen.getByRole("dialog")).toBeTruthy();
     fireEvent.keyDown(window, { key: "Escape" });
@@ -137,4 +141,15 @@ test("on phones it opens as a bottom sheet and Done / Esc close it", () => {
     // @ts-expect-error jsdom has no matchMedia by default
     delete window.matchMedia;
   }
+});
+
+test("closing the popover returns focus to the trigger (Done and Esc)", () => {
+  setup();
+  fireEvent.click(screen.getByText("Done"));
+  expect(document.activeElement).toBe(screen.getByTitle(/Build a filter/));
+  fireEvent.click(screen.getByTitle(/Build a filter/));
+  expect(screen.getByText("Build a filter")).toBeTruthy();
+  fireEvent.keyDown(window, { key: "Escape" });
+  expect(screen.queryByText("Build a filter")).toBeNull();
+  expect(document.activeElement).toBe(screen.getByTitle(/Build a filter/));
 });

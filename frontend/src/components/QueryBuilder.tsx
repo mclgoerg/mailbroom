@@ -1,5 +1,5 @@
-import { SlidersHorizontal } from "lucide-react";
-import { type ReactNode, useId, useState } from "react";
+import { Plus, SlidersHorizontal } from "lucide-react";
+import { type ReactNode, useEffect, useId, useRef, useState } from "react";
 import { t } from "../i18n";
 import { Button, Chip, Input, Modal, SectionLabel, Select, useMediaQuery }
   from "./ui";
@@ -21,6 +21,26 @@ export function QueryBuilder({ value, onChange, className = "" }: {
 }) {
   const [open, setOpen] = useState(false);
   const phone = useMediaQuery("(max-width: 639px)");
+  const trigger = useRef<HTMLButtonElement>(null);
+  const heading = useRef<HTMLDivElement>(null);
+  // Closing hands focus back to the trigger (it would fall to <body>).
+  const close = () => { setOpen(false); trigger.current?.focus(); };
+  const closeRef = useRef(close);
+  closeRef.current = close;
+  useEffect(() => {
+    if (open && phone) heading.current?.focus();   // sheet: focus moves in
+  }, [open, phone]);
+  useEffect(() => {
+    if (!open || phone) return;     // the sheet's Modal handles its own Esc
+    // Capture + stop: Esc closes only the popover, not a Modal around it.
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      e.stopImmediatePropagation();
+      closeRef.current();
+    };
+    window.addEventListener("keydown", onKey, true);
+    return () => window.removeEventListener("keydown", onKey, true);
+  }, [open, phone]);
   const [tag, setTag] = useState("newsletter");
   const [ai, setAi] = useState("safe");
   const [age, setAge] = useState("1");
@@ -34,10 +54,17 @@ export function QueryBuilder({ value, onChange, className = "" }: {
     onChange(q ? `${q} ${tok}` : tok);
   };
   const addBtn = (tok: string) => (
-    <Button variant="secondary" size="sm" className="shrink-0"
-      onClick={() => add(tok)}>
-      {t("qb.add")}
-    </Button>
+    phone ? (
+      <Button variant="secondary" size="icon" className="shrink-0"
+        label={t("qb.add")} onClick={() => add(tok)}>
+        <Plus size={18} />
+      </Button>
+    ) : (
+      <Button variant="secondary" size="sm" className="shrink-0"
+        onClick={() => add(tok)}>
+        {t("qb.add")}
+      </Button>
+    )
   );
   const flag = (tok: string, label: string) => (
     <Chip key={tok} on={value.split(/\s+/).includes(tok)}
@@ -60,19 +87,21 @@ export function QueryBuilder({ value, onChange, className = "" }: {
     <>
       <div className="flex items-start gap-2">
         <div className="min-w-0 flex-1">
-          <div id={titleId} className="type-heading">{t("qb.title")}</div>
+          <div id={titleId} ref={heading} tabIndex={-1}
+            className="type-heading">{t("qb.title")}</div>
           <div className="type-meta text-muted">{t("qb.hint")}</div>
         </div>
         <Button variant="quiet" size="sm" onClick={() => onChange("")}>
           {t("qb.clear")}
         </Button>
-        <Button size="sm" onClick={() => setOpen(false)}>{t("qb.done")}</Button>
+        <Button size="sm" onClick={close}>{t("qb.done")}</Button>
       </div>
       {phone && value.trim() && (
         <div className="mt-2 break-words rounded-control bg-panel2 px-2 py-1
           font-mono type-meta text-body">{value}</div>
       )}
-      <div className="mt-3 grid grid-cols-[5.5rem_1fr_auto] sm:grid-cols-[7rem_1fr_auto] items-center
+      {/* 6.5rem (not a token): "Attachments ≥" must not wrap on phones. */}
+      <div className="mt-3 grid grid-cols-[6.5rem_1fr_auto] sm:grid-cols-[7rem_1fr_auto] items-center
         gap-x-2 gap-y-2">
         {row(t("qb.tag"),
           <Select className="min-w-0 flex-1" value={tag}
@@ -126,13 +155,13 @@ export function QueryBuilder({ value, onChange, className = "" }: {
 
   return (
     <>
-      <Button variant="secondary" size="icon" className={className}
-        label={t("qb.tip")} aria-expanded={open}
+      <Button ref={trigger} variant="secondary" size="icon"
+        className={className} label={t("qb.tip")} aria-expanded={open}
         onClick={() => setOpen(!open)}>
         <SlidersHorizontal size={18} />
       </Button>
       {open && phone && (
-        <Modal size="sm" labelledBy={titleId} onClose={() => setOpen(false)}>
+        <Modal size="sm" labelledBy={titleId} onClose={close}>
           <div className="min-h-0 flex-1 overflow-y-auto p-4">{panel}</div>
         </Modal>
       )}
