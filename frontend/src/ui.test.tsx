@@ -820,3 +820,21 @@ test("BulkBar renders every slot, Clear works, and --bulkbar-h follows its mount
   expect(root.getPropertyValue("--bulkbar-h")).toBe("");
   offset.mockRestore();
 });
+
+test("MailRow: every part of the row is a target (no dead strips)", () => {
+  render(<MailRow subject="Hi" meta="x" onToggle={() => {}} onOpen={() => {}}
+    trailing={<button>pin</button>} />);
+  expect(screen.getByLabelText("Select mail").closest("label")!.className)
+    .toContain("-ml-3");
+  const open = screen.getByText("Hi").closest("button")!;
+  expect(open.className).toContain("-my-3");
+  expect(open.className).toContain("self-stretch");
+  expect(screen.getByText("pin").parentElement!.className)
+    .toContain("self-stretch");
+});
+
+test("MailRow: dateIso renders a ShortDate with the ISO day as tooltip", () => {
+  render(<MailRow subject="Hi" meta="x" dateIso="2025-01-02" />);
+  expect(screen.getByText("2 Jan 2025").getAttribute("title"))
+    .toBe("2025-01-02");
+});

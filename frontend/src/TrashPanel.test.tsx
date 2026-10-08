@@ -17,7 +17,7 @@ vi.mock("./api", () => ({
       folder: "Trash", uv: 1, total,
       mails: emptyList ? [] : [{ uid: 30, folder: "Trash", date: "2026-01-02", ts: 1,
         subject: "Deleted elsewhere", addr: "old@gone.example", size: 700,
-        seen: true, ai: null }],
+        seen: false, ai: null }],
     }),
     trashRestore: (...a: unknown[]) => trashRestore(...a),
   },
@@ -35,6 +35,7 @@ afterEach(() => {
   cleanup();
   trashRestore.mockReset();
   total = 1;
+  emptyList = false;
   setLang("en");
 });
 
@@ -87,8 +88,10 @@ test("rows are MailRows; the restore select only appears with a selection",
     render(<TrashPanel state={state} onClose={() => {}}
       onChanged={() => {}} onEmptyTrash={async () => true} />);
     await screen.findByText("Deleted elsewhere");
-    expect(screen.getByText("2 Jan · old@gone.example · 1 KB"))
-      .toBeTruthy();
+    expect(screen.getByText("old@gone.example · 1 KB")).toBeTruthy();
+    expect(screen.getByText("2 Jan").getAttribute("title")).toBe("2026-01-02");
+    expect(screen.getByText("unread")).toBeTruthy();   // seen: false
+    expect(screen.getByLabelText("Select Deleted elsewhere")).toBeTruthy();
     expect(screen.queryByDisplayValue(/Restore to/)).toBeNull();
     fireEvent.click(screen.getByRole("checkbox"));
     expect(screen.getByDisplayValue(/Restore to… \(1\)/)).toBeTruthy();
@@ -104,5 +107,5 @@ test("an empty Trash shows the empty state and no Empty Trash footer",
       onChanged={() => {}} onEmptyTrash={async () => true} />);
     await screen.findByText("Trash is empty");
     expect(screen.queryByRole("button", { name: /Empty Trash/ })).toBeNull();
-    emptyList = false;
+    expect(screen.queryByPlaceholderText("Search subject or sender")).toBeNull();
   });

@@ -1,8 +1,7 @@
 import { RefreshCw, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { api, fmtSize, mailKey } from "../api";
-import { getLang, t } from "../i18n";
-import { fmtDate } from "../lib";
+import { t } from "../i18n";
 import type { AppState, Mail, TrashResp } from "../types";
 import { MessageView } from "./MailList";
 import { Button, EmptyState, Input, Loading, MailRow, Modal, PanelHeader,
@@ -70,7 +69,7 @@ export function TrashPanel({ state, onClose, onChanged, onEmptyTrash }: {
   };
 
   return (
-    <Modal onClose={onClose}
+    <Modal onClose={onClose} size="lg"
       full={!!view || !shown || shown.length > 0 || !!q}>
       <PanelHeader
         title={<span className="inline-flex items-center gap-2">
@@ -91,25 +90,27 @@ export function TrashPanel({ state, onClose, onChanged, onEmptyTrash }: {
         <MessageView mail={view} onBack={() => setView(null)} />
       ) : (
         <>
-          <Toolbar>
-            <Input className="w-full sm:w-auto sm:min-w-32 sm:flex-1"
-              placeholder={t("search.placeholder")}
-              value={q} onChange={(e) => setQ(e.target.value)} />
-            {sel.size > 0 && (
-              <Select value="" disabled={busy}
-                onChange={(e) => restore(e.target.value)}>
-                <option value="" disabled>
-                  {t("trash.restore_to")} ({sel.size})
-                </option>
-                {(state.folders_raw ?? []).map((f, i) => (
-                  <option key={f} value={f}>{state.folders[i] ?? f}</option>
-                ))}
-              </Select>
-            )}
-            {busy && <Spinner />}
-            {note && <span className="w-full type-meta text-muted">{note}</span>}
-          </Toolbar>
-          <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-4">
+          {trash && (trash.mails.length > 0 || note) && (
+            <Toolbar>
+              <Input className="w-full sm:w-auto sm:min-w-32 sm:flex-1"
+                placeholder={t("search.placeholder")}
+                value={q} onChange={(e) => setQ(e.target.value)} />
+              {sel.size > 0 && (
+                <Select value="" disabled={busy}
+                  onChange={(e) => restore(e.target.value)}>
+                  <option value="" disabled>
+                    {t("trash.restore_to")} ({sel.size})
+                  </option>
+                  {(state.folders_raw ?? []).map((f, i) => (
+                    <option key={f} value={f}>{state.folders[i] ?? f}</option>
+                  ))}
+                </Select>
+              )}
+              {busy && <Spinner />}
+              {note && <span className="w-full type-meta text-muted">{note}</span>}
+            </Toolbar>
+          )}
+          <div className="min-h-0 flex-1 overflow-y-auto pb-4">
             {error && <div className="p-4 type-body text-danger-fg">{error}</div>}
             {!shown && !error && <Loading />}
             {shown && shown.length === 0 && (
@@ -121,8 +122,10 @@ export function TrashPanel({ state, onClose, onChanged, onEmptyTrash }: {
               <MailRow key={mailKey(m)} checked={sel.has(mailKey(m))}
                 onToggle={() => toggle(mailKey(m))} onOpen={() => setView(m)}
                 unread={!m.seen} subject={m.subject || t("(no subject)")}
-                meta={[fmtDate(m.date || "", new Date(), { lang: getLang() }),
-                  m.addr, fmtSize(m.size)].filter(Boolean).join(" · ")} />
+                dateIso={m.date || ""}
+                selectLabel={t("select.named",
+                  { subject: m.subject || t("(no subject)") })}
+                meta={[m.addr, fmtSize(m.size)].join(" · ")} />
             ))}
           </div>
           {trash && trash.total > 0 && (

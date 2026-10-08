@@ -7,7 +7,7 @@ import { cleanup, fireEvent, render, screen, waitFor }
 import { afterEach, expect, test, vi } from "vitest";
 import { DuplicatesPanel } from "./components/DuplicatesPanel";
 import { DialogProvider } from "./components/ui";
-import { cancelDialog, expectNoDialog, pressDialog } from "./dialogTestUtils";
+import { cancelDialog, expectNoDialog, findDialog, pressDialog } from "./dialogTestUtils";
 import { setLang } from "./i18n";
 
 const duplicates = vi.fn();
@@ -22,7 +22,7 @@ vi.mock("./api", () => ({
 
 const mk = (uid: number, folder = "INBOX") => ({ uid, folder,
   date: "2026-01-02T10:30:00", ts: 1, subject: "Invoice", addr: "a@x.example",
-  size: 10, seen: true, ai: null });
+  size: 10, seen: false, ai: null });
 
 const show = () => render(<DialogProvider>
   <DuplicatesPanel onClose={() => {}} onDeleted={() => {}} />
@@ -50,12 +50,18 @@ test("select-all-but-newest then confirm trashes only the older copies; "
     mails: [mk(3), mk(2, "Archive"), mk(1)] }]);
   show();
   await screen.findAllByText("Invoice");
-  expect(screen.getByText(/2 Jan, 10:30 · Archive · 1 KB/)).toBeTruthy();
+  expect(screen.getByText("1 KB · Archive")).toBeTruthy();   // size before folder
+  expect(screen.getAllByText("2 Jan, 10:30")[0].getAttribute("title"))
+    .toBe("2026-01-02T10:30:00");
+  expect(screen.getAllByText("unread")).toHaveLength(3);
   expect(screen.getByText("newest")).toBeTruthy();
   expect(screen.queryByRole("button", { name: /Trash selected/ })).toBeNull();
 
   fireEvent.click(screen.getByRole("button", { name: "Select all but newest" }));
   fireEvent.click(screen.getByRole("button", { name: "Trash selected (2)" }));
+  const dlg = await findDialog();
+  expect(dlg.textContent).toContain("Move to Trash");
+  expect(dlg.textContent).toContain("2 selected mail(s)");
   await cancelDialog();
   await expectNoDialog();
   expect(deleteMessages).not.toHaveBeenCalled();

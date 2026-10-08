@@ -849,6 +849,7 @@ export const DE: Record<string, string> = {
   "confirm.empty_trash_btn_nocount": "Endgültig löschen",
   "confirm.btn_anyway": "Trotzdem: {verb}",
   "confirm.b_mails_groups": "{n} Mails aus {k} Gruppe(n) sind betroffen",
+  "select.named": "{subject} auswählen",
   "confirm.b_selected": "{n} ausgewählte Mail(s)",
   "confirm.b_protected_groups_skipped": "{n} geschützte Gruppe(n) übersprungen",
   "confirm.b_pinned_kept": "{n} geschützte Mail(s) bleiben unberührt",

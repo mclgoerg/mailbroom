@@ -45,7 +45,7 @@ export function AuditLogPanel({ rules, onClose }: {
   useEffect(() => load(offset), [offset]);
 
   return (
-    <Modal onClose={onClose} full={!entries || entries.length > 0}>
+    <Modal onClose={onClose} size="lg" full={!entries || entries.length > 0}>
       <PanelHeader
         title={<span className="inline-flex items-center gap-2">
           <ScrollText size={18} /> {t("Audit Log")}

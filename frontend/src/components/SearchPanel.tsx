@@ -2,9 +2,10 @@ import { Search } from "lucide-react";
 import { useState } from "react";
 import { api, mailKey } from "../api";
 import { t } from "../i18n";
+import { confirmTrashMails } from "../mailActions";
 import type { Mail, SearchNote } from "../types";
 import { MailRows, MessageView } from "./MailList";
-import { Button, Checkbox, confirmTrashMails, EmptyState, Input, Modal,
+import { Button, Checkbox, EmptyState, Input, Modal,
   PanelHeader, Spinner, Toolbar } from "./ui";
 
 export function SearchPanel({ bodySearch = false, bodyMode = "server",
@@ -66,7 +67,7 @@ export function SearchPanel({ bodySearch = false, bodyMode = "server",
   };
 
   return (
-    <Modal onClose={onClose} full={!!view || !!mails?.length}>
+    <Modal onClose={onClose} size="lg" full={!!view || !!mails?.length}>
       <PanelHeader
         title={<span className="inline-flex items-center gap-2">
           <Search size={18} /> {t("Search")}
@@ -123,7 +124,7 @@ export function SearchPanel({ bodySearch = false, bodyMode = "server",
               {t(`search.note.${n.key}`, n.params)}
             </p>
           ))}
-          <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-4">
+          <div className="min-h-0 flex-1 overflow-y-auto pb-4">
             {mails === null && (
               <EmptyState icon={<Search size={18} />}
                 title={t("search.empty_title")}

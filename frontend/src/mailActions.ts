@@ -59,3 +59,12 @@ export const itemsOf = (mails: Mail[]) =>
   mails.map((m) => [m.folder, m.uid] as [string, number]);
 
 export { mailKey };
+
+/** The one confirmation for "move the selected mails to Trash" in the list
+ *  panels (Search, Attachments, Duplicates). */
+export const confirmTrashMails = (n: number): Promise<boolean> => {
+  const verb = actionVerb("trash");
+  return confirmDialog({ title: verb, tone: "danger",
+    bullets: [t("confirm.b_selected", { n })],
+    confirmLabel: t("confirm.btn_n", { verb, n }) });
+};

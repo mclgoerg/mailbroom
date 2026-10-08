@@ -1,11 +1,11 @@
 import { Paperclip } from "lucide-react";
 import { useEffect, useState } from "react";
 import { api, fmtSize, mailKey } from "../api";
-import { getLang, t } from "../i18n";
-import { fmtDate } from "../lib";
+import { t } from "../i18n";
+import { confirmTrashMails } from "../mailActions";
 import type { AppState, AttMail, Mail } from "../types";
 import { MessageView } from "./MailList";
-import { Button, confirmTrashMails, EmptyState, Loading, MailRow, Modal,
+import { Button, EmptyState, Loading, MailRow, Modal,
   PanelHeader, Spinner, Tag, Toolbar } from "./ui";
 
 /** Attachment explorer: lazy BODYSTRUCTURE analysis, then the mailbox's
@@ -80,14 +80,14 @@ export function AttachmentsPanel({ state, onClose, onDeleted }: {
     || (!mails && atts?.status !== "done");
 
   return (
-    <Modal onClose={onClose} full={!!view || running || !emptyPanel}>
+    <Modal onClose={onClose} size="lg" full={!!view || running || !emptyPanel}>
       <PanelHeader
         title={<span className="inline-flex items-center gap-2">
           <Paperclip size={18} /> {t("Attachments")}
         </span>}
         sub={atts?.status === "done"
           ? t("atts.summary", { n: atts.mails, size: fmtSize(atts.size) })
-          : t("atts.hint")}
+          : running ? t("atts.hint") : ""}
         actions={running ? (
           <Button variant="secondary" onClick={cancel}>
             <Spinner /> {starting ? t("Starting…") : atts.progress}{" "}
@@ -119,7 +119,7 @@ export function AttachmentsPanel({ state, onClose, onDeleted }: {
               {note && <span className="type-meta text-muted">{note}</span>}
             </Toolbar>
           )}
-          <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-4">
+          <div className="min-h-0 flex-1 overflow-y-auto pb-4">
             {!mails && !running && atts?.status !== "done" && (
               <EmptyState icon={<Paperclip size={18} />}
                 title={t("atts.not_analyzed")} hint={t("atts.intro")} />
@@ -138,9 +138,11 @@ export function AttachmentsPanel({ state, onClose, onDeleted }: {
               <MailRow key={mailKey(m)} checked={sel.has(mailKey(m))}
                 onToggle={() => toggle(mailKey(m))} onOpen={() => setView(m)}
                 subject={m.subject || t("(no subject)")}
-                meta={[fmtDate(m.date || "", new Date(), { lang: getLang() }),
-                  m.addr, m.atts.map((a) => `${a.name} (${fmtSize(a.size)})`)
-                    .join(", ")].filter(Boolean).join(" · ")}
+                unread={!m.seen} dateIso={m.date || ""}
+                selectLabel={t("select.named",
+                  { subject: m.subject || t("(no subject)") })}
+                meta={[m.addr, m.atts.map((a) =>
+                  `${a.name} (${fmtSize(a.size)})`).join(", ")].join(" · ")}
                 trailing={<Tag tone="attach">📎 {fmtSize(m.att_size)}</Tag>} />
             ))}
           </div>

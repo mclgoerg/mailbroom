@@ -6,7 +6,10 @@
 import { cleanup, fireEvent, render, screen, waitFor }
   from "@testing-library/react";
 import { afterEach, expect, test, vi } from "vitest";
+import type { ReactElement } from "react";
 import { SearchPanel } from "./components/SearchPanel";
+import { DialogProvider } from "./components/ui";
+import { cancelDialog, expectNoDialog, pressDialog } from "./dialogTestUtils";
 import { setLang } from "./i18n";
 import type { SearchResp } from "./types";
 
@@ -14,7 +17,8 @@ const search = vi.fn();
 const deleteMessages = vi.fn();
 
 vi.mock("./api", () => ({
-  api: { search: (...a: unknown[]) => search(...a), deleteMessages: (...a: unknown[]) => deleteMessages(...a) },
+  api: { search: (...a: unknown[]) => search(...a),
+    deleteMessages: (...a: unknown[]) => deleteMessages(...a) },
   fmtSize: () => "1 KB",
   mailKey: (m: { folder: string; uid: number }) => `${m.folder}\0${m.uid}`,
 }));
@@ -96,14 +100,12 @@ test("local mode explains that it searches whole words and shows index notes",
 
 /* ---- list rows, toolbar relevance, empty states, confirm flow ---- */
 
-import { DialogProvider } from "./components/ui";
-import { cancelDialog, expectNoDialog, pressDialog } from "./dialogTestUtils";
 
 const mail = (uid: number) => ({ uid, folder: "INBOX", date: "2026-01-02",
   ts: 1, subject: `Parcel ${uid}`, addr: "shop@x.example", size: 10,
   seen: true, ai: null });
 
-const withDialogs = (ui: React.ReactElement) =>
+const withDialogs = (ui: ReactElement) =>
   render(<DialogProvider>{ui}</DialogProvider>);
 
 test("before a query: header, empty state, no selection actions", () => {

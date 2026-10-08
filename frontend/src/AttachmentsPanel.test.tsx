@@ -22,7 +22,7 @@ vi.mock("./api", () => ({
 }));
 
 const mk = (uid: number) => ({ uid, folder: "INBOX", date: "2026-01-02",
-  ts: 1, subject: `Scan ${uid}`, addr: "a@x.example", size: 10, seen: true,
+  ts: 1, subject: `Scan ${uid}`, addr: "a@x.example", size: 10, seen: false,
   ai: null, att_size: 2e6, atts: [{ name: "doc.pdf", size: 2e6 }] });
 
 const state = (status: string) => ({ status: "done",
@@ -59,8 +59,11 @@ test("rows are MailRows; danger button only with a selection; cancel keeps "
   attachments.mockResolvedValue([mk(1), mk(2)]);
   show();
   await screen.findByText("Scan 1");
-  expect(screen.getAllByText(/2 Jan · a@x.example · doc.pdf \(2 MB\)/))
+  expect(screen.getAllByText(/a@x.example · doc.pdf \(2 MB\)/))
     .toHaveLength(2);
+  expect(screen.getAllByText("2 Jan")[0].getAttribute("title"))
+    .toBe("2026-01-02");
+  expect(screen.getAllByText("unread")).toHaveLength(2);   // seen: false
   expect(screen.queryByRole("button", { name: /Trash selected/ })).toBeNull();
 
   fireEvent.click(screen.getAllByRole("checkbox")[1]);

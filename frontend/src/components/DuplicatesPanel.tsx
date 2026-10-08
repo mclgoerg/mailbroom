@@ -1,11 +1,11 @@
 import { Copy } from "lucide-react";
 import { useEffect, useState } from "react";
 import { api, fmtSize, mailKey } from "../api";
-import { getLang, t } from "../i18n";
-import { fmtDate } from "../lib";
+import { t } from "../i18n";
+import { confirmTrashMails } from "../mailActions";
 import type { DupSet, Mail } from "../types";
 import { MessageView } from "./MailList";
-import { Button, confirmTrashMails, EmptyState, Loading, MailRow, Modal,
+import { Button, EmptyState, Loading, MailRow, Modal,
   PanelHeader, Tag, Toolbar } from "./ui";
 
 /** Duplicate finder: same Message-ID anywhere, or identical
@@ -66,7 +66,7 @@ export function DuplicatesPanel({ onClose, onDeleted }: {
   };
 
   return (
-    <Modal onClose={onClose} full={!!view || !sets || sets.length > 0}>
+    <Modal onClose={onClose} size="lg" full={!!view || !sets || sets.length > 0}>
       <PanelHeader
         title={<span className="inline-flex items-center gap-2">
           <Copy size={18} /> {t("Duplicates")}
@@ -96,7 +96,7 @@ export function DuplicatesPanel({ onClose, onDeleted }: {
               {note && <span className="type-meta text-muted">{note}</span>}
             </Toolbar>
           )}
-          <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-4">
+          <div className="min-h-0 flex-1 overflow-y-auto pb-4">
             {error && <div className="p-4 type-body text-danger-fg">{error}</div>}
             {!sets && !error && <Loading />}
             {sets && sets.length === 0 && (
@@ -105,9 +105,9 @@ export function DuplicatesPanel({ onClose, onDeleted }: {
             )}
             {sets?.map((s, si) => (
               <div key={si}
-                className="my-2 rounded-card border border-line bg-panel2 p-2">
-                <div className="mb-1 flex items-baseline gap-2 px-1 type-meta
-                  text-muted">
+                className="my-2 border-y border-line bg-panel2">
+                <div className="flex items-baseline gap-2 px-3 pt-2 type-meta
+                  text-muted md:px-2">
                   <span className="min-w-0 flex-1 truncate">
                     {s.mails[0].addr}
                   </span>
@@ -121,9 +121,10 @@ export function DuplicatesPanel({ onClose, onDeleted }: {
                     onToggle={() => toggle(mailKey(m))}
                     onOpen={() => setView(m)}
                     subject={m.subject || t("(no subject)")}
-                    meta={[fmtDate(m.date || "", new Date(),
-                      { lang: getLang(), time: true }), m.folder,
-                    fmtSize(m.size)].filter(Boolean).join(" · ")}
+                    unread={!m.seen} dateIso={m.date || ""} dateTime
+                    selectLabel={t("select.named",
+                      { subject: m.subject || t("(no subject)") })}
+                    meta={[fmtSize(m.size), m.folder].join(" · ")}
                     trailing={mi === 0
                       ? <Tag tone="safe">{t("dups.newest")}</Tag> : undefined} />
                 ))}

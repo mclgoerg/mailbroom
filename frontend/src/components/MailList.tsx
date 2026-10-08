@@ -2,8 +2,7 @@ import { ArrowLeft, MessagesSquare } from "lucide-react";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { api, fmtSize, mailKey } from "../api";
 import type { Mail, MessageDetail } from "../types";
-import { getLang, t } from "../i18n";
-import { fmtDate } from "../lib";
+import { t } from "../i18n";
 import { AiTag, Button, MailRow, PinButton, Spinner } from "./ui";
 import { ThreadView } from "./ThreadView";
 
@@ -96,7 +95,7 @@ export function MailRows({ mails, sel, onToggle, onOpen, onPin, detailed,
   return (
     <>
       {(paged ? mails : mails.slice(0, cap)).map((m) => {
-        const meta = [fmtDate(m.date || "", new Date(), { lang: getLang() })];
+        const meta: string[] = [];
         if (multiFolder) meta.push(m.folder);
         if (multiSender) meta.push(m.addr);
         meta.push(fmtSize(m.size));
@@ -105,14 +104,15 @@ export function MailRows({ mails, sel, onToggle, onOpen, onPin, detailed,
             {m.ai && <AiTag ai={{ verdict: m.ai, reason: "" }} />}
             {onPin && (
               <PinButton on={!!m.pinned} onClick={() => onPin(m)}
-                className="justify-center coarse:min-h-11 coarse:min-w-11" />
+                className="justify-center pr-4 coarse:min-h-11 coarse:min-w-11 md:pr-3" />
             )}
           </>
         ) : undefined;
         return (
           <MailRow key={mailKey(m)} checked={sel.has(mailKey(m))}
             onToggle={() => onToggle(mailKey(m))} unread={!m.seen}
-            subject={m.subject || t("(no subject)")} meta={meta.join(" · ")}
+            subject={m.subject || t("(no subject)")} meta={meta.join(" · ")} dateIso={m.date || ""}
+            selectLabel={t("select.named", { subject: m.subject || t("(no subject)") })}
             pinned={!!m.pinned} onOpen={() => onOpen(m)} trailing={trailing} />
         );
       })}
