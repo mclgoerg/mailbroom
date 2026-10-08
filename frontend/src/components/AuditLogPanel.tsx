@@ -102,7 +102,8 @@ export function AuditLogPanel({ rules, onClose }: {
         ))}
       </div>
       {!!total && (
-        <div className="flex justify-end gap-2 border-t border-line px-4 py-2">
+        <div className="flex justify-end gap-2 border-t border-line px-4 py-2
+          max-sm:pb-[calc(0.5rem+env(safe-area-inset-bottom))]">
           <Button variant="secondary" size="sm" disabled={offset === 0}
             onClick={() => setOffset(Math.max(0, offset - PAGE_SIZE))}>
             <ChevronLeft size={16} className="mr-1 inline align-text-bottom" />

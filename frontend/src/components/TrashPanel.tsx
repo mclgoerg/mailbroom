@@ -129,7 +129,8 @@ export function TrashPanel({ state, onClose, onChanged, onEmptyTrash }: {
             ))}
           </div>
           {trash && trash.total > 0 && (
-            <div className="flex justify-end border-t border-line px-4 py-2">
+            <div className="flex justify-end border-t border-line px-4 py-2
+              max-sm:pb-[calc(0.5rem+env(safe-area-inset-bottom))]">
               <Button variant="danger-quiet" disabled={busy}
                 onClick={async () => {
                   if (await onEmptyTrash(trash.total)) load();

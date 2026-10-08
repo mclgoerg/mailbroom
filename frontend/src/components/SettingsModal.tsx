@@ -10,7 +10,7 @@ import type { AdminTenantStats, AuthMode, AutoScanUnit, BodySearchMode, Config,
 import { IndexPanel } from "./IndexPanel";
 import { Button, Checkbox, confirmDialog, Field, Input, LINK_ACCENT, Loading,
   Modal, PanelHeader, promptDialog, SectionLabel, Segmented, Select, Spinner,
-  Tag, TextArea, useMediaQuery } from "./ui";
+  Tag, tabPanelProps, TextArea, useMediaQuery } from "./ui";
 
 /* Provider presets only PREFILL the connection fields - everything stays
  * editable. "custom" prefills nothing. Hosts per provider docs; all of
@@ -513,9 +513,10 @@ export function SettingsModal({ cfg, account, onClose, onSaved,
       </span>} onClose={onClose} />
       <div className="border-b border-line px-4 py-3 sm:px-5">
         <Segmented fill value={tab} onChange={setTab} options={tabs}
-          label={t("Settings")} />
+          label={t("Settings")} idPrefix="settings" />
       </div>
-      <div className="grid flex-1 content-start gap-4 overflow-y-auto p-4 sm:p-5
+      <div {...tabPanelProps("settings", tab)}
+        className="grid flex-1 content-start gap-4 overflow-y-auto p-4 sm:p-5
         sm:grid-cols-2 sm:items-end">
         {tab === "general" && (<>
         <Field label={t("Language")}>

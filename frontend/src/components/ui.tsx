@@ -638,6 +638,15 @@ const openModals: symbol[] = [];
  *  keyboard shortcuts must stay quiet then. */
 export const isModalOpen = (): boolean => openModals.length > 0;
 
+const FOCUSABLE = 'a[href], button, input:not([type="hidden"]), select, '
+  + 'textarea, [tabindex]';
+
+/** Tab stops inside `root`, in DOM order. */
+const tabStops = (root: HTMLElement): HTMLElement[] =>
+  [...root.querySelectorAll<HTMLElement>(FOCUSABLE)].filter((el) =>
+    el.tabIndex >= 0 && !(el as HTMLButtonElement).disabled
+    && !el.closest("[hidden]"));
+
 const MODAL_WIDTH = { sm: "sm:max-w-md", md: "sm:max-w-2xl",
   lg: "sm:max-w-3xl" };   // 448 / 672 / 768 px
 
@@ -652,6 +661,11 @@ export function Modal({ children, onClose, full = false, size, label,
 }) {
   const sz = size ?? (full ? "lg" : "md");
   const id = useRef(Symbol("modal")).current;
+  const dialog = useRef<HTMLDivElement>(null);
+  // Whatever had focus when the modal opened (read during the first render,
+  // before an autoFocus child can take it): focus returns there on close.
+  const opener = useRef<Element | null | undefined>(undefined);
+  if (opener.current === undefined) opener.current = document.activeElement;
   // The listener calls the latest onClose; the effect itself depends on
   // [id] only, so a parent re-render (inline onClose) never re-registers
   // the modal and reshuffles the stack.
@@ -664,8 +678,19 @@ export function Modal({ children, onClose, full = false, size, label,
     const onKey = (e: KeyboardEvent) => {
       // Only the topmost modal reacts, so Esc on a confirm that sits over
       // a panel closes the confirm and leaves the panel open.
-      if (e.key === "Escape" && openModals[openModals.length - 1] === id) {
-        closeRef.current();
+      if (openModals[openModals.length - 1] !== id) return;
+      if (e.key === "Escape") closeRef.current();
+      // Focus trap: Tab wraps inside the dialog and never reaches the page
+      // behind it.
+      if (e.key === "Tab" && dialog.current) {
+        const stops = tabStops(dialog.current);
+        const at = stops.indexOf(document.activeElement as HTMLElement);
+        const edge = e.shiftKey ? at <= 0 : at === stops.length - 1;
+        if (!stops.length || at < 0 || edge) {
+          e.preventDefault();
+          (stops.length ? stops[e.shiftKey ? stops.length - 1 : 0]
+            : dialog.current).focus();
+        }
       }
     };
     window.addEventListener("keydown", onKey);
@@ -674,23 +699,38 @@ export function Modal({ children, onClose, full = false, size, label,
       openModals.splice(openModals.indexOf(id), 1);
     };
   }, [id]);
+  useEffect(() => {
+    const d = dialog.current;
+    // Children that asked for focus (autoFocus, ConfirmDialog) already have
+    // it; otherwise start on the dialog itself so Tab goes to its first
+    // control and a screen reader announces the dialog.
+    if (d && !d.contains(document.activeElement)) d.focus();
+    const back = opener.current as HTMLElement | null;
+    return () => {
+      if (back?.isConnected && back.focus) back.focus();
+    };
+  }, []);
   const shape = sz === "sm"
     ? `max-h-[88dvh] rounded-t-dialog border-t max-sm:pb-[env(safe-area-inset-bottom)]
        sm:rounded-dialog`
     : full
       ? "h-dvh sm:h-[88vh]"
       : "h-dvh overflow-y-auto sm:h-auto sm:max-h-[88vh]";
+  // iPhone (viewport-fit=cover): full-screen modals keep their header below
+  // the status bar.
+  const inset = sz === "sm" ? "" : " max-sm:pt-[env(safe-area-inset-top)]";
   return (
     <div
       className={`fixed inset-0 z-(--z-modal) flex justify-center bg-overlay
         p-0 sm:p-6 ${sz === "sm" ? "items-end sm:items-center"
           : "items-center"}`}
       onClick={(e) => e.target === e.currentTarget && onClose()}>
-      <div role="dialog" aria-modal="true" aria-label={label}
+      <div ref={dialog} tabIndex={-1} role="dialog" aria-modal="true"
+        aria-label={label}
         aria-labelledby={labelledBy} aria-describedby={describedBy}
         data-size={sz}
-        className={`flex w-full flex-col overflow-hidden border-line bg-panel
-        sm:rounded-dialog sm:border ${MODAL_WIDTH[sz]} ${shape}`}>
+        className={`flex w-full flex-col overflow-hidden border-line bg-panel outline-none
+        sm:rounded-dialog sm:border ${MODAL_WIDTH[sz]} ${shape}${inset}`}>
         {children}
       </div>
     </div>
@@ -778,13 +818,17 @@ export function ChipSegment({ on = false, children, className = "", ...rest }:
  *  the solid accent that belongs to the one primary Button. `fill` makes
  *  the row full-width, segments sized to their content (`flex-auto`). */
 export function Segmented<T extends string>({ value, onChange, options,
-  label, fill = false, className = "" }: {
+  label, fill = false, className = "", idPrefix }: {
   value: T | null;
   onChange: (v: T) => void;
   options: { value: T; label: ReactNode }[];
   label: string;
   fill?: boolean;
   className?: string;
+  /** Wires the tabs to a panel: tab ids `${idPrefix}-tab-${value}`, and the
+   *  selected one gets `aria-controls="${idPrefix}-panel"` (render the panel
+   *  with `tabPanelProps(idPrefix, value)`). */
+  idPrefix?: string;
 }) {
   // Roving tabindex: Tab enters on the selected segment, Left/Right/Home/End
   // move FOCUS only; Enter/Space (a native click) activates. Selection must
@@ -809,6 +853,8 @@ export function Segmented<T extends string>({ value, onChange, options,
         const on = o.value === value;
         return (
           <button key={o.value} type="button" role="tab" aria-selected={on}
+            id={idPrefix && `${idPrefix}-tab-${o.value}`}
+            aria-controls={idPrefix && on ? `${idPrefix}-panel` : undefined}
             tabIndex={o.value === tabStop ? 0 : -1}
             onClick={() => onChange(o.value)}
             className={`min-h-9 coarse:min-h-10 min-w-0 whitespace-nowrap
@@ -824,6 +870,12 @@ export function Segmented<T extends string>({ value, onChange, options,
     </div>
   );
 }
+
+/** Props for the one panel a `Segmented idPrefix={…}` controls. */
+export const tabPanelProps = (idPrefix: string, value: string) => ({
+  role: "tabpanel" as const, id: `${idPrefix}-panel`,
+  "aria-labelledby": `${idPrefix}-tab-${value}`,
+});
 
 /** Live `matchMedia` flag (false where matchMedia doesn't exist, e.g.
  *  jsdom: components then render their wide layout). */
@@ -1047,11 +1099,15 @@ export type PromptOptions = {
 
 /** Confirm/submit is ignored this long after a dialog opens. On a phone the
  *  sheet's confirm button lands under the trigger, so the second tap of a
- *  double-tap would otherwise confirm a destructive action unseen. */
+ *  double-tap would otherwise confirm a destructive action unseen. Keyboard
+ *  activations (a click with `detail === 0`: Enter / Space) are exempt -
+ *  nobody double-taps with a keyboard, and typing a name then Enter must
+ *  not be swallowed. */
 export const DIALOG_ARM_MS = 500;
 const useArmed = () => {
   const openedAt = useRef(Date.now());
-  return () => Date.now() - openedAt.current >= DIALOG_ARM_MS;
+  return (viaKeyboard = false) =>
+    viaKeyboard || Date.now() - openedAt.current >= DIALOG_ARM_MS;
 };
 
 /** Confirm sheet. Danger dialogs focus Cancel, the safe choice. */
@@ -1090,7 +1146,7 @@ export function ConfirmDialog({ title, body, bullets, confirmLabel,
         <Button ref={safe} variant="secondary"
           onClick={() => onResult(false)}>{cancelLabel ?? t("Cancel")}</Button>
         <Button ref={ok} variant={tone === "danger" ? "danger" : "primary"}
-          onClick={() => { if (armed()) onResult(true); }}>
+          onClick={(e) => { if (armed(e.detail === 0)) onResult(true); }}>
           {confirmLabel}
         </Button>
       </div>
@@ -1109,6 +1165,9 @@ export function PromptDialog({ title, label, initial = "", confirmLabel,
   const [touched, setTouched] = useState(false);
   const input = useRef<HTMLInputElement>(null);
   const armed = useArmed();
+  // How the submit was triggered: Enter in the field makes the browser click
+  // the submit button with `detail === 0`; a tap/click has `detail >= 1`.
+  const viaKeyboard = useRef(true);
   const titleId = useId();
   useEffect(() => { input.current?.focus(); input.current?.select(); }, []);
   const error = validate?.(value) ?? null;
@@ -1116,7 +1175,9 @@ export function PromptDialog({ title, label, initial = "", confirmLabel,
     <Modal size="sm" labelledBy={titleId} onClose={() => onResult(null)}>
       <form className="flex min-h-0 flex-1 flex-col" onSubmit={(e) => {
         e.preventDefault();
-        if (!armed()) return;
+        const kb = viaKeyboard.current;
+        viaKeyboard.current = true;
+        if (!armed(kb)) return;
         if (error) setTouched(true); else onResult(value);
       }}>
         <div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-4 sm:p-5">
@@ -1134,7 +1195,10 @@ export function PromptDialog({ title, label, initial = "", confirmLabel,
           sm:px-5">
           <Button type="button" variant="secondary"
             onClick={() => onResult(null)}>{t("Cancel")}</Button>
-          <Button type="submit">{confirmLabel ?? t("OK")}</Button>
+          <Button type="submit"
+            onClick={(e) => { viaKeyboard.current = e.detail === 0; }}>
+            {confirmLabel ?? t("OK")}
+          </Button>
         </div>
       </form>
     </Modal>

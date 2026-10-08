@@ -337,17 +337,29 @@ test("a confirm tapped right after opening is ignored; after the delay it resolv
     const onResult = vi.fn();
     render(<ConfirmDialog title="Sure?" confirmLabel="Delete" tone="danger"
       onResult={onResult} />);
-    fireEvent.click(screen.getByText("Delete"));      // the 2nd tap of a double-tap
+    // the 2nd tap of a double-tap (a pointer click has detail >= 1)
+    fireEvent.click(screen.getByText("Delete"), { detail: 2 });
     expect(onResult).not.toHaveBeenCalled();
     expect(screen.getByText("Sure?")).toBeTruthy();   // still open
     fireEvent.click(screen.getByText("Cancel"));      // Cancel is never delayed
     expect(onResult).toHaveBeenLastCalledWith(false);
     vi.advanceTimersByTime(DIALOG_ARM_MS - 1);
-    fireEvent.click(screen.getByText("Delete"));
+    fireEvent.click(screen.getByText("Delete"), { detail: 1 });
     expect(onResult).toHaveBeenCalledTimes(1);
     vi.advanceTimersByTime(1);
-    fireEvent.click(screen.getByText("Delete"));
+    fireEvent.click(screen.getByText("Delete"), { detail: 1 });
     expect(onResult).toHaveBeenLastCalledWith(true);
+  } finally { vi.useRealTimers(); }
+});
+
+test("a keyboard-activated confirm (click detail 0) is not swallowed by the guard", () => {
+  vi.useFakeTimers();
+  try {
+    const onResult = vi.fn();
+    render(<ConfirmDialog title="Sure?" confirmLabel="Delete" tone="danger"
+      onResult={onResult} />);
+    fireEvent.click(screen.getByText("Delete"), { detail: 0 });
+    expect(onResult).toHaveBeenCalledWith(true);
   } finally { vi.useRealTimers(); }
 });
 
@@ -356,10 +368,21 @@ test("PromptDialog ignores a submit (Enter / tap) right after opening", () => {
   try {
     const onResult = vi.fn();
     render(<PromptDialog title="Name" label="Name" initial="x" onResult={onResult} />);
-    fireEvent.click(screen.getByText("OK"));
+    fireEvent.click(screen.getByText("OK"), { detail: 1 });
     expect(onResult).not.toHaveBeenCalled();
     vi.advanceTimersByTime(DIALOG_ARM_MS);
-    fireEvent.click(screen.getByText("OK"));
+    fireEvent.click(screen.getByText("OK"), { detail: 1 });
+    expect(onResult).toHaveBeenCalledWith("x");
+  } finally { vi.useRealTimers(); }
+});
+
+test("PromptDialog: Enter right after opening submits (keyboard is exempt)", () => {
+  vi.useFakeTimers();
+  try {
+    const onResult = vi.fn();
+    render(<PromptDialog title="Name" label="Name" initial="x" onResult={onResult} />);
+    // Enter in a text field: the browser clicks the submit button, detail 0.
+    fireEvent.click(screen.getByText("OK"), { detail: 0 });
     expect(onResult).toHaveBeenCalledWith("x");
   } finally { vi.useRealTimers(); }
 });
@@ -837,4 +860,63 @@ test("MailRow: dateIso renders a ShortDate with the ISO day as tooltip", () => {
   render(<MailRow subject="Hi" meta="x" dateIso="2025-01-02" />);
   expect(screen.getByText("2 Jan 2025").getAttribute("title"))
     .toBe("2025-01-02");
+});
+
+test("Modal moves focus in, traps Tab (both directions) and restores focus on close", () => {
+  const Host = () => {
+    const [open, setOpen] = useState(false);
+    return <>
+      <button onClick={() => setOpen(true)}>open</button>
+      <button>behind</button>
+      {open && <Modal onClose={() => setOpen(false)}>
+        <button>first</button><input aria-label="mid" />
+        <button>last</button>
+      </Modal>}
+    </>;
+  };
+  render(<Host />);
+  const opener = screen.getByText("open");
+  opener.focus();
+  fireEvent.click(opener);
+  const dlg = screen.getByRole("dialog");
+  expect(dlg.contains(document.activeElement)).toBe(true);
+  const [first, last] = [screen.getByText("first"), screen.getByText("last")];
+  // Tab from the last control wraps to the first, never to the page behind.
+  last.focus();
+  expect(fireEvent.keyDown(last, { key: "Tab" })).toBe(false);   // prevented
+  expect(document.activeElement).toBe(first);
+  expect(fireEvent.keyDown(first, { key: "Tab", shiftKey: true })).toBe(false);
+  expect(document.activeElement).toBe(last);
+  // Mid-dialog Tab is left to the browser (not prevented).
+  const mid = screen.getByLabelText("mid");
+  mid.focus();
+  expect(fireEvent.keyDown(mid, { key: "Tab" })).toBe(true);
+  // Focus that escaped to the page is pulled back in.
+  screen.getByText("behind").focus();
+  fireEvent.keyDown(document.body, { key: "Tab" });
+  expect(dlg.contains(document.activeElement)).toBe(true);
+  fireEvent.keyDown(window, { key: "Escape" });
+  expect(screen.queryByRole("dialog")).toBeNull();
+  expect(document.activeElement).toBe(opener);
+});
+
+test("a nested modal traps on its own and hands focus back to the one below", () => {
+  const Host = () => {
+    const [inner, setInner] = useState(false);
+    return <Modal onClose={() => {}}>
+      <button onClick={() => setInner(true)}>spawn</button>
+      {inner && <Modal size="sm" onClose={() => setInner(false)}>
+        <button>only</button></Modal>}
+    </Modal>;
+  };
+  render(<Host />);
+  const spawn = screen.getByText("spawn");
+  spawn.focus();
+  fireEvent.click(spawn);
+  const only = screen.getByText("only");
+  only.focus();
+  fireEvent.keyDown(only, { key: "Tab" });
+  expect(document.activeElement).toBe(only);            // wraps onto itself
+  fireEvent.keyDown(window, { key: "Escape" });
+  expect(document.activeElement).toBe(spawn);
 });
