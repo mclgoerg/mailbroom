@@ -1,6 +1,6 @@
 import { RefreshCw, Settings as SettingsIcon, Shield, Star, X }
   from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { api, downloadFile, fmtUsd } from "../api";
 import { getLang, setLang, t, type Lang } from "../i18n";
 import { fmtAgo, fmtSize } from "../lib";
@@ -8,8 +8,9 @@ import type { AdminTenantStats, AuthMode, AutoScanUnit, BodySearchMode, Config,
   DigestSchedule, FoldersResp, OauthProvider, Preset, Security,
   SmtpSecurity } from "../types";
 import { IndexPanel } from "./IndexPanel";
-import { Button, Checkbox, Field, Input, LINK_ACCENT, Loading, Modal, PanelHeader,
-  SectionLabel, Select, Spinner, Tag, TextArea } from "./ui";
+import { Button, Checkbox, confirmDialog, Field, Input, LINK_ACCENT, Loading,
+  Modal, PanelHeader, promptDialog, SectionLabel, Segmented, Select, Spinner,
+  Tag, TextArea, useMediaQuery } from "./ui";
 
 /* Provider presets only PREFILL the connection fields - everything stays
  * editable. "custom" prefills nothing. Hosts per provider docs; all of
@@ -303,9 +304,24 @@ export function SettingsModal({ cfg, account, onClose, onSaved,
     setDigestTestMsg("");
   };
 
+  // The backend trims names and rejects empty/duplicate ones; say so up
+  // front. `own` (the account being renamed) may keep its name.
+  const accountNameError = (own?: string) => (value: string) => {
+    const name = value.trim();
+    if (!name) return t("account.err_empty");
+    if (name !== own && Object.hasOwn(cfg.accounts, name)) {
+      return t("account.err_dup", { name });
+    }
+    return null;
+  };
+
   const renameAccount = async () => {
-    const name = prompt(t("account.rename_prompt", { name: editAcct }),
-      editAcct)?.trim();
+    const name = (await promptDialog({
+      title: t("account.rename_title"),
+      label: t("account.rename_prompt", { name: editAcct }),
+      initial: editAcct, confirmLabel: t("account.rename_confirm"),
+      validate: accountNameError(editAcct),
+    }))?.trim();
     if (!name || name === editAcct) return;
     try {
       const next = await api.saveConfig(
@@ -319,7 +335,10 @@ export function SettingsModal({ cfg, account, onClose, onSaved,
   };
 
   const newAccount = async () => {
-    const name = prompt(t("account.new_prompt"))?.trim();
+    const name = (await promptDialog({
+      title: t("account.new_title"), label: t("account.new_prompt"),
+      confirmLabel: t("account.add"), validate: accountNameError(),
+    }))?.trim();
     if (!name) return;
     try {
       const next = await api.saveConfig({ add_account: name });
@@ -332,7 +351,12 @@ export function SettingsModal({ cfg, account, onClose, onSaved,
   };
 
   const deleteAccount = async () => {
-    if (!confirm(t("account.confirm_delete", { name: editAcct }))) return;
+    if (!await confirmDialog({
+      title: t("account.delete_title", { name: editAcct }),
+      bullets: [t("account.delete_data"), t("account.delete_rules"),
+        t("account.delete_mails")],
+      confirmLabel: t("account.delete_confirm"), tone: "danger",
+    })) return;
     try {
       const next = await api.saveConfig({ delete_account: editAcct });
       onAccountsChanged(next, null);
@@ -360,7 +384,10 @@ export function SettingsModal({ cfg, account, onClose, onSaved,
   };
 
   const disconnectOauth = async () => {
-    if (!confirm(t("oauth.confirm_disconnect"))) return;
+    if (!await confirmDialog({
+      title: t("oauth.disconnect_title"), body: t("oauth.disconnect_body"),
+      confirmLabel: t("oauth.disconnect"), tone: "danger",
+    })) return;
     await api.oauthDisconnect(editAcct);
     const next = await api.getConfig();
     onSaved(next);
@@ -405,14 +432,49 @@ export function SettingsModal({ cfg, account, onClose, onSaved,
   }, [deviceInfo?.deviceCode]);
 
   const resetStats = async () => {
-    if (!confirm(t("confirm.reset_spend"))) return;
+    if (!await confirmDialog({
+      title: t("confirm.reset_spend"),
+      body: t("confirm.reset_spend_body", { cost: fmtUsd(s.cost),
+        month: fmtUsd(cfg.ai.month_cost ?? 0) }),
+      confirmLabel: t("confirm.reset_spend_confirm"), tone: "danger",
+    })) return;
     onSaved(await api.saveConfig({ reset_ai_stats: true }));
   };
 
   const clearVerdicts = async () => {
-    if (!confirm(t("confirm.clear_verdicts"))) return;
+    if (!await confirmDialog({
+      title: t("confirm.clear_verdicts"),
+      body: t("confirm.clear_verdicts_body"),
+      confirmLabel: t("confirm.clear_verdicts_confirm"), tone: "danger",
+    })) return;
     onSaved(await api.saveConfig({ clear_ai_verdicts: true }));
     setMsg(t("AI verdict cache cleared."));
+  };
+
+  const importBackup = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    if (!await confirmDialog({
+      title: t("import.title"),
+      bullets: [t("import.settings"), t("import.rules"), t("import.merged"),
+        t("import.secrets")],
+      confirmLabel: t("import.confirm"), tone: "danger",
+    })) return;
+    try {
+      const body = JSON.parse(await file.text());
+      const res = await fetch("/api/import_config", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      if (!res.ok) throw new Error(await res.text());
+      const r = await res.json();
+      onSaved(await api.getConfig());
+      setMsg(t("import.done", { rules: r.rules, verdicts: r.verdicts }));
+    } catch (err: any) {
+      setMsg(`Error: ${err.message ?? err}`);
+    }
   };
 
   const [pi, po] = cfg.ai.prices_effective;
@@ -430,13 +492,16 @@ export function SettingsModal({ cfg, account, onClose, onSaved,
       .catch((e) => setTenantStatsErr(String(e.message ?? e)));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tab]);
-  const tabs: [Tab, string][] = [
-    ["account", t("tab.account")],
-    ["general", t("tab.general")],
-    ["ai", t("tab.ai")],
-    ...(cfg.auth.is_admin ? [["server", t("tab.server")] as [Tab, string]]
-      : []),
+  // Phones get the short labels so all four tabs fit on one row.
+  const phone = useMediaQuery("(max-width: 639px)");
+  const tabs: { value: Tab; label: string }[] = [
+    { value: "account", label: t(phone ? "tab.account_short" : "tab.account") },
+    { value: "general", label: t(phone ? "tab.general_short" : "tab.general") },
+    { value: "ai", label: t(phone ? "tab.ai_short" : "tab.ai") },
+    ...(cfg.auth.is_admin ? [{ value: "server" as Tab,
+      label: t(phone ? "tab.server_short" : "tab.server") }] : []),
   ];
+  const importInput = useRef<HTMLInputElement>(null);
 
   return (
     // full = fixed-height sheet: switching tabs must not resize or
@@ -446,20 +511,12 @@ export function SettingsModal({ cfg, account, onClose, onSaved,
       <PanelHeader title={<span className="inline-flex items-center gap-2">
         <SettingsIcon size={18} /> {t("Settings")}
       </span>} onClose={onClose} />
-      <div role="tablist" className="flex flex-wrap gap-1 border-b
-        border-line px-4 pt-3 sm:px-5">
-        {tabs.map(([k, label]) => (
-          <button key={k} role="tab" aria-selected={tab === k}
-            className={`rounded-t-control px-3 py-1.5 type-body ${tab === k
-              ? "bg-accent text-white"
-              : "bg-panel2 text-body hover:bg-chip"}`}
-            onClick={() => setTab(k)}>
-            {label}
-          </button>
-        ))}
+      <div className="border-b border-line px-4 py-3 sm:px-5">
+        <Segmented fill value={tab} onChange={setTab} options={tabs}
+          label={t("Settings")} />
       </div>
       <div className="grid flex-1 content-start gap-4 overflow-y-auto p-4 sm:p-5
-        sm:grid-cols-2">
+        sm:grid-cols-2 sm:items-end">
         {tab === "general" && (<>
         <Field label={t("Language")}>
           <Select className="w-full" value={getLang()}
@@ -490,28 +547,25 @@ export function SettingsModal({ cfg, account, onClose, onSaved,
             }} />
         </>)}
         {tab === "account" && (<>
-        <div className="sm:col-span-2 flex flex-wrap items-end gap-2">
-          <Field label={t("account.label")}>
-            <Select className="w-full" value={editAcct}
-              onChange={(e) => switchEditAccount(e.target.value)}>
-              {Object.keys(cfg.accounts).map((n) =>
-                <option key={n}>{n}</option>)}
-            </Select>
-          </Field>
-          <Button variant="secondary" onClick={newAccount}>
-            {t("account.add")}
-          </Button>
-          <Button variant="secondary" onClick={renameAccount}>
-            {t("account.rename")}
-          </Button>
-          {Object.keys(cfg.accounts).length > 1 && (
-            <Button variant="secondary" onClick={deleteAccount}>
-              {t("Delete…")}
+        <div className="sm:col-span-2">
+          <div className="flex flex-wrap items-end gap-2">
+            <div className="basis-full sm:min-w-40 sm:flex-1 sm:basis-0">
+              <Field label={t("account.label")}>
+                <Select className="w-full" value={editAcct}
+                  onChange={(e) => switchEditAccount(e.target.value)}>
+                  {Object.keys(cfg.accounts).map((n) =>
+                    <option key={n}>{n}</option>)}
+                </Select>
+              </Field>
+            </div>
+            <Button variant="secondary" onClick={newAccount}>
+              {t("account.add")}
             </Button>
-          )}
-          <span className="pb-2 type-meta text-muted">
-            {t("account.hint")}
-          </span>
+            <Button variant="secondary" onClick={renameAccount}>
+              {t("account.rename")}
+            </Button>
+          </div>
+          <p className="mt-1 type-meta text-muted">{t("account.hint")}</p>
         </div>
         <div className="sm:col-span-2">
           <Field label={t("preset.label")}>
@@ -559,7 +613,7 @@ export function SettingsModal({ cfg, account, onClose, onSaved,
             onChange={set("smtpHost")} />
         </Field>
         <div className="grid grid-cols-2 gap-3">
-          <Field label={t("SMTP port (unsubscribe mails)")}>
+          <Field label={t("SMTP port")}>
             <Input className="w-full" type="number" value={f.smtpPort}
               onChange={set("smtpPort")} />
           </Field>
@@ -572,6 +626,9 @@ export function SettingsModal({ cfg, account, onClose, onSaved,
             </Select>
           </Field>
         </div>
+        <p className="-mt-2 type-meta text-muted sm:col-span-2">
+          {t("smtp.help")}
+        </p>
         <div className="sm:col-span-2">
           <Field label={t("cafile.label")}>
             <Input className="w-full" value={f.cafile}
@@ -831,6 +888,18 @@ export function SettingsModal({ cfg, account, onClose, onSaved,
             </>
           )}
         </div>
+
+        {Object.keys(cfg.accounts).length > 1 && (
+        <div className="sm:col-span-2 border-t border-line pt-4">
+          <SectionLabel>{t("account.remove_title")}</SectionLabel>
+          <p className="mb-2 mt-1 type-meta text-muted">
+            {t("account.remove_help")}
+          </p>
+          <Button variant="danger-quiet" onClick={deleteAccount}>
+            {t("account.delete", { name: editAcct })}
+          </Button>
+        </div>
+        )}
         </>)}
 
         {tab === "general" && (<>
@@ -867,6 +936,22 @@ export function SettingsModal({ cfg, account, onClose, onSaved,
           <p className="mt-1 type-meta text-muted">
             {t("new_sender.window_help")}
           </p>
+        </div>
+
+        <div className="sm:col-span-2 border-t border-line pt-4">
+          <SectionLabel>{t("backup.title")}</SectionLabel>
+          <p className="mb-2 mt-1 type-meta text-muted">{t("backup.help")}</p>
+          <div className="flex flex-wrap gap-2">
+            <Button variant="secondary"
+              onClick={() => downloadFile("/api/export_config")}
+              title={t("export.tip")}>{t("Export")}</Button>
+            <Button variant="secondary"
+              onClick={() => importInput.current?.click()}>
+              {t("Import…")}
+            </Button>
+            <input ref={importInput} type="file" accept="application/json"
+              className="hidden" onChange={importBackup} />
+          </div>
         </div>
         </>)}
 
@@ -1134,57 +1219,30 @@ export function SettingsModal({ cfg, account, onClose, onSaved,
           {t("budget.month", { spent: fmtUsd(cfg.ai.month_cost ?? 0) })}
         </div>
 
-        <div className="sm:col-span-2 flex flex-wrap items-center gap-3
-          rounded-card bg-panel2 px-4 py-3 type-meta text-muted">
-          <span>
+        <div className="sm:col-span-2 rounded-card border border-line
+          bg-panel2 p-3">
+          <SectionLabel>{t("ai.usage")}</SectionLabel>
+          <p className="mt-1 type-meta text-muted">
             {t("AI spend")}: <b className="text-body">{fmtUsd(s.cost)}</b>
             {" "}- {s.runs} {t("runs")}, {s.input_tokens.toLocaleString()} /{" "}
             {s.output_tokens.toLocaleString()}
-          </span>
-          <Button variant="secondary" size="sm"
-            onClick={resetStats}>
-            {t("Reset")}
-          </Button>
-          <Button variant="secondary" size="sm"
-            onClick={clearVerdicts}>
-            {t("Clear AI verdict cache")}
-          </Button>
+          </p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <Button variant="danger-quiet" size="sm" onClick={resetStats}>
+              {t("ai.reset_spend")}
+            </Button>
+            <Button variant="danger-quiet" size="sm" onClick={clearVerdicts}>
+              {t("ai.clear_verdicts")}
+            </Button>
+          </div>
         </div>
         </>)}
       </div>
-      <div className="flex flex-wrap items-center gap-3 border-t border-line
-        px-4 py-3 sm:px-5">
+      <div className="flex items-center gap-3 border-t border-line px-4 py-3
+        sm:px-5 max-sm:pb-[calc(0.75rem+env(safe-area-inset-bottom))]">
+        <span className="min-w-0 flex-1 type-meta text-muted">{msg}</span>
+        <Button variant="secondary" onClick={onClose}>{t("Cancel")}</Button>
         <Button onClick={() => save()}>{t("Save")}</Button>
-        <Button variant="secondary"
-          onClick={() => downloadFile("/api/export_config")}
-          title={t("export.tip")}>{t("Export")}</Button>
-        <label className="min-h-9 cursor-pointer rounded-control bg-chip px-3
-          py-1.5 type-body font-medium text-body hover:bg-chiph">
-          {t("Import…")}
-          <input type="file" accept="application/json" className="hidden"
-            onChange={async (e) => {
-              const file = e.target.files?.[0];
-              e.target.value = "";
-              if (!file) return;
-              if (!confirm(t("import.confirm"))) return;
-              try {
-                const body = JSON.parse(await file.text());
-                const res = await fetch("/api/import_config", {
-                  method: "POST",
-                  headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify(body),
-                });
-                if (!res.ok) throw new Error(await res.text());
-                const r = await res.json();
-                onSaved(await api.getConfig());
-                setMsg(t("import.done", { rules: r.rules,
-                  verdicts: r.verdicts }));
-              } catch (err: any) {
-                setMsg(`Error: ${err.message ?? err}`);
-              }
-            }} />
-        </label>
-        <span className="type-meta text-muted">{msg}</span>
       </div>
     </Modal>
   );

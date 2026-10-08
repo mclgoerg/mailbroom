@@ -5,6 +5,9 @@ import { cleanup, fireEvent, render, screen, waitFor }
   from "@testing-library/react";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import { IndexPanel } from "./components/IndexPanel";
+import { DialogProvider } from "./components/ui";
+import { cancelDialog, expectNoDialog, findDialog, pressDialog }
+  from "./dialogTestUtils";
 import type { IndexInfo } from "./types";
 
 const indexInfo = vi.fn();
@@ -35,7 +38,6 @@ const info = (over: Partial<IndexInfo> = {}): IndexInfo => ({
 });
 
 beforeEach(() => {
-  vi.spyOn(window, "confirm").mockReturnValue(true);
   indexBuild.mockResolvedValue({ ok: true });
   indexDelete.mockResolvedValue({ ok: true });
   indexCancel.mockResolvedValue({ ok: true });
@@ -50,8 +52,8 @@ afterEach(() => {
 });
 
 const renderPanel = (over: Partial<Parameters<typeof IndexPanel>[0]> = {}) =>
-  render(<IndexPanel account="proton" savedMode="local" secretKeySet
-    {...over} />);
+  render(<DialogProvider><IndexPanel account="proton" savedMode="local"
+    secretKeySet {...over} /></DialogProvider>);
 
 test("without MAILBROOM_SECRET_KEY it only explains and never calls the API",
   () => {
@@ -73,15 +75,16 @@ test("first build asks for consent, then starts the job", async () => {
   expect(indexInfo).toHaveBeenCalledWith("proton");
   expect(screen.queryByText("Rebuild")).toBeNull();
   fireEvent.click(screen.getByText("Build index"));
-  const asked = (window.confirm as any).mock.calls[0][0] as string;
+  const asked = (await findDialog()).textContent as string;
   expect(asked).toMatch(/no readable text/);
   // the storage the user is agreeing to, up front
   expect(asked).toContain("1000 scanned mails");
   expect(asked).toContain("roughly 5.9 MB of disk space");
   expect(asked).toContain("up to 11.7 MB");
   expect(asked).toContain("500.0 MB are free");
-  expect(asked).toContain("Do you want to proceed?");
   expect(asked).not.toContain("may not fit");
+  expect(indexBuild).not.toHaveBeenCalled();     // nothing starts before OK
+  await pressDialog("Build index");
   await waitFor(() => expect(indexBuild).toHaveBeenCalledWith("proton", false));
 });
 
@@ -101,7 +104,7 @@ test("a build that may not fit warns in the prompt and in the panel",
     await screen.findByText(/Estimated disk space/);
     expect(screen.getByText(/may not fit on the data volume/)).toBeTruthy();
     fireEvent.click(screen.getByText("Build index"));
-    expect((window.confirm as any).mock.calls[0][0])
+    expect((await findDialog()).textContent)
       .toContain("Warning: that may not fit");
   });
 
@@ -110,8 +113,8 @@ test("nothing to read means nothing to consent to", async () => {
     reason: null, docs: 5, built_ts: 1790000000, estimate: est(0) }));
   renderPanel();
   fireEvent.click(await screen.findByText("Update now"));
-  expect(window.confirm).not.toHaveBeenCalled();
   await waitFor(() => expect(indexBuild).toHaveBeenCalledWith("proton", false));
+  await expectNoDialog();
   expect(screen.queryByText(/Estimated disk space/)).toBeNull();
 });
 
@@ -121,17 +124,18 @@ test("rebuild is estimated for every scanned mail", async () => {
     estimate_full: est(2000) }));
   renderPanel();
   fireEvent.click(await screen.findByText("Rebuild"));
-  expect((window.confirm as any).mock.calls[0][0])
-    .toContain("2000 scanned mails");
+  expect((await findDialog()).textContent).toContain("2000 scanned mails");
+  await pressDialog("Rebuild");
   await waitFor(() => expect(indexBuild).toHaveBeenLastCalledWith(
     "proton", true));
 });
 
 test("declining the consent starts nothing", async () => {
-  vi.spyOn(window, "confirm").mockReturnValue(false);
   indexInfo.mockResolvedValue(info());
   renderPanel();
   fireEvent.click(await screen.findByText("Build index"));
+  await cancelDialog();
+  await expectNoDialog();
   expect(indexBuild).not.toHaveBeenCalled();
 });
 
@@ -142,11 +146,14 @@ test("a usable index shows its size, offers update/rebuild/delete", async () => 
   await screen.findByText(/1531 mails indexed, last updated/);
   expect(screen.getByText("Disk space used: 3.0 MB")).toBeTruthy();
   fireEvent.click(screen.getByText("Update now"));
+  await pressDialog("Update now");
   await waitFor(() => expect(indexBuild).toHaveBeenCalledWith("proton", false));
   fireEvent.click(screen.getByText("Rebuild"));
+  await pressDialog("Rebuild");
   await waitFor(() => expect(indexBuild).toHaveBeenLastCalledWith(
     "proton", true));
   fireEvent.click(screen.getByText("Delete index"));
+  await pressDialog("Delete index");
   await waitFor(() => expect(indexDelete).toHaveBeenCalledWith("proton"));
 });
 
@@ -180,6 +187,7 @@ test("API errors are shown", async () => {
   indexBuild.mockRejectedValue(new Error("busy"));
   renderPanel();
   fireEvent.click(await screen.findByText("Build index"));
+  await pressDialog("Build index");
   await screen.findByText("busy");
 });
 
@@ -201,4 +209,14 @@ test("large volumes are shown in GB, not thousands of MB", async () => {
   await screen.findByText(/64\.0 GB free on the data volume/);
   expect(screen.getByText(/about 585\.9 MB for 100000 mails \(up to 1\.1 GB/))
     .toBeTruthy();
+});
+
+test("cancelling the delete confirmation keeps the index", async () => {
+  indexInfo.mockResolvedValue(info({ exists: true, usable: true, reason: null,
+    docs: 5, built_ts: 1790000000 }));
+  renderPanel();
+  fireEvent.click(await screen.findByText("Delete index"));
+  await cancelDialog();
+  await expectNoDialog();
+  expect(indexDelete).not.toHaveBeenCalled();
 });
