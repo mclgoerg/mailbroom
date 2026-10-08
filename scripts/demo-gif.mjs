@@ -1,71 +1,109 @@
-/* README demo GIF: one frame per step (filter builder -> filtered ->
- * AI-safe selection -> group drill-down), assembled with ffmpeg.
+/* README demo GIF: the main workflow in eight frames - list, filter builder,
+ * a condition added, filtered list, select, confirm, result toast with Undo,
+ * group in the split pane - assembled with ffmpeg at 1280 px wide.
  *
- *   docker run -d --name mailbroom-demo --user "$(id -u)" -v "$PWD":/repo \
- *     ghcr.io/mclgoerg/mailbroom:latest python /repo/scripts/demo.py
- *   docker run --rm -v /tmp/frames:/frames -w /tmp node:26 bash -c \
- *     "apt-get update -q && apt-get install -yq chromium ffmpeg \
- *       fonts-noto-color-emoji fonts-noto-core && npm i -s puppeteer-core \
- *       && cp /repo/scripts/demo-gif.mjs . && node demo-gif.mjs \
- *       http://<demo-container-ip>:8765 && ffmpeg -framerate 2/3 \
- *       -i /frames/f%02d.png -vf 'scale=1100:-1:flags=lanczos,split[a][b];\
- *       [a]palettegen=max_colors=128[p];[b][p]paletteuse=dither=bayer' \
- *       -loop 0 /frames/demo.gif"
+ * Same demo setup as screenshots.mjs (see its header for the demo
+ * container). This script really trashes mails in the demo, so use a FRESH
+ * demo container for each run (docker rm -f mb-docs-demo; start it again).
+ *
+ *   docker run --rm --network mb-docs-net -v "$PWD":/repo -w /tmp node:26 \
+ *     bash -c "apt-get update -q && apt-get install -yq --no-install-recommends \
+ *       chromium ffmpeg fonts-noto-color-emoji fonts-noto-core || exit 1; \
+ *       mkdir rig && cd rig && npm i -s puppeteer-core \
+ *       && cp /repo/scripts/*.mjs . && node demo-gif.mjs \
+ *            http://mb-docs-demo:8765 \
+ *       && cp out/demo.gif /repo/docs/screenshots/ \
+ *       && chown $(id -u):$(id -g) /repo/docs/screenshots/demo.gif"
+ *
+ * Frames are captured at 1280x800 with deviceScaleFactor 2 and scaled down
+ * to 1280 px wide by ffmpeg (crisper text than a 1x capture). Optional
+ * OUT=<dir> overrides the output folder.
  */
-import puppeteer from "puppeteer-core";
-const BASE = process.argv[2];
-const browser = await puppeteer.launch({
-  executablePath: "/usr/bin/chromium",
-  args: ["--no-sandbox", "--disable-dev-shm-usage", "--hide-scrollbars",
-         "--force-color-profile=srgb"],
-});
-const page = await browser.newPage();
-await page.setViewport({ width: 1280, height: 800, deviceScaleFactor: 1 });
-await page.evaluateOnNewDocument(() => {
-  localStorage.setItem("pmc_account", "proton");
-});
-await page.goto(BASE, { waitUntil: "networkidle2" });
-await page.waitForSelector("[data-gidx]", { timeout: 20000 });
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-let n = 0;
-const shot = async () => {
-  await sleep(500);
-  console.log(await page.evaluate(() =>
-    (document.body.innerText.match(/\d+ groups[^\n]*/) || ["?"])[0]));
-  await page.screenshot({ path: `/frames/f${String(++n).padStart(2, "0")}.png` });
-  console.log("frame", n);
-};
-const clickText = (txt) => page.evaluate((t) => {
-  [...document.querySelectorAll("button")]
-    .find((b) => b.textContent.trim() === t || b.textContent.includes(t))
-    ?.click();
-}, txt);
+import { mkdirSync, readdirSync, rmSync } from "node:fs";
+import { execFileSync } from "node:child_process";
+import {
+  byRole, click, dismissNotice, hideCaret, launch, open, openGroup, settle,
+  sleep, waitText,
+} from "./capture-lib.mjs";
 
-await shot();                                   // 1 groups overview
-await clickText("🧰");                          // open builder
-await shot();                                   // 2 builder
-await page.evaluate(() => {                     // tag:newsletter
-  [...document.querySelectorAll("button")]
-    .filter((b) => b.textContent.trim() === "Add")[0]?.click();
+const BASE = process.argv[2] ?? "http://127.0.0.1:8765";
+const OUT = process.env.OUT ?? "out";
+const FRAMES = `${OUT}/frames`;
+rmSync(FRAMES, { recursive: true, force: true });
+mkdirSync(FRAMES, { recursive: true });
+
+const browser = await launch();
+const page = await open(browser, BASE, { width: 1280, height: 800, scale: 2 });
+await dismissNotice(page);
+await settle(page);
+
+let n = 0;
+const shot = async (what) => {
+  await hideCaret(page);
+  await sleep(300);
+  await page.screenshot({ path: `${FRAMES}/f${String(++n).padStart(2, "0")}.png` });
+  console.log("frame", n, what);
+};
+
+await shot("1 group list");
+
+await click(page, "button", "Build a filter - click conditions together");
+await byRole(page, "button", "Done");
+await shot("2 filter builder");
+
+// The builder's "Category" row (newsletter is preselected): its Add button.
+const addCategory = await page.evaluateHandle(() => {
+  const isAdd = (b) => b.textContent.trim() === "Add";
+  let row = [...document.querySelectorAll("select")]
+    .find((sel) => [...sel.options].some((o) => o.value === "newsletter"));
+  while (row && ![...row.querySelectorAll("button")].some(isAdd))
+    row = row.parentElement;
+  return [...row.querySelectorAll("button")].find(isAdd);
 });
-await shot();                                   // 3 filtered by tag
-await clickText("with unsubscribe link");
-await shot();                                   // 4 + is:unsub
-await clickText("Done");
-await shot();                                   // 5 clean filtered view
-await page.evaluate(() => {                     // preset: AI-safe groups
-  const sel = [...document.querySelectorAll("select")]
-    .find((s) => [...s.options].some((o) => o.value === "aisafe"));
-  Object.getOwnPropertyDescriptor(
-    HTMLSelectElement.prototype, "value").set.call(sel, "aisafe");
-  sel.dispatchEvent(new Event("change", { bubbles: true }));
-});
-await shot();                                   // 6 AI-safe selected
-await page.evaluate(() => document.activeElement?.blur());
-await page.keyboard.press("j");
-await page.keyboard.press("Enter");
+await addCategory.asElement().click();
 await page.waitForFunction(
-  () => document.body.innerText.includes("Trash selected"),
-  { timeout: 15000 });
-await shot();                                   // 7 group drill-down
+  (ph) => document.querySelector(`input[placeholder="${ph}"]`)
+    ?.value.includes("newsletter"), { timeout: 10000 }, "filter groups…");
+await settle(page);
+await shot("3 condition added, list filtered");
+
+await click(page, "button", "Done");
+await settle(page);
+await shot("4 filtered list");
+
+// Header checkbox: select every group in the filtered list.
+await page.click('thead input[type="checkbox"]');
+const trash = await byRole(page, "button", /^Trash \d+$/);
+await settle(page);
+await shot("5 selection bar");
+
+await trash.click();
+await byRole(page, "dialog", /Trash/);
+await settle(page);
+await shot("6 confirm dialog");
+
+const confirm = await byRole(page, "button", /^Move to Trash \(\d+\)$/);
+await confirm.click();
+await waitText(page, /Moved \d+ mails? to Trash/);
+await byRole(page, "button", "Undo");
+// The trashed groups are gone: drop the filter so the toast sits over the
+// rest of the list instead of an empty result.
+await click(page, "button", "Clear filter");
+await settle(page);
+await shot("7 result toast with undo");
+
+await click(page, "button", "Dismiss");  // keep the toast off the pane footer
+await openGroup(page, "PayBank");       // beside the list (>= 1280 px)
+await shot("8 group in the split pane");
 await browser.close();
+
+// ffmpeg: ~1.8 s per frame, a palette tuned to the frames, 1280 px wide.
+const frames = readdirSync(FRAMES).length;
+execFileSync("ffmpeg", [
+  "-y", "-v", "error", "-framerate", "1/1.8", "-i", `${FRAMES}/f%02d.png`,
+  "-vf", "scale=1280:-1:flags=lanczos,split[a][b];"
+    + "[a]palettegen=max_colors=256:stats_mode=diff[p];"
+    + "[b][p]paletteuse=dither=bayer:bayer_scale=5:diff_mode=rectangle",
+  "-loop", "0", `${OUT}/demo.gif`,
+], { stdio: "inherit" });
+console.log(`demo.gif (${frames} frames)`);

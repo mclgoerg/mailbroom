@@ -15,7 +15,7 @@ Everything set via env can also be configured later in the settings UI
 
 - **Login:** out of the box there is NO authentication. Either keep the
   port on localhost behind a reverse proxy with auth, or enable the
-  built-in password/SSO login (Settings -> Login, or `AUTH_MODE` env).
+  built-in password/SSO login (Settings -> Server -> Login, or `AUTH_MODE` env).
   Never publish port 8765 straight to the internet without one of these.
 - **Secrets encryption:** set `MAILBROOM_SECRET_KEY` (generate with
   `openssl rand -base64 32`) so IMAP passwords and API keys are
@@ -151,5 +151,5 @@ has no app-password option for IMAP). Select the **Outlook / Microsoft
    Gmail/iCloud/Fastmail/GMX/mailbox.org/Yahoo).
 2. Hit **Scan**.
 3. Optional: Settings -> AI for AI-assisted cleanup verdicts, Settings
-   -> Login to protect the UI, Settings -> General for protected
+   -> Server -> Login to protect the UI, Settings -> General for protected
    senders.
