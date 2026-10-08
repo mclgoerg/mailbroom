@@ -76,7 +76,7 @@ export function TrashPanel({ state, onClose, onChanged, onEmptyTrash }: {
           <Trash2 size={18} /> {t("Trash")}
         </span>}
         sub={trash
-          ? `${trash.total} ${t("mails")}`
+          ? t("n.mails", { n: trash.total })
             + (trash.total > trash.mails.length
                ? ` (${t("trash.newest_shown", { n: trash.mails.length })})`
                : "")

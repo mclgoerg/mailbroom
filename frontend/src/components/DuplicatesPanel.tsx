@@ -61,7 +61,7 @@ export function DuplicatesPanel({ onClose, onDeleted }: {
       setNote(t("note.background", { verb: t("Move to Trash") }));
       onDeleted();
     } catch (e: any) {
-      setNote(`Error: ${e.message ?? e}`);
+      setNote(t("err.generic", { msg: e.message ?? e }));
     }
   };
 

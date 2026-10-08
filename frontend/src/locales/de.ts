@@ -12,13 +12,18 @@ export const DE: Record<string, string> = {
     "{restored} von {of} Mails wiederhergestellt ({label}) - zum Anzeigen neu scannen.",
   "notice.emptied_trash":
     "Papierkorb geleert ({count} Mails endgültig gelöscht).",
+  "notice.emptied_trash_one": "Papierkorb geleert (1 Mail endgültig gelöscht).",
   "notice.ai_all_cached":
     "Alle Gruppen haben bereits KI-Bewertungen - nichts zu prüfen.",
   "notice.ai_cancelled": "KI-Prüfung nach {done}/{total} Gruppen abgebrochen.",
   "confirm.act_mails": "{verb}: {n} ausgewählte Mails?",
+  "confirm.act_mails_one": "{verb}: 1 ausgewählte Mail?",
   "confirm.unsubscribe":
-    "Von den Absendern in {k} ausgewählten Gruppe(n) abbestellen?",
+    "Von den Absendern in {n} ausgewählten Gruppen abbestellen?",
+  "confirm.unsubscribe_one":
+    "Vom Absender der ausgewählten Gruppe abbestellen?",
   "confirm.restore": "{count} Mails wiederherstellen ({label})?",
+  "confirm.restore_one": "1 Mail wiederherstellen ({label})?",
   "ai.usage": "Nutzung",
   "ai.reset_spend": "Kosten zurücksetzen…",
   "ai.clear_verdicts": "KI-Bewertungscache leeren…",
@@ -40,6 +45,7 @@ export const DE: Record<string, string> = {
   "show_more": "{n} weitere anzeigen ({hidden} ausgeblendet)",
   "ai_done": "KI fertig ({in} rein / {out} raus{cost}) · gesamt {total}",
   "done_moved": "Fertig: {n} Mails verarbeitet.",
+  "done_moved_one": "Fertig: 1 Mail verarbeitet.",
   "note.ai_progress": "KI prüft… {done}/{total} Mails",
   "ai.disclaimer":
     "Die KI-Prüfung sendet Mail-METADATEN an den konfigurierten "
@@ -69,9 +75,13 @@ export const DE: Record<string, string> = {
   "pin.group_on": "Alle Mails dieser Gruppe schützen",
   "pin.group_off": "Schutz aller Mails aufheben",
   "pin.group_skipped":
-    "{n} Mail(s) ohne Message-ID konnten nicht geschützt werden.",
+    "{n} Mails ohne Message-ID konnten nicht geschützt werden.",
+  "pin.group_skipped_one":
+    "1 Mail ohne Message-ID konnte nicht geschützt werden.",
   "confirm.unpin_group":
-    "Den Schutz aller {n} geschützten Mail(s) dieser Gruppe aufheben?",
+    "Den Schutz aller {n} geschützten Mails dieser Gruppe aufheben?",
+  "confirm.unpin_group_one":
+    "Den Schutz der 1 geschützten Mail dieser Gruppe aufheben?",
   "Sort: engagement": "Sortierung: Interaktion",
   "Eng.": "Inter.",
   "eng.col_tip":
@@ -97,8 +107,10 @@ export const DE: Record<string, string> = {
     "Diese Mail schützen - keine Sammelaktion, Regel oder KI-Auswahl "
     + "verschiebt sie",
   "pin.unprotect_tip": "Schutz dieser Mail aufheben",
-  "pin.badge_tip": "{n} Mail(s) vor Sammelaktionen geschützt",
-  "pin.n_protected": "{n} Mail(s) geschützt",
+  "pin.badge_tip": "{n} Mails vor Sammelaktionen geschützt",
+  "pin.badge_tip_one": "1 Mail vor Sammelaktionen geschützt",
+  "pin.n_protected": "{n} Mails geschützt",
+  "pin.n_protected_one": "1 Mail geschützt",
   "pin.error": "Schutz der Mail konnte nicht geändert werden",
   "pin.no_message_id":
     "Diese Mail hat keine Message-ID und ließe sich nach einem erneuten "
@@ -107,6 +119,7 @@ export const DE: Record<string, string> = {
     "Die Auswahl enthält geschützte Mails - bestätige sie einzeln oder "
     + "hebe zuerst ihren Schutz auf.",
   "rule.pinned_skipped": "{n} geschützte Mails übersprungen",
+  "rule.pinned_skipped_one": "1 geschützte Mail übersprungen",
   "qb.has_pinned": "mit geschützten Mails",
   "confirm.block_trash_existing":
     "Auch die {n} vorhandene(n) Mail(s) jetzt in den Papierkorb "
@@ -264,6 +277,7 @@ export const DE: Record<string, string> = {
   "rule.run_executed":
     "ausgeführt: {acted} Mails eingereiht ({groups} Gruppen, {mails} Treffer)",
   "rule.capped": "{n} Mails über dem Limit pro Lauf",
+  "rule.capped_one": "1 Mail über dem Limit pro Lauf",
   "rule.protected_skipped": "{n} geschützte übersprungen",
   "rule.run_now": "Jetzt ausführen",
   "rule.enable_execute": "Ausführen aktivieren",
@@ -311,6 +325,7 @@ export const DE: Record<string, string> = {
     "Finden Sie die Mails, die Ihren Speicher belegen. Die Analyse liest "
     + "nur die Mail-Struktur (keine Inhalte werden geladen).",
   "atts.summary": "{n} Mails mit Anhängen · {size} gesamt",
+  "atts.summary_one": "1 Mail mit Anhängen · {size} gesamt",
   "atts.analyze": "Anhänge analysieren",
   "atts.reanalyze": "Neu analysieren",
   "atts.intro":
@@ -330,7 +345,8 @@ export const DE: Record<string, string> = {
   "unsub.retry": "Erneut versuchen",
   "unsub.badge_pending": "{n}/{of} abbestellt",
   "unsub.badge_failed": "Abbestellen fehlgeschlagen",
-  "toast.unsub_started": "Bestelle bei {n} Absender(n) ab…",
+  "toast.unsub_started": "Bestelle bei {n} Absendern ab…",
+  "toast.unsub_started_one": "Bestelle bei 1 Absender ab…",
   "toast.unsub_skipped":
     "({n} bereits erledigt, geschützt oder über dem Limit pro Lauf.)",
   "toast.unsub_nothing":
@@ -341,12 +357,14 @@ export const DE: Record<string, string> = {
   "dups.hint":
     "Gleiche Message-ID oder identischer Absender + Betreff + Größe.",
   "dups.summary": "{n} Duplikat-Gruppen · {size} freigebbar",
+  "dups.summary_one": "1 Duplikat-Gruppe · {size} freigebbar",
   "dups.keep_newest": "Alle außer der neuesten auswählen",
   "dups.wasted": "{size} freigebbar",
   "dups.newest": "neueste",
   "dups.none": "Keine Duplikate gefunden",
   "Statistics": "Statistik",
   "stats.this_month": "diesen Monat gelöscht: {n} Mails · {size}",
+  "stats.this_month_one": "diesen Monat gelöscht: 1 Mail · {size}",
   "stats.per_year": "Mails pro Jahr",
   "stats.per_month": "Mails pro Monat (letzte 12)",
   "stats.total_size": "Gesamtgröße",
@@ -383,10 +401,12 @@ export const DE: Record<string, string> = {
     "{n} Mails aus dem Papierkorb nach {dest} wiederhergestellt - zum Anzeigen neu scannen.",
   "trash.browse": "Papierkorb durchsuchen",
   "trash.restore_to": "Wiederherstellen nach…",
-  "trash.restored":
-    "{n} Mails wiederhergestellt - zum Anzeigen neu scannen.",
+  "trash.restored": "{n} Mails wiederhergestellt - zum Anzeigen neu scannen.",
+  "trash.restored_one": "1 Mail wiederhergestellt - zum Anzeigen neu scannen.",
   "trash.restored_refreshing":
     "{n} Mails wiederhergestellt - die Ansichten aktualisieren sich automatisch.",
+  "trash.restored_refreshing_one":
+    "1 Mail wiederhergestellt - die Ansichten aktualisieren sich automatisch.",
   "trash.newest_shown": "neueste {n} angezeigt",
   "trash.empty": "Der Papierkorb ist leer",
   "notice.ai_budget":
@@ -443,6 +463,7 @@ export const DE: Record<string, string> = {
   "thread.read": "Konversation lesen",
   "thread.you": "Sie",
   "thread.n_mails": "{n} Mails",
+  "thread.n_mails_one": "1 Mail",
   "thread.expand_all": "Alle aufklappen",
   "thread.collapse_all": "Alle zuklappen",
   "thread.show_quoted": "Zitierten Text anzeigen",
@@ -457,6 +478,7 @@ export const DE: Record<string, string> = {
   "err.undo": "Fehler beim Rückgängigmachen: {msg}",
   "err.connection": "Verbindungsfehler: {msg}",
   "toast.moved_trash": "{n} Mails in den Papierkorb verschoben",
+  "toast.moved_trash_one": "1 Mail in den Papierkorb verschoben",
   "status.filter_none": "0 von {n} Gruppen passen",
   "status.no_mails": "In den gescannten Ordnern wurden keine Mails gefunden.",
   "onboard.title": "Willkommen - in drei Schritten zum sauberen Postfach",
@@ -479,6 +501,7 @@ export const DE: Record<string, string> = {
     + "bei Tab im Hintergrund)",
   "notify.denied": "Benachrichtigungen wurden vom Browser blockiert.",
   "notify.delete_done": "Fertig: {n} Mails verarbeitet.",
+  "notify.delete_done_one": "Fertig: 1 Mail verarbeitet.",
   "notify.ai_done": "KI-Prüfung abgeschlossen.",
   "notify.atts_done": "Anhang-Analyse abgeschlossen.",
   "notify.unsub_done": "Massenabbestellen abgeschlossen.",
@@ -602,11 +625,11 @@ export const DE: Record<string, string> = {
   "menu.profile": "Profil & Einstellungen",
   "tab.account_short": "Konto",
   "tab.general_short": "Allgemein",
-  "tab.ai_short": "AI",
+  "tab.ai_short": "KI",
   "tab.server_short": "Server",
   "tab.account": "Mail-Konto",
   "tab.general": "Allgemein",
-  "tab.ai": "AI",
+  "tab.ai": "KI",
   "tab.server": "Server (Admin)",
   "menu.theme": "Zu {next}em Design wechseln",
   "menu.light": "hell",
@@ -616,9 +639,9 @@ export const DE: Record<string, string> = {
   "login.tenancy_note":
     "Mit SSO bekommt jeder Nutzer einen EIGENEN Arbeitsbereich (Konten, "
     + "Scans, Einstellungen). Der Admin behält diesen hier.",
-  "shared.section": "Gemeinsamer AI-Schlüssel (alle Nutzer)",
+  "shared.section": "Gemeinsamer KI-Schlüssel (alle Nutzer)",
   "shared.help":
-    "Optional einen serverseitigen AI-Schlüssel teilen: Nutzer ohne "
+    "Optional einen serverseitigen KI-Schlüssel teilen: Nutzer ohne "
     + "eigenen Schlüssel verwenden ihn automatisch, begrenzt pro Nutzer "
     + "und Monat durch das Standard-Budget unten (Nutzer dürfen ihr "
     + "Limit senken, nie erhöhen).",
@@ -627,13 +650,13 @@ export const DE: Record<string, string> = {
   "ai.shared_key_ph": "nutzt den gemeinsamen Server-Schlüssel",
   "usage.section": "Nutzerstatistik",
   "usage.help":
-    "Nutzung pro Arbeitsbereich - nur Zahlen, AI-Kosten und "
+    "Nutzung pro Arbeitsbereich - nur Zahlen, KI-Kosten und "
     + "Speicherplatz. Mailbroom zeigt dir nie Maildaten, Kontonamen "
     + "oder Absender anderer Nutzer.",
   "usage.user": "Nutzer / Arbeitsbereich",
   "usage.mails": "Mails (letzter Scan)",
   "usage.cleaned": "Aufgeräumt (Monat)",
-  "usage.ai_month": "AI-Kosten (Monat)",
+  "usage.ai_month": "KI-Kosten (Monat)",
   "usage.last_scan": "Letzter Scan",
   "usage.disk": "Speicher",
   "usage.shared": "geteilter Schlüssel",
@@ -656,7 +679,7 @@ export const DE: Record<string, string> = {
   "qb.clear": "Leeren",
   "qb.done": "Fertig",
   "qb.tag": "Kategorie",
-  "qb.ai": "AI-Urteil",
+  "qb.ai": "KI-Urteil",
   "qb.ai_safe": "sicher löschbar",
   "qb.ai_review": "prüfen",
   "qb.ai_keep": "behalten",
@@ -674,7 +697,7 @@ export const DE: Record<string, string> = {
   "qb.is_protected": "geschützt",
   "qb.is_new": "neue Absender",
   "ai.shared_note":
-    "Kein eigener Schlüssel - AI läuft über den gemeinsamen "
+    "Kein eigener Schlüssel - KI läuft über den gemeinsamen "
     + "Server-Schlüssel (dein Monatslimit: {cap}).",
   "account.rename": "Umbenennen…",
   "account.rename_prompt": 'Neuer Name für Konto "{name}":',
@@ -856,6 +879,7 @@ export const DE: Record<string, string> = {
   "export.csv": "CSV exportieren",
   "export.csv_tip": "Aktuelle Gruppierung als CSV exportieren",
   "bar.selected": "{n} Gruppen · {mails} Mails",
+  "bar.selected_one": "1 Gruppe · {mails} Mails",
   "bar.clear": "Abwählen",
   "bar.export": "CSV-Export",
   "bar.label": "Aktionen für die Auswahl",
@@ -889,12 +913,31 @@ export const DE: Record<string, string> = {
   "confirm.empty_trash_btn": "Endgültig löschen ({n})",
   "confirm.empty_trash_btn_nocount": "Endgültig löschen",
   "confirm.btn_anyway": "Trotzdem: {verb}",
-  "confirm.b_mails_groups": "{n} Mails aus {k} Gruppe(n) sind betroffen",
+  "confirm.b_mails_groups": "{n} Mails aus {k} Gruppen sind betroffen",
+  "confirm.b_mails_groups_one": "1 Mail aus {k} Gruppen ist betroffen",
   "select.named": "{subject} auswählen",
-  "confirm.b_selected": "{n} ausgewählte Mail(s)",
-  "confirm.b_protected_groups_skipped": "{n} geschützte Gruppe(n) übersprungen",
-  "confirm.b_pinned_kept": "{n} geschützte Mail(s) bleiben unberührt",
-  "confirm.b_pinned_skipped": "{n} geschützte Mail(s) übersprungen",
+  "confirm.b_mails_one_group": "{n} Mails in 1 Gruppe sind betroffen",
+  "confirm.b_mails_one_group_one": "1 Mail in 1 Gruppe ist betroffen",
+  "bar.groups": "{n} Gruppen",
+  "bar.groups_one": "1 Gruppe",
+  "bar.selected_one_mail": "1 Gruppe · 1 Mail",
+  "n.mails": "{n} Mails",
+  "n.mails_one": "1 Mail",
+  "n.groups": "{n} Gruppen",
+  "n.groups_one": "1 Gruppe",
+  "filter.syntax_hint":
+    "Kombinierbar: tag:shipping ai:safe age:>1y unread:>80 is:unsub Text",
+  "tenant.row_tip":
+    "{id} - {accounts} Konten, {scans} Scans, {rules} Regeln, {verdicts} KI-Bewertungen",
+  "confirm.b_subject": "„{subject}“",
+  "confirm.b_selected": "{n} ausgewählte Mails",
+  "confirm.b_selected_one": "1 ausgewählte Mail",
+  "confirm.b_protected_groups_skipped": "{n} geschützte Gruppen übersprungen",
+  "confirm.b_protected_groups_skipped_one": "1 geschützte Gruppe übersprungen",
+  "confirm.b_pinned_kept": "{n} geschützte Mails bleiben unberührt",
+  "confirm.b_pinned_kept_one": "1 geschützte Mail bleibt unberührt",
+  "confirm.b_pinned_skipped": "{n} geschützte Mails übersprungen",
+  "confirm.b_pinned_skipped_one": "1 geschützte Mail übersprungen",
   "confirm.unsubscribe_btn": "Abbestellen",
   "confirm.restore_btn": "Wiederherstellen",
   "confirm.empty_trash_title": "Papierkorb leeren?",
@@ -917,7 +960,9 @@ export const DE: Record<string, string> = {
     "Geplante Läufe verarbeiten dann passende Mails (max. 500 pro Lauf, "
     + "geschützte Absender übersprungen, Undo verfügbar).",
   "trash_all.btn": "Alle {n} in den Papierkorb",
+  "trash_all.btn_one": "1 Mail in den Papierkorb",
   "trash_all.tip": "Alle {n} Mails dieser Gruppe in den Papierkorb verschieben",
+  "trash_all.tip_one": "Die 1 Mail dieser Gruppe in den Papierkorb verschieben",
   "trash_this.btn": "Diese Mail in den Papierkorb",
   "block.btn": "Absender blockieren",
   "rule.f_grouping": "Gruppierung",

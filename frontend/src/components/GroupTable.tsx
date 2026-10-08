@@ -285,7 +285,7 @@ function MobileCards({ slice, baseIdx, selected, focusedKey, onToggle,
                 <div className="truncate type-meta text-muted">{g.sub}</div>
               )}
               <div className="truncate type-meta text-muted">
-                {g.count} {t("mails")} · <ShortDate iso={g.last} /> ·{" "}
+                {t("n.mails", { n: g.count })} · <ShortDate iso={g.last} /> ·{" "}
                 {fmtSize(g.size)} · {unreadPct(g)}% {t("unread")}
               </div>
               <div className="mt-1 flex flex-wrap items-center gap-1">

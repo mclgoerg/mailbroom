@@ -25,4 +25,25 @@ describe("i18n", () => {
     expect(localStorage.getItem("pmc_lang")).toBe("de");
     setLang("en");
   });
+
+  it("picks the _one form when n (or count) is exactly 1", () => {
+    setLang("en");
+    expect(t("toast.moved_trash", { n: 1 })).toBe("Moved 1 mail to Trash");
+    expect(t("toast.moved_trash", { n: 2 })).toBe("Moved 2 mails to Trash");
+    expect(t("toast.moved_trash", { n: 0 })).toBe("Moved 0 mails to Trash");
+    expect(t("notice.emptied_trash", { count: 1 })).toContain("1 mail ");
+    setLang("de");
+    expect(t("toast.moved_trash", { n: 1 }))
+      .toBe("1 Mail in den Papierkorb verschoben");
+    expect(t("toast.moved_trash", { n: 3 }))
+      .toBe("3 Mails in den Papierkorb verschoben");
+    setLang("en");
+  });
+
+  it("never mixes languages: a German key without _one stays German", () => {
+    setLang("de");
+    expect(t("toast.unsub_skipped", { n: 1 })).toBe(
+      "(1 bereits erledigt, geschützt oder über dem Limit pro Lauf.)");
+    setLang("en");
+  });
 });

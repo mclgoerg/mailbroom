@@ -241,7 +241,7 @@ export function Spinner({ size = "sm", className = "" }: {
     lg: "size-9 [--pmc-thickness:3px]",
   }[size];
   return (
-    <span aria-label="loading" role="status"
+    <span aria-label={t("loading…")} role="status"
       className={`pmc-spinner inline-block align-middle text-accent
         ${s} ${className}`} />
   );

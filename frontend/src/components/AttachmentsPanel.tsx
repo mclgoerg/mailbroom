@@ -31,7 +31,7 @@ export function AttachmentsPanel({ state, onClose, onDeleted }: {
   useEffect(() => {
     if (!starting && atts?.status === "done" && mails === null) {
       api.attachments().then(setMails).catch((e) =>
-        setNote(`Error: ${e.message ?? e}`));
+        setNote(t("err.generic", { msg: e.message ?? e })));
     }
   }, [starting, atts?.status, mails]);
 
@@ -43,7 +43,7 @@ export function AttachmentsPanel({ state, onClose, onDeleted }: {
       await onDeleted();   // pull fresh state: job now shows as running
       setMails(null);      // ready for the fresh list once it's done
     } catch (e: any) {
-      setNote(`Error: ${e.message ?? e}`);
+      setNote(t("err.generic", { msg: e.message ?? e }));
     }
     setStarting(false);
   };
@@ -64,7 +64,7 @@ export function AttachmentsPanel({ state, onClose, onDeleted }: {
       setNote(t("note.background", { verb: t("Move to Trash") }));
       onDeleted();
     } catch (e: any) {
-      setNote(`Error: ${e.message ?? e}`);
+      setNote(t("err.generic", { msg: e.message ?? e }));
     }
   };
 

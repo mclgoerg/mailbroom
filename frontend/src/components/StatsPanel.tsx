@@ -142,7 +142,7 @@ export function StatsPanel({ onClose }: { onClose: () => void }) {
                     {s.label}
                   </span>
                   <span className="type-meta text-muted">
-                    {s.count} {t("mails")}
+                    {t("n.mails", { n: s.count })}
                   </span>
                   <span className="w-20 text-right type-meta tabular-nums
                     text-muted">{fmtSize(s.size)}</span>
@@ -160,7 +160,7 @@ export function StatsPanel({ onClose }: { onClose: () => void }) {
                     border-line/60 py-1">
                   <span className="min-w-0 flex-1 truncate">{d.domain}</span>
                   <span className="type-meta text-muted">
-                    {d.count} {t("mails")}
+                    {t("n.mails", { n: d.count })}
                   </span>
                   <span className="w-20 text-right type-meta tabular-nums
                     text-muted">{fmtSize(d.size)}</span>
@@ -219,8 +219,9 @@ export function StatsPanel({ onClose }: { onClose: () => void }) {
                     <span className="w-32 tabular-nums">
                       {new Date(s.ts * 1000).toLocaleString()}
                     </span>
-                    <span>{s.mails} {t("mails")} · {s.senders}{" "}
-                      {t("groups")} · {fmtSize(s.size)}</span>
+                    <span>{t("n.mails", { n: s.mails })} ·{" "}
+                      {t("n.groups", { n: s.senders })} ·{" "}
+                      {fmtSize(s.size)}</span>
                   </div>
                 ))}
               </div>

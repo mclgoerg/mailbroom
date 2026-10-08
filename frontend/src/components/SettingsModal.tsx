@@ -158,7 +158,7 @@ export function SettingsModal({ cfg, account, onClose, onSaved,
       const r = await api.testDigest(editAcct);
       setDigestTestMsg(t(r.demo ? "digest.test_sent_demo" : "digest.test_sent"));
     } catch (e: any) {
-      setDigestTestMsg(`Error: ${e.message ?? e}`);
+      setDigestTestMsg(t("err.generic", { msg: e.message ?? e }));
     }
     setDigestTesting(false);
   };
@@ -293,7 +293,7 @@ export function SettingsModal({ cfg, account, onClose, onSaved,
       setTimeout(() => setMsg(""), 2500);
       return next;
     } catch (e: any) {
-      setMsg(`Error: ${e.message ?? e}`);
+      setMsg(t("err.generic", { msg: e.message ?? e }));
       return null;
     }
   };
@@ -330,7 +330,7 @@ export function SettingsModal({ cfg, account, onClose, onSaved,
       setEditAcct(name);
       setMsg(t("account.renamed", { name }));
     } catch (e: any) {
-      setMsg(`Error: ${e.message ?? e}`);
+      setMsg(t("err.generic", { msg: e.message ?? e }));
     }
   };
 
@@ -346,7 +346,7 @@ export function SettingsModal({ cfg, account, onClose, onSaved,
       setEditAcct(name);
       setF({ ...f, ...imapFields(next, name) });
     } catch (e: any) {
-      setMsg(`Error: ${e.message ?? e}`);
+      setMsg(t("err.generic", { msg: e.message ?? e }));
     }
   };
 
@@ -363,7 +363,7 @@ export function SettingsModal({ cfg, account, onClose, onSaved,
       setEditAcct(next.default_account);
       setF({ ...f, ...imapFields(next, next.default_account) });
     } catch (e: any) {
-      setMsg(`Error: ${e.message ?? e}`);
+      setMsg(t("err.generic", { msg: e.message ?? e }));
     }
   };
 
@@ -402,7 +402,7 @@ export function SettingsModal({ cfg, account, onClose, onSaved,
         verificationUri: r.verification_uri, deviceCode: r.device_code,
         interval: r.interval || 5 });
     } catch (e: any) {
-      setOauthMsg(`Error: ${e.message ?? e}`);
+      setOauthMsg(t("err.generic", { msg: e.message ?? e }));
     }
   };
 
@@ -1107,9 +1107,9 @@ export function SettingsModal({ cfg, account, onClose, onSaved,
                       <tr key={u.id} className="border-b border-line
                         last:border-0 align-top">
                         <td className="truncate px-2 py-1.5"
-                          title={`${u.id} - ${u.accounts} account(s), ${
-                            u.scans} scan(s), ${u.rules} rule(s), ${
-                            u.verdicts} AI verdict(s)`}>
+                          title={t("tenant.row_tip", { id: u.id,
+                            accounts: u.accounts, scans: u.scans,
+                            rules: u.rules, verdicts: u.verdicts })}>
                           {u.is_admin_workspace && (
                             <Star size={14}
                               className="mr-1 inline align-text-bottom" />

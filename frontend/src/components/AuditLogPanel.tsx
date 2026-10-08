@@ -88,7 +88,7 @@ export function AuditLogPanel({ rules, onClose }: {
             </span>
             {e.count > 0 && (
               <span className="type-meta whitespace-nowrap text-muted">
-                {e.count} {t("mails")}
+                {t("n.mails", { n: e.count })}
                 {e.bytes > 0 ? ` · ${fmtSize(e.bytes)}` : ""}
               </span>
             )}

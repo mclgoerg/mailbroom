@@ -213,7 +213,7 @@ describe("DetailPanel", () => {
       await pressDialog("Move to Trash (1)");
       await waitFor(() => expect(deleteMessages).toHaveBeenCalledWith(
         [["INBOX", 1]], "trash", "", false));
-      await screen.findByRole("button", { name: "Trash all 1" });
+      await screen.findByRole("button", { name: "Trash 1 mail" });
       expect(screen.queryByText("Mail 1")).toBeNull();
     });
 
@@ -341,7 +341,7 @@ describe("DetailPanel", () => {
     const onClose = vi.fn();
     renderPanel([mkMail(1)], { onTrash, onClose });
     await waitFor(() => screen.getByText("Mail 1"));
-    fireEvent.click(screen.getByRole("button", { name: "Trash all 1" }));
+    fireEvent.click(screen.getByRole("button", { name: "Trash 1 mail" }));
     await waitFor(() => expect(onClose).toHaveBeenCalled());
     expect(onTrash).toHaveBeenCalled();
   });
@@ -362,7 +362,7 @@ describe("DetailPanel", () => {
         expect(pin).toHaveBeenCalledWith("INBOX", 1, true));
       await waitFor(() =>
         expect(document.querySelectorAll("[data-pinned]").length).toBe(1));
-      expect(screen.getByText(/1 mail\(s\) protected/)).toBeTruthy();
+      expect(screen.getByText(/1 mail protected/)).toBeTruthy();
       expect(onDeleted).toHaveBeenCalled();      // overview badge refreshes
 
       // toggling a pinned mail unpins it again
@@ -464,7 +464,7 @@ describe("DetailPanel", () => {
       fireEvent.click(checkbox(1));
       fireEvent.click(await screen.findByText(/Trash selected/));
       expect((await findDialog()).textContent)
-        .toMatch(/1 protected mail\(s\) skipped/);
+        .toMatch(/1 protected mail skipped/);
       await pressDialog("Move to Trash (1)");
       await waitFor(() => expect(deleteMessages).toHaveBeenCalledWith(
         [["INBOX", 2]], "trash", "", false));
@@ -515,7 +515,7 @@ describe("DetailPanel", () => {
         "sender", "s@x.example", true));
       await waitFor(() =>
         expect(document.querySelectorAll("[data-pinned]").length).toBe(2));
-      expect(screen.getByText(/1 mail\(s\) without a Message-ID/))
+      expect(screen.getByText(/1 mail without a Message-ID/))
         .toBeTruthy();
       expect(onDeleted).toHaveBeenCalled();
     });

@@ -199,7 +199,7 @@ test("pinned mails inside a larger selection are dropped, not moved",
     fireEvent.click(tick(2));
     fireEvent.click(screen.getByText(/Trash selected/));
     expect((await findDialog()).textContent)
-      .toContain("1 protected mail(s) skipped");
+      .toContain("1 protected mail skipped");
     await pressDialog("Move to Trash (1)");
     await waitFor(() => expect(deleteMessages)
       .toHaveBeenCalledWith([["Archive", 2]], "trash", "", false));

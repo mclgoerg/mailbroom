@@ -333,8 +333,8 @@ export function DetailPanel({ grouping, group, aiEnabled, protectedNow,
         title={group.label}
         sub={<>
           {shown && mails && shown.length !== mails.length
-            ? `${shown.length} / ${mails.length}`
-            : mails ? mails.length : group.count} {t("mails")} ·{" "}
+            ? `${shown.length} / ${t("n.mails", { n: mails.length })}`
+            : t("n.mails", { n: mails ? mails.length : group.count })} ·{" "}
           {fmtSize(group.size)}
           {protectedNow && (
             <span className="inline-flex items-center gap-1">

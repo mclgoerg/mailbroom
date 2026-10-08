@@ -710,8 +710,9 @@ export default function App() {
       return false;
     }
     const verb = actionVerb(action) + (dest ? ` → ${dest}` : "");
-    const bullets = [t("confirm.b_mails_groups",
-      { n, k: effective.length })];
+    const bullets = [effective.length === 1
+      ? t("confirm.b_mails_one_group", { n })
+      : t("confirm.b_mails_groups", { n, k: effective.length })];
     if (effective.length !== keys.length) {
       bullets.push(t("confirm.b_protected_groups_skipped",
         { n: keys.length - effective.length }));
@@ -739,7 +740,7 @@ export default function App() {
   const unsubscribeSelected = async () => {
     if (!selected.size) return;
     if (!await confirmDialog({
-      title: t("confirm.unsubscribe", { k: selected.size }),
+      title: t("confirm.unsubscribe", { n: selected.size }),
       confirmLabel: t("confirm.unsubscribe_btn") })) return;
     try {
       const r = await api.unsubscribeBulk(mode, [...selected]);
@@ -909,7 +910,7 @@ export default function App() {
       const mails = groups.reduce((n, g) => n + g.count, 0);
       const size = groups.reduce((n, g) => n + g.size, 0);
       const ago = fmtAgo(state.scanned_ts);
-      return `${groups.length} ${t("groups")} · ${mails} ${t("mails")}`
+      return `${t("n.groups", { n: groups.length })} · ${t("n.mails", { n: mails })}`
         + ` · ${fmtSize(size)}` + (filter ? ` ${t("(filtered)")}` : "")
         + (ago ? ` · ${t("scan.age", { ago })}` : "");
     }
@@ -1141,7 +1142,7 @@ export default function App() {
               ref={filterRef}
               className="w-full pr-9 coarse:pr-10"
               placeholder={t("filter groups…")}
-              title="Combinable: tag:shipping ai:safe age:>1y unread:>80 is:unsub text"
+              title={t("filter.syntax_hint")}
               value={filter}
               onChange={(e) => setFilter(e.target.value)}
             />
@@ -1287,8 +1288,10 @@ export default function App() {
         <BulkBar
           summary={<>
             {selCountPending
-              ? <>{selected.size} {t("groups")} <Spinner /></>
-              : t("bar.selected", { n: selected.size, mails: selCount })}
+              ? <>{t("bar.groups", { n: selected.size })} <Spinner /></>
+              : selected.size === 1 && selCount === 1
+                ? t("bar.selected_one_mail")
+                : t("bar.selected", { n: selected.size, mails: selCount })}
             {selAllPinned && (
               <span className="text-accent"> · {t("bar.all_pinned")}</span>
             )}

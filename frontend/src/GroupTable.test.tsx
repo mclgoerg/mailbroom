@@ -158,7 +158,7 @@ describe("pinned badge", () => {
   it("shows the pinned-mail count on the row (desktop + mobile)", () => {
     const { getAllByTitle } = renderTable({
       groups: [{ ...mk(4), pinned: 3 }] });
-    const badges = getAllByTitle("3 mail(s) protected from bulk actions");
+    const badges = getAllByTitle("3 mails protected from bulk actions");
     expect(badges.length).toBe(2);
     expect(badges[0].textContent).toContain("3");
   });
