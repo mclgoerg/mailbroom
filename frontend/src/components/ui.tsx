@@ -1235,15 +1235,19 @@ export function ShortDate({ iso, className = "", time = false }: {
 /* --------------------------------- mail row -------------------------------- */
 
 /** The two-line per-mail row: `[checkbox] [unread dot] subject … trailing`,
- *  then `meta` (date · folder · sender · size). Clicking the text area
+ *  then the meta line: `dateIso` as a `<ShortDate>` (full date in the
+ *  tooltip; `dateTime` adds the time) followed by `meta` (folder · sender ·
+ *  size). Every point of the row is a target: the gutter toggles, the body
+ *  opens, `trailing` buttons (pin) fill the full row height. Clicking the text area
  *  calls `onOpen`; the checkbox and `trailing` (pin, badge) are their own
  *  targets, so `meta` must not contain interactive elements. Omit `onToggle`
  *  for rows without selection. */
 export function MailRow({ checked = false, onToggle, unread = false, subject,
-  meta, trailing, onOpen, selected = false, pinned = false,
-  selectLabel }: {
+  meta, dateIso, dateTime = false, trailing, onOpen, selected = false,
+  pinned = false, selectLabel }: {
   checked?: boolean; onToggle?: () => void; unread?: boolean;
-  subject: ReactNode; meta?: ReactNode; trailing?: ReactNode;
+  subject: ReactNode; meta?: ReactNode; dateIso?: string; dateTime?: boolean;
+  trailing?: ReactNode;
   onOpen?: () => void; selected?: boolean; pinned?: boolean;
   selectLabel?: string;
 }) {
@@ -1262,9 +1266,13 @@ export function MailRow({ checked = false, onToggle, unread = false, subject,
           ? "font-semibold md:font-semibold"
           : "font-medium md:font-medium"}`}>{subject}</span>
       </span>
-      {meta != null && meta !== "" && (
+      {(!!dateIso || (meta != null && meta !== "")) && (
         <span className="mt-0.5 flex min-w-0 items-center gap-1.5 type-meta
           text-muted">
+          {!!dateIso && <ShortDate iso={dateIso} time={dateTime} />}
+          {!!dateIso && meta != null && meta !== "" && (
+            <span aria-hidden>·</span>
+          )}
           {typeof meta === "string"
             ? <span className="min-w-0 truncate">{meta}</span> : meta}
         </span>
@@ -1274,23 +1282,36 @@ export function MailRow({ checked = false, onToggle, unread = false, subject,
   return (
     <div data-pinned={pinned ? "true" : undefined}
       data-selected={selected ? "true" : undefined}
-      className={`flex items-stretch gap-1 border-b border-l-2 border-b-line/60
+      className={`flex items-stretch border-b border-l-2 border-b-line/60
         px-3 py-3 md:px-2 md:py-2.5 ${selected
           ? "border-l-accent bg-panel2"
           : pinned ? "border-l-accent bg-panel" : "border-l-transparent"}`}>
+      {/* The negative margins + padding below stretch each target to the
+          row's edges, so there are no dead strips between them. */}
       {onToggle && (
         <Checkbox checked={checked} onChange={onToggle}
-          className="-my-3 self-stretch md:-my-2.5"
+          className="-my-3 -ml-3 min-w-14 self-stretch pl-3 md:-my-2.5
+            md:-ml-2 md:min-w-13 md:pl-2"
           aria-label={selectLabel ?? t("Select mail")} />
       )}
       {onOpen ? (
         <button type="button" onClick={onOpen}
-          className="group min-w-0 flex-1 cursor-pointer text-left">
+          className={`group -my-3 min-w-0 flex-1 cursor-pointer self-stretch
+            px-1 py-3 text-left md:-my-2.5 md:py-2.5 ${trailing == null
+            ? "-mr-3 pr-4 md:-mr-2 md:pr-3" : ""}`}>
           {text}
         </button>
-      ) : <div className="min-w-0 flex-1">{text}</div>}
+      ) : <div className="min-w-0 flex-1 px-1">{text}</div>}
       {trailing != null && (
-        <div className="flex shrink-0 items-center gap-1 self-start pt-0.5">
+        // Taps on a badge (anything but a button) open the mail too, so the
+        // badge area isn't a dead zone; the open button stays the one
+        // keyboard / screen-reader target.
+        <div onClick={onOpen && ((e) => {
+          if (!(e.target as Element).closest("button")) onOpen();
+        })}
+          className="-my-3 -mr-3 flex shrink-0 items-stretch gap-1
+          self-stretch md:-my-2.5 md:-mr-2 [&>*:not(button)]:mr-3
+          [&>*:not(button)]:self-center md:[&>*:not(button)]:mr-2">
           {trailing}
         </div>
       )}

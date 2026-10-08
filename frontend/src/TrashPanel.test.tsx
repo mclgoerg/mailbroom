@@ -15,9 +15,9 @@ vi.mock("./api", () => ({
   api: {
     trash: () => Promise.resolve({
       folder: "Trash", uv: 1, total,
-      mails: [{ uid: 30, folder: "Trash", date: "2026-01-02", ts: 1,
+      mails: emptyList ? [] : [{ uid: 30, folder: "Trash", date: "2026-01-02", ts: 1,
         subject: "Deleted elsewhere", addr: "old@gone.example", size: 700,
-        seen: true, ai: null }],
+        seen: false, ai: null }],
     }),
     trashRestore: (...a: unknown[]) => trashRestore(...a),
   },
@@ -26,6 +26,7 @@ vi.mock("./api", () => ({
 }));
 
 let total = 1;
+let emptyList = false;
 const state = {
   folders: ["INBOX"], folders_raw: ["INBOX"],
 } as unknown as AppState;
@@ -34,6 +35,7 @@ afterEach(() => {
   cleanup();
   trashRestore.mockReset();
   total = 1;
+  emptyList = false;
   setLang("en");
 });
 
@@ -80,3 +82,30 @@ test("no Empty Trash footer when Trash is empty", async () => {
   await screen.findByText("Deleted elsewhere");
   expect(screen.queryByRole("button", { name: /Empty Trash/ })).toBeNull();
 });
+
+test("rows are MailRows; the restore select only appears with a selection",
+  async () => {
+    render(<TrashPanel state={state} onClose={() => {}}
+      onChanged={() => {}} onEmptyTrash={async () => true} />);
+    await screen.findByText("Deleted elsewhere");
+    expect(screen.getByText("old@gone.example · 1 KB")).toBeTruthy();
+    expect(screen.getByText("2 Jan").getAttribute("title")).toBe("2026-01-02");
+    expect(screen.getByText("unread")).toBeTruthy();   // seen: false
+    expect(screen.getByLabelText("Select Deleted elsewhere")).toBeTruthy();
+    expect(screen.queryByDisplayValue(/Restore to/)).toBeNull();
+    fireEvent.click(screen.getByRole("checkbox"));
+    expect(screen.getByDisplayValue(/Restore to… \(1\)/)).toBeTruthy();
+    fireEvent.click(screen.getByRole("checkbox"));
+    expect(screen.queryByDisplayValue(/Restore to/)).toBeNull();
+  });
+
+test("an empty Trash shows the empty state and no Empty Trash footer",
+  async () => {
+    emptyList = true;
+    total = 0;
+    render(<TrashPanel state={state} onClose={() => {}}
+      onChanged={() => {}} onEmptyTrash={async () => true} />);
+    await screen.findByText("Trash is empty");
+    expect(screen.queryByRole("button", { name: /Empty Trash/ })).toBeNull();
+    expect(screen.queryByPlaceholderText("Search subject or sender")).toBeNull();
+  });

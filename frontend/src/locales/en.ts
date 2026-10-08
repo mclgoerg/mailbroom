@@ -162,8 +162,32 @@ export const EN: Record<string, string> = {
   "auto_scan.every": "Every",
   "auto_scan.unit_minutes": "minutes",
   "auto_scan.unit_hours": "hours",
-  "search.placeholder_body": "search subject, sender and mail text…",
+  "search.placeholder_body": "Search subject, sender and mail text",
   "search.body_toggle": "Also search mail text",
+  "search.placeholder":
+    "Search subject or sender",
+  "search.empty_title":
+    "Search your mailbox",
+  "search.empty_hint":
+    "Finds scanned mails by subject or sender. Searching mail text is switched off for this account.",
+  "search.empty_hint_body":
+    "Finds scanned mails by subject or sender. Tick “Also search mail text” to include the message text.",
+  "search.none":
+    "No matches",
+  "search.none_hint":
+    "Try a different spelling or a shorter search.",
+  "trash.no_match":
+    "No matching mails",
+  "trash.empty_hint":
+    "Deleted mails stay here until you empty Trash.",
+  "atts.not_analyzed":
+    "Not analyzed yet",
+  "atts.none_hint":
+    "Use “Re-analyze” after new mail has been scanned.",
+  "dups.none_hint":
+    "No mail shares a Message-ID or has the same sender, subject and size as another.",
+  "audit.empty_hint":
+    "Actions such as moving mails to Trash, rule runs and undo will be listed here.",
   "search.body_hint":
     "Searching mail text asks your mail server and may take a moment.",
   "search.note.partial":
@@ -406,7 +430,7 @@ export const EN: Record<string, string> = {
     "Run the analysis to list mails by attachment size. Afterwards the "
     + "att:>10m filter also works on groups. Proton cannot strip single "
     + "attachments over IMAP - deleting removes the whole mail (undoable).",
-  "atts.none": "No attachments found in the scanned folders.",
+  "atts.none": "No attachments found",
   "atts.running": "Analyzing attachments…",
   "unsub.running": "Unsubscribing…",
   "unsub.done":
@@ -429,7 +453,7 @@ export const EN: Record<string, string> = {
   "dups.keep_newest": "Select all but newest",
   "dups.wasted": "{size} reclaimable",
   "dups.newest": "newest",
-  "dups.none": "No duplicates found - nice and tidy.",
+  "dups.none": "No duplicates found",
   "stats.this_month": "trashed this month: {n} mails · {size}",
   "stats.per_year": "Mails per year",
   "stats.per_month": "Mails per month (last 12)",
@@ -464,13 +488,12 @@ export const EN: Record<string, string> = {
   "notice.trash_restored_rescan":
     "Restored {n} mails from Trash to {dest} - rescan to see them again.",
   "trash.browse": "Browse Trash",
-  "trash.search": "search subject / sender…",
   "trash.restore_to": "Restore to…",
   "trash.restored": "Restored {n} mails - rescan to see them in the views.",
   "trash.restored_refreshing":
     "Restored {n} mails - the views update automatically.",
   "trash.newest_shown": "newest {n} shown",
-  "trash.empty": "Trash is empty.",
+  "trash.empty": "Trash is empty",
   "notice.ai_budget":
     "AI review stopped after {done}/{total} groups - monthly budget "
     + "reached (raise it in settings).",
@@ -603,7 +626,7 @@ export const EN: Record<string, string> = {
     "Open the link below on any device and enter this code:",
   "folder.role_excluded":
     "Special folder (detected by role) - always excluded from scans",
-  "audit.empty": "Nothing recorded yet.",
+  "audit.empty": "Nothing recorded yet",
   "audit.export": "Export audit log as CSV",
   "audit.by": "by {actor}",
   "audit.by_rule": "by rule “{name}”",
@@ -659,6 +682,7 @@ export const EN: Record<string, string> = {
   "confirm.empty_trash_btn_nocount": "Delete permanently",
   "confirm.btn_anyway": "{verb} anyway",
   "confirm.b_mails_groups": "{n} mails from {k} group(s) will be affected",
+  "select.named": "Select {subject}",
   "confirm.b_selected": "{n} selected mail(s)",
   "confirm.b_protected_groups_skipped": "{n} protected group(s) skipped",
   "confirm.b_pinned_kept": "{n} protected mail(s) stay untouched",

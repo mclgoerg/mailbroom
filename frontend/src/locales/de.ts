@@ -232,10 +232,6 @@ export const DE: Record<string, string> = {
     "Abbestellseite des Absenders geöffnet - dort bestätigen.",
   "Unsubscribed": "Abbestellt",
   "Marked as unsubscribed.": "Als abbestellt markiert.",
-  "search all scanned mails (subject / sender)…":
-    "alle gescannten Mails durchsuchen (Betreff / Absender)…",
-  "Search every scanned mail by subject or sender.":
-    "Jede gescannte Mail nach Betreff oder Absender durchsuchen.",
   "Showing the newest 500 matches.": "Die neuesten 500 Treffer.",
   "Name for the new account profile:": "Name für das neue Kontoprofil:",
   "Export current grouping as CSV":
@@ -314,7 +310,7 @@ export const DE: Record<string, string> = {
     + "funktioniert auch der Filter att:>10m auf Gruppen. Proton kann per "
     + "IMAP keine einzelnen Anhänge entfernen - Löschen entfernt die ganze "
     + "Mail (rückgängig machbar).",
-  "atts.none": "Keine Anhänge in den gescannten Ordnern gefunden.",
+  "atts.none": "Keine Anhänge gefunden",
   "atts.running": "Analysiere Anhänge…",
   "unsub.running": "Bestelle ab…",
   "unsub.done":
@@ -340,7 +336,7 @@ export const DE: Record<string, string> = {
   "dups.keep_newest": "Alle außer der neuesten auswählen",
   "dups.wasted": "{size} freigebbar",
   "dups.newest": "neueste",
-  "dups.none": "Keine Duplikate gefunden - schön aufgeräumt.",
+  "dups.none": "Keine Duplikate gefunden",
   "Statistics": "Statistik",
   "stats.this_month": "diesen Monat gelöscht: {n} Mails · {size}",
   "stats.per_year": "Mails pro Jahr",
@@ -378,14 +374,13 @@ export const DE: Record<string, string> = {
   "notice.trash_restored_rescan":
     "{n} Mails aus dem Papierkorb nach {dest} wiederhergestellt - zum Anzeigen neu scannen.",
   "trash.browse": "Papierkorb durchsuchen",
-  "trash.search": "Betreff / Absender suchen…",
   "trash.restore_to": "Wiederherstellen nach…",
   "trash.restored":
     "{n} Mails wiederhergestellt - zum Anzeigen neu scannen.",
   "trash.restored_refreshing":
     "{n} Mails wiederhergestellt - die Ansichten aktualisieren sich automatisch.",
   "trash.newest_shown": "neueste {n} angezeigt",
-  "trash.empty": "Der Papierkorb ist leer.",
+  "trash.empty": "Der Papierkorb ist leer",
   "notice.ai_budget":
     "KI-Prüfung nach {done}/{total} Gruppen gestoppt - Monatsbudget "
     + "erreicht (in den Einstellungen erhöhen).",
@@ -679,8 +674,32 @@ export const DE: Record<string, string> = {
   "auto_scan.every": "Alle",
   "auto_scan.unit_minutes": "Minuten",
   "auto_scan.unit_hours": "Stunden",
-  "search.placeholder_body": "Betreff, Absender und Mailtext durchsuchen…",
+  "search.placeholder_body": "Betreff, Absender und Mailtext suchen",
   "search.body_toggle": "Auch im Mailtext suchen",
+  "search.placeholder":
+    "Betreff oder Absender suchen",
+  "search.empty_title":
+    "Postfach durchsuchen",
+  "search.empty_hint":
+    "Findet gescannte Mails nach Betreff oder Absender. Die Suche im Mailtext ist für dieses Konto ausgeschaltet.",
+  "search.empty_hint_body":
+    "Findet gescannte Mails nach Betreff oder Absender. Mit „Auch im Mailtext suchen“ wird auch der Nachrichtentext durchsucht.",
+  "search.none":
+    "Keine Treffer",
+  "search.none_hint":
+    "Versuchen Sie eine andere Schreibweise oder einen kürzeren Suchbegriff.",
+  "trash.no_match":
+    "Keine passenden Mails",
+  "trash.empty_hint":
+    "Gelöschte Mails bleiben hier, bis Sie den Papierkorb leeren.",
+  "atts.not_analyzed":
+    "Noch nicht analysiert",
+  "atts.none_hint":
+    "Nach dem Scannen neuer Mails „Neu analysieren“ verwenden.",
+  "dups.none_hint":
+    "Keine Mail teilt sich eine Message-ID oder hat denselben Absender, Betreff und dieselbe Größe wie eine andere.",
+  "audit.empty_hint":
+    "Aktionen wie Mails in den Papierkorb verschieben, Regelläufe und Rückgängig erscheinen hier.",
   "search.body_hint":
     "Die Suche im Mailtext fragt Ihren Mailserver und kann einen "
     + "Moment dauern.",
@@ -768,7 +787,7 @@ export const DE: Record<string, string> = {
   "Previous": "Zurück",
   "Next": "Weiter",
   "user": "Nutzer",
-  "audit.empty": "Noch nichts aufgezeichnet.",
+  "audit.empty": "Noch nichts aufgezeichnet",
   "audit.export": "Prüfprotokoll als CSV exportieren",
   "audit.by": "von {actor}",
   "audit.by_rule": "von Regel „{name}“",
@@ -830,6 +849,7 @@ export const DE: Record<string, string> = {
   "confirm.empty_trash_btn_nocount": "Endgültig löschen",
   "confirm.btn_anyway": "Trotzdem: {verb}",
   "confirm.b_mails_groups": "{n} Mails aus {k} Gruppe(n) sind betroffen",
+  "select.named": "{subject} auswählen",
   "confirm.b_selected": "{n} ausgewählte Mail(s)",
   "confirm.b_protected_groups_skipped": "{n} geschützte Gruppe(n) übersprungen",
   "confirm.b_pinned_kept": "{n} geschützte Mail(s) bleiben unberührt",

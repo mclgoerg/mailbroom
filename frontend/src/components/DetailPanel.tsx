@@ -513,7 +513,7 @@ export function DetailPanel({ grouping, group, aiEnabled, protectedNow,
             )}
           </div>
 
-          <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-2">
+          <div className="min-h-0 flex-1 overflow-y-auto pb-2">
             {error && <div className="p-4 type-body text-danger-fg">{error}</div>}
             {!shown && !error && <Loading />}
             {shown && (
