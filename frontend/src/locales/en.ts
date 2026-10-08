@@ -47,9 +47,9 @@ export const EN: Record<string, string> = {
   "account.delete": 'Delete account "{name}"…',
   "account.delete_title": 'Delete account "{name}"',
   "account.delete_data":
-    "Its connection settings, scan results, local search index, saved "
-    + "filters, pins, digest and auto-scan settings are deleted from "
-    + "Mailbroom.",
+    "Mailbroom deletes its sign-in and connection settings, scan results, "
+    + "local search index, saved filters, pins, unsubscribe records, known "
+    + "senders, digest and auto-scan settings.",
   "account.delete_rules":
     "Its rules keep the account name but stop running.",
   "account.delete_mails": "Mails on the server are untouched.",

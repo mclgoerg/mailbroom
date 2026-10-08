@@ -559,9 +559,10 @@ export const DE: Record<string, string> = {
   "account.delete": 'Konto "{name}" löschen…',
   "account.delete_title": 'Konto "{name}" löschen',
   "account.delete_data":
-    "Seine Verbindungseinstellungen, Scan-Ergebnisse, der lokale "
-    + "Suchindex, gespeicherte Filter, Pins, Digest und Auto-Scan-"
-    + "Einstellungen werden aus Mailbroom gelöscht.",
+    "Mailbroom löscht die Anmeldedaten und Verbindungseinstellungen, "
+    + "Scan-Ergebnisse, den lokalen Suchindex, gespeicherte Filter, Pins, "
+    + "Abbestell-Einträge, bekannte Absender sowie Digest- und "
+    + "Auto-Scan-Einstellungen.",
   "account.delete_rules":
     "Seine Regeln behalten den Kontonamen, laufen aber nicht mehr.",
   "account.delete_mails": "Mails auf dem Server bleiben unangetastet.",

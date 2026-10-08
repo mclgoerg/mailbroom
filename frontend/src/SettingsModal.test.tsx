@@ -519,7 +519,11 @@ test("the delete dialog lists the data that goes with the account",
     renderWithDialogs();
     fireEvent.click(screen.getByText('Delete account "default"…'));
     const dlg = await findDialog();
-    expect(dlg.textContent).toContain("scan results, local search index");
+    for (const part of ["sign-in and connection settings", "scan results",
+      "local search index", "saved filters", "pins", "unsubscribe records",
+      "known senders", "digest and auto-scan"]) {
+      expect(dlg.textContent).toContain(part);
+    }
     await cancelDialog();
   });
 
