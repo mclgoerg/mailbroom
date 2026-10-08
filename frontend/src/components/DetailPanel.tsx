@@ -27,7 +27,7 @@ const RATING_FILTERS: { key: string; label: string }[] = [
 
 export function DetailPanel({ grouping, group, aiEnabled, protectedNow,
   unsubscribedNow, onTrash, onProtect, onBlock, onUnblock, blocked, folders,
-  sieve = true, onClose, onDeleted }: {
+  sieve = true, onClose, onEmptied, onDeleted, variant = "modal", hideGroupActions = false }: {
   grouping: Grouping;
   group: Group;
   aiEnabled: boolean;
@@ -45,7 +45,17 @@ export function DetailPanel({ grouping, group, aiEnabled, protectedNow,
   folders: AppState["folders_raw"];
   sieve?: boolean;                       // Sieve export is Proton-only
   onClose: () => void;
+  // The group has been emptied by an action in here (Trash all, or every
+  // mail trashed one by one). Defaults to closing; the split pane moves on
+  // to the next group instead.
+  onEmptied?: () => void;
   onDeleted: () => void;
+  // "pane": the same content as a sticky column beside the list (>= 1280 px),
+  // with no overlay, focus trap or modal-stack entry.
+  variant?: "modal" | "pane";
+  // Pane only: the list has a selection, so the bulk bar owns the red button
+  // and the group-scoped footer (Trash all, Block) is not shown.
+  hideGroupActions?: boolean;
 }) {
   const [mails, setMails] = useState<Mail[] | null>(null);
   const [error, setError] = useState("");
@@ -283,7 +293,7 @@ export function DetailPanel({ grouping, group, aiEnabled, protectedNow,
       if (wholeGroup) {
         // The group will be empty - go straight back to the overview.
         onDeleted();
-        onClose();
+        (onEmptied ?? onClose)();
         return;
       }
       if (action !== "mark_read") {
@@ -333,8 +343,8 @@ export function DetailPanel({ grouping, group, aiEnabled, protectedNow,
     ? mails.filter((m) => !m.pinned).length
     : group.count - (group.pinned ?? 0);
 
-  return (
-    <Modal onClose={onClose} full>
+  const content = (
+    <>
       <PanelHeader
         title={group.label}
         sub={<>
@@ -568,7 +578,9 @@ export function DetailPanel({ grouping, group, aiEnabled, protectedNow,
             )}
           </div>
 
-          <div className="min-h-0 flex-1 overflow-y-auto pb-2">
+          {/* `relative`: MailRow's absolutely positioned sr-only spans would
+              otherwise anchor to the page and stretch it past the pane. */}
+          <div className="relative min-h-0 flex-1 overflow-y-auto pb-2">
             {error && <div className="p-4 type-body text-danger-fg">{error}</div>}
             {!shown && !error && <Loading />}
             {shown && (
@@ -638,7 +650,7 @@ export function DetailPanel({ grouping, group, aiEnabled, protectedNow,
               "Trash all N" names its scope and sits away from Close. Hidden
               while a selection exists: the selection bar above is then the
               one place to act (no two red buttons stacked). */}
-          {sel.size === 0 && <div className="flex flex-wrap items-center gap-2 border-t
+          {sel.size === 0 && !hideGroupActions && <div className="flex flex-wrap items-center gap-2 border-t
             border-line px-4 py-2"
             style={{ paddingBottom:
               "calc(env(safe-area-inset-bottom) + 0.5rem)" }}>
@@ -657,13 +669,28 @@ export function DetailPanel({ grouping, group, aiEnabled, protectedNow,
             {groupCount > 0 && (
               <Button variant="danger" className="ml-auto"
                 title={t("trash_all.tip", { n: groupCount })}
-                onClick={async () => { if (await onTrash(group)) onClose(); }}>
+                onClick={async () => {
+                  if (await onTrash(group)) (onEmptied ?? onClose)();
+                }}>
                 {t("trash_all.btn", { n: groupCount })}
               </Button>
             )}
           </div>}
         </>
       )}
-    </Modal>
+    </>
+  );
+
+  // Pane: `h-full` fills the sticky wrapper App sizes to the viewport. It is
+  // focusable (tabIndex -1) so a keyboard open can move focus into it.
+  return variant === "pane" ? (
+    <section aria-label={t("detail.region", { label: group.label })}
+      data-split-pane tabIndex={-1}
+      className="flex h-full outline-none min-h-0 flex-col overflow-hidden border-l
+        border-line bg-panel">
+      {content}
+    </section>
+  ) : (
+    <Modal onClose={onClose} full>{content}</Modal>
   );
 }

@@ -35,6 +35,7 @@ export function QueryBuilder({ value, onChange, className = "" }: {
     // Capture + stop: Esc closes only the popover, not a Modal around it.
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== "Escape") return;
+      e.preventDefault();
       e.stopImmediatePropagation();
       closeRef.current();
     };

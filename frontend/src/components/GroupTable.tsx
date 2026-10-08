@@ -16,6 +16,10 @@ interface Props {
   groups: Group[];
   selected: Set<string>;
   focusedKey: string | null;
+  // Group shown in the split pane (selected-row style), and whether the
+  // table is squeezed into the list column beside it (drops Type / Last).
+  openKey?: string | null;
+  compact?: boolean;
   onToggle: (key: string) => void;
   onToggleAll: (checked: boolean, keys: string[]) => void;
   // Opens DetailPanel, which is where single-group actions (Trash/Block/
@@ -122,7 +126,7 @@ function UnsubBadge({ g, onAck }: { g: Group; onAck: (addr: string) => void }) {
 
 /* Desktop: fixed-layout table so column widths never change when the
    grouping mode (and with it the content) changes. */
-function DesktopTable({ slice, baseIdx, selected, focusedKey, onToggle,
+function DesktopTable({ slice, baseIdx, selected, focusedKey, openKey, compact, onToggle,
   onToggleAll, onOpen, blockedKeys,
   onAckUnsub, sortK, sortDir, onSort, groupLabel, grouping
 }: PageProps) {
@@ -179,7 +183,9 @@ function DesktopTable({ slice, baseIdx, selected, focusedKey, onToggle,
           <th className={sortableTh} aria-sort={ariaSort("label")}>
             {sortBtn("label", groupLabel)}
           </th>
-          <th className={`${th} hidden w-40 lg:table-cell`}>{t("Type")}</th>
+          {!compact && (
+            <th className={`${th} hidden w-40 lg:table-cell`}>{t("Type")}</th>
+          )}
           <th className={`${th} w-24`}>{t("AI")}</th>
           <th className={`${sortableTh} w-18`} aria-sort={ariaSort("engagement")}>
             {sortBtn("engagement", t("Eng."), t("eng.col_tip"))}
@@ -192,20 +198,26 @@ function DesktopTable({ slice, baseIdx, selected, focusedKey, onToggle,
             aria-sort={ariaSort("size")}>
             {sortBtn("size", t("Size"), undefined, true)}
           </th>
-          <th className={`${sortableTh} hidden w-30 text-right md:table-cell`}
-            aria-sort={ariaSort("last")}>
-            {sortBtn("last", t("Last"), undefined, true)}
-          </th>
+          {!compact && (
+            <th className={`${sortableTh} hidden w-30 text-right md:table-cell`}
+              aria-sort={ariaSort("last")}>
+              {sortBtn("last", t("Last"), undefined, true)}
+            </th>
+          )}
           <th className="w-11" />
         </tr>
       </thead>
       <tbody>
         {slice.map((g, i) => (
           <tr key={g.key} data-gidx={baseIdx + i}
+            aria-current={g.key === openKey || undefined}
             onClick={rowClick(g)}
             className={`cursor-pointer border-b border-line hover:bg-panel
-              ${g.key === focusedKey ? "bg-panel outline outline-1 -outline-offset-1 outline-accent/60" : ""}`}>
-            <td className="px-2 py-2 align-top" data-no-open>
+              ${g.key === openKey ? "bg-panel2" : g.key === focusedKey ? "bg-panel" : ""}
+              ${g.key === focusedKey ? "outline outline-1 -outline-offset-1 outline-accent/60" : ""}`}>
+            {/* Open row: 2 px accent left edge (§4.11 selected row). */}
+            <td className={`px-2 py-2 align-top ${g.key === openKey
+              ? "shadow-open-edge" : ""}`} data-no-open>
               <Checkbox checked={selected.has(g.key)} className="-mx-2 -my-1"
                 aria-label={t("Select {label}", { label: g.label || g.key })}
                 onChange={() => onToggle(g.key)} />
@@ -230,7 +242,7 @@ function DesktopTable({ slice, baseIdx, selected, focusedKey, onToggle,
                 {unreadPct(g)}% {t("unread")}
               </div>
             </td>
-            <td className="hidden px-2 py-2 align-top lg:table-cell">
+            {!compact && <td className="hidden px-2 py-2 align-top lg:table-cell">
               <div className="flex flex-wrap gap-1 overflow-hidden">
                 {g.new && (
                   <Tag tone="new">
@@ -256,7 +268,7 @@ function DesktopTable({ slice, baseIdx, selected, focusedKey, onToggle,
                 )}
                 {g.tags.map((t) => <Tag key={t}>{t}</Tag>)}
               </div>
-            </td>
+            </td>}
             <td className="px-2 py-2 align-top">
               <div className="flex flex-col items-start gap-0.5">
                 {g.ai && <AiTag ai={g.ai} />}
@@ -274,10 +286,10 @@ function DesktopTable({ slice, baseIdx, selected, focusedKey, onToggle,
               tabular-nums text-muted">
               {fmtSize(g.size)}
             </td>
-            <td className="hidden whitespace-nowrap px-2 py-2 text-right align-top
-              tabular-nums text-muted md:table-cell">
+            {!compact && <td className="hidden whitespace-nowrap px-2 py-2 text-right
+              align-top tabular-nums text-muted md:table-cell">
               <ShortDate iso={g.last} />
-            </td>
+            </td>}
             <td className="px-1 py-2 text-right align-top">
               <Button variant="quiet" size="icon" label={t("View details")}
                 className="text-faint" onClick={() => onOpen(g)}>
