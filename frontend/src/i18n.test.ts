@@ -1,6 +1,8 @@
 // @vitest-environment jsdom
 import { describe, expect, it } from "vitest";
 import { getLang, setLang, t } from "./i18n";
+import { DE } from "./locales/de";
+import { EN } from "./locales/en";
 
 describe("i18n", () => {
   it("falls back to the key in English", () => {
@@ -24,5 +26,39 @@ describe("i18n", () => {
     expect(t("unknown stays english")).toBe("unknown stays english");
     expect(localStorage.getItem("pmc_lang")).toBe("de");
     setLang("en");
+  });
+
+  it("picks the _one form when n (or count) is exactly 1", () => {
+    setLang("en");
+    expect(t("toast.moved_trash", { n: 1 })).toBe("Moved 1 mail to Trash");
+    expect(t("toast.moved_trash", { n: 2 })).toBe("Moved 2 mails to Trash");
+    expect(t("toast.moved_trash", { n: 0 })).toBe("Moved 0 mails to Trash");
+    expect(t("notice.emptied_trash", { count: 1 })).toContain("1 mail ");
+    setLang("de");
+    expect(t("toast.moved_trash", { n: 1 }))
+      .toBe("1 Mail in den Papierkorb verschoben");
+    expect(t("toast.moved_trash", { n: 3 }))
+      .toBe("3 Mails in den Papierkorb verschoben");
+    setLang("en");
+  });
+
+  it("every locale has the same _one keys, and no '(s)' placeholders remain", () => {
+    const ones = (d: Record<string, string>) =>
+      Object.keys(d).filter((k) => k.endsWith("_one")).sort();
+    expect(ones(DE)).toEqual(ones(EN));       // no English fallback in German
+    for (const [k, v] of [...Object.entries(EN), ...Object.entries(DE)]) {
+      expect(v, k).not.toMatch(/\((s|n|e|en)\)/);
+    }
+    // A _one entry's base key must exist and use the same placeholders; only
+    // the count itself ({n} / {count}) may be spelled out ("1 mail").
+    const ph = (s: string) => new Set(s.match(/\{\w+\}/g) ?? []);
+    for (const dict of [EN, DE]) for (const k of ones(dict)) {
+      const base = dict[k.slice(0, -4)];
+      expect(base, k).toBeTruthy();
+      const [many, one] = [ph(base), ph(dict[k])];
+      expect([...one].filter((p) => !many.has(p)), k).toEqual([]);
+      expect([...many].filter((p) => !one.has(p)
+        && p !== "{n}" && p !== "{count}"), k).toEqual([]);
+    }
   });
 });

@@ -64,6 +64,7 @@ export interface DeleteState {
   progress: string;
   error: string;
   moved: number;
+  seq?: number;   // bumped by the backend whenever a new job starts
 }
 
 export interface AttsState {

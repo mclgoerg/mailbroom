@@ -36,7 +36,8 @@ export async function planMailAction(chosen: Mail[], action: string,
   if (!force) {
     // A single mail is named by its subject, several by their count.
     const bullets = [acting.length === 1
-      ? `"${acting[0].subject || t("(no subject)")}"`
+      ? t("confirm.b_subject", {
+          subject: acting[0].subject || t("(no subject)") })
       : t("confirm.b_selected", { n: acting.length })];
     if (acting.length !== chosen.length) {
       bullets.push(t("confirm.b_pinned_skipped",

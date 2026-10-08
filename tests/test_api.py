@@ -1,5 +1,7 @@
 """API-level tests via FastAPI's TestClient (no server, no network)."""
 
+import time
+
 import pytest
 from fastapi.testclient import TestClient
 
@@ -101,6 +103,19 @@ def test_scan_group_delete_via_api(bridge):
     st = client.get("/api/state").json()
     assert st["delete"]["moved"] == 3
     assert len(st["undo"]) == 1
+    seq1 = st["delete"]["seq"]
+    assert seq1 >= int(time.time()) - 3600   # clock-seeded, survives restarts
+
+    # Every new job gets a new sequence number (the UI uses it to tell a
+    # finished job from a stale tick of the previous one, even when the
+    # counts are equal); undo is not a delete job.
+    assert client.post("/api/undo", json={}).json()["restored"] == 3
+    assert client.get("/api/state").json()["delete"]["seq"] == seq1
+    client.post("/api/delete", json={
+        "grouping": "sender", "keys": ["noreply@dhl.example"]})
+    wait_delete_done()
+    st = client.get("/api/state").json()
+    assert st["delete"]["moved"] == 3 and st["delete"]["seq"] == seq1 + 1
 
     assert client.post("/api/undo", json={}).json()["restored"] == 3
     assert client.get("/api/state").json()["notice"]["key"] == "restored"

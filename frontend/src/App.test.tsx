@@ -361,7 +361,7 @@ test("the detail panel's Trash button confirms, trashes the whole group " +
   await openDetail();
   fireEvent.click(screen.getByRole("button", { name: "Trash all 3" }));
   const dlg = await findDialog();
-  expect(dlg.textContent).toContain("3 mails from 1 group(s)");
+  expect(dlg.textContent).toContain("3 mails in 1 group");
   await pressDialog("Move to Trash (3)");
   await waitFor(() => expect(deleteGroups).toHaveBeenCalledWith(
     "sender", [groupFixture.key], "trash", "", false, null, null));

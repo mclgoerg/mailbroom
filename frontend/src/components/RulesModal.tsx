@@ -90,7 +90,7 @@ export function RulesModal({ state, onClose, onChanged }: {
       setEditId(null);
       onChanged();
     } catch (e: any) {
-      setMsg(`Error: ${e.message ?? e}`);
+      setMsg(t("err.generic", { msg: e.message ?? e }));
     }
   };
 
@@ -104,7 +104,7 @@ export function RulesModal({ state, onClose, onChanged }: {
       await api.runRule(rule.id);
       onChanged();
     } catch (e: any) {
-      setMsg(`Error: ${e.message ?? e}`);
+      setMsg(t("err.generic", { msg: e.message ?? e }));
     }
     setBusyId("");
   };
@@ -120,7 +120,7 @@ export function RulesModal({ state, onClose, onChanged }: {
       await api.updateRule(rule.id, { mode });
       onChanged();
     } catch (e: any) {
-      setMsg(`Error: ${e.message ?? e}`);
+      setMsg(t("err.generic", { msg: e.message ?? e }));
     }
   };
 
@@ -133,7 +133,7 @@ export function RulesModal({ state, onClose, onChanged }: {
       if (editId === rule.id) { setEditId(null); setForm({ ...EMPTY }); }
       onChanged();
     } catch (e: any) {
-      setMsg(`Error: ${e.message ?? e}`);
+      setMsg(t("err.generic", { msg: e.message ?? e }));
     }
   };
 

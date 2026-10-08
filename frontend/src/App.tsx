@@ -302,23 +302,41 @@ export default function App() {
      toasts (a page load or account switch that finds an old "done" stays
      quiet); a scan error is the one exception, nothing else shows it. */
   const seenJobs = useRef<{ scan?: string; d?: string; a?: string;
-    u?: string; undo: string[] } | null>(null);
+    u?: string; undo: string[]; seq?: number; maxSeq?: number } | null>(null);
   const startToast = useRef<{ unsub?: number }>({});
   useEffect(() => {
     if (!state) { seenJobs.current = null; return; }
     const prev = seenJobs.current;
     const { delete: del, ai, unsub } = state;
     const ids = state.undo.map(undoId);
+    // `seq` only grows. A response carrying a LOWER one is older than what
+    // we already saw (a slow full-state fetch landing after newer ticks):
+    // its delete state and undo list are ignored, never toasted.
+    const staleDel = prev?.maxSeq != null && del.seq != null
+      && del.seq < prev.maxSeq;
+    const maxSeq = Math.max(prev?.maxSeq ?? -Infinity, del.seq ?? -Infinity);
     // Undo entries are also recorded mid-job, so while a move runs the
     // baseline stays what it was before it started.
-    seenJobs.current = { scan: state.status, d: del.status,
-      a: ai.status, u: unsub?.status,
-      undo: del.status === "running" && prev ? prev.undo : ids };
+    seenJobs.current = { scan: state.status,
+      d: staleDel ? prev!.d : del.status,
+      a: ai.status, u: unsub?.status, maxSeq,
+      undo: staleDel || (del.status === "running" && prev) ? prev!.undo : ids,
+      // Job sequence number BEFORE the current job (backend `delete.seq`,
+      // bumped when a job starts). The baseline is set to "running" right
+      // after a start call succeeds, so a stale tick still in flight from
+      // before it (status done, the OLD seq) would otherwise look like the
+      // new job finishing; counts can't tell them apart (mark-read x3).
+      // Held while running; a page loaded mid-job counts as "this job".
+      seq: staleDel || del.status === "running"
+        ? (prev ? prev.seq : (del.seq ?? 0) - 1) : del.seq };
     if (state.status === "error" && prev?.scan !== "error")
       notify(t("err.generic", { msg: state.error }), "error");
     if (!prev) return;
-    const fresh = state.undo.filter((u) => !prev.undo.includes(undoId(u)));
-    if (del.status !== "running" && (del.status !== prev.d || fresh.length)) {
+    const fresh = staleDel ? []
+      : state.undo.filter((u) => !prev.undo.includes(undoId(u)));
+    const newJob = del.seq != null && prev.seq != null && del.seq > prev.seq;
+    if (!staleDel && del.status !== "running" && (fresh.length || newJob
+        || (del.seq == null && del.status !== prev.d))) {
       if (del.status === "error") {
         notify(t("err.generic", { msg: del.error }), "error");
       } else if (fresh.length || del.moved > 0) {
@@ -553,12 +571,19 @@ export default function App() {
   const emptyTrash = async (known?: number): Promise<boolean> => {
     let n: number | null = known ?? null;
     if (n === null) {
+      // On real IMAP the live count can take seconds: say so.
+      setPending(t("trash.counting"));
       try { n = (await api.trash()).total; } catch { n = null; }
+      setPending("");
+    }
+    if (n === 0) {
+      toast.show(t("trash.already_empty"));
+      refresh();      // the cached count behind the menu entry was stale
+      return false;
     }
     if (!await confirmDialog({ title: t("confirm.empty_trash_title"),
       body: n === null ? t("confirm.empty_trash_body_nocount")
-        : t(n === 1 ? "confirm.empty_trash_body_1"
-          : "confirm.empty_trash_body", { n }),
+        : t("confirm.empty_trash_body", { n }),
       tone: "danger",
       confirmLabel: n === null ? t("confirm.empty_trash_btn_nocount")
         : t("confirm.empty_trash_btn", { n }) })) return false;
@@ -710,8 +735,9 @@ export default function App() {
       return false;
     }
     const verb = actionVerb(action) + (dest ? ` → ${dest}` : "");
-    const bullets = [t("confirm.b_mails_groups",
-      { n, k: effective.length })];
+    const bullets = [effective.length === 1
+      ? t("confirm.b_mails_one_group", { n })
+      : t("confirm.b_mails_groups", { n, k: effective.length })];
     if (effective.length !== keys.length) {
       bullets.push(t("confirm.b_protected_groups_skipped",
         { n: keys.length - effective.length }));
@@ -739,7 +765,7 @@ export default function App() {
   const unsubscribeSelected = async () => {
     if (!selected.size) return;
     if (!await confirmDialog({
-      title: t("confirm.unsubscribe", { k: selected.size }),
+      title: t("confirm.unsubscribe", { n: selected.size }),
       confirmLabel: t("confirm.unsubscribe_btn") })) return;
     try {
       const r = await api.unsubscribeBulk(mode, [...selected]);
@@ -909,7 +935,7 @@ export default function App() {
       const mails = groups.reduce((n, g) => n + g.count, 0);
       const size = groups.reduce((n, g) => n + g.size, 0);
       const ago = fmtAgo(state.scanned_ts);
-      return `${groups.length} ${t("groups")} · ${mails} ${t("mails")}`
+      return `${t("n.groups", { n: groups.length })} · ${t("n.mails", { n: mails })}`
         + ` · ${fmtSize(size)}` + (filter ? ` ${t("(filtered)")}` : "")
         + (ago ? ` · ${t("scan.age", { ago })}` : "");
     }
@@ -957,6 +983,7 @@ export default function App() {
               className="inline-flex items-center gap-1 whitespace-nowrap
                 text-muted hover:text-body"
               title={t("trash.browse")}
+              aria-label={t("trash.open_label", { n: state.trash_count })}
               onClick={() => setTrashOpen(true)}>
               <Trash2 size={14} /> {state.trash_count}
             </Button>
@@ -966,7 +993,7 @@ export default function App() {
               elements on one min-h-8 baseline on phones. */}
           <Menu label={t("menu.profile")}
             trigger={multiAccount
-              ? <>
+              ? <span className="inline-flex items-center gap-1.5">
                   <AccountAvatar name={account} />
                   <span className="max-w-24 truncate" title={account}>
                     {account}
@@ -974,7 +1001,7 @@ export default function App() {
                   {auth.is_admin && auth.mode === "oidc"
                     ? <Star size={14} className="shrink-0" /> : null}
                   <ChevronDown size={14} className="shrink-0 text-faint" />
-                </>
+                </span>
               : <span className="inline-flex items-center gap-0.5">
                   <User size={18} />
                   {auth.is_admin && auth.mode === "oidc"
@@ -1034,7 +1061,7 @@ export default function App() {
                 <MenuDivider />
                 <MenuItem danger onClick={() => emptyTrash()}>
                   <Trash2 size={16} className="mr-1 inline align-text-bottom" />
-                  {t("Empty Trash")} ({state.trash_count})…
+                  {t("Empty Trash")}…
                 </MenuItem>
               </>
             )}
@@ -1141,7 +1168,7 @@ export default function App() {
               ref={filterRef}
               className="w-full pr-9 coarse:pr-10"
               placeholder={t("filter groups…")}
-              title="Combinable: tag:shipping ai:safe age:>1y unread:>80 is:unsub text"
+              title={t("filter.syntax_hint")}
               value={filter}
               onChange={(e) => setFilter(e.target.value)}
             />
@@ -1287,8 +1314,10 @@ export default function App() {
         <BulkBar
           summary={<>
             {selCountPending
-              ? <>{selected.size} {t("groups")} <Spinner /></>
-              : t("bar.selected", { n: selected.size, mails: selCount })}
+              ? <>{t("bar.groups", { n: selected.size })} <Spinner /></>
+              : selected.size === 1 && selCount === 1
+                ? t("bar.selected_one_mail")
+                : t("bar.selected", { n: selected.size, mails: selCount })}
             {selAllPinned && (
               <span className="text-accent"> · {t("bar.all_pinned")}</span>
             )}
@@ -1406,8 +1435,8 @@ export default function App() {
                     className="block w-full rounded px-2 py-1.5 text-left
                       hover:bg-panel2"
                     onClick={() => undo(i)}>
-                    {actionVerb(u.action)}: {u.count}{" "}
-                    {t("mails")} - <span className="text-muted">{u.label}</span>
+                    {actionVerb(u.action)}: {t("n.mails", { n: u.count })}
+                    {" "}- <span className="text-muted">{u.label}</span>
                   </button>
                 ))}
               </span>
@@ -1425,7 +1454,7 @@ export default function App() {
       {/* First-run onboarding: no credentials or no scan yet. */}
       {cfg && state?.status === "idle" && allGroups.length === 0
         && !scanning && (
-        <div className="mx-auto my-10 max-w-md rounded-dialog border border-line
+        <div className="mx-auto my-10 max-w-md rounded-card border border-line
           bg-panel p-4 type-body sm:p-5">
           <div className="mb-3 type-heading">
             {t("onboard.title")}
@@ -1492,6 +1521,7 @@ export default function App() {
             else { setSortK(k); setSortDir(k === "label" ? 1 : -1); }
           }}
           groupLabel={t(GROUPING_LABEL[mode])}
+          grouping={mode}
           resetSignal={`${mode}\u0000${filter}`}
         />
       ) : (

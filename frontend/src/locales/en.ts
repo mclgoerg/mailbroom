@@ -11,13 +11,18 @@ export const EN: Record<string, string> = {
   "notice.restored_rescan":
     "Restored {restored} of {of} mails ({label}) - rescan to see them again.",
   "notice.emptied_trash": "Emptied Trash ({count} mails permanently deleted).",
+  "notice.emptied_trash_one": "Emptied Trash (1 mail permanently deleted).",
   "notice.ai_all_cached":
     "All groups already have cached AI verdicts - nothing to review.",
   "notice.ai_cancelled": "AI review cancelled after {done}/{total} groups.",
   "confirm.act_mails": "{verb}: {n} selected mails?",
+  "confirm.act_mails_one": "{verb}: 1 selected mail?",
   "confirm.unsubscribe":
-    "Unsubscribe from the senders of {k} selected group(s)?",
+    "Unsubscribe from the senders of {n} selected groups?",
+  "confirm.unsubscribe_one":
+    "Unsubscribe from the senders of the selected group?",
   "confirm.restore": "Restore {count} mails ({label})?",
+  "confirm.restore_one": "Restore 1 mail ({label})?",
   "ai.usage": "Usage",
   "ai.reset_spend": "Reset spend…",
   "ai.clear_verdicts": "Clear AI verdict cache…",
@@ -302,6 +307,7 @@ export const EN: Record<string, string> = {
   "show_more": "Show {n} more ({hidden} hidden)",
   "ai_done": "AI done ({in} in / {out} out{cost}) · total {total}",
   "done_moved": "Done: {n} mails processed.",
+  "done_moved_one": "Done: 1 mail processed.",
   "note.ai_progress": "AI is reviewing… {done}/{total} mails",
   "ai.disclaimer":
     "AI review sends mail METADATA to your configured AI provider "
@@ -322,9 +328,13 @@ export const EN: Record<string, string> = {
   "pin.group_on": "Protect all mails in this group",
   "pin.group_off": "Remove protection from all mails",
   "pin.group_skipped":
-    "{n} mail(s) without a Message-ID could not be protected.",
+    "{n} mails without a Message-ID could not be protected.",
+  "pin.group_skipped_one":
+    "1 mail without a Message-ID could not be protected.",
   "confirm.unpin_group":
-    "Remove the protection from all {n} protected mail(s) of this group?",
+    "Remove the protection from all {n} protected mails of this group?",
+  "confirm.unpin_group_one":
+    "Remove the protection from the 1 protected mail of this group?",
   "Sort: engagement": "Sort: engagement",
   "Eng.": "Eng.",
   "eng.col_tip":
@@ -348,8 +358,10 @@ export const EN: Record<string, string> = {
   "pin.protect_tip":
     "Protect this mail - no bulk action, rule or AI pick will move it",
   "pin.unprotect_tip": "Remove this mail's protection",
-  "pin.badge_tip": "{n} mail(s) protected from bulk actions",
-  "pin.n_protected": "{n} mail(s) protected",
+  "pin.badge_tip": "{n} mails protected from bulk actions",
+  "pin.badge_tip_one": "1 mail protected from bulk actions",
+  "pin.n_protected": "{n} mails protected",
+  "pin.n_protected_one": "1 mail protected",
   "pin.error": "Could not change the mail's protection",
   "pin.no_message_id":
     "This mail has no Message-ID header, so it could not be recognised "
@@ -358,9 +370,12 @@ export const EN: Record<string, string> = {
     "The selection contains protected mails - confirm them one at a time "
     + "or remove their protection first.",
   "rule.pinned_skipped": "{n} protected mails skipped",
+  "rule.pinned_skipped_one": "1 protected mail skipped",
   "qb.has_pinned": "with protected mails",
   "confirm.block_trash_existing":
-    "Also move its {n} existing mail(s) to Trash now?",
+    "Also move its {n} existing mails to Trash now?",
+  "confirm.block_trash_existing_one":
+    "Also move its 1 existing mail to Trash now?",
   "toast.blocked": 'Blocked "{label}".',
   "block.tip":
     "Block this sender/domain: creates a standing rule that auto-trashes "
@@ -395,7 +410,16 @@ export const EN: Record<string, string> = {
   "v.review": "review",
   "v.keep": "keep",
   "v.unrated": "unrated",
-  "ratings.title": "Per-mail AI ratings (open the group for details)",
+  "ratings.aria": "Per-mail AI ratings: {parts}",
+  "ratings.popover_title": "Per-mail AI ratings",
+  "ratings.popover_hint":
+    "Counts of this group's mails by rating. Open the group for details.",
+  "trash.open_label": "Trash ({n} mails)",
+  "trash.open_label_one": "Trash (1 mail)",
+  "page.first": "First page",
+  "page.prev": "Previous page",
+  "page.next": "Next page",
+  "page.last": "Last page",
   "page.of": "Page {p} / {n}",
   "per page": "per page",
   "All": "All",
@@ -414,6 +438,7 @@ export const EN: Record<string, string> = {
   "rule.run_report": "report: {groups} groups · {mails} mails would be affected",
   "rule.run_executed": "executed: {acted} mails queued ({groups} groups, {mails} matched)",
   "rule.capped": "{n} mails beyond the per-run cap",
+  "rule.capped_one": "1 mail beyond the per-run cap",
   "rule.protected_skipped": "{n} protected skipped",
   "rule.run_now": "Run now",
   "rule.enable_execute": "Enable execute",
@@ -457,6 +482,7 @@ export const EN: Record<string, string> = {
     "Find the mails hogging your storage. Analysis reads only the mail "
     + "structure (no content is downloaded).",
   "atts.summary": "{n} mails with attachments · {size} total",
+  "atts.summary_one": "1 mail with attachments · {size} total",
   "atts.analyze": "Analyze attachments",
   "atts.reanalyze": "Re-analyze",
   "atts.intro":
@@ -475,19 +501,24 @@ export const EN: Record<string, string> = {
   "unsub.retry": "Retry unsubscribe",
   "unsub.badge_pending": "{n}/{of} unsubscribed",
   "unsub.badge_failed": "unsubscribe failed",
-  "toast.unsub_started": "Unsubscribing from {n} sender(s)…",
+  "toast.unsub_started": "Unsubscribing from {n} senders…",
+  "toast.unsub_started_one": "Unsubscribing from 1 sender…",
   "toast.unsub_skipped":
-    "({n} sender(s) already handled, protected, or over the per-run limit.)",
+    "({n} senders already handled, protected, or over the per-run limit.)",
+  "toast.unsub_skipped_one":
+    "(1 sender already handled, protected, or over the per-run limit.)",
   "toast.unsub_nothing":
     "Nothing to unsubscribe from - every sender is already handled or "
     + "protected.",
   "dups.hint": "Same Message-ID, or identical sender + subject + size.",
   "dups.summary": "{n} duplicate sets · {size} reclaimable",
+  "dups.summary_one": "1 duplicate set · {size} reclaimable",
   "dups.keep_newest": "Select all but newest",
   "dups.wasted": "{size} reclaimable",
   "dups.newest": "newest",
   "dups.none": "No duplicates found",
   "stats.this_month": "trashed this month: {n} mails · {size}",
+  "stats.this_month_one": "trashed this month: 1 mail · {size}",
   "stats.per_year": "Mails per year",
   "stats.per_month": "Mails per month (last 12)",
   "stats.total_size": "total size",
@@ -502,6 +533,8 @@ export const EN: Record<string, string> = {
   "stats.ai": "AI verdicts (sender groups)",
   "stats.rated_mails":
     "· {n} mails rated individually ({safe} safe to delete)",
+  "stats.rated_mails_one":
+    "· 1 mail rated individually ({safe} safe to delete)",
   "stats.top_domains": "Top domains by size",
   "stats.cleanup": "Cleanup by month",
   "stats.actions_line":
@@ -518,13 +551,19 @@ export const EN: Record<string, string> = {
   "Copy": "Copy",
   "notice.trash_restored":
     "Restored {n} mails from Trash to {dest}.",
+  "notice.trash_restored_one": "Restored 1 mail from Trash to {dest}.",
   "notice.trash_restored_rescan":
     "Restored {n} mails from Trash to {dest} - rescan to see them again.",
+  "notice.trash_restored_rescan_one":
+    "Restored 1 mail from Trash to {dest} - rescan to see it again.",
   "trash.browse": "Browse Trash",
   "trash.restore_to": "Restore to…",
   "trash.restored": "Restored {n} mails - rescan to see them in the views.",
+  "trash.restored_one": "Restored 1 mail - rescan to see it in the views.",
   "trash.restored_refreshing":
     "Restored {n} mails - the views update automatically.",
+  "trash.restored_refreshing_one":
+    "Restored 1 mail - the views update automatically.",
   "trash.newest_shown": "newest {n} shown",
   "trash.empty": "Trash is empty",
   "notice.ai_budget":
@@ -575,6 +614,7 @@ export const EN: Record<string, string> = {
   "thread.read": "Read conversation",
   "thread.you": "You",
   "thread.n_mails": "{n} mails",
+  "thread.n_mails_one": "1 mail",
   "thread.expand_all": "Expand all",
   "thread.collapse_all": "Collapse all",
   "thread.show_quoted": "Show quoted text",
@@ -589,7 +629,9 @@ export const EN: Record<string, string> = {
   "err.undo": "Undo error: {msg}",
   "err.connection": "Connection error: {msg}",
   "toast.moved_trash": "Moved {n} mails to Trash",
+  "toast.moved_trash_one": "Moved 1 mail to Trash",
   "status.filter_none": "0 of {n} groups match",
+  "status.filter_none_one": "0 of 1 group matches",
   "status.no_mails": "No mails found in the scanned folders.",
   "onboard.title": "Welcome - three steps to a tidy mailbox",
   "onboard.step_bridge":
@@ -611,6 +653,7 @@ export const EN: Record<string, string> = {
     + "tab is in the background)",
   "notify.denied": "Notifications were blocked by the browser.",
   "notify.delete_done": "Done: {n} mails processed.",
+  "notify.delete_done_one": "Done: 1 mail processed.",
   "notify.ai_done": "AI review finished.",
   "notify.atts_done": "Attachment analysis finished.",
   "notify.unsub_done": "Bulk unsubscribe finished.",
@@ -682,6 +725,8 @@ export const EN: Record<string, string> = {
   "audit.act.rule_execute": "Rule executed",
   "audit.act.unsubscribe": "Unsubscribe",
   "audit.act.undo": "Undo",
+  "trash.counting": "Counting…",
+  "trash.already_empty": "Trash is empty.",
   "audit.act.empty_trash": "Trash emptied",
   "audit.outcome.ok": "ok",
   "audit.outcome.error": "error",
@@ -694,6 +739,7 @@ export const EN: Record<string, string> = {
   "export.csv": "Export CSV",
   "export.csv_tip": "Export the current grouping as CSV",
   "bar.selected": "{n} groups · {mails} mails",
+  "bar.selected_one": "1 group · {mails} mails",
   "bar.clear": "Clear selection",
   "bar.export": "Export CSV",
   "bar.label": "Selection actions",
@@ -717,19 +763,40 @@ export const EN: Record<string, string> = {
     + "explicitly overrides its protection.",
   "confirm.empty_trash_body":
     "{n} mails in Trash will be permanently deleted. This cannot be undone.",
-  "confirm.empty_trash_body_1":
+  "confirm.empty_trash_body_one":
     "The 1 mail in Trash will be permanently deleted. This cannot be undone.",
   "confirm.empty_trash_body_nocount":
     "All mails in Trash will be permanently deleted. This cannot be undone.",
   "confirm.empty_trash_btn": "Delete permanently ({n})",
   "confirm.empty_trash_btn_nocount": "Delete permanently",
   "confirm.btn_anyway": "{verb} anyway",
-  "confirm.b_mails_groups": "{n} mails from {k} group(s) will be affected",
+  "confirm.b_mails_groups": "{n} mails from {k} groups will be affected",
+  "confirm.b_mails_groups_one": "1 mail from {k} groups will be affected",
   "select.named": "Select {subject}",
-  "confirm.b_selected": "{n} selected mail(s)",
-  "confirm.b_protected_groups_skipped": "{n} protected group(s) skipped",
-  "confirm.b_pinned_kept": "{n} protected mail(s) stay untouched",
-  "confirm.b_pinned_skipped": "{n} protected mail(s) skipped",
+  "confirm.b_mails_one_group": "{n} mails in 1 group will be affected",
+  "confirm.b_mails_one_group_one": "1 mail in 1 group will be affected",
+  "bar.groups": "{n} groups",
+  "bar.groups_one": "1 group",
+  "bar.selected_one_mail": "1 group · 1 mail",
+  "n.mails": "{n} mails",
+  "n.mails_one": "1 mail",
+  "n.senders": "{n} senders",
+  "n.senders_one": "1 sender",
+  "n.groups": "{n} groups",
+  "n.groups_one": "1 group",
+  "filter.syntax_hint":
+    "Combinable: tag:shipping ai:safe age:>1y unread:>80 is:unsub text",
+  "tenant.row_tip":
+    "{id} - {accounts} accounts, {scans} scans, {rules} rules, {verdicts} AI verdicts",
+  "confirm.b_subject": '"{subject}"',
+  "confirm.b_selected": "{n} selected mails",
+  "confirm.b_selected_one": "1 selected mail",
+  "confirm.b_protected_groups_skipped": "{n} protected groups skipped",
+  "confirm.b_protected_groups_skipped_one": "1 protected group skipped",
+  "confirm.b_pinned_kept": "{n} protected mails stay untouched",
+  "confirm.b_pinned_kept_one": "1 protected mail stays untouched",
+  "confirm.b_pinned_skipped": "{n} protected mails skipped",
+  "confirm.b_pinned_skipped_one": "1 protected mail skipped",
   "confirm.unsubscribe_btn": "Unsubscribe",
   "confirm.restore_btn": "Restore",
   "confirm.empty_trash_title": "Empty Trash?",
@@ -752,7 +819,9 @@ export const EN: Record<string, string> = {
     "Scheduled runs will then act on matching mails (cap 500 per run, "
     + "protected senders skipped, undo available).",
   "trash_all.btn": "Trash all {n}",
+  "trash_all.btn_one": "Trash 1 mail",
   "trash_all.tip": "Move all {n} mails of this group to Trash",
+  "trash_all.tip_one": "Move the 1 mail of this group to Trash",
   "trash_this.btn": "Trash this mail",
   "block.btn": "Block sender",
   "rule.f_grouping": "Grouping",

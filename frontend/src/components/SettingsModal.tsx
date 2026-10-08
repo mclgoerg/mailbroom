@@ -1,4 +1,4 @@
-import { RefreshCw, Settings as SettingsIcon, Shield, Star, X }
+import { Check, RefreshCw, Settings as SettingsIcon, Shield, Star, X }
   from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { api, downloadFile, fmtUsd } from "../api";
@@ -10,7 +10,7 @@ import type { AdminTenantStats, AuthMode, AutoScanUnit, BodySearchMode, Config,
 import { IndexPanel } from "./IndexPanel";
 import { Button, Checkbox, confirmDialog, Field, Input, LINK_ACCENT, Loading,
   Modal, PanelHeader, promptDialog, SectionLabel, Segmented, Select, Spinner,
-  Tag, TextArea, useMediaQuery } from "./ui";
+  Tag, tabPanelProps, TextArea, useMediaQuery } from "./ui";
 
 /* Provider presets only PREFILL the connection fields - everything stays
  * editable. "custom" prefills nothing. Hosts per provider docs; all of
@@ -158,7 +158,7 @@ export function SettingsModal({ cfg, account, onClose, onSaved,
       const r = await api.testDigest(editAcct);
       setDigestTestMsg(t(r.demo ? "digest.test_sent_demo" : "digest.test_sent"));
     } catch (e: any) {
-      setDigestTestMsg(`Error: ${e.message ?? e}`);
+      setDigestTestMsg(t("err.generic", { msg: e.message ?? e }));
     }
     setDigestTesting(false);
   };
@@ -293,7 +293,7 @@ export function SettingsModal({ cfg, account, onClose, onSaved,
       setTimeout(() => setMsg(""), 2500);
       return next;
     } catch (e: any) {
-      setMsg(`Error: ${e.message ?? e}`);
+      setMsg(t("err.generic", { msg: e.message ?? e }));
       return null;
     }
   };
@@ -330,7 +330,7 @@ export function SettingsModal({ cfg, account, onClose, onSaved,
       setEditAcct(name);
       setMsg(t("account.renamed", { name }));
     } catch (e: any) {
-      setMsg(`Error: ${e.message ?? e}`);
+      setMsg(t("err.generic", { msg: e.message ?? e }));
     }
   };
 
@@ -346,7 +346,7 @@ export function SettingsModal({ cfg, account, onClose, onSaved,
       setEditAcct(name);
       setF({ ...f, ...imapFields(next, name) });
     } catch (e: any) {
-      setMsg(`Error: ${e.message ?? e}`);
+      setMsg(t("err.generic", { msg: e.message ?? e }));
     }
   };
 
@@ -363,7 +363,7 @@ export function SettingsModal({ cfg, account, onClose, onSaved,
       setEditAcct(next.default_account);
       setF({ ...f, ...imapFields(next, next.default_account) });
     } catch (e: any) {
-      setMsg(`Error: ${e.message ?? e}`);
+      setMsg(t("err.generic", { msg: e.message ?? e }));
     }
   };
 
@@ -402,7 +402,7 @@ export function SettingsModal({ cfg, account, onClose, onSaved,
         verificationUri: r.verification_uri, deviceCode: r.device_code,
         interval: r.interval || 5 });
     } catch (e: any) {
-      setOauthMsg(`Error: ${e.message ?? e}`);
+      setOauthMsg(t("err.generic", { msg: e.message ?? e }));
     }
   };
 
@@ -421,7 +421,7 @@ export function SettingsModal({ cfg, account, onClose, onSaved,
         } else if (r.status === "error") {
           clearInterval(id);
           setDeviceInfo(null);
-          setOauthMsg(`Error: ${r.error}`);
+          setOauthMsg(t("err.generic", { msg: r.error ?? "" }));
         }
       } catch {
         /* transient network error - keep polling until it expires */
@@ -473,7 +473,7 @@ export function SettingsModal({ cfg, account, onClose, onSaved,
       onSaved(await api.getConfig());
       setMsg(t("import.done", { rules: r.rules, verdicts: r.verdicts }));
     } catch (err: any) {
-      setMsg(`Error: ${err.message ?? err}`);
+      setMsg(t("err.generic", { msg: err.message ?? err }));
     }
   };
 
@@ -513,9 +513,10 @@ export function SettingsModal({ cfg, account, onClose, onSaved,
       </span>} onClose={onClose} />
       <div className="border-b border-line px-4 py-3 sm:px-5">
         <Segmented fill value={tab} onChange={setTab} options={tabs}
-          label={t("Settings")} />
+          label={t("Settings")} idPrefix="settings" />
       </div>
-      <div className="grid flex-1 content-start gap-4 overflow-y-auto p-4 sm:p-5
+      <div {...tabPanelProps("settings", tab)}
+        className="grid flex-1 content-start gap-4 overflow-y-auto p-4 sm:p-5
         sm:grid-cols-2 sm:items-end">
         {tab === "general" && (<>
         <Field label={t("Language")}>
@@ -674,8 +675,9 @@ export function SettingsModal({ cfg, account, onClose, onSaved,
 
           <div className="mt-3 flex flex-wrap items-center gap-2">
             {f.oauthConnected ? (<>
-              <span className="type-body text-safe-fg">
-                ✓ {t("oauth.connected")}
+              <span className="inline-flex items-center gap-1.5 type-body
+                text-safe-fg">
+                <Check size={16} /> {t("oauth.connected")}
               </span>
               <Button variant="secondary" onClick={disconnectOauth}>
                 {t("oauth.disconnect")}
@@ -1107,9 +1109,9 @@ export function SettingsModal({ cfg, account, onClose, onSaved,
                       <tr key={u.id} className="border-b border-line
                         last:border-0 align-top">
                         <td className="truncate px-2 py-1.5"
-                          title={`${u.id} - ${u.accounts} account(s), ${
-                            u.scans} scan(s), ${u.rules} rule(s), ${
-                            u.verdicts} AI verdict(s)`}>
+                          title={t("tenant.row_tip", { id: u.id,
+                            accounts: u.accounts, scans: u.scans,
+                            rules: u.rules, verdicts: u.verdicts })}>
                           {u.is_admin_workspace && (
                             <Star size={14}
                               className="mr-1 inline align-text-bottom" />

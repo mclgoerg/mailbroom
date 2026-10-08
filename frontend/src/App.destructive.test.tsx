@@ -13,6 +13,7 @@ let versionCalls = 0;
 
 let trashTotal = 5;            // what the live Trash listing reports
 let trashFails = false;
+let trashGate: Promise<void> | null = null;   // holds the live count back
 const emptyTrash = vi.fn().mockResolvedValue({ ok: true });
 const aiReview = vi.fn().mockResolvedValue({ ok: true });
 const undoApi = vi.fn().mockResolvedValue({ ok: true });
@@ -24,9 +25,11 @@ vi.mock("./api", () => ({
     state: () => { stateCalls.n++; return Promise.resolve(state); },
     emptyTrash: (...a: unknown[]) => emptyTrash(...a),
     undo: (...a: unknown[]) => undoApi(...a),
-    trash: () => trashFails
-      ? Promise.reject(new Error("imap down"))
-      : Promise.resolve({ folder: "Trash", uv: 1, total: trashTotal, mails: [] }),
+    trash: async () => {
+      if (trashGate) await trashGate;
+      if (trashFails) throw new Error("imap down");
+      return { folder: "Trash", uv: 1, total: trashTotal, mails: [] };
+    },
     logout: () => Promise.resolve(),
     exportUrl: (mode: string, keys?: string[]) =>
       `/api/export?grouping=${mode}`
@@ -116,6 +119,7 @@ afterEach(() => {
   emptyTrash.mockClear();
   trashTotal = 5;
   trashFails = false;
+  trashGate = null;
   aiReview.mockClear();
   undoApi.mockClear();
 });
@@ -140,7 +144,7 @@ test("profile menu: Empty Trash sits last, set apart and danger-styled",
   await mount();
   openProfile();
   const item = await screen.findByRole("menuitem", { name: /Empty Trash/ });
-  expect(item.textContent).toContain("Empty Trash (5)…");
+  expect(item.textContent).toBe("Empty Trash…")        // no (stale) cached count;
   expect(item.className).toContain("text-danger-fg");
   const menu = item.parentElement!;
   const items = [...menu.children];
@@ -269,4 +273,30 @@ test("AI consent: continuing remembers the choice and runs the review",
   await waitFor(() => expect(aiReview).toHaveBeenCalledWith(
     "sender", [groupFixture.key]));
   expect(localStorage.getItem("pmc_ai_ack")).toBe("1");
+});
+
+test("the menu path says 'Counting…' while it fetches the live count",
+  async () => {
+  let release!: () => void;
+  trashGate = new Promise<void>((r) => { release = r; });
+  await mount();
+  openProfile();
+  fireEvent.click(await screen.findByRole("menuitem", { name: /Empty Trash/ }));
+  expect(await screen.findByText("Counting…")).toBeTruthy();
+  await expectNoDialog();                              // nothing to confirm yet
+  release();
+  expect((await findDialog()).textContent).toContain("5 mails in Trash");
+  expect(screen.queryByText("Counting…")).toBeNull();
+  await cancelDialog();
+});
+
+test("a live count of 0 toasts 'Trash is empty' instead of offering to delete 0",
+  async () => {
+  trashTotal = 0;                        // state.trash_count still says 5
+  await mount();
+  openProfile();
+  fireEvent.click(await screen.findByRole("menuitem", { name: /Empty Trash/ }));
+  expect(await screen.findByText("Trash is empty.")).toBeTruthy();
+  await expectNoDialog();
+  expect(emptyTrash).not.toHaveBeenCalled();
 });

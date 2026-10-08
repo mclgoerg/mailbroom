@@ -109,6 +109,41 @@ describe("DetailPanel", () => {
     expect(screen.getByText("Mail 1")).toBeTruthy();
   });
 
+  it("shows no rating filter chips at all while no mail is rated", async () => {
+    renderPanel([mkMail(1), mkMail(2)]);
+    await waitFor(() => screen.getByText("Mail 1"));
+    expect(screen.queryByText(/^All \(/)).toBeNull();
+    expect(screen.queryByText(/unrated/)).toBeNull();
+  });
+
+  it("on a phone Sort is an icon menu and Unsubscribe lives in the ⋯ menu",
+    async () => {
+    vi.stubGlobal("matchMedia", (q: string) => ({
+      matches: true, media: q, addEventListener: () => {},
+      removeEventListener: () => {},
+    }));
+    try {
+      renderPanel([mkMail(1), mkMail(2)],
+        { group: mkGroup({ unsub: true }) });
+      await waitFor(() => screen.getByText("Mail 1"));
+      expect(screen.queryByDisplayValue("Sort: date")).toBeNull();
+      expect(screen.queryByRole("button", { name: "Unsubscribe" })).toBeNull();
+      fireEvent.click(screen.getByRole("button", { name: "Sort: date" }));
+      fireEvent.click(screen.getByRole("menuitemradio",
+        { name: "Sort: size" }));
+      expect(screen.getByRole("button", { name: "Sort: size" })).toBeTruthy();
+      fireEvent.click(screen.getByRole("button", { name: "More" }));
+      expect(screen.getByRole("menuitem", { name: "Unsubscribe" })).toBeTruthy();
+    } finally { vi.unstubAllGlobals(); }
+  });
+
+  it("on a wide screen Sort is a select and Unsubscribe a button", async () => {
+    renderPanel([mkMail(1), mkMail(2)], { group: mkGroup({ unsub: true }) });
+    await waitFor(() => screen.getByText("Mail 1"));
+    expect(screen.getByDisplayValue("Sort: date")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Unsubscribe" })).toBeTruthy();
+  });
+
   it("has no bulk-action chrome until a mail is selected", async () => {
     renderPanel([mkMail(1), mkMail(2)]);
     await waitFor(() => screen.getByText("Mail 1"));
@@ -213,7 +248,7 @@ describe("DetailPanel", () => {
       await pressDialog("Move to Trash (1)");
       await waitFor(() => expect(deleteMessages).toHaveBeenCalledWith(
         [["INBOX", 1]], "trash", "", false));
-      await screen.findByRole("button", { name: "Trash all 1" });
+      await screen.findByRole("button", { name: "Trash 1 mail" });
       expect(screen.queryByText("Mail 1")).toBeNull();
     });
 
@@ -341,7 +376,7 @@ describe("DetailPanel", () => {
     const onClose = vi.fn();
     renderPanel([mkMail(1)], { onTrash, onClose });
     await waitFor(() => screen.getByText("Mail 1"));
-    fireEvent.click(screen.getByRole("button", { name: "Trash all 1" }));
+    fireEvent.click(screen.getByRole("button", { name: "Trash 1 mail" }));
     await waitFor(() => expect(onClose).toHaveBeenCalled());
     expect(onTrash).toHaveBeenCalled();
   });
@@ -362,7 +397,7 @@ describe("DetailPanel", () => {
         expect(pin).toHaveBeenCalledWith("INBOX", 1, true));
       await waitFor(() =>
         expect(document.querySelectorAll("[data-pinned]").length).toBe(1));
-      expect(screen.getByText(/1 mail\(s\) protected/)).toBeTruthy();
+      expect(screen.getByText(/1 mail protected/)).toBeTruthy();
       expect(onDeleted).toHaveBeenCalled();      // overview badge refreshes
 
       // toggling a pinned mail unpins it again
@@ -464,7 +499,7 @@ describe("DetailPanel", () => {
       fireEvent.click(checkbox(1));
       fireEvent.click(await screen.findByText(/Trash selected/));
       expect((await findDialog()).textContent)
-        .toMatch(/1 protected mail\(s\) skipped/);
+        .toMatch(/1 protected mail skipped/);
       await pressDialog("Move to Trash (1)");
       await waitFor(() => expect(deleteMessages).toHaveBeenCalledWith(
         [["INBOX", 2]], "trash", "", false));
@@ -515,7 +550,7 @@ describe("DetailPanel", () => {
         "sender", "s@x.example", true));
       await waitFor(() =>
         expect(document.querySelectorAll("[data-pinned]").length).toBe(2));
-      expect(screen.getByText(/1 mail\(s\) without a Message-ID/))
+      expect(screen.getByText(/1 mail without a Message-ID/))
         .toBeTruthy();
       expect(onDeleted).toHaveBeenCalled();
     });

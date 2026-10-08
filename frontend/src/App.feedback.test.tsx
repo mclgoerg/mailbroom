@@ -28,6 +28,7 @@ vi.mock("./api", async (importOriginal) => ({
     exportUrl: (mode: string) => `/api/export?grouping=${mode}`,
     version: () => Promise.resolve({ build: "v1" }),
     undo: vi.fn().mockResolvedValue({ ok: true }),
+    deleteGroups: vi.fn().mockResolvedValue({ ok: true, queued: 1, skipped: 0 }),
   },
   setAccount: () => {},
   withAccount: (p: string) => p,
@@ -165,7 +166,7 @@ test("an empty filter reads '0 of N' and Clear filter brings the list back",
     const { container } = await mount({ ...baseState });
     fireEvent.change(screen.getByPlaceholderText("filter groups…"),
       { target: { value: "zzz-nothing" } });
-    expect(await screen.findByText("0 of 1 groups match")).toBeTruthy();
+    expect(await screen.findByText("0 of 1 group matches")).toBeTruthy();
     expect(screen.getByText("No groups match this filter")).toBeTruthy();
     expect(container.textContent).not.toContain("No scan yet");
     fireEvent.click(screen.getByText("Clear filter"));
@@ -256,3 +257,69 @@ test("a zero-match filter after a failed rescan still offers Clear filter",
     expect(await screen.findByText("No groups match this filter")).toBeTruthy();
     expect(screen.queryByText(/Welcome/)).toBeNull();
   });
+
+test("a stale pre-start tick (old job, old seq) does not toast the new job's result",
+  async () => {
+    // A finished job from earlier: done, 5 moved, seq 4, nothing new in undo.
+    await mount({ ...baseState, delete: job("done", { moved: 5, seq: 4 }) as any });
+    fireEvent.click(screen.getAllByLabelText("Select Shop News")[0]);
+    fireEvent.click(screen.getByRole("button", { name: /^Trash \d+/ }));
+    await pressDialog(/Move to Trash/);
+    await waitFor(() => expect(api.deleteGroups).toHaveBeenCalled());
+    // An SSE tick that was already in flight before the start call arrives:
+    // it still carries the OLD job. It must stay quiet.
+    tick({ delete: job("done", { moved: 5, seq: 4 }) as any });
+    expect(screen.queryByText(/Moved|processed/)).toBeNull();
+    // The real job: running, then done with an Undo entry -> exactly one toast.
+    tick({ delete: job("running", { progress: "1/12", seq: 5 }) as any });
+    tick({ delete: job("done", { moved: 12, seq: 5 }) as any,
+      undo: [{ ts: 9, label: "Shop News", count: 12, action: "trash" }] });
+    expect(await screen.findByText("Moved 12 mails to Trash")).toBeTruthy();
+  });
+
+test("mark-read x3 (same count, no undo entries) toasts every time; an unrelated tick does not",
+  async () => {
+    await mount({ ...baseState, delete: job("done", { moved: 5, seq: 1 }) as any });
+    for (const seq of [2, 3, 4]) {
+      tick({ delete: job("running", { seq }) as any });
+      tick({ delete: job("done", { moved: 5, seq }) as any });
+      await waitFor(() => expect(screen.getAllByText("Done: 5 mails processed.")
+        .length).toBe(seq - 1));
+    }
+    // A tick with the same finished job (e.g. after an Undo click) is quiet.
+    tick({ delete: job("done", { moved: 5, seq: 4 }) as any, undo: [] });
+    expect(screen.getAllByText("Done: 5 mails processed.")).toHaveLength(3);
+  });
+
+test("a short job that skips the running state still toasts (new seq, no undo)",
+  async () => {
+    await mount({ ...baseState, delete: job("done", { moved: 5, seq: 1 }) as any });
+    tick({ delete: job("done", { moved: 5, seq: 2 }) as any });
+    expect(await screen.findByText("Done: 5 mails processed.")).toBeTruthy();
+  });
+
+test("a higher seq after running still toasts (positive control)",
+  async () => {
+    await mount({ ...baseState, delete: job("done", { moved: 5, seq: 10 }) as any });
+    tick({ delete: job("running", { seq: 11 }) as any });
+    tick({ delete: job("done", { moved: 64, seq: 11 }) as any,
+      undo: [{ ts: 5, label: "Shop News", count: 64, action: "trash" }] });
+    expect(await screen.findByText("Moved 64 mails to Trash")).toBeTruthy();
+    cleanup();
+  });
+
+test("lower seq after a higher one: no toast now and no duplicate later", async () => {
+  await mount({ ...baseState, delete: job("done", { moved: 5, seq: 10 }) as any });
+  tick({ delete: job("done", { moved: 64, seq: 11 }) as any,
+    undo: [{ ts: 5, label: "Shop News", count: 64, action: "trash" }] });
+  await screen.findByText("Moved 64 mails to Trash");
+  const count = () => document.querySelectorAll("[data-variant]").length;
+  const before = count();
+  // A slow full-state fetch of the PREVIOUS state lands now (seq 10, old undo).
+  tick({ delete: job("done", { moved: 5, seq: 10 }) as any, undo: [] });
+  tick({ delete: job("done", { moved: 64, seq: 11 }) as any,
+    undo: [{ ts: 5, label: "Shop News", count: 64, action: "trash" }] });
+  expect(count()).toBe(before);                     // no false or duplicate toast
+  expect(screen.queryByText(/Done: /)).toBeNull();
+});
+

@@ -52,7 +52,7 @@ test("restore with a started rescan says the views update by themselves",
     trashRestore.mockResolvedValue({ restored: 1, rescan: true });
     await restoreOne();
     await waitFor(() => expect(screen.getByText(
-      "Restored 1 mails - the views update automatically.")).toBeTruthy());
+      "Restored 1 mail - the views update automatically.")).toBeTruthy());
   });
 
 test("restore while the server is busy still asks for a manual rescan",
@@ -60,7 +60,7 @@ test("restore while the server is busy still asks for a manual rescan",
     trashRestore.mockResolvedValue({ restored: 1, rescan: false });
     await restoreOne();
     await waitFor(() => expect(screen.getByText(
-      "Restored 1 mails - rescan to see them in the views.")).toBeTruthy());
+      "Restored 1 mail - rescan to see it in the views.")).toBeTruthy());
   });
 
 test("the footer's Empty Trash runs the shared handler and reloads the list",

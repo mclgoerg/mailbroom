@@ -39,7 +39,7 @@ export function SearchPanel({ bodySearch = false, bodyMode = "server",
       setNote(r.mails.length === 500
         ? t("Showing the newest 500 matches.") : "");
     } catch (e: any) {
-      setNote(`Error: ${e.message ?? e}`);
+      setNote(t("err.generic", { msg: e.message ?? e }));
     }
     setBusy(false);
   };
@@ -62,7 +62,7 @@ export function SearchPanel({ bodySearch = false, bodyMode = "server",
       setNote(t("note.background", { verb: t("Move to Trash") }));
       onDeleted();
     } catch (e: any) {
-      setNote(`Error: ${e.message ?? e}`);
+      setNote(t("err.generic", { msg: e.message ?? e }));
     }
   };
 

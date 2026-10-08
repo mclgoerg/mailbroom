@@ -63,7 +63,7 @@ export function TrashPanel({ state, onClose, onChanged, onEmptyTrash }: {
       setSel(new Set());
       onChanged();
     } catch (e: any) {
-      setNote(`Error: ${e.message ?? e}`);
+      setNote(t("err.generic", { msg: e.message ?? e }));
     }
     setBusy(false);
   };
@@ -76,7 +76,7 @@ export function TrashPanel({ state, onClose, onChanged, onEmptyTrash }: {
           <Trash2 size={18} /> {t("Trash")}
         </span>}
         sub={trash
-          ? `${trash.total} ${t("mails")}`
+          ? t("n.mails", { n: trash.total })
             + (trash.total > trash.mails.length
                ? ` (${t("trash.newest_shown", { n: trash.mails.length })})`
                : "")
@@ -129,7 +129,8 @@ export function TrashPanel({ state, onClose, onChanged, onEmptyTrash }: {
             ))}
           </div>
           {trash && trash.total > 0 && (
-            <div className="flex justify-end border-t border-line px-4 py-2">
+            <div className="flex justify-end border-t border-line px-4 py-2
+              max-sm:pb-[calc(0.5rem+env(safe-area-inset-bottom))]">
               <Button variant="danger-quiet" disabled={busy}
                 onClick={async () => {
                   if (await onEmptyTrash(trash.total)) load();

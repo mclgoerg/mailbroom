@@ -61,7 +61,7 @@ test("select-all-but-newest then confirm trashes only the older copies; "
   fireEvent.click(screen.getByRole("button", { name: "Trash selected (2)" }));
   const dlg = await findDialog();
   expect(dlg.textContent).toContain("Move to Trash");
-  expect(dlg.textContent).toContain("2 selected mail(s)");
+  expect(dlg.textContent).toContain("2 selected mails");
   await cancelDialog();
   await expectNoDialog();
   expect(deleteMessages).not.toHaveBeenCalled();

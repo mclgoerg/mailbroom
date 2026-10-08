@@ -12,7 +12,7 @@ import {
   ConfirmDialog, DIALOG_ARM_MS, DialogProvider, PromptDialog, EmptyState, MailRow, Menu, MenuDivider,
   MenuHeading, MenuItem, Modal, Notice, ProgressBar, Segmented, ToastProvider,
   confirmDialog,
-  LINK, Tag, ensureAiAck, promptDialog, ProtectButton, useToast,
+  LINK, RatingChips, Tag, ensureAiAck, promptDialog, ProtectButton, useToast,
 } from "./components/ui";
 
 afterEach(cleanup);
@@ -337,17 +337,29 @@ test("a confirm tapped right after opening is ignored; after the delay it resolv
     const onResult = vi.fn();
     render(<ConfirmDialog title="Sure?" confirmLabel="Delete" tone="danger"
       onResult={onResult} />);
-    fireEvent.click(screen.getByText("Delete"));      // the 2nd tap of a double-tap
+    // the 2nd tap of a double-tap (a pointer click has detail >= 1)
+    fireEvent.click(screen.getByText("Delete"), { detail: 2 });
     expect(onResult).not.toHaveBeenCalled();
     expect(screen.getByText("Sure?")).toBeTruthy();   // still open
     fireEvent.click(screen.getByText("Cancel"));      // Cancel is never delayed
     expect(onResult).toHaveBeenLastCalledWith(false);
     vi.advanceTimersByTime(DIALOG_ARM_MS - 1);
-    fireEvent.click(screen.getByText("Delete"));
+    fireEvent.click(screen.getByText("Delete"), { detail: 1 });
     expect(onResult).toHaveBeenCalledTimes(1);
     vi.advanceTimersByTime(1);
-    fireEvent.click(screen.getByText("Delete"));
+    fireEvent.click(screen.getByText("Delete"), { detail: 1 });
     expect(onResult).toHaveBeenLastCalledWith(true);
+  } finally { vi.useRealTimers(); }
+});
+
+test("a keyboard-activated confirm (click detail 0) is not swallowed by the guard", () => {
+  vi.useFakeTimers();
+  try {
+    const onResult = vi.fn();
+    render(<ConfirmDialog title="Sure?" confirmLabel="Delete" tone="danger"
+      onResult={onResult} />);
+    fireEvent.click(screen.getByText("Delete"), { detail: 0 });
+    expect(onResult).toHaveBeenCalledWith(true);
   } finally { vi.useRealTimers(); }
 });
 
@@ -356,10 +368,21 @@ test("PromptDialog ignores a submit (Enter / tap) right after opening", () => {
   try {
     const onResult = vi.fn();
     render(<PromptDialog title="Name" label="Name" initial="x" onResult={onResult} />);
-    fireEvent.click(screen.getByText("OK"));
+    fireEvent.click(screen.getByText("OK"), { detail: 1 });
     expect(onResult).not.toHaveBeenCalled();
     vi.advanceTimersByTime(DIALOG_ARM_MS);
-    fireEvent.click(screen.getByText("OK"));
+    fireEvent.click(screen.getByText("OK"), { detail: 1 });
+    expect(onResult).toHaveBeenCalledWith("x");
+  } finally { vi.useRealTimers(); }
+});
+
+test("PromptDialog: Enter right after opening submits (keyboard is exempt)", () => {
+  vi.useFakeTimers();
+  try {
+    const onResult = vi.fn();
+    render(<PromptDialog title="Name" label="Name" initial="x" onResult={onResult} />);
+    // Enter in a text field: the browser clicks the submit button, detail 0.
+    fireEvent.click(screen.getByText("OK"), { detail: 0 });
     expect(onResult).toHaveBeenCalledWith("x");
   } finally { vi.useRealTimers(); }
 });
@@ -437,7 +460,7 @@ test("promptDialog validates, submits the value, and cancels with null", async (
 });
 
 test("Modal sizes map to 448 / 672 / 768 px, full = lg at fixed height", () => {
-  const panel = () => screen.getByText("body");
+  const panel = () => screen.getByText("body").closest<HTMLElement>("[role=dialog]")!;
   const sizes: [Parameters<typeof Modal>[0]["size"], string][] = [
     ["sm", "sm:max-w-md"], ["md", "sm:max-w-2xl"], ["lg", "sm:max-w-3xl"]];
   for (const [size, cls] of sizes) {
@@ -453,6 +476,10 @@ test("Modal sizes map to 448 / 672 / 768 px, full = lg at fixed height", () => {
   render(<Modal onClose={() => {}}>body</Modal>);   // default md, shrinks to content
   expect(panel().className).toContain("sm:max-w-2xl");
   expect(panel().className).toContain("sm:h-auto");
+  // phone insets: top for every full-screen modal, bottom for the content-
+  // sized ones (full panels put the inset on their own footers)
+  expect(panel().className).toContain("max-sm:pt-[env(safe-area-inset-top)]");
+  expect(panel().className).toContain("max-sm:pb-[env(safe-area-inset-bottom)]");
   cleanup();
   render(<Modal size="sm" onClose={() => {}}>body</Modal>);   // phone bottom sheet
   expect(panel().className).not.toContain("h-dvh");
@@ -837,4 +864,146 @@ test("MailRow: dateIso renders a ShortDate with the ISO day as tooltip", () => {
   render(<MailRow subject="Hi" meta="x" dateIso="2025-01-02" />);
   expect(screen.getByText("2 Jan 2025").getAttribute("title"))
     .toBe("2025-01-02");
+});
+
+test("Modal moves focus in, traps Tab (both directions) and restores focus on close", () => {
+  const Host = () => {
+    const [open, setOpen] = useState(false);
+    return <>
+      <button onClick={() => setOpen(true)}>open</button>
+      <button>behind</button>
+      {open && <Modal onClose={() => setOpen(false)}>
+        <button>first</button><input aria-label="mid" />
+        <button>last</button>
+      </Modal>}
+    </>;
+  };
+  render(<Host />);
+  const opener = screen.getByText("open");
+  opener.focus();
+  fireEvent.click(opener);
+  const dlg = screen.getByRole("dialog");
+  expect(dlg.contains(document.activeElement)).toBe(true);
+  const [first, last] = [screen.getByText("first"), screen.getByText("last")];
+  // Tab from the last control wraps to the first, never to the page behind.
+  last.focus();
+  expect(fireEvent.keyDown(last, { key: "Tab" })).toBe(false);   // prevented
+  expect(document.activeElement).toBe(first);
+  expect(fireEvent.keyDown(first, { key: "Tab", shiftKey: true })).toBe(false);
+  expect(document.activeElement).toBe(last);
+  // Mid-dialog Tab is left to the browser (not prevented).
+  const mid = screen.getByLabelText("mid");
+  mid.focus();
+  expect(fireEvent.keyDown(mid, { key: "Tab" })).toBe(true);
+  // Focus that escaped to the page is pulled back in.
+  screen.getByText("behind").focus();
+  fireEvent.keyDown(document.body, { key: "Tab" });
+  expect(dlg.contains(document.activeElement)).toBe(true);
+  fireEvent.keyDown(window, { key: "Escape" });
+  expect(screen.queryByRole("dialog")).toBeNull();
+  expect(document.activeElement).toBe(opener);
+});
+
+test("a nested modal traps on its own and hands focus back to the one below", () => {
+  const Host = () => {
+    const [inner, setInner] = useState(false);
+    return <Modal onClose={() => {}}>
+      <button onClick={() => setInner(true)}>spawn</button>
+      {inner && <Modal size="sm" onClose={() => setInner(false)}>
+        <button>only</button></Modal>}
+    </Modal>;
+  };
+  render(<Host />);
+  const spawn = screen.getByText("spawn");
+  spawn.focus();
+  fireEvent.click(spawn);
+  const only = screen.getByText("only");
+  only.focus();
+  fireEvent.keyDown(only, { key: "Tab" });
+  expect(document.activeElement).toBe(only);            // wraps onto itself
+  fireEvent.keyDown(window, { key: "Escape" });
+  expect(document.activeElement).toBe(spawn);
+});
+
+test("RatingChips: a labelled button whose popover explains the counts", () => {
+  const onRow = vi.fn();
+  render(<div onClick={onRow}>
+    <RatingChips ratings={{ delete_safe: 3, review: 0, keep: 2 }} />
+  </div>);
+  const btn = screen.getByRole("button", {
+    name: "Per-mail AI ratings: 3 safe to delete, 2 keep" });
+  expect(btn.textContent).toBe("🟢3🔴2");            // zero buckets stay out
+  expect(screen.queryByRole("dialog")).toBeNull();
+  fireEvent.click(btn);
+  const pop = screen.getByRole("dialog", { name: "Per-mail AI ratings" });
+  expect(pop.textContent).toContain("3 safe to delete");
+  expect(pop.textContent).toContain("2 keep");
+  expect(btn.getAttribute("aria-expanded")).toBe("true");
+  expect(onRow).not.toHaveBeenCalled();             // never opens the row
+  fireEvent.keyDown(document, { key: "Escape" });
+  expect(screen.queryByRole("dialog")).toBeNull();
+});
+
+test("using a toast's button while a panel is open returns focus to that panel, not <body>", () => {
+  let show!: ReturnType<typeof useToast>["show"];
+  const Grab = () => { show = useToast().show; return null; };
+  render(<ToastProvider><Grab />
+    <Modal onClose={() => {}}><button>inside</button></Modal></ToastProvider>);
+  const dlg = screen.getByRole("dialog");
+  const ran = vi.fn();
+  act(() => { show("Moved", { action: { label: "Undo", onClick: ran } }); });
+  const undo = screen.getByRole("button", { name: "Undo" });
+  undo.focus();                                    // what a click does
+  expect(document.activeElement).toBe(undo);
+  fireEvent.click(undo);
+  expect(ran).toHaveBeenCalled();
+  expect(screen.queryByText("Moved")).toBeNull();  // toast gone ...
+  expect(document.activeElement).toBe(dlg);        // ... focus is not
+  // Dismiss (X) behaves the same.
+  act(() => { show("Again"); });
+  const x = screen.getByRole("button", { name: "Dismiss" });
+  x.focus();
+  fireEvent.click(x);
+  expect(document.activeElement).toBe(dlg);
+});
+
+test("Tab inside a dialog can reach a toast's Undo; the trap still wraps around it", () => {
+  let show!: ReturnType<typeof useToast>["show"];
+  const Grab = () => { show = useToast().show; return null; };
+  render(<ToastProvider><Grab />
+    <Modal onClose={() => {}}><button>first</button><button>last</button></Modal>
+  </ToastProvider>);
+  act(() => { show("Moved", { action: { label: "Undo", onClick: () => {} } }); });
+  const last = screen.getByText("last");
+  last.focus();
+  expect(fireEvent.keyDown(last, { key: "Tab" })).toBe(true);   // browser moves on to the toast
+  const undo = screen.getByRole("button", { name: "Undo" });
+  undo.focus();
+  const dismiss = screen.getByRole("button", { name: "Dismiss" });
+  dismiss.focus();
+  expect(fireEvent.keyDown(dismiss, { key: "Tab" })).toBe(false);  // end of the trap
+  expect(document.activeElement).toBe(screen.getByText("first"));
+  fireEvent.keyDown(screen.getByText("first"), { key: "Tab", shiftKey: true });
+  expect(document.activeElement).toBe(dismiss);                   // wraps backwards into the toasts
+});
+
+test("if the opener vanished while the dialog was open, focus falls back to its list", () => {
+  const Host = () => {
+    const [open, setOpen] = useState(false);
+    const [row, setRow] = useState(true);
+    return <div data-focus-return tabIndex={-1} data-testid="list">
+      {row && <button onClick={() => setOpen(true)}>row</button>}
+      {open && <Modal onClose={() => setOpen(false)}>
+        <button onClick={() => setRow(false)}>trash all</button></Modal>}
+    </div>;
+  };
+  render(<Host />);
+  const row = screen.getByText("row");
+  row.focus();
+  fireEvent.click(row);
+  fireEvent.click(screen.getByText("trash all"));     // the row unmounts
+  expect(screen.queryByText("row")).toBeNull();
+  fireEvent.keyDown(window, { key: "Escape" });
+  expect(screen.queryByRole("dialog")).toBeNull();
+  expect(document.activeElement).toBe(screen.getByTestId("list"));
 });

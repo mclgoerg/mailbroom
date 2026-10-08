@@ -1,9 +1,10 @@
-import { ArrowDown, ChevronRight } from "lucide-react";
-import { useEffect, useState, type MouseEvent } from "react";
+import { ArrowDown, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight,
+  MessagesSquare } from "lucide-react";
+import { useEffect, useRef, useState, type MouseEvent } from "react";
 import { fmtSize } from "../api";
-import type { Group } from "../types";
+import type { Group, Grouping } from "../types";
 import { t } from "../i18n";
-import { AiTag, Avatar, Button, Checkbox, EngagementMeter, PinBadge, RatingChips, ShortDate, Tag, Select } from "./ui";
+import { AiTag, Avatar, Button, Checkbox, EngagementMeter, PinBadge, RatingChips, ShortDate, Tag, Select, isModalOpen } from "./ui";
 
 export type SortKey = "count" | "size" | "label" | "last" | "unreadPct"
   | "engagement";
@@ -26,7 +27,35 @@ interface Props {
   sortDir: number;
   onSort: (k: SortKey) => void;
   groupLabel: string;
+  grouping?: Grouping;   // "thread" rows show a sender / neutral avatar
   resetSignal: string;   // page resets to 1 when this changes (mode/filter)
+}
+
+/** Thread / subject groups carry an English summary from the backend
+ *  ("2 mails, 1 sender" / "3 senders"); show it in the UI language. Sender
+ *  and domain groups carry an address, which passes through untouched. */
+const SUB_COUNTS = /^(?:(\d+) mails?, )?(\d+) senders?$/;
+export function localizedSub(sub: string): string {
+  const m = SUB_COUNTS.exec(sub);
+  if (!m) return sub;
+  const senders = t("n.senders", { n: Number(m[2]) });
+  return m[1] ? `${t("n.mails", { n: Number(m[1]) })}, ${senders}` : senders;
+}
+
+/** The row's avatar. A thread's label is its subject, and a subject's
+ *  first letter says nothing - so thread rows show their first sender, or a
+ *  neutral icon avatar when there is none. */
+function RowAvatar({ g, grouping }: { g: Group; grouping?: Grouping }) {
+  if (grouping !== "thread") {
+    return <Avatar name={g.label || g.key} size="md" />;
+  }
+  const first = g.samples[0];
+  return first ? <Avatar name={first} size="md" /> : (
+    <span aria-hidden className="inline-flex size-8 shrink-0 items-center
+      justify-center rounded-full bg-chip text-faint">
+      <MessagesSquare size={16} />
+    </span>
+  );
 }
 
 interface PageProps extends Props {
@@ -95,7 +124,7 @@ function UnsubBadge({ g, onAck }: { g: Group; onAck: (addr: string) => void }) {
    grouping mode (and with it the content) changes. */
 function DesktopTable({ slice, baseIdx, selected, focusedKey, onToggle,
   onToggleAll, onOpen, blockedKeys,
-  onAckUnsub, sortK, sortDir, onSort, groupLabel
+  onAckUnsub, sortK, sortDir, onSort, groupLabel, grouping
 }: PageProps) {
   // Sort indicator, inline after the label: the active column shows an
   // accent arrow that ROTATES between directions; inactive sortable columns
@@ -182,7 +211,7 @@ function DesktopTable({ slice, baseIdx, selected, focusedKey, onToggle,
                 onChange={() => onToggle(g.key)} />
             </td>
             <td className="py-2 pl-0 pr-2 align-top">
-              <Avatar name={g.label || g.key} size="md" />
+              <RowAvatar g={g} grouping={grouping} />
             </td>
             <td className="min-w-0 px-2 py-2">
               <button
@@ -192,7 +221,9 @@ function DesktopTable({ slice, baseIdx, selected, focusedKey, onToggle,
                 {g.label}
               </button>
               {g.sub && (
-                <div className="truncate type-meta text-muted">{g.sub}</div>
+                <div className="truncate type-meta text-muted">
+                  {localizedSub(g.sub)}
+                </div>
               )}
               <div className="truncate type-meta text-muted">
                 <ShortDate iso={g.first} /> → <ShortDate iso={g.last} /> ·{" "}
@@ -262,7 +293,7 @@ function DesktopTable({ slice, baseIdx, selected, focusedKey, onToggle,
 
 /* Mobile: a card list - no table semantics, no horizontal squeeze. */
 function MobileCards({ slice, baseIdx, selected, focusedKey, onToggle,
-  onOpen, blockedKeys, onAckUnsub
+  onOpen, blockedKeys, onAckUnsub, grouping
 }: PageProps) {
   return (
     <div>
@@ -276,16 +307,25 @@ function MobileCards({ slice, baseIdx, selected, focusedKey, onToggle,
             className="w-11 shrink-0 self-stretch coarse:min-h-0"
             aria-label={t("Select {label}", { label: g.label || g.key })}
             onChange={() => onToggle(g.key)} />
+          {/* Taps anywhere on the card open the detail; the title is the
+              real <button>, so keyboard and screen-reader users can too. */}
           <div className="flex min-w-0 flex-1 cursor-pointer items-center
             gap-3 py-2.5 pr-1" onClick={() => onOpen(g)}>
-            <Avatar name={g.label || g.key} size="md" />
+            <RowAvatar g={g} grouping={grouping} />
             <div className="min-w-0 flex-1">
-              <div className="truncate type-body-mobile">{g.label}</div>
+              <button type="button" data-no-open
+                className="block w-full cursor-pointer truncate text-left
+                  type-body-mobile"
+                onClick={(e) => { e.stopPropagation(); onOpen(g); }}>
+                {g.label}
+              </button>
               {g.sub && (
-                <div className="truncate type-meta text-muted">{g.sub}</div>
+                <div className="truncate type-meta text-muted">
+                  {localizedSub(g.sub)}
+                </div>
               )}
               <div className="truncate type-meta text-muted">
-                {g.count} {t("mails")} · <ShortDate iso={g.last} /> ·{" "}
+                {t("n.mails", { n: g.count })} · <ShortDate iso={g.last} /> ·{" "}
                 {fmtSize(g.size)} · {unreadPct(g)}% {t("unread")}
               </div>
               <div className="mt-1 flex flex-wrap items-center gap-1">
@@ -329,6 +369,38 @@ function MobileCards({ slice, baseIdx, selected, focusedKey, onToggle,
 export function GroupTable(props: Props) {
   const { groups, focusedKey, resetSignal } = props;
   const [page, setPage] = useState(0);
+  // Focus that sat on a row which then vanished (Trash all removes it) would
+  // drop to <body>: remember whether focus was last inside the list and, when
+  // the rows change under it, park focus on the list itself.
+  const root = useRef<HTMLDivElement>(null);
+  const focusInside = useRef(false);
+  const focusIdx = useRef(-1);     // absolute index of the row focus was in
+  useEffect(() => {
+    const onIn = (e: FocusEvent) => {
+      const el = e.target as HTMLElement;
+      focusInside.current = !!root.current?.contains(el);
+      const row = focusInside.current ? el.closest("[data-gidx]") : null;
+      if (row) focusIdx.current = Number(row.getAttribute("data-gidx"));
+    };
+    document.addEventListener("focusin", onIn);
+    return () => document.removeEventListener("focusin", onIn);
+  }, []);
+  useEffect(() => {
+    const a = document.activeElement;
+    if (!focusInside.current || (a && a !== document.body) || isModalOpen())
+      return;
+    // The row that took the removed row's place (the previous one if it was
+    // the last); the list itself if there is no visible row to land on.
+    const want = Math.min(focusIdx.current, groups.length - 1);
+    const rows = want < 0 ? [] : [...root.current!.querySelectorAll(
+      `[data-gidx="${want}"]`)] as HTMLElement[];
+    // (the table and card twins: only one is laid out; jsdom has no layout)
+    const laidOut = document.documentElement.getClientRects().length > 0;
+    const row = laidOut ? rows.find((r) => r.getClientRects().length > 0)
+      : rows[0];
+    (row?.querySelector<HTMLElement>("button") ?? root.current)
+      ?.focus({ preventScroll: true });
+  }, [groups]);
   const [perPage, setPerPage] = useState(() =>
     Number(localStorage.getItem("pmc_page_size")) || 50);
 
@@ -351,7 +423,9 @@ export function GroupTable(props: Props) {
   const slice = groups.slice(baseIdx, baseIdx + perPage);
 
   return (
-    <>
+    // Focus falls back here when a dialog's opener row is gone (Modal).
+    <div ref={root} data-focus-return tabIndex={-1}
+      className="outline-none">
       <div className="hidden md:block">
         <DesktopTable {...props} slice={slice} baseIdx={baseIdx} />
       </div>
@@ -362,16 +436,28 @@ export function GroupTable(props: Props) {
         <div className="flex flex-wrap items-center justify-center gap-2
           py-3 type-meta text-muted">
           <Button variant="secondary" size="sm"
-              disabled={page === 0} onClick={() => setPage(0)}>«</Button>
+              aria-label={t("page.first")} title={t("page.first")}
+              disabled={page === 0} onClick={() => setPage(0)}>
+            <ChevronsLeft size={16} />
+          </Button>
           <Button variant="secondary" size="sm"
-              disabled={page === 0} onClick={() => setPage(page - 1)}>‹</Button>
+              aria-label={t("page.prev")} title={t("page.prev")}
+              disabled={page === 0} onClick={() => setPage(page - 1)}>
+            <ChevronLeft size={16} />
+          </Button>
           <span className="tabular-nums">
             {t("page.of", { p: page + 1, n: maxPage + 1 })}
           </span>
           <Button variant="secondary" size="sm"
-              disabled={page >= maxPage} onClick={() => setPage(page + 1)}>›</Button>
+              aria-label={t("page.next")} title={t("page.next")}
+              disabled={page >= maxPage} onClick={() => setPage(page + 1)}>
+            <ChevronRight size={16} />
+          </Button>
           <Button variant="secondary" size="sm"
-              disabled={page >= maxPage} onClick={() => setPage(maxPage)}>»</Button>
+              aria-label={t("page.last")} title={t("page.last")}
+              disabled={page >= maxPage} onClick={() => setPage(maxPage)}>
+            <ChevronsRight size={16} />
+          </Button>
           <Select
             value={perPage}
             onChange={(e) => {
@@ -387,6 +473,6 @@ export function GroupTable(props: Props) {
           </Select>
         </div>
       )}
-    </>
+    </div>
   );
 }

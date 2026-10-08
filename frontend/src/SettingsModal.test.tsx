@@ -226,6 +226,21 @@ test("tabs switch the visible section", () => {
   expect(screen.queryByText("Backup & restore")).toBeNull();
 });
 
+test("the active tab controls one labelled tabpanel", () => {
+  renderWithDialogs();
+  for (const name of ["Mail account", "General", "AI"]) {
+    const tab = screen.getByRole("tab", { name });
+    fireEvent.click(tab);
+    const panel = screen.getByRole("tabpanel");
+    expect(tab.getAttribute("aria-controls")).toBe(panel.id);
+    expect(panel.getAttribute("aria-labelledby")).toBe(tab.id);
+    expect(screen.getByRole("tabpanel", { name })).toBe(panel);
+    // Only the selected tab points at the panel.
+    expect(screen.getAllByRole("tab").filter((x) =>
+      x.getAttribute("aria-controls") === panel.id)).toEqual([tab]);
+  }
+});
+
 test("Cancel closes without saving; Save saves and stays open", () => {
   saveCalls.length = 0;
   const onClose = vi.fn();

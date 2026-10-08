@@ -66,19 +66,82 @@ export function AiTag({ ai }: { ai: GroupAi }) {
   );
 }
 
-/** Compact per-mail rating summary for a group: 🟢n 🟡n 🔴n. */
+/** Open/close state of a small popover under a trigger: closes on an outside
+ *  press or Esc, and flips to right-aligned when it would run off the right
+ *  edge of the screen. Attach `ref` to the wrapper, `pop` to the popover. */
+function usePopover() {
+  const [open, setOpen] = useState(false);
+  const [alignRight, setAlignRight] = useState(false);
+  const ref = useRef<HTMLSpanElement>(null);
+  const pop = useRef<HTMLDivElement>(null);
+  // Opens left-aligned under the trigger; flips if that runs off the screen.
+  useLayoutEffect(() => {
+    if (!open) { setAlignRight(false); return; }
+    const r = pop.current?.getBoundingClientRect();
+    if (r && r.width > 0 && r.right > window.innerWidth - 8) {
+      setAlignRight(true);
+    }
+  }, [open]);
+  useEffect(() => {
+    if (!open) return;
+    const onDoc = (e: Event) => {
+      if (!ref.current?.contains(e.target as Node)) setOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setOpen(false);
+    };
+    document.addEventListener("pointerdown", onDoc);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("pointerdown", onDoc);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
+  return { open, setOpen, alignRight, ref, pop };
+}
+
+const POPOVER = `absolute top-full z-(--z-dropdown) mt-1 w-max
+  max-w-[min(18rem,calc(100vw-1rem))] rounded-card border border-line
+  bg-panel p-3 text-left type-meta shadow-popover`;
+
+/** Compact per-mail rating summary for a group: 🟢n 🟡n 🔴n. A button: tap
+ *  (or click) opens a popover spelling out what the counts are - touch
+ *  screens have no hover, and the bare emoji don't say what they count. */
 export function RatingChips({ ratings }: {
   ratings: { delete_safe: number; review: number; keep: number };
 }) {
-  const parts: [string, number][] = [
-    ["🟢", ratings.delete_safe], ["🟡", ratings.review], ["🔴", ratings.keep]];
+  const { open, setOpen, alignRight, ref, pop } = usePopover();
+  const parts: [string, number, string][] = [
+    ["🟢", ratings.delete_safe, "v.delete_safe"],
+    ["🟡", ratings.review, "v.review"], ["🔴", ratings.keep, "v.keep"]];
+  const shown = parts.filter(([, n]) => n > 0);
+  const tip = t("ratings.aria", { parts: shown.map(([, n, k]) =>
+    `${n} ${t(k)}`).join(", ") });
   return (
-    <span className="inline-flex gap-1 whitespace-nowrap align-middle
-      type-caption text-muted"
-      title={t("ratings.title")}>
-      {parts.filter(([, n]) => n > 0).map(([icon, n]) => (
-        <span key={icon}>{icon}{n}</span>
-      ))}
+    <span ref={ref} className="relative inline-block align-middle">
+      <button type="button" title={tip} aria-label={tip} aria-expanded={open}
+        // Rows are tap targets themselves (open the detail view) - this one
+        // only explains the counts.
+        onClick={(e) => { e.stopPropagation(); setOpen(!open); }}
+        className="inline-flex min-h-6 cursor-pointer gap-1 rounded px-0.5
+          whitespace-nowrap type-caption text-muted hover:bg-chip">
+        {shown.map(([icon, n]) => <span key={icon}>{icon}{n}</span>)}
+      </button>
+      {open && (
+        <div ref={pop} role="dialog" aria-label={t("ratings.popover_title")}
+          onClick={(e) => e.stopPropagation()}
+          className={`${POPOVER} ${alignRight ? "right-0" : "left-0"}`}>
+          <div className="font-semibold text-body">
+            {t("ratings.popover_title")}
+          </div>
+          <ul className="mt-1 space-y-0.5 text-muted">
+            {shown.map(([icon, n, k]) => (
+              <li key={icon}>{icon} {n} {t(k)}</li>
+            ))}
+          </ul>
+          <div className="mt-1 text-muted">{t("ratings.popover_hint")}</div>
+        </div>
+      )}
     </span>
   );
 }
@@ -145,10 +208,7 @@ export function EngagementMeter({ g }: {
   g: { engagement: number; count: number; unread: number; replied: boolean;
        bulk: boolean; last: string };
 }) {
-  const [open, setOpen] = useState(false);
-  const [alignRight, setAlignRight] = useState(false);
-  const ref = useRef<HTMLSpanElement>(null);
-  const pop = useRef<HTMLDivElement>(null);
+  const { open, setOpen, alignRight, ref, pop } = usePopover();
   const tier = engagementTier(g.engagement);
   const lit = { low: 1, medium: 2, high: 3 }[tier];
   const readPct = g.count ? Math.round(100 * (1 - g.unread / g.count)) : 0;
@@ -161,30 +221,6 @@ export function EngagementMeter({ g }: {
   const tierName = t(`eng.${tier}`);
   const tip = t("eng.tip", { score: g.engagement, tier: tierName,
     parts: parts.join(", ") });
-  // Opens left-aligned under the meter; flips if that runs off the right
-  // edge of the screen.
-  useLayoutEffect(() => {
-    if (!open) { setAlignRight(false); return; }
-    const r = pop.current?.getBoundingClientRect();
-    if (r && r.width > 0 && r.right > window.innerWidth - 8) {
-      setAlignRight(true);
-    }
-  }, [open]);
-  useEffect(() => {
-    if (!open) return;
-    const onDoc = (e: Event) => {
-      if (!ref.current?.contains(e.target as Node)) setOpen(false);
-    };
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setOpen(false);
-    };
-    document.addEventListener("pointerdown", onDoc);
-    document.addEventListener("keydown", onKey);
-    return () => {
-      document.removeEventListener("pointerdown", onDoc);
-      document.removeEventListener("keydown", onKey);
-    };
-  }, [open]);
   return (
     <span ref={ref} className="relative inline-block">
       <button type="button" title={tip} aria-label={tip} aria-expanded={open}
@@ -202,10 +238,7 @@ export function EngagementMeter({ g }: {
       </button>
       {open && (
         <div ref={pop} role="dialog" onClick={(e) => e.stopPropagation()}
-          className={`absolute top-full z-(--z-dropdown) mt-1 w-max
-            max-w-[min(18rem,calc(100vw-1rem))] rounded-card border
-            border-line bg-panel p-3 text-left type-meta
-            shadow-popover ${alignRight ? "right-0" : "left-0"}`}>
+          className={`${POPOVER} ${alignRight ? "right-0" : "left-0"}`}>
           <div className="font-semibold text-body">
             {t("eng.popover_title", { score: g.engagement, tier: tierName })}
           </div>
@@ -241,7 +274,7 @@ export function Spinner({ size = "sm", className = "" }: {
     lg: "size-9 [--pmc-thickness:3px]",
   }[size];
   return (
-    <span aria-label="loading" role="status"
+    <span aria-label={t("loading…")} role="status"
       className={`pmc-spinner inline-block align-middle text-accent
         ${s} ${className}`} />
   );
@@ -551,7 +584,7 @@ export function MenuItem({ children, onClick, disabled, active, sub,
           <span className="block truncate type-meta text-muted">{sub}</span>
         )}
       </span>
-      {active && <span className="text-accent">✓</span>}
+      {active && <Check size={16} aria-hidden className="text-accent" />}
     </button>
   );
 }
@@ -638,6 +671,27 @@ const openModals: symbol[] = [];
  *  keyboard shortcuts must stay quiet then. */
 export const isModalOpen = (): boolean => openModals.length > 0;
 
+const FOCUSABLE = 'a[href], button, input:not([type="hidden"]), select, '
+  + 'textarea, [tabindex]';
+
+/** Tab stops inside `root`, in DOM order. CSS-hidden elements (display:none
+ *  parents, `hidden md:block` twins) are skipped wherever the browser lays
+ *  out; jsdom has no layout, so there the check is off. */
+const tabStops = (root: HTMLElement): HTMLElement[] => {
+  const layout = document.documentElement.getClientRects().length > 0;
+  return [...root.querySelectorAll<HTMLElement>(FOCUSABLE)].filter((el) =>
+    el.tabIndex >= 0 && !(el as HTMLButtonElement).disabled
+    && !el.closest("[hidden]")
+    && (!layout || el.getClientRects().length > 0));
+};
+
+/** Where Tab may go inside a dialog: its own controls, then the toast stack
+ *  (toasts never take focus on their own, but Undo must stay reachable). */
+const trapStops = (dialog: HTMLElement): HTMLElement[] => {
+  const toasts = document.querySelector<HTMLElement>(".pmc-toasts");
+  return [...tabStops(dialog), ...(toasts ? tabStops(toasts) : [])];
+};
+
 const MODAL_WIDTH = { sm: "sm:max-w-md", md: "sm:max-w-2xl",
   lg: "sm:max-w-3xl" };   // 448 / 672 / 768 px
 
@@ -652,6 +706,11 @@ export function Modal({ children, onClose, full = false, size, label,
 }) {
   const sz = size ?? (full ? "lg" : "md");
   const id = useRef(Symbol("modal")).current;
+  const dialog = useRef<HTMLDivElement>(null);
+  // Whatever had focus when the modal opened (read during the first render,
+  // before an autoFocus child can take it): focus returns there on close.
+  const opener = useRef<Element | null | undefined>(undefined);
+  if (opener.current === undefined) opener.current = document.activeElement;
   // The listener calls the latest onClose; the effect itself depends on
   // [id] only, so a parent re-render (inline onClose) never re-registers
   // the modal and reshuffles the stack.
@@ -664,8 +723,19 @@ export function Modal({ children, onClose, full = false, size, label,
     const onKey = (e: KeyboardEvent) => {
       // Only the topmost modal reacts, so Esc on a confirm that sits over
       // a panel closes the confirm and leaves the panel open.
-      if (e.key === "Escape" && openModals[openModals.length - 1] === id) {
-        closeRef.current();
+      if (openModals[openModals.length - 1] !== id) return;
+      if (e.key === "Escape") closeRef.current();
+      // Focus trap: Tab wraps inside the dialog and never reaches the page
+      // behind it.
+      if (e.key === "Tab" && dialog.current) {
+        const stops = trapStops(dialog.current);
+        const at = stops.indexOf(document.activeElement as HTMLElement);
+        const edge = e.shiftKey ? at <= 0 : at === stops.length - 1;
+        if (!stops.length || at < 0 || edge) {
+          e.preventDefault();
+          (stops.length ? stops[e.shiftKey ? stops.length - 1 : 0]
+            : dialog.current).focus();
+        }
       }
     };
     window.addEventListener("keydown", onKey);
@@ -674,24 +744,55 @@ export function Modal({ children, onClose, full = false, size, label,
       openModals.splice(openModals.indexOf(id), 1);
     };
   }, [id]);
+  useEffect(() => {
+    const d = dialog.current;
+    // Children that asked for focus (autoFocus, ConfirmDialog) already have
+    // it; otherwise start on the dialog itself so Tab goes to its first
+    // control and a screen reader announces the dialog.
+    if (d && !d.contains(document.activeElement)) d.focus();
+    const back = opener.current as HTMLElement | null;
+    // The opener can be gone by close time (Trash all unmounts its row):
+    // fall back to the list it sat in, so focus never drops to <body>.
+    const home = back?.closest<HTMLElement>("[data-focus-return]") ?? null;
+    return () => {
+      const to = back?.isConnected ? back
+        : home?.isConnected ? home
+        : document.querySelector<HTMLElement>("[data-focus-return]");
+      to?.focus?.();
+    };
+  }, []);
   const shape = sz === "sm"
     ? `max-h-[88dvh] rounded-t-dialog border-t max-sm:pb-[env(safe-area-inset-bottom)]
        sm:rounded-dialog`
     : full
       ? "h-dvh sm:h-[88vh]"
-      : "h-dvh overflow-y-auto sm:h-auto sm:max-h-[88vh]";
+      : "h-dvh sm:h-auto sm:max-h-[88vh]";
+  // Content-sized modals scroll in an inner box, so on a phone the safe-area
+  // padding of the dialog stays put (a scrolling dialog would carry it away).
+  // iPhone (viewport-fit=cover): full-screen modals keep their header below
+  // the status bar.
+  const scrolls = sz !== "sm" && !full;
+  // Full panels place their own footers above the home indicator.
+  const inset = sz === "sm" ? "" : " max-sm:pt-[env(safe-area-inset-top)]"
+    + (scrolls ? " max-sm:pb-[env(safe-area-inset-bottom)]" : "");
   return (
     <div
       className={`fixed inset-0 z-(--z-modal) flex justify-center bg-overlay
         p-0 sm:p-6 ${sz === "sm" ? "items-end sm:items-center"
           : "items-center"}`}
       onClick={(e) => e.target === e.currentTarget && onClose()}>
-      <div role="dialog" aria-modal="true" aria-label={label}
+      <div ref={dialog} tabIndex={-1} role="dialog" aria-modal="true"
+        aria-label={label}
         aria-labelledby={labelledBy} aria-describedby={describedBy}
         data-size={sz}
-        className={`flex w-full flex-col overflow-hidden border-line bg-panel
-        sm:rounded-dialog sm:border ${MODAL_WIDTH[sz]} ${shape}`}>
-        {children}
+        className={`flex w-full flex-col overflow-hidden border-line bg-panel outline-none
+        sm:rounded-dialog sm:border ${MODAL_WIDTH[sz]} ${shape}${inset}`}>
+        {/* Always rendered (`contents` when not scrolling): `full` can flip
+            while open, and a changing tree would remount the content. */}
+        <div className={scrolls ? `flex min-h-0 flex-1 flex-col
+          overflow-y-auto sm:flex-initial` : "contents"}>
+          {children}
+        </div>
       </div>
     </div>
   );
@@ -778,13 +879,17 @@ export function ChipSegment({ on = false, children, className = "", ...rest }:
  *  the solid accent that belongs to the one primary Button. `fill` makes
  *  the row full-width, segments sized to their content (`flex-auto`). */
 export function Segmented<T extends string>({ value, onChange, options,
-  label, fill = false, className = "" }: {
+  label, fill = false, className = "", idPrefix }: {
   value: T | null;
   onChange: (v: T) => void;
   options: { value: T; label: ReactNode }[];
   label: string;
   fill?: boolean;
   className?: string;
+  /** Wires the tabs to a panel: tab ids `${idPrefix}-tab-${value}`, and the
+   *  selected one gets `aria-controls="${idPrefix}-panel"` (render the panel
+   *  with `tabPanelProps(idPrefix, value)`). */
+  idPrefix?: string;
 }) {
   // Roving tabindex: Tab enters on the selected segment, Left/Right/Home/End
   // move FOCUS only; Enter/Space (a native click) activates. Selection must
@@ -809,6 +914,8 @@ export function Segmented<T extends string>({ value, onChange, options,
         const on = o.value === value;
         return (
           <button key={o.value} type="button" role="tab" aria-selected={on}
+            id={idPrefix && `${idPrefix}-tab-${o.value}`}
+            aria-controls={idPrefix && on ? `${idPrefix}-panel` : undefined}
             tabIndex={o.value === tabStop ? 0 : -1}
             onClick={() => onChange(o.value)}
             className={`min-h-9 coarse:min-h-10 min-w-0 whitespace-nowrap
@@ -824,6 +931,12 @@ export function Segmented<T extends string>({ value, onChange, options,
     </div>
   );
 }
+
+/** Props for the one panel a `Segmented idPrefix={…}` controls. */
+export const tabPanelProps = (idPrefix: string, value: string) => ({
+  role: "tabpanel" as const, id: `${idPrefix}-panel`,
+  "aria-labelledby": `${idPrefix}-tab-${value}`,
+});
 
 /** Live `matchMedia` flag (false where matchMedia doesn't exist, e.g.
  *  jsdom: components then render their wide layout). */
@@ -902,7 +1015,16 @@ function ToastView({ toast, dismiss }: {
 }) {
   const { variant = "info", action, duration, id } = toast;
   const ms = duration ?? (variant === "error" ? 0 : TOAST_MS);
-  const onDismiss = () => dismiss(id);
+  const box = useRef<HTMLDivElement>(null);
+  // The toast is about to unmount: if the user had focused one of its
+  // buttons, hand focus to the open dialog instead of dropping it on <body>.
+  const handBack = () => {
+    if (!box.current?.contains(document.activeElement)) return;
+    const dlgs = document.querySelectorAll<HTMLElement>(
+      '[role="dialog"][aria-modal="true"]');
+    dlgs[dlgs.length - 1]?.focus();
+  };
+  const onDismiss = () => { handBack(); dismiss(id); };
   useEffect(() => {
     if (ms <= 0) return;
     const timer = setTimeout(() => dismiss(id), ms);
@@ -910,7 +1032,7 @@ function ToastView({ toast, dismiss }: {
   }, [ms, id, dismiss]);
   const Icon = TOAST_ICON[variant];
   return (
-    <div data-variant={variant}
+    <div ref={box} data-variant={variant}
       role={variant === "error" ? "alert" : undefined}
       className={`pointer-events-auto flex
       w-full max-w-120 items-center gap-2 rounded-card border py-1.5 pl-3
@@ -1047,11 +1169,15 @@ export type PromptOptions = {
 
 /** Confirm/submit is ignored this long after a dialog opens. On a phone the
  *  sheet's confirm button lands under the trigger, so the second tap of a
- *  double-tap would otherwise confirm a destructive action unseen. */
+ *  double-tap would otherwise confirm a destructive action unseen. Keyboard
+ *  activations (a click with `detail === 0`: Enter / Space) are exempt -
+ *  nobody double-taps with a keyboard, and typing a name then Enter must
+ *  not be swallowed. */
 export const DIALOG_ARM_MS = 500;
 const useArmed = () => {
   const openedAt = useRef(Date.now());
-  return () => Date.now() - openedAt.current >= DIALOG_ARM_MS;
+  return (viaKeyboard = false) =>
+    viaKeyboard || Date.now() - openedAt.current >= DIALOG_ARM_MS;
 };
 
 /** Confirm sheet. Danger dialogs focus Cancel, the safe choice. */
@@ -1090,7 +1216,7 @@ export function ConfirmDialog({ title, body, bullets, confirmLabel,
         <Button ref={safe} variant="secondary"
           onClick={() => onResult(false)}>{cancelLabel ?? t("Cancel")}</Button>
         <Button ref={ok} variant={tone === "danger" ? "danger" : "primary"}
-          onClick={() => { if (armed()) onResult(true); }}>
+          onClick={(e) => { if (armed(e.detail === 0)) onResult(true); }}>
           {confirmLabel}
         </Button>
       </div>
@@ -1109,6 +1235,9 @@ export function PromptDialog({ title, label, initial = "", confirmLabel,
   const [touched, setTouched] = useState(false);
   const input = useRef<HTMLInputElement>(null);
   const armed = useArmed();
+  // How the submit was triggered: Enter in the field makes the browser click
+  // the submit button with `detail === 0`; a tap/click has `detail >= 1`.
+  const viaKeyboard = useRef(true);
   const titleId = useId();
   useEffect(() => { input.current?.focus(); input.current?.select(); }, []);
   const error = validate?.(value) ?? null;
@@ -1116,7 +1245,9 @@ export function PromptDialog({ title, label, initial = "", confirmLabel,
     <Modal size="sm" labelledBy={titleId} onClose={() => onResult(null)}>
       <form className="flex min-h-0 flex-1 flex-col" onSubmit={(e) => {
         e.preventDefault();
-        if (!armed()) return;
+        const kb = viaKeyboard.current;
+        viaKeyboard.current = true;
+        if (!armed(kb)) return;
         if (error) setTouched(true); else onResult(value);
       }}>
         <div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-4 sm:p-5">
@@ -1134,7 +1265,10 @@ export function PromptDialog({ title, label, initial = "", confirmLabel,
           sm:px-5">
           <Button type="button" variant="secondary"
             onClick={() => onResult(null)}>{t("Cancel")}</Button>
-          <Button type="submit">{confirmLabel ?? t("OK")}</Button>
+          <Button type="submit"
+            onClick={(e) => { viaKeyboard.current = e.detail === 0; }}>
+            {confirmLabel ?? t("OK")}
+          </Button>
         </div>
       </form>
     </Modal>

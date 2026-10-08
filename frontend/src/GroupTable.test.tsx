@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { cleanup, fireEvent, render } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { GroupTable } from "./components/GroupTable";
+import { GroupTable, localizedSub } from "./components/GroupTable";
 import { setLang } from "./i18n";
 import type { Group } from "./types";
 
@@ -55,15 +55,15 @@ describe("GroupTable pagination", () => {
   });
 
   it("navigates with next / last / first", () => {
-    const { container, getByText } = renderTable();
-    fireEvent.click(getByText("›"));
+    const { container, getByText, getByRole } = renderTable();
+    fireEvent.click(getByRole("button", { name: "Next page" }));
     getByText("Page 2 / 3");
     expect(container.querySelector("tbody tr")!.textContent)
       .toContain("Sender 50");
-    fireEvent.click(getByText("»"));
+    fireEvent.click(getByRole("button", { name: "Last page" }));
     getByText("Page 3 / 3");
     expect(rows(container)).toBe(20);
-    fireEvent.click(getByText("«"));
+    fireEvent.click(getByRole("button", { name: "First page" }));
     getByText("Page 1 / 3");
   });
 
@@ -158,7 +158,7 @@ describe("pinned badge", () => {
   it("shows the pinned-mail count on the row (desktop + mobile)", () => {
     const { getAllByTitle } = renderTable({
       groups: [{ ...mk(4), pinned: 3 }] });
-    const badges = getAllByTitle("3 mail(s) protected from bulk actions");
+    const badges = getAllByTitle("3 mails protected from bulk actions");
     expect(badges.length).toBe(2);
     expect(badges[0].textContent).toContain("3");
   });
@@ -391,5 +391,112 @@ describe("GroupTable rows and header", () => {
     expect(onOpen).toHaveBeenCalledTimes(2);
     fireEvent.click(row.querySelector("button[aria-label='View details']")!);
     expect(onOpen).toHaveBeenCalledTimes(3);
+  });
+});
+
+describe("GroupTable avatars and phone cards", () => {
+  beforeEach(() => setLang("en"));
+  afterEach(cleanup);
+
+  const avatars = (c: HTMLElement) =>
+    [...c.querySelectorAll("tbody tr td:nth-child(2) > *")];
+
+  it("thread rows use the first sender's avatar, never the subject letter", () => {
+    const g = { ...mk(0), label: "Re: Quarterly plan", samples: ["news@x.example"] };
+    const { container } = renderTable({ groups: [g], grouping: "thread" });
+    expect(avatars(container)[0].textContent).toBe("n");
+    const letters = [...container.querySelectorAll("span.rounded-full")]
+      .map((a) => a.textContent);
+    expect(letters).toEqual(["n", "n"]);                // table + card, no "R"
+  });
+
+  it("a thread without a known sender gets a neutral icon avatar", () => {
+    const g = { ...mk(0), label: "Quarterly plan", samples: [] };
+    const { container } = renderTable({ groups: [g], grouping: "thread" });
+    const av = avatars(container)[0];
+    expect(av.textContent).toBe("");                    // no letter at all
+    expect(av.querySelector("svg")).toBeTruthy();
+    expect(av.className).toContain("bg-chip");
+  });
+
+  it("other groupings keep the letter avatar", () => {
+    const { container } = renderTable({ groups: [mk(0)], grouping: "sender" });
+    expect(avatars(container)[0].textContent).toBe("S");
+  });
+
+  it("a phone card's title is a real button that opens the detail once", () => {
+    const onOpen = vi.fn();
+    const { container } = renderTable({ groups: [mk(0)], onOpen });
+    const card = container.querySelector(".md\\:hidden")!;
+    const title = card.querySelector("button[data-no-open]") as HTMLElement;
+    expect(title.textContent).toBe("Sender 0");
+    fireEvent.click(title);
+    expect(onOpen).toHaveBeenCalledTimes(1);            // not twice (bubbling)
+    fireEvent.click(card.querySelector(".cursor-pointer.gap-3")!);
+    expect(onOpen).toHaveBeenCalledTimes(2);            // the card body still works
+  });
+});
+
+
+describe("localizedSub", () => {
+  afterEach(() => setLang("en"));
+  it("translates the backend's thread / subject summaries, leaves addresses alone", () => {
+    setLang("de");
+    expect(localizedSub("2 mails, 1 sender")).toBe("2 Mails, 1 Absender");
+    expect(localizedSub("1 mail, 3 senders")).toBe("1 Mail, 3 Absender");
+    expect(localizedSub("4 senders")).toBe("4 Absender");
+    expect(localizedSub("news@shop.example")).toBe("news@shop.example");
+    setLang("en");
+    expect(localizedSub("1 mail, 3 senders")).toBe("1 mail, 3 senders");
+  });
+});
+
+describe("GroupTable focus", () => {
+  afterEach(cleanup);
+  it("moves focus to the replacement row, or the list when none is left", () => {
+    const { container, rerender } = renderTable({ groups: [mk(0), mk(1)] });
+    const row = container.querySelector("tbody tr button") as HTMLElement;
+    row.focus();
+    expect(document.activeElement).toBe(row);
+    rerender(<GroupTable groups={[mk(1)]} selected={new Set()} focusedKey={null}
+      onToggle={noop} onToggleAll={noop} onOpen={noop} onAckUnsub={noop}
+      sortK="count" sortDir={-1} onSort={noop} groupLabel="Sender" resetSignal="a" />);
+    expect(row.isConnected).toBe(false);
+    expect(document.activeElement!.textContent).toBe("Sender 1");  // took its place
+    document.querySelector<HTMLElement>("tbody tr button")!.focus();
+    rerender(<GroupTable groups={[]} selected={new Set()} focusedKey={null}
+      onToggle={noop} onToggleAll={noop} onOpen={noop} onAckUnsub={noop}
+      sortK="count" sortDir={-1} onSort={noop} groupLabel="Sender" resetSignal="a" />);
+    expect(document.activeElement)                    // no rows left: the list
+      .toBe(container.querySelector("[data-focus-return]"));
+  });
+
+  it("does not steal focus when it was never in the list", () => {
+    const { rerender } = renderTable({ groups: [mk(0)] });
+    rerender(<GroupTable groups={[mk(1)]} selected={new Set()} focusedKey={null}
+      onToggle={noop} onToggleAll={noop} onOpen={noop} onAckUnsub={noop}
+      sortK="count" sortDir={-1} onSort={noop} groupLabel="Sender" resetSignal="a" />);
+    expect(document.activeElement).toBe(document.body);
+  });
+});
+
+describe("GroupTable focus lands on the row that took the place", () => {
+  afterEach(cleanup);
+  const re = (groups: Group[]) => (<GroupTable groups={groups} selected={new Set()}
+    focusedKey={null} onToggle={noop} onToggleAll={noop} onOpen={noop}
+    onAckUnsub={noop} sortK="count" sortDir={-1} onSort={noop}
+    groupLabel="Sender" resetSignal="a" />);
+  it("focuses the next row, or the previous when the last one was removed", () => {
+    const { container, rerender } = render(re([mk(0), mk(1), mk(2)]));
+    const title = (i: number) => container.querySelectorAll("tbody tr")[i]
+      .querySelector("button") as HTMLElement;
+    title(1).focus();
+    rerender(re([mk(0), mk(2)]));                    // row 1 trashed
+    expect(document.activeElement).toBe(title(1));   // now Sender 2's button
+    expect(document.activeElement!.textContent).toBe("Sender 2");
+    rerender(re([mk(0), mk(2)].slice(0, 2)));
+    title(1).focus();
+    rerender(re([mk(0)]));                           // the last one trashed
+    expect(document.activeElement!.textContent).toBe("Sender 0");
   });
 });
