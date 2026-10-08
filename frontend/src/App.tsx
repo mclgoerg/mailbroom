@@ -22,9 +22,9 @@ import { StatsPanel } from "./components/StatsPanel";
 import { QueryBuilder } from "./components/QueryBuilder";
 import { TrashPanel } from "./components/TrashPanel";
 import { AccountAvatar, applyTheme, BAR_ICON_BTN, BulkBar, Button, Chip, ChipGroup, ChipSegment,
-  currentTheme, EmptyState, ensureAiAck, FILTER_ROW, Input, isModalOpen, LINK,
+  confirmDialog, currentTheme, EmptyState, ensureAiAck, FILTER_ROW, Input, isModalOpen, LINK,
   LINK_ACCENT, Menu, MenuDivider, MenuHeading, MenuItem, Notice, ProgressBar,
-  Segmented, Select, Spinner, useToast,
+  promptDialog, Segmented, Select, Spinner, useToast,
   type ToastVariant } from "./components/ui";
 import { t } from "./i18n";
 import { applyStatus, fmtAgo, fmtSize, fmtUsd, matchGroup, parseFilter,
@@ -516,7 +516,7 @@ export default function App() {
   // the run to just those groups (the contextual bar's selection-aware
   // entry).
   const startAi = async (keys?: string[]) => {
-    if (!ensureAiAck()) return;
+    if (!await ensureAiAck()) return;
     setPending(t("Starting…"));
     try {
       await api.aiReview(mode, keys);
@@ -535,21 +535,39 @@ export default function App() {
     const entry = stateRef.current?.undo[index];
     if (!entry) return;
     setUndoOpen(false);
-    if (!confirm(t("confirm.restore",
-      { count: entry.count, label: entry.label }))) return;
+    if (!await confirmDialog({
+      title: t("confirm.restore",
+        { count: entry.count, label: entry.label }),
+      confirmLabel: t("confirm.restore_btn") })) return;
     setPending(t("Restoring…"));
     try { await api.undo(index); refresh(); }
     catch (e: any) { fail(e, "err.undo"); }
     setPending("");
   };
 
-  const emptyTrash = async () => {
-    const n = state?.trash_count ?? 0;
-    if (!confirm(t("confirm.empty_trash", { n }))) return;
+  // Shared by the profile menu and the Trash panel; resolves whether the
+  // Trash was actually emptied (false = declined or failed). The count on
+  // the irreversible button must be live: state.trash_count is only
+  // refreshed by scans/listings, so it can lag behind mails trashed since.
+  // `known` = a total the caller just read (the Trash panel's own list).
+  const emptyTrash = async (known?: number): Promise<boolean> => {
+    let n: number | null = known ?? null;
+    if (n === null) {
+      try { n = (await api.trash()).total; } catch { n = null; }
+    }
+    if (!await confirmDialog({ title: t("confirm.empty_trash_title"),
+      body: n === null ? t("confirm.empty_trash_body_nocount")
+        : t(n === 1 ? "confirm.empty_trash_body_1"
+          : "confirm.empty_trash_body", { n }),
+      tone: "danger",
+      confirmLabel: n === null ? t("confirm.empty_trash_btn_nocount")
+        : t("confirm.empty_trash_btn", { n }) })) return false;
     setPending(t("Emptying Trash…"));
+    let ok = true;
     try { await api.emptyTrash(); refresh(); }
-    catch (e: any) { fail(e); }
+    catch (e: any) { fail(e); ok = false; }
     setPending("");
+    return ok;
   };
 
   // The filter-box DSL equivalent of each quick-select preset - the
@@ -615,7 +633,11 @@ export default function App() {
   // selection), tapping one REPLACES the filter query - they are one-tap
   // recall for a named search, not a selection shortcut.
   const saveFilterPreset = async () => {
-    const name = prompt(t("saved_filter.name_prompt"))?.trim();
+    const name = (await promptDialog({
+      title: t("saved_filter.name_prompt"), label: t("saved_filter.name_label"),
+      confirmLabel: t("Save"),
+      validate: (v) => v.trim() ? null : t("saved_filter.name_required"),
+    }))?.trim();
     if (!name) return;
     try {
       await api.createPreset(name, filter);
@@ -626,7 +648,9 @@ export default function App() {
   };
 
   const deleteFilterPreset = async (id: string, name: string) => {
-    if (!confirm(t("saved_filter.confirm_delete", { name }))) return;
+    if (!await confirmDialog({
+      title: t("saved_filter.confirm_delete", { name }), tone: "danger",
+      confirmLabel: t("saved_filter.confirm_btn") })) return;
     try {
       await api.deletePreset(id);
       refresh();
@@ -662,8 +686,11 @@ export default function App() {
       if (prot.length === 1 && keys.length === 1) {
         // Explicitly trashing one protected group: allow, after its own
         // warning (the backend requires force for this).
-        if (!confirm(t("confirm.trash_protected",
-          { label: all[keys[0]]?.label ?? keys[0] }))) return false;
+        const verb = actionVerb(action);
+        if (!await confirmDialog({ title: verb, tone: "danger",
+          body: t("confirm.trash_protected",
+            { label: all[keys[0]]?.label ?? keys[0] }),
+          confirmLabel: t("confirm.btn_anyway", { verb }) })) return false;
         force = true;
       } else if (prot.length) {
         effective = keys.filter((k) => !all[k]?.protected);
@@ -683,12 +710,16 @@ export default function App() {
       return false;
     }
     const verb = actionVerb(action) + (dest ? ` → ${dest}` : "");
-    const skipNote = (effective.length !== keys.length
-      ? " " + t("confirm.protected_skipped",
-          { n: keys.length - effective.length }) : "")
-      + (pins ? " " + t("confirm.pinned_kept", { n: pins }) : "");
-    if (!force && !confirm(
-      t("confirm.act", { verb, n, k: effective.length }) + skipNote))
+    const bullets = [t("confirm.b_mails_groups",
+      { n, k: effective.length })];
+    if (effective.length !== keys.length) {
+      bullets.push(t("confirm.b_protected_groups_skipped",
+        { n: keys.length - effective.length }));
+    }
+    if (pins) bullets.push(t("confirm.b_pinned_kept", { n: pins }));
+    if (!force && !await confirmDialog({ title: verb, bullets,
+      tone: action === "mark_read" ? "primary" : "danger",
+      confirmLabel: t("confirm.btn_n", { verb, n }) }))
       return false;
     try {
       await api.deleteGroups(mode, effective, action, dest, force,
@@ -707,7 +738,9 @@ export default function App() {
   // "select -> Unsubscribe -> Trash" stays a two-click flow on the same set.
   const unsubscribeSelected = async () => {
     if (!selected.size) return;
-    if (!confirm(t("confirm.unsubscribe", { k: selected.size }))) return;
+    if (!await confirmDialog({
+      title: t("confirm.unsubscribe", { k: selected.size }),
+      confirmLabel: t("confirm.unsubscribe_btn") })) return;
     try {
       const r = await api.unsubscribeBulk(mode, [...selected]);
       const skipped = r.skipped_protected + r.skipped_done + r.capped;
@@ -742,9 +775,17 @@ export default function App() {
   // Sender/domain only (same restriction as protect - subject groups have
   // no stable sender to build a from:/domain: rule from).
   const blockGroup = KEYED_BY_MAIL(mode) ? undefined : async (g: Group) => {
-    if (!confirm(t("confirm.block", { label: g.label }))) return;
+    if (!await confirmDialog({
+      title: t("confirm.block_title", { label: g.label }),
+      body: t("confirm.block_body"), tone: "danger",
+      confirmLabel: t("Block") })) return;
+    // Declining this second question still blocks - it only skips trashing.
     const trashExisting = g.count > 0
-      && confirm(t("confirm.block_trash_existing", { n: g.count }));
+      && await confirmDialog({
+        title: t("confirm.block_trash_existing", { n: g.count }),
+        tone: "danger", cancelLabel: t("confirm.block_only"),
+        confirmLabel: t("confirm.btn_n",
+          { verb: actionVerb("trash"), n: g.count }) });
     try {
       await api.block(mode, g.key, g.label, trashExisting);
       notify(t("toast.blocked", { label: g.label }), "success");
@@ -760,7 +801,10 @@ export default function App() {
   const unblockGroup = KEYED_BY_MAIL(mode) ? undefined : async (g: Group) => {
     const ruleId = blockedRules.get(g.key);
     if (!ruleId) return;
-    if (!confirm(t("confirm.unblock", { label: g.label }))) return;
+    if (!await confirmDialog({
+      title: t("confirm.unblock_title", { label: g.label }),
+      body: t("confirm.unblock_body"),
+      confirmLabel: t("Unblock") })) return;
     try {
       await api.deleteRule(ruleId);
       notify(t("toast.unblocked", { label: g.label }), "success");
@@ -976,12 +1020,6 @@ export default function App() {
               <SettingsIcon size={16} className="mr-1 inline align-text-bottom" />
               {t("Settings")}
             </MenuItem>
-            {state?.trash_count != null && state.trash_count > 0 && (
-              <MenuItem onClick={emptyTrash}>
-                <Trash2 size={16} className="mr-1 inline align-text-bottom" />
-                {t("Empty Trash")} ({state.trash_count})
-              </MenuItem>
-            )}
             {auth.mode !== "none" && (
               <MenuItem onClick={async () => {
                 try { await api.logout(); } catch { /* session gone */ }
@@ -990,6 +1028,15 @@ export default function App() {
                 <Power size={16} className="mr-1 inline align-text-bottom" />
                 {t("login.logout")}
               </MenuItem>
+            )}
+            {state?.trash_count != null && state.trash_count > 0 && (
+              <>
+                <MenuDivider />
+                <MenuItem danger onClick={() => emptyTrash()}>
+                  <Trash2 size={16} className="mr-1 inline align-text-bottom" />
+                  {t("Empty Trash")} ({state.trash_count})…
+                </MenuItem>
+              </>
             )}
             {buildId && (
               <MenuHeading>
@@ -1507,6 +1554,7 @@ export default function App() {
           state={state}
           onClose={() => { setTrashOpen(false); refresh(); }}
           onChanged={refresh}
+          onEmptyTrash={emptyTrash}
         />
       )}
       {dupsOpen && (

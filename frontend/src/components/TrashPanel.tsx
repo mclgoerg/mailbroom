@@ -9,10 +9,13 @@ import { Button, Checkbox, EmptyState, Input, Loading, Modal, PanelHeader,
 
 /** Trash browser: live Trash contents (also mail deleted outside the app),
  *  with search and restore-to-folder. */
-export function TrashPanel({ state, onClose, onChanged }: {
+export function TrashPanel({ state, onClose, onChanged, onEmptyTrash }: {
   state: AppState;
   onClose: () => void;
   onChanged: () => void;
+  /** The shared "Empty Trash" flow (confirm + permanent delete), given the
+   *  live total this panel just listed; resolves true once emptied. */
+  onEmptyTrash: (total: number) => Promise<boolean>;
 }) {
   const [trash, setTrash] = useState<TrashResp | null>(null);
   const [error, setError] = useState("");
@@ -130,6 +133,16 @@ export function TrashPanel({ state, onClose, onChanged }: {
               </div>
             ))}
           </div>
+          {trash && trash.total > 0 && (
+            <div className="flex justify-end border-t border-line px-4 py-2">
+              <Button variant="danger-quiet" disabled={busy}
+                onClick={async () => {
+                  if (await onEmptyTrash(trash.total)) load();
+                }}>
+                {t("Empty Trash")} ({trash.total})…
+              </Button>
+            </div>
+          )}
         </>
       )}
     </Modal>

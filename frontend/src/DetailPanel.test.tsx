@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render, screen, waitFor } from
+import { cleanup, fireEvent, render, screen, waitFor, within } from
   "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { setLang } from "./i18n";
@@ -35,6 +35,8 @@ vi.mock("./api", async (importOriginal) => {
 });
 
 import { DetailPanel } from "./components/DetailPanel";
+import { DialogProvider } from "./components/ui";
+import { cancelDialog, expectNoDialog, findDialog, pressDialog } from "./dialogTestUtils";
 
 const mkMail = (uid: number, over: Partial<Mail> = {}): Mail => ({
   uid, folder: "INBOX", date: "2025-01-01", ts: 0,
@@ -56,7 +58,7 @@ const noopAsync = async () => true;
 function renderPanel(mails: Mail[], extra: Partial<Parameters<
     typeof DetailPanel>[0]> = {}) {
   group_.mockResolvedValue(mails);
-  return render(
+  return render(<DialogProvider>
     <DetailPanel
       grouping="sender"
       group={mkGroup()}
@@ -69,8 +71,8 @@ function renderPanel(mails: Mail[], extra: Partial<Parameters<
       onClose={noop}
       onDeleted={noop}
       {...extra}
-    />,
-  );
+    />
+  </DialogProvider>);
 }
 
 describe("DetailPanel", () => {
@@ -82,7 +84,6 @@ describe("DetailPanel", () => {
     pin.mockClear();
     pinGroup.mockReset();
     pin.mockResolvedValue({ ok: true, pinned: true });
-    vi.spyOn(window, "confirm").mockReturnValue(true);
     localStorage.setItem("pmc_ai_ack", "1");   // skip the AI consent prompt
   });
   afterEach(cleanup);
@@ -129,8 +130,153 @@ describe("DetailPanel", () => {
     await waitFor(() => screen.getByText("Mail 1"));
     fireEvent.click(document.querySelectorAll('input[type="checkbox"]')[0]);
     fireEvent.click(await screen.findByText(/Trash selected/));
+    await pressDialog("Move to Trash (1)");
     await waitFor(() => expect(deleteMessages).toHaveBeenCalledWith(
       [["INBOX", 1]], "trash", "", false));
+  });
+
+  it("cancelling the trash confirmation sends nothing", async () => {
+    renderPanel([mkMail(1), mkMail(2)]);
+    await waitFor(() => screen.getByText("Mail 1"));
+    fireEvent.click(document.querySelectorAll('input[type="checkbox"]')[0]);
+    fireEvent.click(await screen.findByText(/Trash selected/));
+    await cancelDialog();
+    await expectNoDialog();
+    expect(deleteMessages).not.toHaveBeenCalled();
+  });
+
+  it("list view: header has only Protect + Close; the footer offers Block "
+    + "sender and 'Trash all N'", async () => {
+    renderPanel([mkMail(1), mkMail(2)], {
+      onProtect: vi.fn(), onBlock: vi.fn() });
+    await waitFor(() => screen.getByText("Mail 1"));
+    expect(screen.getByRole("button", { name: /Protect this sender/ })
+      .getAttribute("aria-pressed")).toBe("false");
+    expect(screen.getByRole("button", { name: "Block sender" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Trash all 2" })).toBeTruthy();
+    expect(screen.queryByText("Trash this mail")).toBeNull();
+  });
+
+  it("an empty group shows no 'Trash all' button", async () => {
+    renderPanel([], { group: mkGroup({ count: 0 }) });
+    await waitFor(() => expect(group_).toHaveBeenCalled());
+    expect(screen.queryByRole("button", { name: /Trash all/ })).toBeNull();
+  });
+
+  it("'Trash all N' counts only unpinned mails and hides when none are left",
+    async () => {
+    const { unmount } = renderPanel([mkMail(1, { pinned: true }),
+      mkMail(2, { pinned: true }), mkMail(3), mkMail(4)]);
+    await screen.findByRole("button", { name: "Trash all 2" });
+    unmount();
+    renderPanel([mkMail(1, { pinned: true }), mkMail(2, { pinned: true })]);
+    await waitFor(() => screen.getByText("Mail 1"));
+    expect(screen.queryByRole("button", { name: /Trash all/ })).toBeNull();
+  });
+
+  it("with a selection the group footer gives way to the selection bar "
+    + "(never two red buttons)", async () => {
+    renderPanel([mkMail(1), mkMail(2)], { onBlock: vi.fn() });
+    await screen.findByRole("button", { name: "Trash all 2" });
+    fireEvent.click(document.querySelectorAll('input[type="checkbox"]')[0]);
+    await screen.findByText(/Trash selected/);
+    expect(screen.queryByRole("button", { name: /Trash all/ })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Block sender" })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Clear selection" }));
+    await screen.findByRole("button", { name: "Trash all 2" });
+  });
+
+  describe("message view footer", () => {
+    const open = async (mails: Mail[], extra = {}) => {
+      renderPanel(mails, { onBlock: vi.fn(), ...extra });
+      await waitFor(() => screen.getByText("Mail 1"));
+      fireEvent.click(screen.getByText("Mail 1"));
+      await screen.findByText("back to list");
+    };
+
+    it("is message-scoped: Pin + Trash this mail, no group actions",
+      async () => {
+      await open([mkMail(1), mkMail(2)]);
+      expect(screen.getByRole("button", { name: "Trash this mail" }))
+        .toBeTruthy();
+      expect(screen.getByRole("button", { name: /Protect this mail/ }))
+        .toBeTruthy();
+      expect(screen.queryByRole("button", { name: /Trash all/ })).toBeNull();
+      expect(screen.queryByRole("button", { name: "Block sender" })).toBeNull();
+    });
+
+    it("Trash this mail confirms, trashes only that mail and returns to "
+      + "the list", async () => {
+      await open([mkMail(1), mkMail(2)]);
+      fireEvent.click(screen.getByRole("button", { name: "Trash this mail" }));
+      expect((await findDialog()).textContent).toContain('"Mail 1"');
+      await pressDialog("Move to Trash (1)");
+      await waitFor(() => expect(deleteMessages).toHaveBeenCalledWith(
+        [["INBOX", 1]], "trash", "", false));
+      await screen.findByRole("button", { name: "Trash all 1" });
+      expect(screen.queryByText("Mail 1")).toBeNull();
+    });
+
+    it("the pin is labelled for the mail, distinct from the sender's Protect",
+      async () => {
+      await open([mkMail(1), mkMail(2)], { onProtect: vi.fn() });
+      const footerPin = screen.getByRole("button", { name: /Protect this mail/ });
+      expect(footerPin.textContent).toBe("Protect mail");
+      expect(screen.getByRole("button", { name: /Protect this sender/ })
+        .textContent).toBe("Protect");
+    });
+
+    it("trashing the open mail leaves other selected mails selected",
+      async () => {
+      renderPanel([mkMail(1), mkMail(2), mkMail(3)]);
+      await waitFor(() => screen.getByText("Mail 1"));
+      const boxes = document.querySelectorAll('input[type="checkbox"]');
+      fireEvent.click(boxes[1]);
+      fireEvent.click(boxes[2]);
+      fireEvent.click(screen.getByText("Mail 1"));
+      await screen.findByText("back to list");
+      fireEvent.click(screen.getByRole("button", { name: "Trash this mail" }));
+      await pressDialog("Move to Trash (1)");
+      expect(await screen.findByText("2 selected")).toBeTruthy();
+    });
+
+    it("the protected-mail warning doesn't repeat its title in the body",
+      async () => {
+      await open([mkMail(1, { pinned: true }), mkMail(2)]);
+      fireEvent.click(screen.getByRole("button", { name: "Trash this mail" }));
+      const text = (await findDialog()).textContent!;
+      expect(text).toContain('The protected mail "Mail 1"');
+      expect(text).not.toContain("Move to Trash:");
+      await cancelDialog();
+    });
+
+    it("cancelling Trash this mail keeps the message open", async () => {
+      await open([mkMail(1), mkMail(2)]);
+      fireEvent.click(screen.getByRole("button", { name: "Trash this mail" }));
+      await cancelDialog();
+      await expectNoDialog();
+      expect(deleteMessages).not.toHaveBeenCalled();
+      expect(screen.getByText("back to list")).toBeTruthy();
+    });
+
+    it("a protected mail gets its own warning and is sent with force",
+      async () => {
+      await open([mkMail(1, { pinned: true }), mkMail(2)]);
+      fireEvent.click(screen.getByRole("button", { name: "Trash this mail" }));
+      expect((await findDialog()).textContent)
+        .toMatch(/protected mail "Mail 1"/);
+      await pressDialog("Move to Trash anyway");
+      await waitFor(() => expect(deleteMessages).toHaveBeenCalledWith(
+        [["INBOX", 1]], "trash", "", true));
+    });
+
+    it("trashing the last mail closes the panel", async () => {
+      const onClose = vi.fn();
+      await open([mkMail(1)], { onClose });
+      fireEvent.click(screen.getByRole("button", { name: "Trash this mail" }));
+      await pressDialog("Move to Trash (1)");
+      await waitFor(() => expect(onClose).toHaveBeenCalled());
+    });
   });
 
   it("the move-to-folder picker always has a way back, and resets once "
@@ -195,7 +341,7 @@ describe("DetailPanel", () => {
     const onClose = vi.fn();
     renderPanel([mkMail(1)], { onTrash, onClose });
     await waitFor(() => screen.getByText("Mail 1"));
-    fireEvent.click(screen.getByText("Trash"));
+    fireEvent.click(screen.getByRole("button", { name: "Trash all 1" }));
     await waitFor(() => expect(onClose).toHaveBeenCalled());
     expect(onTrash).toHaveBeenCalled();
   });
@@ -287,38 +433,41 @@ describe("DetailPanel", () => {
 
     it("explicitly trashing ONE pinned mail asks first and sends force",
       async () => {
-      const confirm = vi.spyOn(window, "confirm").mockReturnValue(true);
       renderPanel([mkMail(1, { pinned: true }), mkMail(2)]);
       await waitFor(() => screen.getByText("Mail 1"));
       fireEvent.click(checkbox(0));
       fireEvent.click(await screen.findByText(/Trash selected/));
+      // the dedicated warning only, not the generic count confirm
+      expect((await findDialog()).textContent)
+        .toMatch(/protected mail "Mail 1"/);
+      await pressDialog("Move to Trash anyway");
       await waitFor(() => expect(deleteMessages).toHaveBeenCalledWith(
         [["INBOX", 1]], "trash", "", true));
-      expect(confirm).toHaveBeenCalledTimes(1);   // the dedicated one only
-      expect(confirm.mock.calls[0][0]).toMatch(/protected mail "Mail 1"/);
     });
 
     it("declining the pinned-mail confirmation does nothing", async () => {
-      vi.spyOn(window, "confirm").mockReturnValue(false);
       renderPanel([mkMail(1, { pinned: true }), mkMail(2)]);
       await waitFor(() => screen.getByText("Mail 1"));
       fireEvent.click(checkbox(0));
       fireEvent.click(await screen.findByText(/Trash selected/));
+      await cancelDialog();
+      await expectNoDialog();
       expect(deleteMessages).not.toHaveBeenCalled();
       expect(screen.getByText("1 selected")).toBeTruthy();   // still there
     });
 
     it("pinned mails ticked inside a bigger selection are left out, "
       + "never forced", async () => {
-      const confirm = vi.spyOn(window, "confirm").mockReturnValue(true);
       renderPanel([mkMail(1, { pinned: true }), mkMail(2), mkMail(3)]);
       await waitFor(() => screen.getByText("Mail 1"));
       fireEvent.click(checkbox(0));
       fireEvent.click(checkbox(1));
       fireEvent.click(await screen.findByText(/Trash selected/));
+      expect((await findDialog()).textContent)
+        .toMatch(/1 protected mail\(s\) skipped/);
+      await pressDialog("Move to Trash (1)");
       await waitFor(() => expect(deleteMessages).toHaveBeenCalledWith(
         [["INBOX", 2]], "trash", "", false));
-      expect(confirm.mock.calls[0][0]).toMatch(/1 protected mail\(s\) skipped/);
       // the pinned mail is still listed afterwards
       await waitFor(() => expect(screen.queryByText("Mail 2")).toBeNull());
       expect(screen.getByText("Mail 1")).toBeTruthy();
@@ -339,15 +488,15 @@ describe("DetailPanel", () => {
 
     it("mark as read is non-destructive: pinned mails need no confirmation",
       async () => {
-      const confirm = vi.spyOn(window, "confirm").mockReturnValue(true);
       renderPanel([mkMail(1, { pinned: true, seen: false }), mkMail(2)]);
       await waitFor(() => screen.getByText("Mail 1"));
       fireEvent.click(checkbox(0));
       fireEvent.change(await screen.findByDisplayValue("Action…"),
         { target: { value: "mark_read" } });
+      expect((await findDialog()).textContent).not.toMatch(/protected/);
+      await pressDialog("Mark as read (1)");
       await waitFor(() => expect(deleteMessages).toHaveBeenCalledWith(
         [["INBOX", 1]], "mark_read", "", false));
-      expect(confirm.mock.calls[0][0]).not.toMatch(/protected/);
     });
 
     it("'Protect all mails in this group' pins the whole group and "
@@ -374,19 +523,19 @@ describe("DetailPanel", () => {
     it("removing the protection of the whole group asks first", async () => {
       pinGroup.mockResolvedValue({ ok: true, pinned: false, changed: 1,
         skipped: 0 });
-      const confirm = vi.spyOn(window, "confirm").mockReturnValue(false);
       renderPanel([mkMail(1, { pinned: true }), mkMail(2)]);
       await waitFor(() => screen.getByText("Mail 1"));
       fireEvent.click(await screen.findByLabelText("More"));
       // some mails are unpinned -> both entries are offered
       expect(screen.getByText("Protect all mails in this group")).toBeTruthy();
       fireEvent.click(screen.getByText("Remove protection from all mails"));
-      expect(confirm).toHaveBeenCalledTimes(1);
+      await cancelDialog();
+      await expectNoDialog();
       expect(pinGroup).not.toHaveBeenCalled();
 
-      confirm.mockReturnValue(true);
       fireEvent.click(screen.getByLabelText("More"));
       fireEvent.click(screen.getByText("Remove protection from all mails"));
+      await pressDialog("Remove protection");
       await waitFor(() => expect(pinGroup).toHaveBeenCalledWith(
         "sender", "s@x.example", false));
     });

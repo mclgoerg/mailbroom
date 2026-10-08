@@ -3,7 +3,7 @@
  * state.presets, tapping one replaces the filter query, and the save
  * affordance prompts for a name and posts the current filter. */
 
-import { cleanup, fireEvent, render, screen, waitFor } from
+import { cleanup, fireEvent, render, screen, waitFor, within } from
   "@testing-library/react";
 import { afterEach, expect, test, vi } from "vitest";
 
@@ -34,7 +34,8 @@ vi.mock("./api", () => ({
 }));
 
 import App from "./App";
-import { ToastProvider } from "./components/ui";
+import { DialogProvider, ToastProvider } from "./components/ui";
+import { cancelDialog, expectNoDialog, findDialog, pressDialog } from "./dialogTestUtils";
 import type { AppState, Config } from "./types";
 
 const acct = {
@@ -89,7 +90,7 @@ test("a saved preset renders as a chip with its name", async () => {
   state = { ...baseState, presets: [
     { id: "p1", name: "Old DHL", query: "from:dhl age:>1y",
       account: "proton" }] };
-  render(<ToastProvider><App /></ToastProvider>);
+  render(<ToastProvider><DialogProvider><App /></DialogProvider></ToastProvider>);
   await waitFor(() => expect(screen.getByText("Old DHL")).toBeTruthy());
 });
 
@@ -98,7 +99,7 @@ test("tapping a saved preset chip replaces the filter query", async () => {
   state = { ...baseState, presets: [
     { id: "p1", name: "Old DHL", query: "from:dhl age:>1y",
       account: "proton" }] };
-  render(<ToastProvider><App /></ToastProvider>);
+  render(<ToastProvider><DialogProvider><App /></DialogProvider></ToastProvider>);
   await waitFor(() => expect(screen.getByText("Old DHL")).toBeTruthy());
   const filterInput = screen.getByPlaceholderText(
     "filter groups…") as HTMLInputElement;
@@ -112,40 +113,37 @@ test("tapping a saved preset chip replaces the filter query", async () => {
 
 test("deleting a saved preset confirms, then calls api.deletePreset",
   async () => {
-    const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(true);
     localStorage.setItem("pmc_account", "proton");
     state = { ...baseState, presets: [
       { id: "p1", name: "Old DHL", query: "from:dhl age:>1y",
         account: "proton" }] };
-    render(<ToastProvider><App /></ToastProvider>);
+    render(<ToastProvider><DialogProvider><App /></DialogProvider></ToastProvider>);
     await waitFor(() => expect(screen.getByText("Old DHL")).toBeTruthy());
     fireEvent.click(screen.getByLabelText("Delete"));
-    expect(confirmSpy).toHaveBeenCalledWith(
-      expect.stringContaining("Old DHL"));
+    expect((await findDialog()).textContent).toContain("Old DHL");
+    await pressDialog("Delete");
     await waitFor(() => expect(deletePreset).toHaveBeenCalledWith("p1"));
-    confirmSpy.mockRestore();
   });
 
 test("declining the delete confirmation never calls api.deletePreset",
   async () => {
-    const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(false);
     localStorage.setItem("pmc_account", "proton");
     state = { ...baseState, presets: [
       { id: "p1", name: "Old DHL", query: "from:dhl age:>1y",
         account: "proton" }] };
-    render(<ToastProvider><App /></ToastProvider>);
+    render(<ToastProvider><DialogProvider><App /></DialogProvider></ToastProvider>);
     await waitFor(() => expect(screen.getByText("Old DHL")).toBeTruthy());
     fireEvent.click(screen.getByLabelText("Delete"));
+    await cancelDialog();
+    await expectNoDialog();
     expect(deletePreset).not.toHaveBeenCalled();
-    confirmSpy.mockRestore();
   });
 
 test("the save button is disabled until the filter has text, then " +
   "prompts for a name and saves", async () => {
-  const promptSpy = vi.spyOn(window, "prompt").mockReturnValue("Old DHL");
   localStorage.setItem("pmc_account", "proton");
   state = { ...baseState };
-  render(<ToastProvider><App /></ToastProvider>);
+  render(<ToastProvider><DialogProvider><App /></DialogProvider></ToastProvider>);
   await waitFor(() => expect(screen.getByPlaceholderText("filter groups…"))
     .toBeTruthy());
   const saveBtn =
@@ -157,25 +155,27 @@ test("the save button is disabled until the filter has text, then " +
   expect(saveBtn.disabled).toBe(false);
 
   fireEvent.click(saveBtn);
-  expect(promptSpy).toHaveBeenCalled();
+  const dlg = await findDialog();
+  fireEvent.change(within(dlg).getByLabelText("Name"),
+    { target: { value: "Old DHL" } });
+  await pressDialog("Save");
   await waitFor(() => expect(createPreset).toHaveBeenCalledWith(
     "Old DHL", "from:dhl age:>1y"));
-  promptSpy.mockRestore();
 });
 
 test("declining the save name prompt never calls api.createPreset",
   async () => {
-    const promptSpy = vi.spyOn(window, "prompt").mockReturnValue(null);
     localStorage.setItem("pmc_account", "proton");
     state = { ...baseState };
-    render(<ToastProvider><App /></ToastProvider>);
+    render(<ToastProvider><DialogProvider><App /></DialogProvider></ToastProvider>);
     await waitFor(() => expect(screen.getByPlaceholderText("filter groups…"))
       .toBeTruthy());
     const filterInput = screen.getByPlaceholderText("filter groups…");
     fireEvent.change(filterInput, { target: { value: "from:dhl" } });
     fireEvent.click(screen.getByTitle("Save current filter as a preset"));
+    await cancelDialog();
+    await expectNoDialog();
     expect(createPreset).not.toHaveBeenCalled();
-    promptSpy.mockRestore();
   });
 
 test("editing a preset opens an inline editor prefilled with ITS OWN " +
@@ -185,7 +185,7 @@ test("editing a preset opens an inline editor prefilled with ITS OWN " +
   state = { ...baseState, presets: [
     { id: "p1", name: "Old DHL", query: "from:dhl age:>1y",
       account: "proton" }] };
-  render(<ToastProvider><App /></ToastProvider>);
+  render(<ToastProvider><DialogProvider><App /></DialogProvider></ToastProvider>);
   await waitFor(() => expect(screen.getByText("Old DHL")).toBeTruthy());
 
   // Unrelated text sitting in the filter box must NOT leak into the edit.
@@ -214,7 +214,7 @@ test("Cancel closes the inline editor without calling api.updatePreset",
     state = { ...baseState, presets: [
       { id: "p1", name: "Old DHL", query: "from:dhl age:>1y",
         account: "proton" }] };
-    render(<ToastProvider><App /></ToastProvider>);
+    render(<ToastProvider><DialogProvider><App /></DialogProvider></ToastProvider>);
     await waitFor(() => expect(screen.getByText("Old DHL")).toBeTruthy());
     fireEvent.click(screen.getByLabelText("Edit"));
     expect(screen.getByDisplayValue("from:dhl age:>1y")).toBeTruthy();
@@ -228,7 +228,7 @@ test("a clear button appears once the filter has text and empties it",
   async () => {
     localStorage.setItem("pmc_account", "proton");
     state = { ...baseState };
-    render(<ToastProvider><App /></ToastProvider>);
+    render(<ToastProvider><DialogProvider><App /></DialogProvider></ToastProvider>);
     await waitFor(() => expect(screen.getByPlaceholderText("filter groups…"))
       .toBeTruthy());
     expect(screen.queryByLabelText("Clear filter")).toBeNull();

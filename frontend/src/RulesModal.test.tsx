@@ -1,18 +1,25 @@
 // @vitest-environment jsdom
 /* Retention fields (keep_latest / older_than_days) on saved rules. */
 
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from
+  "@testing-library/react";
 import { afterEach, expect, test, vi } from "vitest";
 import { RulesModal } from "./components/RulesModal";
+import { DialogProvider } from "./components/ui";
+import { cancelDialog, expectNoDialog, findDialog, pressDialog } from "./dialogTestUtils";
 import { setLang } from "./i18n";
 import type { AppState, Rule } from "./types";
 
 const createRule = vi.fn().mockResolvedValue({});
 const updateRule = vi.fn().mockResolvedValue({});
+const deleteRule = vi.fn().mockResolvedValue({});
+const runRule = vi.fn().mockResolvedValue({});
 
 vi.mock("./api", () => ({
   api: { createRule: (body: unknown) => createRule(body),
-         updateRule: (id: string, body: unknown) => updateRule(id, body) },
+         updateRule: (id: string, body: unknown) => updateRule(id, body),
+         deleteRule: (id: string) => deleteRule(id),
+         runRule: (id: string) => runRule(id) },
 }));
 
 const baseState: AppState = {
@@ -40,6 +47,8 @@ afterEach(() => {
   cleanup();
   createRule.mockClear();
   updateRule.mockClear();
+  deleteRule.mockClear();
+  runRule.mockClear();
   setLang("en");
 });
 
@@ -47,13 +56,13 @@ test("creating a rule with keep-latest sends the field, leaves the other " +
   "null", () => {
   render(<RulesModal state={baseState} onClose={() => {}}
     onChanged={() => {}} />);
-  fireEvent.change(screen.getByPlaceholderText("Rule name"),
+  fireEvent.change(screen.getByLabelText("Name"),
     { target: { value: "My rule" } });
-  fireEvent.change(screen.getByDisplayValue("All mails"),
+  fireEvent.change(screen.getByLabelText("Apply to"),
     { target: { value: "keep_latest" } });
   fireEvent.change(screen.getByPlaceholderText("N"),
     { target: { value: "5" } });
-  fireEvent.click(screen.getByText("Create (report mode)"));
+  fireEvent.click(screen.getByText("Create rule (report only)"));
   expect(createRule).toHaveBeenCalledWith(expect.objectContaining(
     { keep_latest: 5, older_than_days: null }));
 });
@@ -97,4 +106,86 @@ test("a run summary names the protected mails it skipped", () => {
   render(<RulesModal state={{ ...baseState, rules: [ran] }}
     onClose={() => {}} onChanged={() => {}} />);
   expect(screen.getByText(/3 protected mails skipped/)).toBeTruthy();
+});
+
+test("every field of the new-rule form has a label", () => {
+  render(<RulesModal state={baseState} onClose={() => {}}
+    onChanged={() => {}} />);
+  for (const label of ["Name", "Grouping", "Filter", "Action", "Schedule",
+    "Apply to"]) {
+    expect(screen.getByLabelText(label)).toBeTruthy();
+  }
+});
+
+const renderCards = (rules: Rule[], onChanged = () => {}) =>
+  render(<DialogProvider>
+    <RulesModal state={{ ...baseState, rules }} onClose={() => {}}
+      onChanged={onChanged} />
+  </DialogProvider>);
+
+test("card actions: Run now, Edit, Enable execute, then Delete last",
+  () => {
+  renderCards([rule]);
+  const names = screen.getAllByRole("button")
+    .map((b) => b.textContent?.trim())
+    .filter((x) => ["Run now", "Edit", "Enable execute", "Delete"].includes(x!));
+  expect(names).toEqual(["Run now", "Edit", "Enable execute", "Delete"]);
+  expect(screen.getByText("Delete").className).toContain("text-danger-fg");
+  expect(screen.getByText("Enable execute").className).not.toContain("bg-danger");
+});
+
+test("Delete asks first, then deletes the rule", async () => {
+  const onChanged = vi.fn();
+  renderCards([rule], onChanged);
+  fireEvent.click(screen.getByText("Delete"));
+  expect((await findDialog()).textContent).toContain("Old shop mail");
+  expect(deleteRule).not.toHaveBeenCalled();
+  await pressDialog("Delete");
+  await waitFor(() => expect(deleteRule).toHaveBeenCalledWith("abc1"));
+  expect(onChanged).toHaveBeenCalled();
+});
+
+test("cancelling Delete keeps the rule", async () => {
+  renderCards([rule]);
+  fireEvent.click(screen.getByText("Delete"));
+  await cancelDialog();
+  await expectNoDialog();
+  expect(deleteRule).not.toHaveBeenCalled();
+});
+
+test("Enable execute asks first, then switches the rule to execute",
+  async () => {
+  renderCards([rule]);
+  fireEvent.click(screen.getByText("Enable execute"));
+  expect((await findDialog()).textContent).toContain("cap 500 per run");
+  expect(updateRule).not.toHaveBeenCalled();
+  await pressDialog("Enable execute");
+  await waitFor(() => expect(updateRule)
+    .toHaveBeenCalledWith("abc1", { mode: "execute" }));
+});
+
+test("cancelling Enable execute leaves the rule in report mode", async () => {
+  renderCards([rule]);
+  fireEvent.click(screen.getByText("Enable execute"));
+  await cancelDialog();
+  await expectNoDialog();
+  expect(updateRule).not.toHaveBeenCalled();
+});
+
+test("Run now on an execute-mode rule confirms; report mode runs directly",
+  async () => {
+  const exec: Rule = { ...rule, mode: "execute" };
+  const { unmount } = renderCards([exec]);
+  fireEvent.click(screen.getByText("Run now"));
+  await cancelDialog();
+  await expectNoDialog();
+  expect(runRule).not.toHaveBeenCalled();
+  fireEvent.click(screen.getByText("Run now"));
+  await pressDialog("Run now");
+  await waitFor(() => expect(runRule).toHaveBeenCalledWith("abc1"));
+  unmount();
+  runRule.mockClear();
+  renderCards([rule]);
+  fireEvent.click(screen.getByText("Run now"));
+  await waitFor(() => expect(runRule).toHaveBeenCalledWith("abc1"));
 });

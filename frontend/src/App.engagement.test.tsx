@@ -42,7 +42,7 @@ const deleteGroups = api.deleteGroups as ReturnType<typeof vi.fn>;
 const groupApi = api.group as ReturnType<typeof vi.fn>;
 
 import App from "./App";
-import { ToastProvider } from "./components/ui";
+import { DialogProvider, ToastProvider } from "./components/ui";
 import type { AppState, Config, Group } from "./types";
 
 const acctCfg = {
@@ -119,7 +119,7 @@ test("sorting by engagement orders groups high to low, and the arrow " +
   state = withGroups(mk("a@x", "Alpha", 10), mk("b@x", "Bravo", 90),
     mk("c@x", "Charlie", 50));
   mountReady();
-  const { container } = render(<ToastProvider><App /></ToastProvider>);
+  const { container } = render(<ToastProvider><DialogProvider><App /></DialogProvider></ToastProvider>);
   await waitFor(() => expect(rowLabels(container).length).toBe(3),
     { timeout: 5000 });
 
@@ -136,7 +136,7 @@ test("sorting by engagement orders groups high to low, and the arrow " +
 test("the engagement sort is persisted like the other sort keys", async () => {
   state = withGroups(mk("a@x", "Alpha", 10), mk("b@x", "Bravo", 90));
   mountReady();
-  const first = render(<ToastProvider><App /></ToastProvider>);
+  const first = render(<ToastProvider><DialogProvider><App /></DialogProvider></ToastProvider>);
   await waitFor(() => expect(rowLabels(first.container).length).toBe(2),
     { timeout: 5000 });
   fireEvent.change(screen.getByDisplayValue("Sort: mails"),
@@ -145,7 +145,7 @@ test("the engagement sort is persisted like the other sort keys", async () => {
     expect(localStorage.getItem("pmc_sort_k")).toBe("engagement"));
   first.unmount();
 
-  const again = render(<ToastProvider><App /></ToastProvider>);
+  const again = render(<ToastProvider><DialogProvider><App /></DialogProvider></ToastProvider>);
   await waitFor(() => expect(rowLabels(again.container).length).toBe(2),
     { timeout: 5000 });
   expect(screen.getByDisplayValue("Sort: engagement")).toBeTruthy();
@@ -156,7 +156,7 @@ test("an eng:low filter shows only the low-engagement groups", async () => {
   state = withGroups(mk("a@x", "Alpha", 10), mk("b@x", "Bravo", 90),
     mk("c@x", "Charlie", 33));
   mountReady();
-  const { container } = render(<ToastProvider><App /></ToastProvider>);
+  const { container } = render(<ToastProvider><DialogProvider><App /></DialogProvider></ToastProvider>);
   await waitFor(() => expect(rowLabels(container).length).toBe(3),
     { timeout: 5000 });
   fireEvent.change(screen.getByPlaceholderText(/Filter/i),

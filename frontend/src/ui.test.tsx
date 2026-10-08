@@ -9,13 +9,16 @@ import { afterEach, expect, test, vi } from "vitest";
 
 import {
   isModalOpen, AccountAvatar, BulkBar, Button, Checkbox, Chip, ChipGroup, ChipSegment,
-  ConfirmDialog, DialogProvider, EmptyState, MailRow, Menu, MenuDivider,
+  ConfirmDialog, DIALOG_ARM_MS, DialogProvider, PromptDialog, EmptyState, MailRow, Menu, MenuDivider,
   MenuHeading, MenuItem, Modal, Notice, ProgressBar, Segmented, ToastProvider,
   confirmDialog,
-  LINK, Tag, promptDialog, useToast,
+  LINK, Tag, ensureAiAck, promptDialog, ProtectButton, useToast,
 } from "./components/ui";
 
 afterEach(cleanup);
+
+/** Dialogs ignore confirm/submit for DIALOG_ARM_MS after opening. */
+const armed = () => new Promise((r) => setTimeout(r, DIALOG_ARM_MS + 30));
 
 const renderMenu = (onPick: () => void) =>
   render(
@@ -315,6 +318,7 @@ test("confirmDialog resolves true on confirm, false on Cancel / Esc / backdrop",
     const p = confirmDialog(opts).then((v) => { result = v; });
     await screen.findByText("Delete?");
     expect(screen.getByText("3 mails")).toBeTruthy();
+    await armed();
     act2();
     await p;
     expect(screen.queryByText("Delete?")).toBeNull();
@@ -327,6 +331,39 @@ test("confirmDialog resolves true on confirm, false on Cancel / Esc / backdrop",
     screen.getByRole("dialog").parentElement!))).toBe(false);
 });
 
+test("a confirm tapped right after opening is ignored; after the delay it resolves", async () => {
+  vi.useFakeTimers();
+  try {
+    const onResult = vi.fn();
+    render(<ConfirmDialog title="Sure?" confirmLabel="Delete" tone="danger"
+      onResult={onResult} />);
+    fireEvent.click(screen.getByText("Delete"));      // the 2nd tap of a double-tap
+    expect(onResult).not.toHaveBeenCalled();
+    expect(screen.getByText("Sure?")).toBeTruthy();   // still open
+    fireEvent.click(screen.getByText("Cancel"));      // Cancel is never delayed
+    expect(onResult).toHaveBeenLastCalledWith(false);
+    vi.advanceTimersByTime(DIALOG_ARM_MS - 1);
+    fireEvent.click(screen.getByText("Delete"));
+    expect(onResult).toHaveBeenCalledTimes(1);
+    vi.advanceTimersByTime(1);
+    fireEvent.click(screen.getByText("Delete"));
+    expect(onResult).toHaveBeenLastCalledWith(true);
+  } finally { vi.useRealTimers(); }
+});
+
+test("PromptDialog ignores a submit (Enter / tap) right after opening", () => {
+  vi.useFakeTimers();
+  try {
+    const onResult = vi.fn();
+    render(<PromptDialog title="Name" label="Name" initial="x" onResult={onResult} />);
+    fireEvent.click(screen.getByText("OK"));
+    expect(onResult).not.toHaveBeenCalled();
+    vi.advanceTimersByTime(DIALOG_ARM_MS);
+    fireEvent.click(screen.getByText("OK"));
+    expect(onResult).toHaveBeenCalledWith("x");
+  } finally { vi.useRealTimers(); }
+});
+
 test("danger confirm focuses Cancel, primary confirm focuses the confirm button", async () => {
   render(
     <ConfirmDialog title="T" confirmLabel="Do" tone="danger" onResult={() => {}} />);
@@ -334,6 +371,41 @@ test("danger confirm focuses Cancel, primary confirm focuses the confirm button"
   cleanup();
   render(<ConfirmDialog title="T" confirmLabel="Do" onResult={() => {}} />);
   expect(document.activeElement).toBe(screen.getByText("Do"));
+});
+
+test("ConfirmDialog cancelLabel replaces Cancel", () => {
+  const onResult = vi.fn();
+  render(<ConfirmDialog title="T" confirmLabel="Do" cancelLabel="Only block"
+    onResult={onResult} />);
+  expect(screen.queryByText("Cancel")).toBeNull();
+  fireEvent.click(screen.getByText("Only block"));
+  expect(onResult).toHaveBeenCalledWith(false);
+});
+
+test("ensureAiAck asks once: declining stays unacknowledged, accepting is remembered", async () => {
+  localStorage.clear();
+  render(<DialogProvider><span /></DialogProvider>);
+  let p = ensureAiAck();
+  fireEvent.click(await screen.findByText("Cancel"));
+  expect(await p).toBe(false);
+  expect(localStorage.getItem("pmc_ai_ack")).toBeNull();
+  p = ensureAiAck();
+  await screen.findByText("Continue");
+  await armed();
+  fireEvent.click(screen.getByText("Continue"));
+  expect(await p).toBe(true);
+  expect(await ensureAiAck()).toBe(true);        // no dialog the second time
+  localStorage.clear();
+});
+
+test("ProtectButton exposes aria-pressed and an optional visible label", () => {
+  const { rerender } = render(<ProtectButton on={false} showLabel onClick={() => {}} />);
+  const btn = screen.getByRole("button");
+  expect(btn.getAttribute("aria-pressed")).toBe("false");
+  expect(btn.textContent).toBe("Protect");
+  rerender(<ProtectButton on showLabel onClick={() => {}} />);
+  expect(btn.getAttribute("aria-pressed")).toBe("true");
+  expect(btn.textContent).toBe("Protected");
 });
 
 test("confirmDialog rejects without a provider (the action must not proceed)", async () => {
@@ -350,6 +422,7 @@ test("promptDialog validates, submits the value, and cancels with null", async (
   expect(document.activeElement).toBe(input);
   fireEvent.change(input, { target: { value: "  " } });
   expect(screen.getByRole("alert").textContent).toBe("Name required");
+  await armed();
   fireEvent.click(screen.getByText("OK"));              // invalid: stays open
   expect(screen.getByRole("alert")).toBeTruthy();
   fireEvent.change(input, { target: { value: "new" } });
@@ -526,6 +599,7 @@ test("DialogProvider returns focus to the opener and settles pending on unmount"
   const p = confirmDialog({ title: "Sure?", confirmLabel: "Yes" });
   await screen.findByText("Sure?");
   await waitFor(() => expect(document.activeElement).not.toBe(opener));
+  await armed();
   fireEvent.click(screen.getByText("Yes"));
   expect(await p).toBe(true);
   await waitFor(() => expect(document.activeElement).toBe(opener));
@@ -544,6 +618,7 @@ test("queued dialogs are removed by id and shown one after another", async () =>
   const b = confirmDialog({ title: "Second", confirmLabel: "Yes" });
   await screen.findByText("First");
   expect(screen.queryByText("Second")).toBeNull();
+  await armed();
   fireEvent.click(screen.getByText("Yes"));
   expect(await a).toBe(true);
   await screen.findByText("Second");
@@ -557,6 +632,7 @@ test("PromptDialog with an invalid initial value shows the error on submit", asy
     validate: (v) => (v ? null : "Required") });
   const input = await screen.findByLabelText("Name");
   expect(screen.queryByRole("alert")).toBeNull();
+  await armed();
   fireEvent.submit(input.closest("form")!);           // Enter
   expect(screen.getByRole("alert").textContent).toBe("Required");
   fireEvent.click(screen.getByText("Cancel"));

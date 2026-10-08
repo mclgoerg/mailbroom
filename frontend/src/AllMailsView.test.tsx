@@ -6,7 +6,8 @@ import { cleanup, fireEvent, render, screen, waitFor }
   from "@testing-library/react";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import { AllMailsView } from "./components/AllMailsView";
-import { ToastProvider } from "./components/ui";
+import { DialogProvider, ToastProvider } from "./components/ui";
+import { cancelDialog, expectNoDialog, findDialog, pressDialog } from "./dialogTestUtils";
 import type { AppState, Mail, MailsResp } from "./types";
 
 const mails = vi.fn();
@@ -41,12 +42,11 @@ const state = {
 
 const onChanged = vi.fn();
 const renderView = () =>
-  render(<ToastProvider>
+  render(<ToastProvider><DialogProvider>
     <AllMailsView state={state} onChanged={onChanged} />
-  </ToastProvider>);
+  </DialogProvider></ToastProvider>);
 
 beforeEach(() => {
-  vi.spyOn(window, "confirm").mockReturnValue(true);
   deleteMessages.mockResolvedValue({ ok: true, queued: 1 });
   pin.mockResolvedValue({ ok: true });
 });
@@ -129,12 +129,26 @@ test("selecting shows the action bar; Trash sends the picked mails",
     fireEvent.click(tick(2));
     expect(screen.getByText("1 selected")).toBeTruthy();
     fireEvent.click(screen.getByText(/Trash selected/));
+    expect((await findDialog()).textContent).toContain('"Subject 2"');
+    await pressDialog("Move to Trash (1)");
     await waitFor(() => expect(deleteMessages)
       .toHaveBeenCalledWith([["Archive", 2]], "trash", "", false));
     await waitFor(() => expect(screen.queryByText("Subject 2")).toBeNull());
     expect(screen.getByText("1 of 1 mails")).toBeTruthy();
     expect(onChanged).toHaveBeenCalled();
   });
+
+test("cancelling the trash confirmation sends nothing", async () => {
+  mails.mockResolvedValue(resp([mk(1)], 1));
+  renderView();
+  await screen.findByText("Subject 1");
+  fireEvent.click(tick(1));
+  fireEvent.click(screen.getByText(/Trash selected/));
+  await cancelDialog();
+  await expectNoDialog();
+  expect(deleteMessages).not.toHaveBeenCalled();
+  expect(screen.getByText("Subject 1")).toBeTruthy();
+});
 
 test("Move to folder asks for a folder and sends it", async () => {
   mails.mockResolvedValue(resp([mk(1)], 1));
@@ -145,6 +159,7 @@ test("Move to folder asks for a folder and sends it", async () => {
     { target: { value: "move" } });
   fireEvent.change(screen.getAllByDisplayValue("Move to folder…")[0],
     { target: { value: "Archive" } });
+  await pressDialog(/^Move → Archive \(1\)$/);
   await waitFor(() => expect(deleteMessages)
     .toHaveBeenCalledWith([["INBOX", 1]], "move", "Archive", false));
 });
@@ -156,6 +171,7 @@ test("mark read keeps the row and marks it read", async () => {
   fireEvent.click(tick(1));
   fireEvent.change(screen.getByDisplayValue("Action…"),
     { target: { value: "mark_read" } });
+  await pressDialog("Mark as read (1)");
   await waitFor(() => expect(deleteMessages)
     .toHaveBeenCalledWith([["INBOX", 1]], "mark_read", "", false));
   expect(screen.getByText("Subject 1")).toBeTruthy();
@@ -168,9 +184,10 @@ test("ONE pinned mail gets its own warning and is sent with force",
     await screen.findByText("Subject 1");
     fireEvent.click(tick(1));
     fireEvent.click(screen.getByText(/Trash selected/));
+    expect((await findDialog()).textContent).toContain("Subject 1");
+    await pressDialog("Move to Trash anyway");
     await waitFor(() => expect(deleteMessages)
       .toHaveBeenCalledWith([["INBOX", 1]], "trash", "", true));
-    expect((window.confirm as any).mock.calls[0][0]).toContain("Subject 1");
   });
 
 test("pinned mails inside a larger selection are dropped, not moved",
@@ -181,6 +198,9 @@ test("pinned mails inside a larger selection are dropped, not moved",
     fireEvent.click(tick(1));
     fireEvent.click(tick(2));
     fireEvent.click(screen.getByText(/Trash selected/));
+    expect((await findDialog()).textContent)
+      .toContain("1 protected mail(s) skipped");
+    await pressDialog("Move to Trash (1)");
     await waitFor(() => expect(deleteMessages)
       .toHaveBeenCalledWith([["Archive", 2]], "trash", "", false));
     expect(screen.getByText("Subject 1")).toBeTruthy();   // still listed
@@ -211,10 +231,10 @@ test("a new groups_rev refreshes in place keeping the loaded pages",
     await screen.findByText("Subject 1");
     mails.mockClear();
     mails.mockResolvedValue(resp([mk(2)], 1));
-    rerender(<ToastProvider>
+    rerender(<ToastProvider><DialogProvider>
       <AllMailsView state={{ ...state, groups_rev: 2 } as AppState}
         onChanged={onChanged} />
-    </ToastProvider>);
+    </DialogProvider></ToastProvider>);
     await waitFor(() => expect(screen.queryByText("Subject 1")).toBeNull());
     expect(mails).toHaveBeenCalledWith(
       { offset: 0, limit: 100, sort: "date", dir: "desc", q: "" });

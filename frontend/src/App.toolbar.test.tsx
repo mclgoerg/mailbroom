@@ -32,7 +32,7 @@ vi.mock("./api", () => ({
 }));
 
 import App from "./App";
-import { ToastProvider } from "./components/ui";
+import { DialogProvider, ToastProvider } from "./components/ui";
 import type { AppState, Config } from "./types";
 
 const cfg = {
@@ -86,7 +86,7 @@ const group = {
 const open = async () => {
   state = { ...baseState, groups: { ...baseState.groups,
     sender: { [group.key]: group } } };
-  render(<ToastProvider><App /></ToastProvider>);
+  render(<ToastProvider><DialogProvider><App /></DialogProvider></ToastProvider>);
   await screen.findByPlaceholderText("filter groups…");
   await waitFor(() => expect(screen.getAllByText("Acme").length)
     .toBeGreaterThan(0));
@@ -181,7 +181,7 @@ test("while scanning with AI unavailable: Duplicates disabled, no AI review",
     cfg.ai.available = false;
     state = { ...baseState, status: "scanning", groups: { ...baseState.groups,
       sender: { [group.key]: group } } };
-    render(<ToastProvider><App /></ToastProvider>);
+    render(<ToastProvider><DialogProvider><App /></DialogProvider></ToastProvider>);
     await waitFor(() => expect(screen.getAllByText("Acme").length)
       .toBeGreaterThan(0));
     fireEvent.click(screen.getByRole("button", { name: "Tools" }));

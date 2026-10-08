@@ -37,7 +37,8 @@ const { api } = await import("./api");
 const undoApi = api.undo as ReturnType<typeof vi.fn>;
 
 import App from "./App";
-import { ToastProvider } from "./components/ui";
+import { DialogProvider, ToastProvider } from "./components/ui";
+import { cancelDialog, findDialog, pressDialog } from "./dialogTestUtils";
 import type { AppState, Config, Group } from "./types";
 
 const acctCfg = {
@@ -105,7 +106,7 @@ Element.prototype.scrollIntoView = () => {};
 const mount = async (st: AppState) => {
   state = st;
   localStorage.setItem("pmc_account", "proton");
-  const r = render(<ToastProvider><App /></ToastProvider>);
+  const r = render(<ToastProvider><DialogProvider><App /></DialogProvider></ToastProvider>);
   await waitFor(() => expect(FakeEventSource.instances.length).toBeGreaterThan(0));
   await waitFor(() => expect(r.container.textContent).toMatch(/scanned|No scan/));
   return r;
@@ -122,7 +123,6 @@ const job = (status: string, extra: object = {}) =>
 
 test("a finished move shows a toast whose Undo restores the latest entry",
   async () => {
-    vi.stubGlobal("confirm", () => true);
     await mount({ ...baseState });
     tick({ delete: job("running", { progress: "3/12" }) as any });
     tick({ delete: job("done", { moved: 12 }) as any,
@@ -130,6 +130,7 @@ test("a finished move shows a toast whose Undo restores the latest entry",
     const msg = await screen.findByText("Moved 12 mails to Trash");
     const bar = msg.parentElement!;
     fireEvent.click(within(bar).getByRole("button", { name: "Undo" }));
+    await pressDialog("Restore");
     await waitFor(() => expect(undoApi).toHaveBeenCalledWith(0));
     // The toast closes after its action.
     expect(screen.queryByText("Moved 12 mails to Trash")).toBeNull();
@@ -227,7 +228,6 @@ test("undoing the last entry does not toast", async () => {
 });
 
 test("Undo targets its own entry after the list shifted", async () => {
-  vi.stubGlobal("confirm", () => true);
   await mount({ ...baseState, undo: [entry(1, 5)] });
   tick({ delete: job("done", { moved: 10 }) as any,
     undo: [entry(1, 5), entry(2, 10)] });
@@ -235,6 +235,7 @@ test("Undo targets its own entry after the list shifted", async () => {
   tick({ undo: [entry(2, 10)] });                  // the older one was undone
   fireEvent.click(within(msg.parentElement!)
     .getByRole("button", { name: "Undo" }));
+  await pressDialog("Restore");
   await waitFor(() => expect(undoApi).toHaveBeenCalledWith(0));
 });
 
