@@ -42,6 +42,18 @@ test("wrong password shows the error and stays", async () => {
   expect(ok).toBe(false);
 });
 
+test("uses the design tokens: title layer, card radius, danger-fg error", async () => {
+  render(<Login mode="password" onLogin={() => {}} />);
+  expect(screen.getByText("Mailbroom").className).toContain("type-title");
+  expect(screen.getByText("Mailbroom").parentElement!.className)
+    .toContain("rounded-card");
+  fireEvent.change(screen.getByPlaceholderText("Password"),
+    { target: { value: "nope" } });
+  fireEvent.click(screen.getByText("Sign in"));
+  expect((await screen.findByText(/wrong password/)).className)
+    .toContain("text-danger-fg");
+});
+
 test("oidc mode renders the SSO link", () => {
   render(<Login mode="oidc" onLogin={() => {}} />);
   const a = screen.getByText("Sign in with SSO") as HTMLAnchorElement;

@@ -31,6 +31,17 @@ interface Props {
   resetSignal: string;   // page resets to 1 when this changes (mode/filter)
 }
 
+/** Thread / subject groups carry an English summary from the backend
+ *  ("2 mails, 1 sender" / "3 senders"); show it in the UI language. Sender
+ *  and domain groups carry an address, which passes through untouched. */
+const SUB_COUNTS = /^(?:(\d+) mails?, )?(\d+) senders?$/;
+export function localizedSub(sub: string): string {
+  const m = SUB_COUNTS.exec(sub);
+  if (!m) return sub;
+  const senders = t("n.senders", { n: Number(m[2]) });
+  return m[1] ? `${t("n.mails", { n: Number(m[1]) })}, ${senders}` : senders;
+}
+
 /** The row's avatar. A thread's label is its subject, and a subject's
  *  first letter says nothing - so thread rows show their first sender, or a
  *  neutral icon avatar when there is none. */
@@ -210,7 +221,9 @@ function DesktopTable({ slice, baseIdx, selected, focusedKey, onToggle,
                 {g.label}
               </button>
               {g.sub && (
-                <div className="truncate type-meta text-muted">{g.sub}</div>
+                <div className="truncate type-meta text-muted">
+                  {localizedSub(g.sub)}
+                </div>
               )}
               <div className="truncate type-meta text-muted">
                 <ShortDate iso={g.first} /> → <ShortDate iso={g.last} /> ·{" "}
@@ -307,7 +320,9 @@ function MobileCards({ slice, baseIdx, selected, focusedKey, onToggle,
                 {g.label}
               </button>
               {g.sub && (
-                <div className="truncate type-meta text-muted">{g.sub}</div>
+                <div className="truncate type-meta text-muted">
+                  {localizedSub(g.sub)}
+                </div>
               )}
               <div className="truncate type-meta text-muted">
                 {t("n.mails", { n: g.count })} · <ShortDate iso={g.last} /> ·{" "}

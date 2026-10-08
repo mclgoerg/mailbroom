@@ -774,6 +774,8 @@ export const EN: Record<string, string> = {
   "bar.selected_one_mail": "1 group · 1 mail",
   "n.mails": "{n} mails",
   "n.mails_one": "1 mail",
+  "n.senders": "{n} senders",
+  "n.senders_one": "1 sender",
   "n.groups": "{n} groups",
   "n.groups_one": "1 group",
   "filter.syntax_hint":

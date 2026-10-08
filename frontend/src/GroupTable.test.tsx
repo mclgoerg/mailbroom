@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { cleanup, fireEvent, render } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { GroupTable } from "./components/GroupTable";
+import { GroupTable, localizedSub } from "./components/GroupTable";
 import { setLang } from "./i18n";
 import type { Group } from "./types";
 
@@ -437,3 +437,16 @@ describe("GroupTable avatars and phone cards", () => {
   });
 });
 
+
+describe("localizedSub", () => {
+  afterEach(() => setLang("en"));
+  it("translates the backend's thread / subject summaries, leaves addresses alone", () => {
+    setLang("de");
+    expect(localizedSub("2 mails, 1 sender")).toBe("2 Mails, 1 Absender");
+    expect(localizedSub("1 mail, 3 senders")).toBe("1 Mail, 3 Absender");
+    expect(localizedSub("4 senders")).toBe("4 Absender");
+    expect(localizedSub("news@shop.example")).toBe("news@shop.example");
+    setLang("en");
+    expect(localizedSub("1 mail, 3 senders")).toBe("1 mail, 3 senders");
+  });
+});
