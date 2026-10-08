@@ -21,23 +21,27 @@ Foundry) that suggests what's safe to delete and tracks its own cost.
 
 ![Mailbroom group view](docs/screenshots/groups-dark.png)
 
-**In action** - click a filter together, select everything the AI rated
-safe, drill into a group:
+**In action** - click a filter together, select the matches, confirm the
+move to Trash (with the count spelled out), undo it from the toast, then
+open a group beside the list:
 
-![Filter, select, drill down](docs/screenshots/demo.gif)
+![Build a filter, select, move to Trash with confirmation and Undo, open a group in the split pane](docs/screenshots/demo.gif)
 
 <details>
-<summary>More screenshots - drill-down, statistics, light theme</summary>
+<summary>More screenshots - split pane, drill-down, statistics, phone, light theme</summary>
 
-![Group drill-down](docs/screenshots/detail.png)
-![Statistics](docs/screenshots/stats.png)
-![Light theme](docs/screenshots/groups-light.png)
+![A group open in the side pane next to the group list](docs/screenshots/split-pane.png)
+![Group drill-down as a dialog on a mid-size screen, with the Block sender and Trash all actions](docs/screenshots/detail.png)
+![Statistics panel: totals, mails per month and year, categories](docs/screenshots/stats.png)
+![Phone layout: group list, a group's mails, and the bottom-sheet confirmation before moving to Trash](docs/screenshots/mobile.png)
+![The group list in the light theme](docs/screenshots/groups-light.png)
 
 </details>
 
 All screenshots show generated demo data (`scripts/demo.py` - run it
-yourself for a zero-setup playground on fake mailboxes; the GIF rig is
-`scripts/demo-gif.mjs`).
+yourself for a zero-setup playground on fake mailboxes). The capture
+scripts are `scripts/screenshots.mjs` and `scripts/demo-gif.mjs`; their
+headers have the copy-paste commands.
 
 ## Supported providers
 
@@ -77,15 +81,19 @@ presets.
 
 ## Features
 
-- **Three group views** - by sender, by domain (catches `noreply@`,
-  `news@`, … of the same company), by normalized subject (merges
-  `Order 123` / `Order 456`, strips Re:/Fwd:).
+- **Grouping tabs** - switch between Sender, Domain (catches `noreply@`,
+  `news@`, … of the same company), Subject (normalized: merges
+  `Order 123` / `Order 456`, strips Re:/Fwd:), Thread (whole
+  conversations) and a flat "All mails" list. The choice is remembered.
 - **Cleanup signals** - mail count, total size (find attachment hogs),
-  unread percentage, first→last date range, category tags (shipping,
+  unread percentage, first→last date range (short dates, e.g. "7 Oct"), category tags (shipping,
   finance, shopping, social, travel, newsletters, automated…).
 - **Drill-down** - every mail of a group with date/size/unread, full-text
   reader (HTML mails rendered as plain text - no remote content, no
-  tracking pixels), per-mail selection and deletion.
+  tracking pixels), per-mail selection and deletion ("Trash this mail",
+  or "Trash all N" for the whole group). On screens 1280 px and wider the
+  group opens in a **side pane** next to the list, so you can keep
+  scanning the list while you read; below that it is a dialog.
 - **AI review (optional)** - coarse verdicts per group
   (delete-safe/review/keep) and a fine-grained mode that rates every mail
   *inside* a group, with selection by rating. Verdicts are cached (by group
@@ -99,7 +107,7 @@ presets.
   names, adds a 📎 aggregate to groups, and enables the `att:>10m` filter.
   Proton IMAP can't strip single attachments, so cleanup means deleting
   the whole mail (reversible as always).
-- **Statistics** - mails-per-year histogram, top domains by size, scan
+- **Statistics** (Tools → Statistics) - mails-per-year histogram, top domains by size, scan
   history and per-month cleanup tallies ("freed this month"), persisted
   across restarts.
 - **Duplicate finder** - mails with the same Message-ID (e.g. copies
@@ -177,33 +185,53 @@ presets.
 - **Sieve export** - generate a Proton Sieve filter for a sender or
   domain (move to folder / delete on arrival / mark read) with a copy
   button, so future mail never clutters the mailbox again.
-- **Undo** - restore the last deletions from Trash (matched by Message-ID).
-- **Trash browser** - inspect the live Trash (also mail deleted outside
-  the app), search it, and restore selected mails to any folder.
+- **Undo** - every move to Trash ends in a toast ("Moved 618 mails to
+  Trash") with an **Undo** button; older deletions can be restored from
+  the Undo list in the toolbar (matched by Message-ID).
+- **Trash browser** - the Trash button in the header (with the live count)
+  opens the real Trash (also mail deleted outside the app): search it,
+  restore selected mails to any folder, or empty it. "Empty Trash…" is
+  also in the profile menu and always asks first, naming how many mails
+  will be deleted permanently.
 - **Persistent audit log** - every mailbox action (trash/archive/move/
   mark-read, incl. rule-triggered ones, rule runs, unsubscribes, undo,
   empty-trash) is recorded with a timestamp, actor, outcome and bytes
   freed - browsable in-app and exportable as CSV.
-- **Contextual bulk-action bar** - appears only once something is
-  selected: Archive/Move/Mark read/Unsubscribe/AI review/Trash collapse
-  into one "Action…" picker, with the retention limiter above it.
-  One-tap quick-select chips (AI-safe, inactive >6 months/1 year/2 years,
-  not-yet-unsubscribed, new senders) narrow the list down to their own
-  matches and select them - chips never combine, and each cycles through
-  filter → select → un-select-and-clear on repeated taps. AI review and
-  CSV export scope to the current selection here; their "⋯" overflow-menu
-  versions (nothing selected) act on everything, as before.
+- **Selection bar** - appears at the bottom only once something is
+  selected, showing how many groups and mails you picked, with Clear
+  selection, Export CSV, the retention limiter ("Limit to:"), an
+  "Action…" picker (Archive/Move/Mark read/Unsubscribe/AI review) and the
+  red **Trash N** button. Every destructive action opens an in-app
+  confirmation that names the scope and count ("618 mails from 6 groups
+  will be affected"), mentions skipped protected senders and mails, and
+  focuses Cancel; on a phone it is a bottom sheet.
+- **Quick chips** - one-tap chips under the filter box: AI-safe groups,
+  **Inactive: 6 mo | 1 yr | 2 yr**, and Not yet unsubscribed (plus
+  new senders when there are any). A chip narrows the list down to its
+  own matches and, on the next tap, selects them; a third tap un-selects
+  and clears. Chips never combine - use the filter box for that.
+- **Filter builder** - the sliders button next to the filter box opens a
+  click-together builder (category, AI verdict, age, unread %,
+  attachments, flags such as "not yet unsubscribed" or "rarely engaged
+  with"); on phones it opens as a bottom sheet. It writes the same
+  filter syntax you can type, and the result can be saved as a preset.
+- **Tools menu** - Rules, Attachments, Duplicates, Statistics, Audit Log,
+  AI review and Export CSV live under one Tools button. AI review and CSV
+  export scope to the current selection once something is selected; the
+  Tools versions (nothing selected) act on everything, as before.
 - **Bulk workflows** - background deletion queue with live progress and
   cancel, global mail search (optionally inside the message text, a
   per-account setting: your mail server does that search per query and
   nothing is stored, or an opt-in local word index for instant searches -
-  see below), Empty-Trash button, cancellable scans and AI runs.
+  see below), Empty Trash (profile menu or Trash panel), cancellable scans
+  and AI runs. Results and errors arrive as toasts instead of a status
+  line you have to scroll back to.
 - **Multiple accounts** - connect several providers at once (e.g. Proton
   Bridge + Gmail). Every account is strictly separate: its own scans,
   groups, rules, saved presets, digest settings, statistics, folder
   exclusions and replied/verdict/known-senders caches - nothing is ever
-  mixed or aggregated. A header toggle switches the whole view between
-  accounts; accounts can be added, renamed (all their data follows) and
+  mixed or aggregated. The profile menu (top right) switches the whole view
+  between accounts; accounts can be added, renamed (all their data follows) and
   removed in settings, and each has its own folder-discovery picker.
 - **Fast to open** - each account's last scan is cached on disk and shown
   instantly after a restart or account switch (with its age); a rescan
@@ -212,9 +240,20 @@ presets.
 - **Safe by design** - deletions are IMAP `MOVE` to Trash (reversible),
   UIDVALIDITY checked before every move, read-only scans, UID bookkeeping
   stays server-side, non-root container.
+- **Keyboard shortcuts** - `j`/`k` (or the arrow keys) move through the
+  list, `Enter` or `o` opens the group, `x` selects it, `#` trashes the
+  selection (or the focused group; it still asks first), `/` jumps to the
+  filter box and `Esc` closes the side pane.
+- **Light and dark theme** - toggle in the profile menu; remembered per
+  browser.
+- **Phone layout** - the same app on a small screen: touch-sized
+  controls, filters and confirmations as bottom sheets, a compact list.
+- **Settings** - four tabs (Mail account, General, AI, and Server for the
+  admin); **Backup & restore** (config and AI verdict export + import)
+  is on the General tab.
 - **Polish** - installable as a PWA (manifest + icon), optional desktop
   notifications when background jobs finish, monthly AI budget cap,
-  onboarding wizard on first run, config/verdict backup export+import.
+  onboarding wizard on first run.
 - **Languages** - English and German. Translations live in
   `frontend/src/locales/`; to contribute one, copy `de.ts`, translate the
   values and register the locale in `frontend/src/i18n.ts`.
@@ -266,7 +305,7 @@ in the UI; they persist in `/data`. Env bootstrap for other providers:
 > read your mail metadata and reconfigure the IMAP host / AI endpoint
 > (i.e. exfiltrate the stored credentials). Either keep the port on
 > localhost behind a reverse proxy with an auth middleware (Traefik +
-> tinyauth/Authelia, …), or enable the built-in login in Settings →
+> tinyauth/Authelia, …), or enable the built-in login in Settings → Server →
 > Login: a **password** (scrypt-hashed, session cookie), or **SSO via
 > any OpenID Connect provider** (Pocket ID, Authentik, Keycloak, …-
 > register the app there with callback URL
