@@ -1,5 +1,5 @@
-import { ArrowUpDown, Ban, Check, MessagesSquare, MoreHorizontal, Pin, PinOff,
-  Shield, Wand2, X }
+import { ArrowUpDown, Ban, Check, MailMinus, MessagesSquare, MoreHorizontal, Pin,
+  PinOff, Shield, Wand2, X }
   from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { api } from "../api";
@@ -467,13 +467,17 @@ export function DetailPanel({ grouping, group, aiEnabled, protectedNow,
                   ) : unsubscribedNow?.status === "link" ? (<>
                     <MenuItem disabled={busy} onClick={() =>
                       window.open(unsubscribedNow.link, "_blank", "noopener")}>
+                      <MailMinus size={16} className="mr-1 inline align-text-bottom" />
                       {t("unsub.open_link")}
                     </MenuItem>
                     <MenuItem disabled={busy} onClick={ackUnsubscribe}>
+                      <Check size={16}
+                        className="mr-1 inline align-text-bottom" />
                       {t("unsub.mark_done")}
                     </MenuItem>
                   </>) : (
                     <MenuItem disabled={busy} onClick={unsubscribe}>
+                      <MailMinus size={16} className="mr-1 inline align-text-bottom" />
                       {unsubscribedNow?.status === "failed"
                         ? t("unsub.retry") : t("Unsubscribe")}
                     </MenuItem>

@@ -391,7 +391,8 @@ export function GroupTable(props: Props) {
   const slice = groups.slice(baseIdx, baseIdx + perPage);
 
   return (
-    <>
+    // Focus falls back here when a dialog's opener row is gone (Modal).
+    <div data-focus-return tabIndex={-1} className="outline-none">
       <div className="hidden md:block">
         <DesktopTable {...props} slice={slice} baseIdx={baseIdx} />
       </div>
@@ -439,6 +440,6 @@ export function GroupTable(props: Props) {
           </Select>
         </div>
       )}
-    </>
+    </div>
   );
 }

@@ -460,7 +460,7 @@ test("promptDialog validates, submits the value, and cancels with null", async (
 });
 
 test("Modal sizes map to 448 / 672 / 768 px, full = lg at fixed height", () => {
-  const panel = () => screen.getByText("body");
+  const panel = () => screen.getByText("body").closest<HTMLElement>("[role=dialog]")!;
   const sizes: [Parameters<typeof Modal>[0]["size"], string][] = [
     ["sm", "sm:max-w-md"], ["md", "sm:max-w-2xl"], ["lg", "sm:max-w-3xl"]];
   for (const [size, cls] of sizes) {
@@ -476,6 +476,10 @@ test("Modal sizes map to 448 / 672 / 768 px, full = lg at fixed height", () => {
   render(<Modal onClose={() => {}}>body</Modal>);   // default md, shrinks to content
   expect(panel().className).toContain("sm:max-w-2xl");
   expect(panel().className).toContain("sm:h-auto");
+  // phone insets: top for every full-screen modal, bottom for the content-
+  // sized ones (full panels put the inset on their own footers)
+  expect(panel().className).toContain("max-sm:pt-[env(safe-area-inset-top)]");
+  expect(panel().className).toContain("max-sm:pb-[env(safe-area-inset-bottom)]");
   cleanup();
   render(<Modal size="sm" onClose={() => {}}>body</Modal>);   // phone bottom sheet
   expect(panel().className).not.toContain("h-dvh");
@@ -961,4 +965,45 @@ test("using a toast's button while a panel is open returns focus to that panel, 
   x.focus();
   fireEvent.click(x);
   expect(document.activeElement).toBe(dlg);
+});
+
+test("Tab inside a dialog can reach a toast's Undo; the trap still wraps around it", () => {
+  let show!: ReturnType<typeof useToast>["show"];
+  const Grab = () => { show = useToast().show; return null; };
+  render(<ToastProvider><Grab />
+    <Modal onClose={() => {}}><button>first</button><button>last</button></Modal>
+  </ToastProvider>);
+  act(() => { show("Moved", { action: { label: "Undo", onClick: () => {} } }); });
+  const last = screen.getByText("last");
+  last.focus();
+  expect(fireEvent.keyDown(last, { key: "Tab" })).toBe(true);   // browser moves on to the toast
+  const undo = screen.getByRole("button", { name: "Undo" });
+  undo.focus();
+  const dismiss = screen.getByRole("button", { name: "Dismiss" });
+  dismiss.focus();
+  expect(fireEvent.keyDown(dismiss, { key: "Tab" })).toBe(false);  // end of the trap
+  expect(document.activeElement).toBe(screen.getByText("first"));
+  fireEvent.keyDown(screen.getByText("first"), { key: "Tab", shiftKey: true });
+  expect(document.activeElement).toBe(dismiss);                   // wraps backwards into the toasts
+});
+
+test("if the opener vanished while the dialog was open, focus falls back to its list", () => {
+  const Host = () => {
+    const [open, setOpen] = useState(false);
+    const [row, setRow] = useState(true);
+    return <div data-focus-return tabIndex={-1} data-testid="list">
+      {row && <button onClick={() => setOpen(true)}>row</button>}
+      {open && <Modal onClose={() => setOpen(false)}>
+        <button onClick={() => setRow(false)}>trash all</button></Modal>}
+    </div>;
+  };
+  render(<Host />);
+  const row = screen.getByText("row");
+  row.focus();
+  fireEvent.click(row);
+  fireEvent.click(screen.getByText("trash all"));     // the row unmounts
+  expect(screen.queryByText("row")).toBeNull();
+  fireEvent.keyDown(window, { key: "Escape" });
+  expect(screen.queryByRole("dialog")).toBeNull();
+  expect(document.activeElement).toBe(screen.getByTestId("list"));
 });

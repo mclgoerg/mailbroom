@@ -674,11 +674,23 @@ export const isModalOpen = (): boolean => openModals.length > 0;
 const FOCUSABLE = 'a[href], button, input:not([type="hidden"]), select, '
   + 'textarea, [tabindex]';
 
-/** Tab stops inside `root`, in DOM order. */
-const tabStops = (root: HTMLElement): HTMLElement[] =>
-  [...root.querySelectorAll<HTMLElement>(FOCUSABLE)].filter((el) =>
+/** Tab stops inside `root`, in DOM order. CSS-hidden elements (display:none
+ *  parents, `hidden md:block` twins) are skipped wherever the browser lays
+ *  out; jsdom has no layout, so there the check is off. */
+const tabStops = (root: HTMLElement): HTMLElement[] => {
+  const layout = document.documentElement.getClientRects().length > 0;
+  return [...root.querySelectorAll<HTMLElement>(FOCUSABLE)].filter((el) =>
     el.tabIndex >= 0 && !(el as HTMLButtonElement).disabled
-    && !el.closest("[hidden]"));
+    && !el.closest("[hidden]")
+    && (!layout || el.getClientRects().length > 0));
+};
+
+/** Where Tab may go inside a dialog: its own controls, then the toast stack
+ *  (toasts never take focus on their own, but Undo must stay reachable). */
+const trapStops = (dialog: HTMLElement): HTMLElement[] => {
+  const toasts = document.querySelector<HTMLElement>(".pmc-toasts");
+  return [...tabStops(dialog), ...(toasts ? tabStops(toasts) : [])];
+};
 
 const MODAL_WIDTH = { sm: "sm:max-w-md", md: "sm:max-w-2xl",
   lg: "sm:max-w-3xl" };   // 448 / 672 / 768 px
@@ -716,7 +728,7 @@ export function Modal({ children, onClose, full = false, size, label,
       // Focus trap: Tab wraps inside the dialog and never reaches the page
       // behind it.
       if (e.key === "Tab" && dialog.current) {
-        const stops = tabStops(dialog.current);
+        const stops = trapStops(dialog.current);
         const at = stops.indexOf(document.activeElement as HTMLElement);
         const edge = e.shiftKey ? at <= 0 : at === stops.length - 1;
         if (!stops.length || at < 0 || edge) {
@@ -739,8 +751,14 @@ export function Modal({ children, onClose, full = false, size, label,
     // control and a screen reader announces the dialog.
     if (d && !d.contains(document.activeElement)) d.focus();
     const back = opener.current as HTMLElement | null;
+    // The opener can be gone by close time (Trash all unmounts its row):
+    // fall back to the list it sat in, so focus never drops to <body>.
+    const home = back?.closest<HTMLElement>("[data-focus-return]") ?? null;
     return () => {
-      if (back?.isConnected && back.focus) back.focus();
+      const to = back?.isConnected ? back
+        : home?.isConnected ? home
+        : document.querySelector<HTMLElement>("[data-focus-return]");
+      to?.focus?.();
     };
   }, []);
   const shape = sz === "sm"
@@ -748,10 +766,15 @@ export function Modal({ children, onClose, full = false, size, label,
        sm:rounded-dialog`
     : full
       ? "h-dvh sm:h-[88vh]"
-      : "h-dvh overflow-y-auto sm:h-auto sm:max-h-[88vh]";
+      : "h-dvh sm:h-auto sm:max-h-[88vh]";
+  // Content-sized modals scroll in an inner box, so on a phone the safe-area
+  // padding of the dialog stays put (a scrolling dialog would carry it away).
   // iPhone (viewport-fit=cover): full-screen modals keep their header below
   // the status bar.
-  const inset = sz === "sm" ? "" : " max-sm:pt-[env(safe-area-inset-top)]";
+  const scrolls = sz !== "sm" && !full;
+  // Full panels place their own footers above the home indicator.
+  const inset = sz === "sm" ? "" : " max-sm:pt-[env(safe-area-inset-top)]"
+    + (scrolls ? " max-sm:pb-[env(safe-area-inset-bottom)]" : "");
   return (
     <div
       className={`fixed inset-0 z-(--z-modal) flex justify-center bg-overlay
@@ -764,7 +787,12 @@ export function Modal({ children, onClose, full = false, size, label,
         data-size={sz}
         className={`flex w-full flex-col overflow-hidden border-line bg-panel outline-none
         sm:rounded-dialog sm:border ${MODAL_WIDTH[sz]} ${shape}${inset}`}>
-        {children}
+        {scrolls ? (
+          <div className="flex min-h-0 flex-1 flex-col overflow-y-auto
+            sm:flex-initial">
+            {children}
+          </div>
+        ) : children}
       </div>
     </div>
   );

@@ -79,14 +79,22 @@ const RULES: Rule[] = [
     // literals: a variable (`size={S}`) can't be checked, so it is refused.
     // Form controls keep their native `size` attribute.
     const bad: string[] = [];
+    // Only lucide icons must use literal sizes; Modal/Button/Spinner/Avatar
+    // take a variable `size` prop of their own (a variant name).
+    const icons = new Set<string>();
+    for (const im of src.matchAll(/import\s*\{([^}]*)\}\s*from\s*["']lucide-react["']/g))
+      for (const part of im[1].split(",")) {
+        const name = part.trim().split(/\s+as\s+/).pop();
+        if (name) icons.add(name);
+      }
     for (const tag of jsxTags(src, /[A-Z]\w*/)) {
       if (/^<(Input|Select|TextArea)\b/.test(tag)) continue;
       for (const m of tag.matchAll(/\bsize=(?:"([^"]*)"|\{([^{}]*)\})/g)) {
         const expr = m[1] ?? m[2];
         const nums = expr.match(/\d+(\.\d+)?/g) ?? [];
         const isWord = m[1] !== undefined && !/\d/.test(expr);   // size="sm"
-        const variable = m[2] !== undefined && !nums.length
-          && !/["'`]/.test(expr);
+        const variable = icons.has(tag.match(/^<(\w+)/)![1])
+          && m[2] !== undefined && !nums.length && !/["'`]/.test(expr);
         if (!isWord && (variable || nums.some((n) => !ICON_SIZES.has(Number(n)))))
           bad.push(m[0]);
       }
@@ -99,8 +107,11 @@ const RULES: Rule[] = [
     const util = "(?:min-|max-|[hw]-|[pm][xytrbl]?-|bg-|text-|rounded|border|"
       + "opacity|size-|font-|gap-|shadow|ring|outline)";
     const pre = new RegExp(`(?<=[\\s"'\`:])!${util}[\\w./-]*`, "g");
-    const suf = new RegExp(`(?<=[\\s"'\`:])${util}[\\w./-]*!(?![\\w=])`, "g");
-    return [...src.matchAll(pre), ...src.matchAll(suf)]
+    // Suffix form: a lowercase class-like token (has a `-`), so TS non-null
+    // assertions (`ref!.current`, `outlineEl!`) and prose ("...ring!") pass.
+    const suf = new RegExp(
+      `(?<=[\\s"'\`:])${util}[a-z0-9./\\[\\]-]*!(?![\\w=.])`, "g");
+    return [...src.matchAll(pre), ...[...src.matchAll(suf)].filter((m) => m[0].includes("-"))]
       .map((m) => m[0].endsWith("!") ? "!" + m[0].slice(0, -1) : m[0])
       .filter((t) => !BANG_ALLOWED.has(t));
   } },
@@ -185,9 +196,9 @@ test("the guard flags known-bad snippets", () => {
     ["transform", '<Button onClick={() => go()} className="hover:-translate-y-0.5">x</Button>'],
     ["raw shadow", '<p className="shadow-xs">'],
     ["raw shadow", '<p className="shadow-2xs">'],
-    ["icon size", "<X size={S} />"],
-    ["icon size", "<X size={iconSize} className=\"a\" />"],
-    ["icon size", "<X size={s * 2} />"],
+    ["icon size", 'import { X } from "lucide-react"; <X size={S} />'],
+    ["icon size", 'import { X } from "lucide-react"; <X size={iconSize} className="a" />'],
+    ["icon size", 'import { X as Close } from "lucide-react"; <Close size={s * 2} />'],
   ];
   for (const [rule, snippet] of bad) {
     expect(check(snippet).join("\n").toLowerCase(), snippet).toContain(rule);
@@ -211,6 +222,11 @@ test("the guard accepts the sanctioned patterns", () => {
     '<Button className={`${a > b ? "x" : "y"}`}>x</Button>',
     '<Button size={big ? "sm" : "md"}>x</Button> <Spinner size="sm" />',
     '<Button className="max-sm:w-full">x</Button>',
+    // non-null assertions, prose, and variable sizes on non-icon components
+    "const el = ref!.current; outlineEl!.focus(); ringEl!;",
+    't("Almost there, keep going - ring!")',
+    '<Modal size={sz}>x</Modal> <Button size={s}>x</Button> <Avatar size={sz} /> <Spinner size={sp} />',
+    'import { X } from "lucide-react"; <X size={16} /> <Spinner size={s} />',
   ];
   for (const s of good) expect(check(s), s).toEqual([]);
   expect(check('  "bg-violet-900 text-violet-300",', "src/components/ui.tsx"))
