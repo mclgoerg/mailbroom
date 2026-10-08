@@ -12,7 +12,7 @@ import {
   ConfirmDialog, DIALOG_ARM_MS, DialogProvider, PromptDialog, EmptyState, MailRow, Menu, MenuDivider,
   MenuHeading, MenuItem, Modal, Notice, ProgressBar, Segmented, ToastProvider,
   confirmDialog,
-  LINK, Tag, ensureAiAck, promptDialog, ProtectButton, useToast,
+  LINK, RatingChips, Tag, ensureAiAck, promptDialog, ProtectButton, useToast,
 } from "./components/ui";
 
 afterEach(cleanup);
@@ -919,4 +919,23 @@ test("a nested modal traps on its own and hands focus back to the one below", ()
   expect(document.activeElement).toBe(only);            // wraps onto itself
   fireEvent.keyDown(window, { key: "Escape" });
   expect(document.activeElement).toBe(spawn);
+});
+
+test("RatingChips: a labelled button whose popover explains the counts", () => {
+  const onRow = vi.fn();
+  render(<div onClick={onRow}>
+    <RatingChips ratings={{ delete_safe: 3, review: 0, keep: 2 }} />
+  </div>);
+  const btn = screen.getByRole("button", {
+    name: "Per-mail AI ratings: 3 safe to delete, 2 keep" });
+  expect(btn.textContent).toBe("🟢3🔴2");            // zero buckets stay out
+  expect(screen.queryByRole("dialog")).toBeNull();
+  fireEvent.click(btn);
+  const pop = screen.getByRole("dialog", { name: "Per-mail AI ratings" });
+  expect(pop.textContent).toContain("3 safe to delete");
+  expect(pop.textContent).toContain("2 keep");
+  expect(btn.getAttribute("aria-expanded")).toBe("true");
+  expect(onRow).not.toHaveBeenCalled();             // never opens the row
+  fireEvent.keyDown(document, { key: "Escape" });
+  expect(screen.queryByRole("dialog")).toBeNull();
 });

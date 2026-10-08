@@ -220,7 +220,10 @@ export const DE: Record<string, string> = {
   "v.review": "prüfen",
   "v.keep": "behalten",
   "v.unrated": "unbewertet",
-  "ratings.title": "KI-Bewertungen pro Mail (Gruppe öffnen für Details)",
+  "ratings.aria": "KI-Bewertungen pro Mail: {parts}",
+  "ratings.popover_title": "KI-Bewertungen pro Mail",
+  "ratings.popover_hint":
+    "Anzahl der Mails dieser Gruppe je Bewertung. Gruppe öffnen für Details.",
   "trash.open_label": "Papierkorb ({n} Mails)",
   "trash.open_label_one": "Papierkorb (1 Mail)",
   "page.first": "Erste Seite",

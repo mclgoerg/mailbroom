@@ -410,7 +410,10 @@ export const EN: Record<string, string> = {
   "v.review": "review",
   "v.keep": "keep",
   "v.unrated": "unrated",
-  "ratings.title": "Per-mail AI ratings (open the group for details)",
+  "ratings.aria": "Per-mail AI ratings: {parts}",
+  "ratings.popover_title": "Per-mail AI ratings",
+  "ratings.popover_hint":
+    "Counts of this group's mails by rating. Open the group for details.",
   "trash.open_label": "Trash ({n} mails)",
   "trash.open_label_one": "Trash (1 mail)",
   "page.first": "First page",

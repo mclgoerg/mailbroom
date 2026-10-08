@@ -1,5 +1,5 @@
-import { Ban, Check, MessagesSquare, MoreHorizontal, Pin, PinOff, Shield, Wand2,
-  X }
+import { ArrowUpDown, Ban, Check, MessagesSquare, MoreHorizontal, Pin, PinOff,
+  Shield, Wand2, X }
   from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { api } from "../api";
@@ -11,7 +11,8 @@ import type { AppState, Group, Grouping, GroupUnsub, Mail } from "../types";
 import { MailRows, MessageView } from "./MailList";
 import { ThreadView } from "./ThreadView";
 import { Button, Chip, confirmDialog, ensureAiAck, Input, LINK, LINK_ACCENT, Loading, Menu,
-  MenuItem, Modal, PanelHeader, PinButton, ProtectButton, Select, Spinner }
+  MenuItem, Modal, PanelHeader, PinButton, ProtectButton, Select, Spinner,
+  useMediaQuery }
   from "./ui";
 
 // Rating filter chips: same green/yellow/red/unrated buckets as the
@@ -60,6 +61,8 @@ export function DetailPanel({ grouping, group, aiEnabled, protectedNow,
   const [sieveAction, setSieveAction] = useState<SieveAction>("fileinto");
   const [sieveFolder, setSieveFolder] = useState("Archive");
   const cancelAi = useRef(false);
+  // Phone: Sort becomes an icon menu and Unsubscribe moves into the "⋯" menu.
+  const phone = useMediaQuery("(width < 40rem)");
 
   useEffect(() => {
     let alive = true;   // guard against a slow response for a previous group
@@ -99,6 +102,8 @@ export function DetailPanel({ grouping, group, aiEnabled, protectedNow,
       c[(m.ai ?? "unrated") as keyof typeof c]++);
     return c;
   }, [mails]);
+  // The rating filter only means something once the AI rated a mail.
+  const anyRated = vCounts.delete_safe + vCounts.review + vCounts.keep > 0;
 
   const toggle = (k: string) => {
     const next = new Set(sel);
@@ -370,17 +375,19 @@ export function DetailPanel({ grouping, group, aiEnabled, protectedNow,
                 ended up stranded alone on a 2nd line, flush right with a
                 big empty gap to its left. */}
             <div className="flex flex-wrap items-center gap-2">
-              <Chip className="shrink-0" on={vFilter === "all"}
-                onClick={() => { setVFilter("all"); setSel(new Set()); }}>
-                {t("filter.all")} ({mails ? mails.length : group.count})
-              </Chip>
-              {RATING_FILTERS.filter((f) =>
-                vCounts[f.key as keyof typeof vCounts] > 0).map((f) => (
-                <Chip key={f.key} className="shrink-0" on={vFilter === f.key}
-                  onClick={() => { setVFilter(f.key); setSel(new Set()); }}>
-                  {f.label} ({vCounts[f.key as keyof typeof vCounts]})
+              {(anyRated || vFilter !== "all") && (<>
+                <Chip className="shrink-0" on={vFilter === "all"}
+                  onClick={() => { setVFilter("all"); setSel(new Set()); }}>
+                  {t("filter.all")} ({mails ? mails.length : group.count})
                 </Chip>
-              ))}
+                {RATING_FILTERS.filter((f) =>
+                  vCounts[f.key as keyof typeof vCounts] > 0).map((f) => (
+                  <Chip key={f.key} className="shrink-0" on={vFilter === f.key}
+                    onClick={() => { setVFilter(f.key); setSel(new Set()); }}>
+                    {f.label} ({vCounts[f.key as keyof typeof vCounts]})
+                  </Chip>
+                ))}
+              </>)}
               {/* Not in the header's sub line: that one is truncated to a
                   few words on a phone, which hid the count entirely. */}
               {pinnedCount > 0 && (
@@ -394,12 +401,29 @@ export function DetailPanel({ grouping, group, aiEnabled, protectedNow,
             {/* Row 2: sort + build-a-selection + per-group secondary
                 actions, grouped together as one "list controls" row. */}
             <div className="flex flex-wrap items-center gap-2">
-              <Select value={sortBy} className="w-auto shrink-0"
-                onChange={(e) => setSortBy(e.target.value as "date" | "size")}>
-                <option value="date">{t("Sort: date")}</option>
-                <option value="size">{t("Sort: size")}</option>
-              </Select>
-              <Select value="" className="w-auto shrink-0"
+              {phone ? (
+                <Menu variant="secondary" icon label={t(
+                  sortBy === "date" ? "Sort: date" : "Sort: size")}
+                  trigger={<ArrowUpDown size={18} />}>
+                  <MenuItem active={sortBy === "date"}
+                    onClick={() => setSortBy("date")}>
+                    {t("Sort: date")}
+                  </MenuItem>
+                  <MenuItem active={sortBy === "size"}
+                    onClick={() => setSortBy("size")}>
+                    {t("Sort: size")}
+                  </MenuItem>
+                </Menu>
+              ) : (
+                <Select value={sortBy} className="w-auto shrink-0"
+                  onChange={(e) =>
+                    setSortBy(e.target.value as "date" | "size")}>
+                  <option value="date">{t("Sort: date")}</option>
+                  <option value="size">{t("Sort: size")}</option>
+                </Select>
+              )}
+              <Select value=""
+                className="min-w-0 flex-1 sm:w-auto sm:flex-none sm:shrink-0"
                 onChange={(e) => selectPreset(e.target.value)}>
                 <option value="" disabled>{t("Select…")}</option>
                 <option value="all">{t("All / none")}</option>
@@ -408,7 +432,7 @@ export function DetailPanel({ grouping, group, aiEnabled, protectedNow,
                 <option value="older24">{t("Older than 2 years")}</option>
                 <option value="none">{t("Clear selection")}</option>
               </Select>
-              {group.unsub && (
+              {group.unsub && !phone && (
                 unsubscribedNow?.status === "done" ? (
                   <span className="inline-flex items-center gap-1
                     rounded-badge bg-chip px-2 py-1 type-meta text-chiptext">
@@ -433,6 +457,28 @@ export function DetailPanel({ grouping, group, aiEnabled, protectedNow,
                 )
               )}
               <Menu label={t("menu.more")} trigger={<MoreHorizontal size={18} />}>
+                {group.unsub && phone && (
+                  unsubscribedNow?.status === "done" ? (
+                    <MenuItem disabled>
+                      <Check size={16}
+                        className="mr-1 inline align-text-bottom" />
+                      {t("Unsubscribed")}
+                    </MenuItem>
+                  ) : unsubscribedNow?.status === "link" ? (<>
+                    <MenuItem disabled={busy} onClick={() =>
+                      window.open(unsubscribedNow.link, "_blank", "noopener")}>
+                      {t("unsub.open_link")}
+                    </MenuItem>
+                    <MenuItem disabled={busy} onClick={ackUnsubscribe}>
+                      {t("unsub.mark_done")}
+                    </MenuItem>
+                  </>) : (
+                    <MenuItem disabled={busy} onClick={unsubscribe}>
+                      {unsubscribedNow?.status === "failed"
+                        ? t("unsub.retry") : t("Unsubscribe")}
+                    </MenuItem>
+                  )
+                )}
                 {/* AI rate mails only lives here while nothing is selected
                     (rate the whole group - secondary/occasional, like the
                     overview's own overflow entry). Once something IS

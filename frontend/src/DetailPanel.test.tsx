@@ -109,6 +109,41 @@ describe("DetailPanel", () => {
     expect(screen.getByText("Mail 1")).toBeTruthy();
   });
 
+  it("shows no rating filter chips at all while no mail is rated", async () => {
+    renderPanel([mkMail(1), mkMail(2)]);
+    await waitFor(() => screen.getByText("Mail 1"));
+    expect(screen.queryByText(/^All \(/)).toBeNull();
+    expect(screen.queryByText(/unrated/)).toBeNull();
+  });
+
+  it("on a phone Sort is an icon menu and Unsubscribe lives in the ⋯ menu",
+    async () => {
+    vi.stubGlobal("matchMedia", (q: string) => ({
+      matches: true, media: q, addEventListener: () => {},
+      removeEventListener: () => {},
+    }));
+    try {
+      renderPanel([mkMail(1), mkMail(2)],
+        { group: mkGroup({ unsub: true }) });
+      await waitFor(() => screen.getByText("Mail 1"));
+      expect(screen.queryByDisplayValue("Sort: date")).toBeNull();
+      expect(screen.queryByRole("button", { name: "Unsubscribe" })).toBeNull();
+      fireEvent.click(screen.getByRole("button", { name: "Sort: date" }));
+      fireEvent.click(screen.getByRole("menuitemradio",
+        { name: "Sort: size" }));
+      expect(screen.getByRole("button", { name: "Sort: size" })).toBeTruthy();
+      fireEvent.click(screen.getByRole("button", { name: "More" }));
+      expect(screen.getByRole("menuitem", { name: "Unsubscribe" })).toBeTruthy();
+    } finally { vi.unstubAllGlobals(); }
+  });
+
+  it("on a wide screen Sort is a select and Unsubscribe a button", async () => {
+    renderPanel([mkMail(1), mkMail(2)], { group: mkGroup({ unsub: true }) });
+    await waitFor(() => screen.getByText("Mail 1"));
+    expect(screen.getByDisplayValue("Sort: date")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Unsubscribe" })).toBeTruthy();
+  });
+
   it("has no bulk-action chrome until a mail is selected", async () => {
     renderPanel([mkMail(1), mkMail(2)]);
     await waitFor(() => screen.getByText("Mail 1"));

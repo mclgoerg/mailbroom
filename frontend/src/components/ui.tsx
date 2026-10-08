@@ -66,19 +66,82 @@ export function AiTag({ ai }: { ai: GroupAi }) {
   );
 }
 
-/** Compact per-mail rating summary for a group: 🟢n 🟡n 🔴n. */
+/** Open/close state of a small popover under a trigger: closes on an outside
+ *  press or Esc, and flips to right-aligned when it would run off the right
+ *  edge of the screen. Attach `ref` to the wrapper, `pop` to the popover. */
+function usePopover() {
+  const [open, setOpen] = useState(false);
+  const [alignRight, setAlignRight] = useState(false);
+  const ref = useRef<HTMLSpanElement>(null);
+  const pop = useRef<HTMLDivElement>(null);
+  // Opens left-aligned under the trigger; flips if that runs off the screen.
+  useLayoutEffect(() => {
+    if (!open) { setAlignRight(false); return; }
+    const r = pop.current?.getBoundingClientRect();
+    if (r && r.width > 0 && r.right > window.innerWidth - 8) {
+      setAlignRight(true);
+    }
+  }, [open]);
+  useEffect(() => {
+    if (!open) return;
+    const onDoc = (e: Event) => {
+      if (!ref.current?.contains(e.target as Node)) setOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setOpen(false);
+    };
+    document.addEventListener("pointerdown", onDoc);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("pointerdown", onDoc);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
+  return { open, setOpen, alignRight, ref, pop };
+}
+
+const POPOVER = `absolute top-full z-(--z-dropdown) mt-1 w-max
+  max-w-[min(18rem,calc(100vw-1rem))] rounded-card border border-line
+  bg-panel p-3 text-left type-meta shadow-popover`;
+
+/** Compact per-mail rating summary for a group: 🟢n 🟡n 🔴n. A button: tap
+ *  (or click) opens a popover spelling out what the counts are - touch
+ *  screens have no hover, and the bare emoji don't say what they count. */
 export function RatingChips({ ratings }: {
   ratings: { delete_safe: number; review: number; keep: number };
 }) {
-  const parts: [string, number][] = [
-    ["🟢", ratings.delete_safe], ["🟡", ratings.review], ["🔴", ratings.keep]];
+  const { open, setOpen, alignRight, ref, pop } = usePopover();
+  const parts: [string, number, string][] = [
+    ["🟢", ratings.delete_safe, "v.delete_safe"],
+    ["🟡", ratings.review, "v.review"], ["🔴", ratings.keep, "v.keep"]];
+  const shown = parts.filter(([, n]) => n > 0);
+  const tip = t("ratings.aria", { parts: shown.map(([, n, k]) =>
+    `${n} ${t(k)}`).join(", ") });
   return (
-    <span className="inline-flex gap-1 whitespace-nowrap align-middle
-      type-caption text-muted"
-      title={t("ratings.title")}>
-      {parts.filter(([, n]) => n > 0).map(([icon, n]) => (
-        <span key={icon}>{icon}{n}</span>
-      ))}
+    <span ref={ref} className="relative inline-block align-middle">
+      <button type="button" title={tip} aria-label={tip} aria-expanded={open}
+        // Rows are tap targets themselves (open the detail view) - this one
+        // only explains the counts.
+        onClick={(e) => { e.stopPropagation(); setOpen(!open); }}
+        className="inline-flex min-h-6 cursor-pointer gap-1 rounded px-0.5
+          whitespace-nowrap type-caption text-muted hover:bg-chip">
+        {shown.map(([icon, n]) => <span key={icon}>{icon}{n}</span>)}
+      </button>
+      {open && (
+        <div ref={pop} role="dialog" aria-label={t("ratings.popover_title")}
+          onClick={(e) => e.stopPropagation()}
+          className={`${POPOVER} ${alignRight ? "right-0" : "left-0"}`}>
+          <div className="font-semibold text-body">
+            {t("ratings.popover_title")}
+          </div>
+          <ul className="mt-1 space-y-0.5 text-muted">
+            {shown.map(([icon, n, k]) => (
+              <li key={icon}>{icon} {n} {t(k)}</li>
+            ))}
+          </ul>
+          <div className="mt-1 text-muted">{t("ratings.popover_hint")}</div>
+        </div>
+      )}
     </span>
   );
 }
@@ -145,10 +208,7 @@ export function EngagementMeter({ g }: {
   g: { engagement: number; count: number; unread: number; replied: boolean;
        bulk: boolean; last: string };
 }) {
-  const [open, setOpen] = useState(false);
-  const [alignRight, setAlignRight] = useState(false);
-  const ref = useRef<HTMLSpanElement>(null);
-  const pop = useRef<HTMLDivElement>(null);
+  const { open, setOpen, alignRight, ref, pop } = usePopover();
   const tier = engagementTier(g.engagement);
   const lit = { low: 1, medium: 2, high: 3 }[tier];
   const readPct = g.count ? Math.round(100 * (1 - g.unread / g.count)) : 0;
@@ -161,30 +221,6 @@ export function EngagementMeter({ g }: {
   const tierName = t(`eng.${tier}`);
   const tip = t("eng.tip", { score: g.engagement, tier: tierName,
     parts: parts.join(", ") });
-  // Opens left-aligned under the meter; flips if that runs off the right
-  // edge of the screen.
-  useLayoutEffect(() => {
-    if (!open) { setAlignRight(false); return; }
-    const r = pop.current?.getBoundingClientRect();
-    if (r && r.width > 0 && r.right > window.innerWidth - 8) {
-      setAlignRight(true);
-    }
-  }, [open]);
-  useEffect(() => {
-    if (!open) return;
-    const onDoc = (e: Event) => {
-      if (!ref.current?.contains(e.target as Node)) setOpen(false);
-    };
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setOpen(false);
-    };
-    document.addEventListener("pointerdown", onDoc);
-    document.addEventListener("keydown", onKey);
-    return () => {
-      document.removeEventListener("pointerdown", onDoc);
-      document.removeEventListener("keydown", onKey);
-    };
-  }, [open]);
   return (
     <span ref={ref} className="relative inline-block">
       <button type="button" title={tip} aria-label={tip} aria-expanded={open}
@@ -202,10 +238,7 @@ export function EngagementMeter({ g }: {
       </button>
       {open && (
         <div ref={pop} role="dialog" onClick={(e) => e.stopPropagation()}
-          className={`absolute top-full z-(--z-dropdown) mt-1 w-max
-            max-w-[min(18rem,calc(100vw-1rem))] rounded-card border
-            border-line bg-panel p-3 text-left type-meta
-            shadow-popover ${alignRight ? "right-0" : "left-0"}`}>
+          className={`${POPOVER} ${alignRight ? "right-0" : "left-0"}`}>
           <div className="font-semibold text-body">
             {t("eng.popover_title", { score: g.engagement, tier: tierName })}
           </div>
