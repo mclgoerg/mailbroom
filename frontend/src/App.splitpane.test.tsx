@@ -3,7 +3,7 @@
 
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from
   "@testing-library/react";
-import { afterEach, expect, test, vi } from "vitest";
+import { afterEach, beforeEach, expect, test, vi } from "vitest";
 
 const stateCalls = { n: 0 };
 let state: any;
@@ -16,6 +16,12 @@ const deleteGroups = vi.fn()
   .mockResolvedValue({ ok: true, queued: 1, skipped: 0 });
 const aiReview = vi.fn().mockResolvedValue({ ok: true });
 const downloadFile = vi.fn().mockResolvedValue(undefined);
+const mails = (key: string) => [1, 2, 3].map((uid) => ({
+  uid, folder: "INBOX", date: "2024-01-01", ts: uid,
+  subject: `Mail ${uid} of ${key}`, addr: key, size: 100,
+  seen: true, ai: null, pinned: false }));
+// Every group-detail fetch goes through here (count it, or hold it back).
+const groupFetch = vi.fn((key: string) => Promise.resolve(mails(key)));
 
 vi.mock("./api", () => ({
   api: {
@@ -33,10 +39,7 @@ vi.mock("./api", () => ({
     deleteRule: (...args: unknown[]) => deleteRule(...args),
     // three unpinned mails, matching groupFixture.count (the detail panel's
     // "Trash all N" counts the loaded, unpinned mails)
-    group: () => Promise.resolve([1, 2, 3].map((uid) => ({
-      uid, folder: "INBOX", date: "2024-01-01", ts: uid,
-      subject: `Mail ${uid}`, addr: "noreply@dhl.example", size: 100,
-      seen: true, ai: null, pinned: false }))),
+    group: (_grouping: string, key: string) => groupFetch(key),
     deleteGroups: (...args: unknown[]) => deleteGroups(...args),
     aiReview: (...args: unknown[]) => aiReview(...args),
   },
@@ -50,7 +53,7 @@ vi.mock("./api", () => ({
 
 import App from "./App";
 import { DialogProvider, ToastProvider } from "./components/ui";
-import { cancelDialog, expectNoDialog, findDialog, pressDialog } from "./dialogTestUtils";
+import { expectNoDialog, findDialog, pressDialog } from "./dialogTestUtils";
 import type { AppState, Config } from "./types";
 
 const cfg: Config = {
@@ -136,8 +139,12 @@ const paneTitle = () => pane()?.querySelector(".type-heading")?.textContent;
 const key = (k: string, target: Element = document.body) =>
   fireEvent.keyDown(target, { key: k });
 
-afterEach(() => { cleanup(); vi.unstubAllGlobals(); localStorage.clear();
-  deleteGroups.mockClear(); });
+beforeEach(() => {
+  groupFetch.mockClear();
+  groupFetch.mockImplementation((key) => Promise.resolve(mails(key)));
+});
+afterEach(() => { cleanup(); vi.useRealTimers(); vi.unstubAllGlobals();
+  localStorage.clear(); deleteGroups.mockClear(); block.mockClear(); });
 
 test(">= 1280 px: a row opens the pane (no dialog); the row is marked open",
   async () => {
@@ -221,7 +228,138 @@ test("a ConfirmDialog from the pane is a modal on top of it; Esc closes " +
   key("Escape");
   await expectNoDialog();
   expect(paneTitle()).toBe("Alpha");
-  void cancelDialog;
+});
+
+// The contract (not the timing): whoever uses an Esc marks it defaultPrevented
+// and nobody later in the chain acts on a used Esc. In a real browser React
+// re-renders between the Modal's and App's window listeners, so App can no
+// longer see the dialog open - only the mark tells it.
+const esc = (target: EventTarget = document.body) => {
+  const ev = new KeyboardEvent("keydown", { key: "Escape", bubbles: true,
+    cancelable: true });
+  act(() => { target.dispatchEvent(ev); });
+  return ev;
+};
+
+test("Esc contract: the topmost Modal marks the Esc as used", async () => {
+  mount();
+  fireEvent.click(await row("Alpha"));
+  await waitFor(() => expect(paneTitle()).toBe("Alpha"));
+  fireEvent.click(await screen.findByRole("button", { name: "Trash all 3" }));
+  await findDialog();
+  expect(esc().defaultPrevented).toBe(true);
+  await expectNoDialog();
+  expect(paneTitle()).toBe("Alpha");
+});
+
+test("Esc contract: App ignores an Esc something else already used",
+  async () => {
+  mount();
+  fireEvent.click(await row("Alpha"));
+  await waitFor(() => expect(paneTitle()).toBe("Alpha"));
+  // (a popover / menu / dialog earlier in the chain)
+  const use = (e: Event) => e.preventDefault();
+  document.addEventListener("keydown", use);
+  try { esc(); } finally { document.removeEventListener("keydown", use); }
+  expect(paneTitle()).toBe("Alpha");
+  expect(esc().defaultPrevented).toBe(false);   // App doesn't mark its own
+  expect(pane()).toBeNull();                    // an unused Esc does close it
+});
+
+test("rapid j/k: the last row wins with ONE fetch (debounced)", async () => {
+  mount();
+  fireEvent.click(await row("Alpha"));
+  await waitFor(() => expect(paneTitle()).toBe("Alpha"));
+  groupFetch.mockClear();
+  vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+  for (const k of ["j", "j", "k", "j", "j"]) { key(k); vi.advanceTimersByTime(100); }
+  expect(groupFetch).not.toHaveBeenCalled();       // never paused 150 ms yet
+  act(() => { vi.advanceTimersByTime(150); });
+  vi.useRealTimers();
+  await waitFor(() => expect(paneTitle()).toBe("Charlie"));
+  expect(groupFetch.mock.calls).toEqual([[C.key]]);
+});
+
+test("a slow fetch for group A arriving after B is open doesn't show A",
+  async () => {
+  mount();
+  let release!: () => void;
+  groupFetch.mockImplementationOnce((key) => new Promise((r) => {
+    release = () => r(mails(key));
+  }));
+  fireEvent.click(await row("Alpha"));
+  await waitFor(() => expect(groupFetch).toHaveBeenCalledTimes(1));
+  fireEvent.click(await row("Bravo"));
+  await waitFor(() => screen.getByText(`Mail 1 of ${B.key}`));
+  await act(async () => { release(); });
+  expect(screen.queryByText(`Mail 1 of ${A.key}`)).toBeNull();
+  expect(screen.getByText(`Mail 1 of ${B.key}`)).toBeTruthy();
+  expect(paneTitle()).toBe("Bravo");
+});
+
+// Block + "Move to Trash": the mocked state drops the open group.
+const blockAndTrash = async (dropped: string[]) => {
+  block.mockImplementationOnce(async () => {
+    const sender = { ...(state.groups.sender as Record<string, unknown>) };
+    dropped.forEach((k) => delete sender[k]);
+    state = { ...state, groups_rev: state.groups_rev + 1,
+      groups: { ...state.groups, sender } };
+    return { rule: { id: "r1" } };
+  });
+  fireEvent.click(await screen.findByRole("button", { name: "Block sender" }));
+  await pressDialog("Block");
+  await pressDialog(/Move to Trash/);
+};
+
+test("the open group vanishing from the mailbox advances to its neighbour",
+  async () => {
+  mount();
+  fireEvent.click(await row("Bravo"));
+  await waitFor(() => expect(paneTitle()).toBe("Bravo"));
+  await blockAndTrash([B.key]);
+  await waitFor(() => expect(paneTitle()).toBe("Charlie"));
+  expect((await row("Charlie")).getAttribute("aria-current")).toBe("true");
+});
+
+test("...and closes without stealing focus from the filter input",
+  async () => {
+  mount(true, { [A.key]: A });
+  fireEvent.click(await row("Alpha"));
+  await waitFor(() => expect(paneTitle()).toBe("Alpha"));
+  const filter = screen.getByPlaceholderText(/filter groups/i);
+  filter.focus();
+  await blockAndTrash([A.key]);
+  await waitFor(() => expect(pane()).toBeNull());
+  expect(document.activeElement).toBe(filter);
+});
+
+test("keyboard: Enter on the focused row opens the pane AND focuses it; " +
+  "j/k with focus inside keep focus in the pane", async () => {
+  mount();
+  await row("Alpha");
+  key("j");                       // focus the first row
+  key("Enter");
+  await waitFor(() => expect(paneTitle()).toBe("Alpha"));
+  await waitFor(() => expect(document.activeElement).toBe(pane()));
+  within(pane() as HTMLElement).getByRole("button", { name: /Trash all/ })
+    .focus();
+  key("j", document.activeElement!);
+  await waitFor(() => expect(paneTitle()).toBe("Bravo"));
+  await waitFor(() => expect(document.activeElement).toBe(pane()));
+});
+
+test("a list selection hides the pane's group actions (one red scope)",
+  async () => {
+  mount();
+  fireEvent.click(await row("Alpha"));
+  await waitFor(() => expect(paneTitle()).toBe("Alpha"));
+  expect(screen.getByRole("button", { name: "Trash all 3" })).toBeTruthy();
+  const box = (await row("Charlie")).querySelector("input[type=checkbox]")!;
+  fireEvent.click(box);
+  expect(screen.queryByRole("button", { name: "Trash all 3" })).toBeNull();
+  expect(screen.queryByRole("button", { name: "Block sender" })).toBeNull();
+  fireEvent.click(box);
+  expect(screen.getByRole("button", { name: "Trash all 3" })).toBeTruthy();
 });
 
 test("resizing across 1280 px swaps pane and modal, keeping the open group",
@@ -229,6 +367,7 @@ test("resizing across 1280 px swaps pane and modal, keeping the open group",
   mount();
   fireEvent.click(await row("Bravo"));
   await waitFor(() => expect(paneTitle()).toBe("Bravo"));
+  expect(groupFetch).toHaveBeenCalledTimes(1);
   await resize(false);
   const dlg = await screen.findByRole("dialog");
   expect(within(dlg).getByText("Bravo")).toBeTruthy();
@@ -236,6 +375,9 @@ test("resizing across 1280 px swaps pane and modal, keeping the open group",
   await resize(true);
   await waitFor(() => expect(paneTitle()).toBe("Bravo"));
   expect(screen.queryByRole("dialog")).toBeNull();
+  // each swap remounts the panel: exactly one refetch per swap, no more
+  await new Promise((r) => setTimeout(r, 300));
+  expect(groupFetch).toHaveBeenCalledTimes(3);
   // j continues from the open row, not from wherever focus used to be
   key("j");
   await waitFor(() => expect(paneTitle()).toBe("Charlie"));

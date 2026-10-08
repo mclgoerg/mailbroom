@@ -217,7 +217,7 @@ function DesktopTable({ slice, baseIdx, selected, focusedKey, openKey, compact, 
               ${g.key === focusedKey ? "outline outline-1 -outline-offset-1 outline-accent/60" : ""}`}>
             {/* Open row: 2 px accent left edge (§4.11 selected row). */}
             <td className={`px-2 py-2 align-top ${g.key === openKey
-              ? "border-l-2 border-accent" : ""}`} data-no-open>
+              ? "shadow-open-edge" : ""}`} data-no-open>
               <Checkbox checked={selected.has(g.key)} className="-mx-2 -my-1"
                 aria-label={t("Select {label}", { label: g.label || g.key })}
                 onChange={() => onToggle(g.key)} />

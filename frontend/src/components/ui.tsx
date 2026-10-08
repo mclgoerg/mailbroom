@@ -88,7 +88,8 @@ function usePopover() {
       if (!ref.current?.contains(e.target as Node)) setOpen(false);
     };
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setOpen(false);
+      // preventDefault = "used": App and Modal ignore a handled Esc.
+      if (e.key === "Escape") { e.preventDefault(); setOpen(false); }
     };
     document.addEventListener("pointerdown", onDoc);
     document.addEventListener("keydown", onKey);
@@ -504,7 +505,7 @@ export function Menu({ trigger, label, variant, icon, children }: {
     const onKey = (e: KeyboardEvent) => {
       // Stop it here (document, before window): a Modal around the menu
       // must not also close on the same Esc.
-      if (e.key === "Escape") { e.stopPropagation(); close(); }
+      if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); close(); }
     };
     document.addEventListener("mousedown", onDoc);
     document.addEventListener("keydown", onKey);
@@ -724,7 +725,13 @@ export function Modal({ children, onClose, full = false, size, label,
       // Only the topmost modal reacts, so Esc on a confirm that sits over
       // a panel closes the confirm and leaves the panel open.
       if (openModals[openModals.length - 1] !== id) return;
-      if (e.key === "Escape") closeRef.current();
+      // preventDefault marks the Esc as used: another window listener (App's
+      // pane Esc) runs after the re-render and must not act on it too. A
+      // popover that already handled it (defaultPrevented) leaves us alone.
+      if (e.key === "Escape" && !e.defaultPrevented) {
+        e.preventDefault();
+        closeRef.current();
+      }
       // Focus trap: Tab wraps inside the dialog and never reaches the page
       // behind it.
       if (e.key === "Tab" && dialog.current) {

@@ -907,6 +907,7 @@ export const DE: Record<string, string> = {
   "bar.limit_to": "Beschränken auf:",
   "Cancel": "Abbrechen",
   "detail.n_selected": "{n} ausgewählt",
+  "detail.region": "Details: {label}",
   "Dismiss": "Schließen",
   "Refresh": "Aktualisieren",
   "OK": "OK",

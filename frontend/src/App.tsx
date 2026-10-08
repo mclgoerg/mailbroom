@@ -522,8 +522,22 @@ export default function App() {
   // modal - the list stays keyboard-navigable and nothing traps focus.
   const splitPane = useSplitPane();
   const paneOpen = splitPane && !!detail;
-  const paneRef = useRef<HTMLDivElement>(null);
-  usePaneHeight(paneRef, paneOpen);
+  const [paneEl, setPaneEl] = useState<HTMLDivElement | null>(null);
+  usePaneHeight(paneEl);
+  // Set when the pane should take focus once its next group has rendered:
+  // an explicit keyboard open, or a swap while focus sat inside the pane
+  // (the new group remounts the panel, which would drop focus to <body>).
+  const focusPane = useRef(false);
+  const focusInPane = () => !!document.activeElement
+    ?.closest?.("[data-split-pane]");
+  useEffect(() => {
+    if (!paneOpen || !focusPane.current) return;
+    focusPane.current = false;
+    document.querySelector<HTMLElement>("[data-split-pane]")?.focus();
+  }, [detail?.key, paneOpen]);
+  // Last render's list: when the open group vanishes, `groups` is already
+  // the new one, so its neighbours come from here.
+  const prevGroups = useRef<Group[]>([]);
   const followTimer = useRef<number | undefined>(undefined);
   const focusRef = useRef(focusIdx);   // latest focusIdx, for key repeat
   focusRef.current = focusIdx;
@@ -533,28 +547,42 @@ export default function App() {
   };
   useEffect(() => cancelFollow, []);
   useEffect(() => { if (!paneOpen) cancelFollow(); }, [paneOpen]);
-  const openGroup = (g: Group) => {
-    cancelFollow();
+  const swapDetail = (g: Group) => {
+    if (focusInPane()) focusPane.current = true;
     setDetail(g);
+  };
+  const openGroup = (g: Group, byKeyboard = false) => {
+    cancelFollow();
+    if (byKeyboard && splitPane) focusPane.current = true;
+    swapDetail(g);
     // In the pane the focused row is the open row, so j/k continue from it.
     if (splitPane) setFocusIdx(groups.findIndex((x) => x.key === g.key));
   };
   const closePane = () => {
     cancelFollow();
+    // The pane held focus (or focus already fell to <body>): hand it back to
+    // the list, as a modal does. Focus elsewhere (the filter input, during a
+    // remote removal) stays put.
+    const a = document.activeElement;
+    const reclaim = !a || a === document.body || focusInPane();
     setDetail(null);
     refresh();
-    // The pane held focus; hand it back to the list (a modal does this itself).
-    document.querySelector<HTMLElement>("[data-focus-return]")?.focus();
+    if (reclaim)
+      document.querySelector<HTMLElement>("[data-focus-return]")?.focus();
   };
   // The open group is gone (Trash all, Block + trash): show the next one in
   // the list, else the previous, else close - the modal just closes.
-  const advancePane = (gone: Group) => {
-    const i = groups.findIndex((g) => g.key === gone.key);
-    const next = i < 0 ? undefined : groups[i + 1] ?? groups[i - 1];
+  const advancePane = (gone: Group, from: Group[] = groups) => {
+    const i = from.findIndex((g) => g.key === gone.key);
+    // `from` may be the list before the group vanished: pick the nearest
+    // neighbour that still exists.
+    const next = i < 0 ? undefined
+      : [...from.slice(i + 1), ...from.slice(0, i).reverse()]
+        .find((g) => groups.some((x) => x.key === g.key));
     if (next) {
       cancelFollow();
-      setDetail(next);
-      setFocusIdx(groups.indexOf(next));
+      swapDetail(groups.find((x) => x.key === next.key)!);
+      setFocusIdx(groups.findIndex((x) => x.key === next.key));
     } else closePane();
   };
   // The pane follows the focused row, after a short pause so key-repeat
@@ -564,6 +592,7 @@ export default function App() {
     cancelFollow();
     followTimer.current = window.setTimeout(() => {
       followTimer.current = undefined;
+      if (focusInPane()) focusPane.current = true;
       setDetail((cur) => cur && cur.key !== g.key ? g : cur);
     }, 150);
   };
@@ -579,9 +608,10 @@ export default function App() {
   // out): same as after Trash all.
   useEffect(() => {
     if (paneOpen && detail && state && !state.groups[mode]?.[detail.key])
-      advancePane(detail);
+      advancePane(detail, prevGroups.current);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state?.groups_rev]);
+  useEffect(() => { prevGroups.current = groups; });
   const anyModal = (!!detail && !splitPane) || searchOpen || settingsOpen || rulesOpen
     || attsOpen || dupsOpen || statsOpen || auditOpen || trashOpen;
 
@@ -936,6 +966,8 @@ export default function App() {
   };
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
+      // Something nearer (a dialog, menu or popover) already used this key.
+      if (e.defaultPrevented) return;
       const el = e.target as HTMLElement;
       // isModalOpen(): also covers confirm/prompt dialogs, which App's own
       // panel flags don't know about.
@@ -972,7 +1004,7 @@ export default function App() {
         next.has(key) ? next.delete(key) : next.add(key);
         setSelected(next);
       } else if ((e.key === "Enter" || e.key === "o") && focusIdx >= 0) {
-        openGroup(groups[focusIdx]);
+        openGroup(groups[focusIdx], true);
       } else if (e.key === "#") {
         if (selected.size) act([...selected], "trash", "", ...retentionParams());
         else if (focusIdx >= 0)
@@ -1054,6 +1086,9 @@ export default function App() {
       // open message never leak from one group into the next.
       key={variant === "pane" ? detail.key : undefined}
       variant={variant}
+      // A list selection brings the bulk bar: the pane's own destructive
+      // group actions step aside so two red scopes never stack.
+      hideGroupActions={variant === "pane" && selected.size > 0}
       grouping={mode}
       group={detail}
       aiEnabled={aiEnabled}
@@ -1638,9 +1673,9 @@ export default function App() {
         </div>
         {paneOpen && (
           <div className="min-w-0">
-            {/* Sticky to the top of the scroll container (body). Height:
-                what usePaneHeight measured, minus the bulk bar / safe area. */}
-            <div ref={paneRef} className="sticky top-0 h-[calc(var(--pane-avail,100dvh)-max(var(--bulkbar-h,0px),env(safe-area-inset-bottom)))]">
+            {/* Sticky to the top of the scroll container (body); usePaneHeight
+                sizes it to the room below the toolbar. */}
+            <div ref={setPaneEl} className="sticky top-0 h-dvh">
               {renderDetail("pane")}
             </div>
           </div>

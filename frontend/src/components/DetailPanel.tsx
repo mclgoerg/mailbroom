@@ -27,7 +27,7 @@ const RATING_FILTERS: { key: string; label: string }[] = [
 
 export function DetailPanel({ grouping, group, aiEnabled, protectedNow,
   unsubscribedNow, onTrash, onProtect, onBlock, onUnblock, blocked, folders,
-  sieve = true, onClose, onEmptied, onDeleted, variant = "modal" }: {
+  sieve = true, onClose, onEmptied, onDeleted, variant = "modal", hideGroupActions = false }: {
   grouping: Grouping;
   group: Group;
   aiEnabled: boolean;
@@ -53,6 +53,9 @@ export function DetailPanel({ grouping, group, aiEnabled, protectedNow,
   // "pane": the same content as a sticky column beside the list (>= 1280 px),
   // with no overlay, focus trap or modal-stack entry.
   variant?: "modal" | "pane";
+  // Pane only: the list has a selection, so the bulk bar owns the red button
+  // and the group-scoped footer (Trash all, Block) is not shown.
+  hideGroupActions?: boolean;
 }) {
   const [mails, setMails] = useState<Mail[] | null>(null);
   const [error, setError] = useState("");
@@ -575,7 +578,9 @@ export function DetailPanel({ grouping, group, aiEnabled, protectedNow,
             )}
           </div>
 
-          <div className="min-h-0 flex-1 overflow-y-auto pb-2">
+          {/* `relative`: MailRow's absolutely positioned sr-only spans would
+              otherwise anchor to the page and stretch it past the pane. */}
+          <div className="relative min-h-0 flex-1 overflow-y-auto pb-2">
             {error && <div className="p-4 type-body text-danger-fg">{error}</div>}
             {!shown && !error && <Loading />}
             {shown && (
@@ -645,7 +650,7 @@ export function DetailPanel({ grouping, group, aiEnabled, protectedNow,
               "Trash all N" names its scope and sits away from Close. Hidden
               while a selection exists: the selection bar above is then the
               one place to act (no two red buttons stacked). */}
-          {sel.size === 0 && <div className="flex flex-wrap items-center gap-2 border-t
+          {sel.size === 0 && !hideGroupActions && <div className="flex flex-wrap items-center gap-2 border-t
             border-line px-4 py-2"
             style={{ paddingBottom:
               "calc(env(safe-area-inset-bottom) + 0.5rem)" }}>
@@ -676,12 +681,12 @@ export function DetailPanel({ grouping, group, aiEnabled, protectedNow,
     </>
   );
 
-  // Pane: `h-full` fills the sticky wrapper App sizes to the viewport.
-  // `relative` + overflow-hidden also clip the checkboxes' absolutely
-  // positioned inputs, which would otherwise stretch the page itself.
+  // Pane: `h-full` fills the sticky wrapper App sizes to the viewport. It is
+  // focusable (tabIndex -1) so a keyboard open can move focus into it.
   return variant === "pane" ? (
-    <section aria-label={group.label} data-split-pane
-      className="relative flex h-full min-h-0 flex-col overflow-hidden border-l
+    <section aria-label={t("detail.region", { label: group.label })}
+      data-split-pane tabIndex={-1}
+      className="flex h-full outline-none min-h-0 flex-col overflow-hidden border-l
         border-line bg-panel">
       {content}
     </section>

@@ -102,6 +102,8 @@
 }
 @utility shadow-popover { box-shadow: var(--shadow-popover); }
 @utility shadow-bar { box-shadow: var(--shadow-bar); }
+/* 2 px accent left edge of the row open in the split pane (inset: no layout shift). */
+@utility shadow-open-edge { box-shadow: inset 2px 0 0 var(--color-accent); }
 
 /* Stacking scale: every z-index in the app comes from here (use
    z-(--z-dropdown) etc.), never a bare z-10/z-20. Popovers must sit above
