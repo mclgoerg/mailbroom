@@ -271,7 +271,7 @@ test("AI consent: continuing remembers the choice and runs the review",
   await selectAndRateWithAi();
   await pressDialog("Continue");
   await waitFor(() => expect(aiReview).toHaveBeenCalledWith(
-    "sender", [groupFixture.key]));
+    "sender", [groupFixture.key], false));
   expect(localStorage.getItem("pmc_ai_ack")).toBe("1");
 });
 

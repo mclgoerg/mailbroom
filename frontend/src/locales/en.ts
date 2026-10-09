@@ -833,4 +833,14 @@ export const EN: Record<string, string> = {
   "rule.f_retention_n": "Number",
   "rule.f_dest": "Folder",
   "rule.f_name": "Name",
+
+  "ai.rerate_action": "AI re-rate",
+  "ai.rerate_title": "Re-rate with AI?",
+  "ai.rerate_body":
+    "The selected groups that already have an AI verdict are sent to the AI "
+    + "again and their verdicts are replaced. This uses tokens (and budget) "
+    + "again. Groups without a verdict are not touched here - use "
+    + "\u201cAI review\u201d for those.",
+  "ai.rerate_btn": "Re-rate ({n})",
+  "ai.rerate_btn_one": "Re-rate (1)",
 };

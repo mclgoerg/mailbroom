@@ -628,11 +628,11 @@ export default function App() {
   // behavior, reachable from the "⋯" overflow menu); a `keys` list scopes
   // the run to just those groups (the contextual bar's selection-aware
   // entry).
-  const startAi = async (keys?: string[]) => {
+  const startAi = async (keys?: string[], rerate = false) => {
     if (!await ensureAiAck()) return;
     setPending(t("Starting…"));
     try {
-      await api.aiReview(mode, keys);
+      await api.aiReview(mode, keys, rerate);
       if (seenJobs.current) seenJobs.current.a = "running";   // see effect
       refresh();
     }
@@ -940,11 +940,25 @@ export default function App() {
     catch (e: any) { fail(e); }
   };
 
+  // Selected groups that already carry an AI verdict: what a re-rate replaces.
+  const ratedSelected = [...selected].filter((k) => state?.groups[mode]?.[k]?.ai);
+  // A plain "AI review" skips rated groups (no double billing); this is the
+  // explicit second opinion on just the selected ones.
+  const rerateSelected = async () => {
+    if (!ratedSelected.length) return;
+    if (!await confirmDialog({
+      title: t("ai.rerate_title"), body: t("ai.rerate_body"),
+      confirmLabel: t("ai.rerate_btn", { n: ratedSelected.length }),
+    })) return;
+    startAi(ratedSelected, true);
+  };
+
   const onAction = (v: string) => {
     if (!selected.size) return;
     if (v === "move") setMoveDest("?");
     else if (v === "unsubscribe") unsubscribeSelected();
     else if (v === "ai_review") startAi([...selected]);
+    else if (v === "ai_rerate") rerateSelected();
     else act([...selected], v, "", ...retentionParams());
   };
 
@@ -1506,6 +1520,9 @@ export default function App() {
               <option value="unsubscribe">{t("Unsubscribe")}</option>
               {aiEnabled && (
                 <option value="ai_review">{t("AI review")}</option>
+              )}
+              {aiEnabled && ratedSelected.length > 0 && (
+                <option value="ai_rerate">{t("ai.rerate_action")}</option>
               )}
             </Select>
             {moveDest === "?" && (
