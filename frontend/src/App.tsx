@@ -29,17 +29,22 @@ import { AccountAvatar, applyTheme, BAR_ICON_BTN, BulkBar, Button, Chip, ChipGro
 import { t } from "./i18n";
 import { usePaneHeight, useSplitPane } from "./splitPane";
 import { applyStatus, fmtAgo, fmtSize, fmtUsd, matchGroup, parseFilter,
-  parseProgress, retainedMailKeys } from "./lib";
+  parseProgress, retainedMailKeys, shortcutTarget } from "./lib";
+import { smartView } from "./smart";
 import type { AppState, AuthProbe, Config, FilterPreset, Group, Grouping,
   StatusMsg } from "./types";
 
 const GROUPING_LABEL: Record<Grouping, string> = {
-  sender: "Sender", domain: "Domain", subject: "Subject",
+  sender: "Sender", smart: "Smart", domain: "Domain", subject: "Subject",
   thread: "Thread",
 };
-// Groupings keyed by something that is neither an address nor a domain:
-// no protect/block/Sieve shortcuts (those need a sender or a domain).
-const KEYED_BY_MAIL = (g: Grouping) => g === "subject" || g === "thread";
+// The grouping tabs: Smart took the Domain tab's slot. "domain" stays a
+// grouping (rules, `domain:` filters, existing block/protect entries) but
+// is no longer shown as a tab.
+const TAB_GROUPINGS: Grouping[] = ["sender", "smart", "subject", "thread"];
+// Protect / block / Sieve shortcuts need a sender or a domain, so they are
+// per row (lib.ts shortcutTarget): subject / thread rows and Smart bucket
+// rows have none.
 
 const SORT_OPTIONS: { k: SortKey; label: string }[] = [
   { k: "count", label: "Sort: mails" },
@@ -408,8 +413,16 @@ export default function App() {
   // reflect the same full mailbox regardless of whatever filter is
   // currently showing - otherwise filtering down to one chip's
   // condition can make an UNRELATED chip disappear or change its count.
-  const allGroups = useMemo(() =>
-    Object.values(state?.groups?.[mode] ?? {}), [state, mode]);
+  // Smart's pooled rows are worded here (translated label + "N senders"),
+  // so the table, the filter, sorting and the dialogs all see the same text.
+  const modeGroups = useMemo(() => {
+    const raw = state?.groups?.[mode] ?? {};
+    return mode === "smart"
+      ? Object.fromEntries(Object.entries(raw)
+        .map(([k, g]) => [k, smartView(g)]))
+      : raw;
+  }, [state, mode]);
+  const allGroups = useMemo(() => Object.values(modeGroups), [modeGroups]);
 
   const groups = useMemo(() => {
     const f = parseFilter(filter);
@@ -426,17 +439,24 @@ export default function App() {
   // keys are currently blocked (and their rule id, for one-click unblock)
   // so rows/detail can show a badge+Unblock button and hide the Block one.
   const blockedRules = useMemo(() => {
-    const map = new Map<string, string>();
-    if (KEYED_BY_MAIL(mode)) return map;
-    const prefix = mode === "sender" ? "from:" : "domain:";
+    // "<rule grouping>:<value>" -> rule id; then each row looks up the
+    // address/domain its shortcuts act on (a Smart own row is a sender,
+    // a company row a domain).
+    const rules = new Map<string, string>();
     for (const r of state?.rules ?? []) {
-      if (r.origin === "block" && r.grouping === mode
-          && r.query.startsWith(prefix)) {
-        map.set(r.query.slice(prefix.length), r.id);
+      const prefix = r.grouping === "sender" ? "from:" : "domain:";
+      if (r.origin === "block" && r.query.startsWith(prefix)) {
+        rules.set(`${r.grouping}:${r.query.slice(prefix.length)}`, r.id);
       }
     }
+    const map = new Map<string, string>();
+    for (const g of allGroups) {
+      const tg = shortcutTarget(mode, g);
+      const id = tg && rules.get(`${tg.kind}:${tg.value}`);
+      if (id) map.set(g.key, id);
+    }
     return map;
-  }, [state?.rules, mode]);
+  }, [state?.rules, allGroups, mode]);
 
   // How many mails `keys` would actually move: the full group counts when
   // no retention restriction applies, or (when one does) the real count
@@ -798,7 +818,7 @@ export default function App() {
   const act = async (keys: string[], action: string, dest = "",
       keepLatest: number | null = null,
       olderThanDays: number | null = null): Promise<boolean> => {
-    const all = state?.groups[mode] ?? {};
+    const all = modeGroups;
     let force = false;
     let effective = keys;
     if (action === "trash") {
@@ -880,22 +900,31 @@ export default function App() {
     }
   };
 
-  // Sender mode protects the exact address, domain mode the whole domain.
-  // Subject groups have no stable sender, so they get no protect toggle.
-  const toggleProtect = KEYED_BY_MAIL(mode) ? undefined : async (g: Group) => {
-    const entry = mode === "domain" ? `@${g.key}` : g.key;
+  // Protect / block act on what the row stands for (shortcutTarget): the
+  // exact address, or the whole domain for a domain row. Subject / thread
+  // rows and Smart bucket rows have no target, so they get no shortcuts.
+  const toggleProtect = async (g: Group) => {
+    const tg = shortcutTarget(mode, g);
+    if (!tg) return;
+    const entry = tg.kind === "domain" ? `@${tg.value}` : tg.value;
     try {
       const r = await api.protect(entry, !g.protected);
       setCfg((c) => (c ? { ...c, protected: r.protected } : c));
+      // A Smart company row dissolves into "Protected senders" (the
+      // backend re-derives the pools): say where its mails went.
+      if (mode === "smart" && g.kind === "company") {
+        setDetail(null);
+        notify(t("smart.protected_moved", { label: g.label }));
+      }
       refresh();
     } catch (e: any) {
       fail(e);
     }
   };
 
-  // Sender/domain only (same restriction as protect - subject groups have
-  // no stable sender to build a from:/domain: rule from).
-  const blockGroup = KEYED_BY_MAIL(mode) ? undefined : async (g: Group) => {
+  const blockGroup = async (g: Group) => {
+    const tg = shortcutTarget(mode, g);
+    if (!tg) return;
     if (!await confirmDialog({
       title: t("confirm.block_title", { label: g.label }),
       body: t("confirm.block_body"), tone: "danger",
@@ -907,8 +936,14 @@ export default function App() {
         tone: "danger", cancelLabel: t("confirm.block_only"),
         confirmLabel: t("confirm.btn_n",
           { verb: actionVerb("trash"), n: g.count }) });
+    // A Smart company row holds only the domain's SMALL senders: trash
+    // exactly that row (the count the user confirmed), not the whole
+    // domain group the block endpoint would empty.
+    const poolOnly = mode === "smart" && tg.kind === "domain";
     try {
-      await api.block(mode, g.key, g.label, trashExisting);
+      await api.block(tg.kind, tg.value, g.label,
+        trashExisting && !poolOnly);
+      if (trashExisting && poolOnly) await api.deleteGroups(mode, [g.key]);
       notify(t("toast.blocked", { label: g.label }), "success");
       refresh();
     } catch (e: any) {
@@ -919,7 +954,7 @@ export default function App() {
   // Unblock = delete the standing rule the Block action created (same
   // reversible path as deleting any other rule in the Rules modal, just
   // reachable with one click from the group itself).
-  const unblockGroup = KEYED_BY_MAIL(mode) ? undefined : async (g: Group) => {
+  const unblockGroup = async (g: Group) => {
     const ruleId = blockedRules.get(g.key);
     if (!ruleId) return;
     if (!await confirmDialog({
@@ -1097,10 +1132,11 @@ export default function App() {
       unsubscribedNow={state?.groups[mode][detail.key]?.unsubscribed
         ?? detail.unsubscribed}
       onTrash={(g) => act([g.key], "trash")}
-      onProtect={toggleProtect}
-      onBlock={blockGroup}
-      onUnblock={unblockGroup}
+      onProtect={shortcutTarget(mode, detail) ? toggleProtect : undefined}
+      onBlock={shortcutTarget(mode, detail) ? blockGroup : undefined}
+      onUnblock={shortcutTarget(mode, detail) ? unblockGroup : undefined}
       blocked={blockedRules.has(detail.key)}
+      smartMin={acct?.smart_min ?? 10}
       folders={state?.folders_raw ?? []}
       sieve={(acct?.preset ?? "proton") === "proton"}
       onClose={variant === "pane" ? closePane
@@ -1241,7 +1277,7 @@ export default function App() {
             className="md:w-auto"
             value={flat ? "flat" : mode}
             options={[
-              ...(Object.keys(GROUPING_LABEL) as Grouping[]).map((g) =>
+              ...TAB_GROUPINGS.map((g) =>
                 ({ value: g as Grouping | "flat", label: t(GROUPING_LABEL[g]) })),
               { value: "flat", label: t("view.all_mails") },
             ]}

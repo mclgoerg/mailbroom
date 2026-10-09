@@ -98,6 +98,7 @@ export function SettingsModal({ cfg, account, onClose, onSaved,
       autoScanValue: String(im.auto_scan?.value ?? 6),
       autoScanAlign: String(im.auto_scan?.align_minute ?? 0),
       bodySearch: (im.body_search ?? "server") as BodySearchMode,
+      smartMin: String(im.smart_min ?? 10),
     };
   };
   const [f, setF] = useState({
@@ -248,6 +249,7 @@ export function SettingsModal({ cfg, account, onClose, onSaved,
             value: +f.autoScanValue || 1,
             align_minute: +f.autoScanAlign || 0 },
           body_search: f.bodySearch,
+          smart_min: Math.min(50, Math.max(2, Math.round(+f.smartMin) || 10)),
           ...(f.password ? { password: f.password } : {}),
           ...(oauthProvider ? { oauth: { provider: oauthProvider,
             client_id: f.oauthClientId,
@@ -889,6 +891,17 @@ export function SettingsModal({ cfg, account, onClose, onSaved,
                 secretKeySet={!!cfg.secret_key_set} />
             </>
           )}
+        </div>
+
+        <div className="sm:col-span-2 rounded-card border border-line
+          bg-panel2 p-3">
+          <SectionLabel className="mb-2">{t("smart.title")}</SectionLabel>
+          <Field label={t("smart.min_label")}>
+            <Input className="w-full sm:w-32" type="number" min={2} max={50}
+              inputMode="numeric" value={f.smartMin}
+              onChange={set("smartMin")} />
+          </Field>
+          <p className="mt-1 type-meta text-muted">{t("smart.min_help")}</p>
         </div>
 
         {Object.keys(cfg.accounts).length > 1 && (

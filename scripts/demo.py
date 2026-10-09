@@ -7,8 +7,11 @@ For screenshots and local poking without any real IMAP server:
       python /repo/scripts/demo.py
 
 Two demo accounts ("proton", "icloud") with plausible senders, seeded AI
-verdicts/ratings and statistics. Everything lives in a temp dir; nothing
-touches /data or the network. All addresses use .example domains.
+verdicts/ratings and statistics, plus a long tail of small senders so the
+Smart tab has something to pool. Everything lives in a temp dir; nothing
+touches /data or the network. All addresses use .example domains (the
+"Individuals" tail writes from gmail.com / gmx.de / web.de with obviously
+fake `demo.person*` local parts - freemail is what makes them individuals).
 """
 
 from __future__ import annotations
@@ -163,19 +166,103 @@ PROTON_INBOX = WANDER + (
             ["Terminbestätigung", "Ihr Laborbefund ist da"], 5, unread=0.1)
 )
 
+
+# --- long tail ------------------------------------------------------------
+# Real mailboxes are 80% senders with < 10 mails. Generated from a separate
+# seeded stream, so the hand-written senders above keep their exact data.
+_WORDS = ["acorn", "birch", "cobalt", "dune", "ember", "fjord", "glacier",
+          "harbor", "iris", "juniper", "kelp", "lagoon", "maple", "nectar",
+          "onyx", "pebble", "quartz", "reed", "sable", "tundra", "umber",
+          "velvet", "willow", "yarrow", "zephyr", "amber", "basil", "cedar",
+          "delta", "elm", "fern", "grove", "hazel", "indigo", "jade", "kiwi",
+          "lotus", "mint", "nova", "olive"]
+
+
+def _tail(local: str, domain: str, brands: list[str], subjects: list[str],
+          counts=(1, 3), **kw) -> list[dict]:
+    out: list[dict] = []
+    for b in brands:
+        out += mails(
+            f'"{b.title()}" <{local}@{domain.format(b=b)}>',
+            [s.replace("{b}", b.title()) for s in subjects],
+            random.randint(*counts), newest_days=random.uniform(1, 200),
+            span_days=random.uniform(30, 600), **kw)
+    return out
+
+
+def long_tail(scale: float = 1.0) -> tuple[list[dict], list[dict]]:
+    """(inbox mails, sent mails): ~100 small senders spread over every kind
+    Smart pools - companies, sign-ups, newsletters, notifications, shipping /
+    finance categories, private addresses, people you write to, the rest."""
+    state = random.getstate()
+    random.seed(11)
+    w = _WORDS
+    k = lambda n: max(1, round(n * scale))          # noqa: E731
+    inbox: list[dict] = []
+    inbox += _tail("service", "{b}.example", ["paymate"],
+                   ["Your monthly statement {n}", "Rewards update"], (5, 5))
+    inbox += _tail("alerts", "{b}.example", ["paymate"],
+                   ["New sign-in alert", "Spending summary"], (3, 3))
+    inbox += _tail("support", "mail.{b}.example", ["paymate"],
+                   ["Ticket {n} updated"], (3, 3))         # a subdomain: mixed
+    for brand in ("rentwheels", "tripnest"):                # one exact domain
+        for local in ("deals", "booking", "club"):
+            inbox += _tail(local, "{b}.example", [brand],
+                           ["Your trip, your deal", "Booking {n}"], (4, 4))
+    inbox += _tail("no-reply", "{b}.example", w[:k(14)],
+                   ["Welcome to {b}", "Please verify your email address",
+                    "Your {b} login code"], unread=0.8)
+    inbox += _tail("news", "{b}.example", w[14:14 + k(28)],
+                   ["This week at {b}", "Our autumn picks", "{b} news"],
+                   unsub=True)
+    inbox += _tail("noreply", "{b}-app.example", w[2:2 + k(12)],
+                   ["Your weekly summary", "Reminder: an update is ready"])
+    inbox += _tail("parcel", "{b}-post.example", w[5:5 + k(6)],
+                   ["Your parcel is on its way", "Shipment update {n}"])
+    inbox += _tail("billing", "{b}-pay.example", w[9:9 + k(6)],
+                   ["Invoice {n}", "Payment received"])
+    people = [f"demo.person{i:02d}@{d}" for i, d in enumerate(
+        ["gmail.com", "gmx.de", "web.de", "gmail.com", "outlook.com",
+         "gmx.de", "gmail.com", "web.de", "gmail.com", "gmx.de"][:k(10)])]
+    for addr in people:
+        inbox += mails(f'"{addr.split("@")[0].replace(".", " ").title()}" '
+                       f"<{addr}>", ["Hallo!", "Foto vom Sonntag", "Bis bald"],
+                       random.randint(1, 3), newest_days=random.uniform(1, 90))
+    inbox += _tail("m.schulz", "{b}-gmbh.example", w[20:20 + k(16)],
+                   ["Ihr Angebot", "Quarterly update", "Terminerinnerung"],
+                   (1, 2), unread=0.4)
+    # People you write to: small senders that also got a mail from the user.
+    wrote = [f"{n}@{d}.example" for n, d in (
+        ("tobi", "kletterhalle"), ("nina.k", "mietverein"),
+        ("vermieter", "hausverwaltung-nord"), ("opa", "familienpost"),
+        ("steuerberater", "kanzlei-brandt"))]
+    sent: list[dict] = []
+    for addr in wrote:
+        inbox += mails(f"<{addr}>", ["Re: Termin", "Kurze Frage"],
+                       random.randint(2, 4), newest_days=random.uniform(3, 60),
+                       unread=0.2)
+        sent.append(make_msg(next(_UID), frm="Demo <demo@example.com>",
+                             subject="Re: Termin", to=addr, seen=True,
+                             date=_date(random.uniform(2, 50))))
+    random.setstate(state)
+    return inbox, sent
+
+
+PROTON_TAIL, PROTON_TAIL_SENT = long_tail()
+ICLOUD_TAIL, ICLOUD_TAIL_SENT = long_tail(0.4)
+
+
 PROTON = FakeIMAP({
-    "INBOX": PROTON_INBOX,
-    "Sent": [make_msg(next(_UID), frm="Demo <demo@example.com>",
-                      subject="Re: Wanderung am Samstag?", msgid=WANDER_R1,
-                      irt=WANDER_1, refs=WANDER_1,
-                      to="anna.weber@mailfox.example",
-                      cc="praxis@dr-meier.example", seen=True,
-                      date=_date(4),
-                      body="Klingt gut, ich bringe Brote mit. Wann geht es "
-                           "los?\n\nAm Montag, 29. September 2026 um 09:12 "
-                           "schrieb Anna Weber <anna.weber@mailfox.example>:\n"
-                           "> Hi! Hast du am Samstag Zeit für eine "
-                           "Wanderung?")],
+    "INBOX": PROTON_INBOX + PROTON_TAIL,
+    "Sent": PROTON_TAIL_SENT + [make_msg(
+        next(_UID), frm="Demo <demo@example.com>",
+        subject="Re: Wanderung am Samstag?", msgid=WANDER_R1,
+        irt=WANDER_1, refs=WANDER_1, to="anna.weber@mailfox.example",
+        cc="praxis@dr-meier.example", seen=True, date=_date(4),
+        body="Klingt gut, ich bringe Brote mit. Wann geht es los?\n\n"
+             "Am Montag, 29. September 2026 um 09:12 schrieb Anna Weber "
+             "<anna.weber@mailfox.example>:\n> Hi! Hast du am Samstag Zeit "
+             "für eine Wanderung?")],
     "Trash": mails('"Old Newsletter" <bye@gone.example>',
                    ["We miss you!"], 34, unread=0.9),
     "Spam": [],
@@ -192,10 +279,12 @@ ICLOUD = FakeIMAP({
         + mails('"Cloud Photos" <no-reply@cloudphotos.example>',
                 ["Your storage is 80% full", "Memories from last year"],
                 22, unsub=True)
+        + ICLOUD_TAIL
     ),
-    "Sent Messages": [make_msg(next(_UID), frm="Demo <demo@icloud.example>",
-                               subject="Re: Sonntag bei Oma?",
-                               to="lisa@familienpost.example", seen=True)],
+    "Sent Messages": ICLOUD_TAIL_SENT + [make_msg(
+        next(_UID), frm="Demo <demo@icloud.example>",
+        subject="Re: Sonntag bei Oma?",
+        to="lisa@familienpost.example", seen=True)],
     "Deleted Messages": [],
 })
 

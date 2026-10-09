@@ -939,6 +939,8 @@ def post_protect(body: ProtectBody):
         "protected list %s %r (%d entries)",
         "add" if body.on else "remove", body.entry.strip().lower(),
         len(protected))
+    # Smart rows keep a protected sender in the protected bucket: re-derive.
+    mailops.rebuild_smart_all()
     return {"protected": protected}
 
 
@@ -1323,6 +1325,9 @@ def post_config(body: dict):
                 "account renamed: %r -> %r (state, verdicts, unsubscribes, "
                 "replied, stats, rules, presets, digest, known senders, "
                 "pins, auto-scan, audit log migrated)", old, new)
+    # Own-row threshold or protected list changed -> smart rows re-derive
+    # (no-op otherwise, so unrelated saves never reshuffle the list).
+    mailops.rebuild_smart_all()
     return cfgmod.masked_config(cfg)
 
 

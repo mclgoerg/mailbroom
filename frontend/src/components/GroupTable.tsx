@@ -1,8 +1,9 @@
-import { ArrowDown, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight,
-  MessagesSquare } from "lucide-react";
+import { ArrowDown, Bell, Building2, ChevronLeft, ChevronRight, ChevronsLeft,
+  ChevronsRight, KeyRound, MessagesSquare, Newspaper, Reply, Shapes, Shield,
+  Tag as TagIcon, Users, type LucideIcon } from "lucide-react";
 import { useEffect, useRef, useState, type MouseEvent } from "react";
 import { fmtSize } from "../api";
-import type { Group, Grouping } from "../types";
+import type { Group, Grouping, SmartKind } from "../types";
 import { t } from "../i18n";
 import { AiTag, Avatar, Button, Checkbox, EngagementMeter, PinBadge, RatingChips, ShortDate, Tag, Select, isModalOpen } from "./ui";
 
@@ -46,10 +47,28 @@ export function localizedSub(sub: string): string {
   return m[1] ? `${t("n.mails", { n: Number(m[1]) })}, ${senders}` : senders;
 }
 
+// Smart pools have no single sender to take a letter from: each kind gets
+// an icon (DESIGN.md Icons) on the same neutral avatar disc as thread rows.
+const KIND_ICON: Record<Exclude<SmartKind, "sender">, LucideIcon> = {
+  company: Building2, protected: Shield, replied: Reply, accounts: KeyRound,
+  category: TagIcon, newsletter: Newspaper, notifications: Bell,
+  individuals: Users, other: Shapes,
+};
+
 /** The row's avatar. A thread's label is its subject, and a subject's
  *  first letter says nothing - so thread rows show their first sender, or a
- *  neutral icon avatar when there is none. */
+ *  neutral icon avatar when there is none. A Smart company / bucket row
+ *  shows its kind's icon. */
 function RowAvatar({ g, grouping }: { g: Group; grouping?: Grouping }) {
+  if (grouping === "smart" && g.kind && g.kind !== "sender") {
+    const Icon = KIND_ICON[g.kind];
+    return (
+      <span aria-hidden className="inline-flex size-8 shrink-0 items-center
+        justify-center rounded-full bg-chip text-muted">
+        <Icon size={16} />
+      </span>
+    );
+  }
   if (grouping !== "thread") {
     return <Avatar name={g.label || g.key} size="md" />;
   }

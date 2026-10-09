@@ -1,4 +1,11 @@
-export type Grouping = "sender" | "domain" | "subject" | "thread";
+// "domain" is no longer a tab (Smart replaced it) but stays a grouping for
+// rules, `domain:` filters and the block/protect shortcuts.
+export type Grouping = "sender" | "smart" | "domain" | "subject" | "thread";
+/** What a Smart row is: an own row for a big sender, a company pool, or a
+ *  bucket of small senders (see backend mailops.build_smart). */
+export type SmartKind = "sender" | "company" | "protected" | "replied"
+  | "accounts" | "category" | "newsletter" | "notifications"
+  | "individuals" | "other";
 export type Verdict = "delete_safe" | "review" | "keep";
 
 export interface GroupAi {
@@ -42,6 +49,15 @@ export interface Group {
   new: boolean;
   pinned: number;   // mails of this group protected from bulk actions
   engagement: number;   // 0-100, see lib.ts engagementTier()
+  // Smart grouping only. The backend ships fields, the UI words them
+  // (lib.ts smartView): `sub` is empty and `label` is an English fallback
+  // for pooled rows.
+  kind?: SmartKind;
+  n_senders?: number;
+  members?: string[];   // sender addresses (capped), for the free-text filter
+  addr?: string;        // own rows: the sender's address
+  domain?: string;      // company rows: the ONE exact domain, else ""
+  category?: string;    // category rows: the category name
 }
 
 export interface AiUsage {
@@ -355,6 +371,7 @@ export interface ImapAccount {
   digest: DigestSettings;
   auto_scan: AutoScanSettings;
   body_search?: BodySearchMode;   // absent from older backends = "server"
+  smart_min?: number;             // Smart: own row from N mails (default 10)
 }
 
 export type OauthProvider = "google" | "microsoft";

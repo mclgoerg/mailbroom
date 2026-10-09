@@ -57,7 +57,7 @@ const cfg = {
 const baseState: AppState = {
   account: "proton", status: "done", scanned_ts: 1, groups_rev: 1,
   progress: "", error: "", folders: ["INBOX"],
-  groups: { sender: {}, domain: {}, subject: {}, thread: {} },
+  groups: { sender: {}, smart: {}, domain: {}, subject: {}, thread: {} },
   ai: { status: "idle", grouping: "sender", progress: "", error: "",
     usage: null },
   delete: { status: "idle", progress: "", error: "", moved: 0 },
@@ -120,10 +120,10 @@ test("the grouping segments mark the current one with aria-selected",
       .filter((b) => b.getAttribute("aria-selected") === "true")
       .map((b) => b.textContent);
     expect(screen.getAllByRole("tab").map((b) => b.textContent))
-      .toEqual(["Sender", "Domain", "Subject", "Thread", "All mails"]);
+      .toEqual(["Sender", "Smart", "Subject", "Thread", "All mails"]);
     expect(sel()).toEqual(["Sender"]);
-    fireEvent.click(screen.getByRole("tab", { name: "Domain" }));
-    expect(sel()).toEqual(["Domain"]);
+    fireEvent.click(screen.getByRole("tab", { name: "Smart" }));
+    expect(sel()).toEqual(["Smart"]);
     fireEvent.click(screen.getByRole("tab", { name: "All mails" }));
     expect(sel()).toEqual(["All mails"]);
   });
@@ -195,7 +195,7 @@ test("Enter on a focused grouping tab doesn't trigger the list's Enter-opens-" +
   await open();
   Element.prototype.scrollIntoView = () => {};              // jsdom lacks it
   fireEvent.keyDown(document.body, { key: "j" });          // focus row 0
-  fireEvent.keyDown(screen.getByRole("tab", { name: "Domain" }),
+  fireEvent.keyDown(screen.getByRole("tab", { name: "Smart" }),
     { key: "Enter" });
   expect(screen.queryByRole("dialog")).toBeNull();
 });

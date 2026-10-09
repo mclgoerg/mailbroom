@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { applyStatus, fmtDate, ENGAGEMENT_HIGH_MIN, ENGAGEMENT_LOW_MAX,
   engagementTier, fmtAgo, fmtSize, fmtUsd, mailKey, matchGroup, olderThan,
-  parseFilter, parseProgress, retainedMailKeys, sieveSnippet } from "./lib";
+  parseFilter, parseProgress, retainedMailKeys, shortcutTarget,
+  sieveSnippet } from "./lib";
 import type { Group } from "./types";
 
 const g = (over: Partial<Group> = {}): Group => ({
@@ -368,5 +369,56 @@ describe("fmtDate", () => {
   });
   it("keeps years below 100 as they are", () => {
     expect(fmtDate("0050-03-04", now)).toContain("50");
+  });
+});
+
+describe("Smart rows", () => {
+  const own = g({ key: "s:a@x.example", kind: "sender", addr: "a@x.example",
+    label: "A", sub: "a@x.example", members: [] });
+  const pool = g({ key: "o:paypal.de", kind: "company", domain: "paypal.de",
+    label: "paypal.de", sub: "3 senders", n_senders: 3,
+    members: ["a@paypal.de", "news@mail.paypal.de"] });
+  const bucket = g({ key: "k:other", kind: "other", domain: undefined,
+    label: "Other senders", sub: "2 senders",
+    members: ["zed@lone.example", "amy@one.example"] });
+  const f = (q: string) => parseFilter(q);
+
+  it("free text also matches the members", () => {
+    expect(matchGroup(bucket, f("lone"))).toBe(true);
+    expect(matchGroup(bucket, f("amy@one"))).toBe(true);
+    expect(matchGroup(bucket, f("nobody"))).toBe(false);
+    expect(matchGroup(pool, f("mail.paypal"))).toBe(true);
+    // rows without members behave as before
+    expect(matchGroup(g(), f("lone"))).toBe(false);
+  });
+
+  it("from: and domain: reach a row's senders", () => {
+    expect(matchGroup(own, f("from:a@x.example"))).toBe(true);
+    expect(matchGroup(own, f("from:b@x.example"))).toBe(false);
+    expect(matchGroup(bucket, f("from:zed@lone.example"))).toBe(true);
+    expect(matchGroup(pool, f("domain:paypal.de"))).toBe(true);
+    expect(matchGroup(pool, f("domain:mail.paypal.de"))).toBe(true);
+    expect(matchGroup(bucket, f("domain:one.example"))).toBe(true);
+    expect(matchGroup(bucket, f("domain:other.example"))).toBe(false);
+    // plain Sender / Domain rows keep matching on their key
+    expect(matchGroup(g(), f("from:noreply@dhl.example"))).toBe(true);
+    expect(matchGroup(g({ key: "dhl.example" }), f("domain:dhl.example")))
+      .toBe(true);
+  });
+
+  it("shortcutTarget: sender / domain rows, own rows, one-domain pools", () => {
+    expect(shortcutTarget("sender", g()))
+      .toEqual({ kind: "sender", value: "noreply@dhl.example" });
+    expect(shortcutTarget("domain", g({ key: "dhl.example" })))
+      .toEqual({ kind: "domain", value: "dhl.example" });
+    expect(shortcutTarget("smart", own))
+      .toEqual({ kind: "sender", value: "a@x.example" });
+    expect(shortcutTarget("smart", pool))
+      .toEqual({ kind: "domain", value: "paypal.de" });
+    // several domains (subdomains included): no shortcuts
+    expect(shortcutTarget("smart", { ...pool, domain: "" })).toBeNull();
+    expect(shortcutTarget("smart", bucket)).toBeNull();
+    expect(shortcutTarget("subject", g())).toBeNull();
+    expect(shortcutTarget("thread", g())).toBeNull();
   });
 });
