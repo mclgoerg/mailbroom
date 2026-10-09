@@ -55,6 +55,13 @@ AI_PROTECTED_NOTE = """
 Groups marked "protected": true contain senders the user explicitly
 protects. NEVER rate a protected group delete_safe - use review or keep."""
 
+# Appended for the "smart" grouping: pooled rows hold many small senders.
+AI_SMART_NOTE = """
+Some groups pool many small senders (the label says which kind; the samples
+are some of their addresses). Rate such a group as a whole and stay careful:
+a pooled group is only delete_safe when it is clearly all marketing or
+automated mail."""
+
 AI_GROUP_PROTECTED_NOTE = """
 Mails marked "protected": true are from senders the user explicitly
 protects. NEVER rate a protected mail delete_safe - use review or keep."""
@@ -220,7 +227,8 @@ def _run_ai(grouping: str, acc=None, keys: set[str] | None = None) -> None:
                 for r in STATE["groups"][grouping].values()
                 if r["ai"] is None and (keys is None or r["key"] in keys)]
         system = AI_SYSTEM.format(grouping=grouping) + (
-            AI_PROTECTED_NOTE if prot_keys else "")
+            AI_PROTECTED_NOTE if prot_keys else "") + (
+            AI_SMART_NOTE if grouping == "smart" else "")
 
         if not batch_src:
             with STATE_LOCK:
@@ -270,7 +278,10 @@ def _run_ai(grouping: str, acc=None, keys: set[str] | None = None) -> None:
                                 verdict = "review"
                             rec["ai"] = {"verdict": verdict,
                                          "reason": v["reason"][:160]}
-                            applied[rec["key"]] = rec["ai"]
+                            stored = dict(rec["ai"])
+                            if "fp" in rec:        # pooled row: see verdictstore
+                                stored["fp"] = rec["fp"]
+                            applied[rec["key"]] = stored
                     done += len(batch)
                     STATE["ai"]["progress"] = f"{done}/{len(batch_src)} groups"
                     STATE["groups_rev"] += 1

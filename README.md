@@ -12,7 +12,7 @@ Mailbroom sweeps any IMAP mailbox - built with love for
 [Proton Mail Bridge](https://proton.me/mail/bridge).
 
 Declutter a mailbox: scan everything over IMAP, group mails **by
-sender, domain, subject, or conversation thread** with counts, sizes, and unread ratios, drill
+sender, smart pools, subject, or conversation thread** with counts, sizes, and unread ratios, drill
 into any group down to the full mail text (or browse everything in a flat,
 date-sorted "All mails" list, or read a whole conversation as one thread -
 including your own replies from Sent), and move whole groups or single
@@ -81,8 +81,12 @@ presets.
 
 ## Features
 
-- **Grouping tabs** - switch between Sender, Domain (catches `noreply@`,
-  `news@`, … of the same company), Subject (normalized: merges
+- **Grouping tabs** - switch between Sender, Smart (every big sender keeps
+  its own row; the long tail of small senders is pooled by company - all
+  `noreply@`, `news@`, … of one domain - and by kind: sign-ups and security
+  codes, newsletters, people you write to, …, so hundreds of rows become
+  ~50; the per-account threshold is "Own row from N mails", default 10),
+  Subject (normalized: merges
   `Order 123` / `Order 456`, strips Re:/Fwd:), Thread (whole
   conversations) and a flat "All mails" list. The All mails view is
   remembered; the grouping starts at Sender.

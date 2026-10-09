@@ -833,4 +833,43 @@ export const EN: Record<string, string> = {
   "rule.f_retention_n": "Number",
   "rule.f_dest": "Folder",
   "rule.f_name": "Name",
+
+  // Smart grouping (the "Smart" tab: big senders keep a row, the long tail
+  // of small senders is pooled by company / kind).
+  "smart.kind.protected": "Protected senders",
+  "smart.kind.replied": "People you write to",
+  "smart.kind.accounts": "Accounts & security",
+  "smart.kind.newsletter": "Newsletters",
+  "smart.kind.notifications": "Automated notifications",
+  "smart.kind.individuals": "Individuals",
+  "smart.kind.other": "Other senders",
+  "smart.cat": "Category: {name}",
+  "smart.why.company":
+    "Several small senders from {domain}, each with fewer than {min} mails.",
+  "smart.why.protected":
+    "Senders with fewer than {min} mails that you have protected.",
+  "smart.why.replied":
+    "Senders with fewer than {min} mails that you have written to.",
+  "smart.why.accounts":
+    "Senders with fewer than {min} mails, mostly sign-ups and security codes.",
+  "smart.why.category":
+    "Senders with fewer than {min} mails in the category \u201c{name}\u201d.",
+  "smart.why.newsletter":
+    "Senders with fewer than {min} mails that offer an unsubscribe link.",
+  "smart.why.notifications":
+    "Senders with fewer than {min} mails that look automated "
+    + "(no-reply addresses).",
+  "smart.why.individuals":
+    "Senders with fewer than {min} mails writing from a private address "
+    + "(Gmail, Outlook, GMX, \u2026).",
+  "smart.why.other":
+    "All other senders with fewer than {min} mails.",
+  "smart.protected_moved":
+    "{label} is protected now - its mails moved to \u201cProtected senders\u201d.",
+  "smart.title": "Smart grouping",
+  "smart.min_label": "Own row from N mails",
+  "smart.min_help":
+    "In the Smart tab a sender with at least this many mails keeps its own "
+    + "row; smaller senders are pooled by company and kind. 2\u201350, "
+    + "default 10. Applies right away, no rescan needed.",
 };

@@ -483,6 +483,29 @@ test("mail-text search mode defaults to server and saves the chosen mode",
     expect(saveCalls[0].imap.body_search).toBe("disabled");
   });
 
+test("the Smart threshold defaults to 10 and saves clamped to 2-50", () => {
+  render(<SettingsModal cfg={cfg} account="default" onClose={() => {}}
+    onSaved={() => {}} onAccountsChanged={() => {}} />);
+  const n = screen.getByLabelText("Own row from N mails") as HTMLInputElement;
+  expect(n.value).toBe("10");
+  for (const [typed, sent] of [["25", 25], ["1", 2], ["999", 50], ["", 10]] as
+    [string, number][]) {
+    fireEvent.change(n, { target: { value: typed } });
+    saveCalls.length = 0;
+    fireEvent.click(screen.getByText("Save"));
+    expect(saveCalls[0].imap.smart_min, typed).toBe(sent);
+  }
+});
+
+test("the Smart threshold is read from the account being edited", () => {
+  const custom: Config = { ...cfg, accounts: { ...cfg.accounts,
+    default: { ...acct, smart_min: 4 } } };
+  render(<SettingsModal cfg={custom} account="default" onClose={() => {}}
+    onSaved={() => {}} onAccountsChanged={() => {}} />);
+  expect((screen.getByLabelText("Own row from N mails") as HTMLInputElement)
+    .value).toBe("4");
+});
+
 test("mail-text search mode is read from the account being edited", () => {
   const off: Config = { ...cfg, accounts: { ...cfg.accounts,
     default: { ...acct, body_search: "disabled" } } };

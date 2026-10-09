@@ -108,14 +108,38 @@ def clear() -> None:
 
 def apply_to_groups(groups: dict, account: str | None = None) -> int:
     """Attach one account's cached verdicts to scanned groups; returns how
-    many were applied."""
+    many were applied.
+
+    Pooled rows (smart grouping) carry a fingerprint `fp` of their member
+    senders, stored next to the verdict: a verdict made on different
+    members is dropped - a bucket must never inherit a rating given to
+    other senders."""
     data = load_account(account)
     applied = 0
+    stale: dict[str, list[str]] = {}
     for grouping, recs in groups.items():
         cached = data.get(grouping) or {}
         for key, rec in recs.items():
             v = cached.get(key)
-            if v and rec.get("ai") is None:
+            if not v:
+                continue
+            if rec.get("fp") is not None and v.get("fp") != rec["fp"]:
+                stale.setdefault(grouping, []).append(key)
+            elif rec.get("ai") is None:
                 rec["ai"] = {"verdict": v["verdict"], "reason": v["reason"]}
                 applied += 1
+    if stale:
+        _drop(stale, account)
     return applied
+
+
+def _drop(keys: dict[str, list[str]], account: str | None = None) -> None:
+    """Forget cached verdicts ({grouping: [key, ...]}) of one account."""
+    account = account or accounts.default_name()
+    with _LOCK:
+        data = load()
+        mine = data["accounts"].get(account) or {}
+        for grouping, ks in keys.items():
+            for k in ks:
+                (mine.get(grouping) or {}).pop(k, None)
+        _persist(data)

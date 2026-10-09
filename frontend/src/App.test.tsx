@@ -100,7 +100,7 @@ let cfg: Config = multiCfg;
 const baseState: AppState = {
   account: "proton", status: "idle", scanned_ts: null, groups_rev: 0,
   progress: "", error: "", folders: [],
-  groups: { sender: {}, domain: {}, subject: {}, thread: {} },
+  groups: { sender: {}, smart: {}, domain: {}, subject: {}, thread: {} },
   ai: { status: "idle", grouping: "sender", progress: "", error: "",
     usage: null },
   delete: { status: "idle", progress: "", error: "", moved: 0 },
@@ -268,7 +268,7 @@ const renderWithOneSenderGroup = () => {
   localStorage.setItem("pmc_account", "proton");
   state = { ...baseState, status: "done",
     groups: { sender: { [groupFixture.key]: groupFixture },
-              domain: {}, subject: {}, thread: {} } };
+              smart: {}, domain: {}, subject: {}, thread: {} } };
   return render(<ToastProvider><DialogProvider><App /></DialogProvider></ToastProvider>);
 };
 
@@ -329,7 +329,7 @@ const renderWithOneBlockedSenderGroup = () => {
   localStorage.setItem("pmc_account", "proton");
   state = { ...baseState, status: "done",
     groups: { sender: { [groupFixture.key]: groupFixture },
-              domain: {}, subject: {}, thread: {} },
+              smart: {}, domain: {}, subject: {}, thread: {} },
     rules: [blockRuleFixture] };
   return render(<ToastProvider><DialogProvider><App /></DialogProvider></ToastProvider>);
 };
@@ -516,7 +516,7 @@ test("the bar's Action… offers AI review (only when AI is enabled) and " +
   localStorage.setItem("pmc_ai_ack", "1");   // skip the metadata-sharing confirm
   state = { ...baseState, status: "done",
     groups: { sender: { [groupFixture.key]: groupFixture },
-              domain: {}, subject: {}, thread: {} } };
+              smart: {}, domain: {}, subject: {}, thread: {} } };
   render(<ToastProvider><DialogProvider><App /></DialogProvider></ToastProvider>);
   await waitFor(() => expect(screen.getAllByText("DHL Paket").length)
     .toBeGreaterThan(0));

@@ -997,4 +997,46 @@ export const DE: Record<string, string> = {
   "rule.f_retention_n": "Anzahl",
   "rule.f_dest": "Ordner",
   "rule.f_name": "Name",
+
+  // Smart-Gruppierung (Tab "Smart": große Absender behalten eine Zeile, der
+  // lange Schwanz kleiner Absender wird nach Firma / Art gebündelt).
+  "Smart": "Smart",
+  "smart.kind.protected": "Geschützte Absender",
+  "smart.kind.replied": "Leute, denen du schreibst",
+  "smart.kind.accounts": "Konten & Sicherheit",
+  "smart.kind.newsletter": "Newsletter",
+  "smart.kind.notifications": "Automatische Benachrichtigungen",
+  "smart.kind.individuals": "Privatpersonen",
+  "smart.kind.other": "Sonstige Absender",
+  "smart.cat": "Kategorie: {name}",
+  "smart.why.company":
+    "Mehrere kleine Absender von {domain}, jeder mit weniger als {min} Mails.",
+  "smart.why.protected":
+    "Absender mit weniger als {min} Mails, die du geschützt hast.",
+  "smart.why.replied":
+    "Absender mit weniger als {min} Mails, denen du geschrieben hast.",
+  "smart.why.accounts":
+    "Absender mit weniger als {min} Mails, meist Anmeldungen und "
+    + "Sicherheitscodes.",
+  "smart.why.category":
+    "Absender mit weniger als {min} Mails in der Kategorie \u201e{name}\u201c.",
+  "smart.why.newsletter":
+    "Absender mit weniger als {min} Mails, die einen Abmeldelink anbieten.",
+  "smart.why.notifications":
+    "Absender mit weniger als {min} Mails, die automatisch wirken "
+    + "(No-Reply-Adressen).",
+  "smart.why.individuals":
+    "Absender mit weniger als {min} Mails, die von einer privaten Adresse "
+    + "schreiben (Gmail, Outlook, GMX, \u2026).",
+  "smart.why.other":
+    "Alle übrigen Absender mit weniger als {min} Mails.",
+  "smart.protected_moved":
+    "{label} ist jetzt geschützt \u2013 die Mails liegen unter "
+    + "\u201eGeschützte Absender\u201c.",
+  "smart.title": "Smart-Gruppierung",
+  "smart.min_label": "Eigene Zeile ab N Mails",
+  "smart.min_help":
+    "Im Tab Smart behält ein Absender mit mindestens so vielen Mails eine "
+    + "eigene Zeile; kleinere Absender werden nach Firma und Art gebündelt. "
+    + "2\u201350, Standard 10. Gilt sofort, kein neuer Scan nötig.",
 };

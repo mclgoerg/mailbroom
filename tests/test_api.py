@@ -17,7 +17,8 @@ client = TestClient(app)
 def test_state_shape():
     st = client.get("/api/state").json()
     assert st["status"] == "idle"
-    assert set(st["groups"]) == {"sender", "domain", "subject", "thread"}
+    assert set(st["groups"]) == {"sender", "smart", "domain", "subject",
+                                 "thread"}
     assert "undo" in st and "trash_count" in st
 
 

@@ -22,6 +22,18 @@ CONFIG_PATH = Path(os.environ.get("CONFIG_PATH", "/data/config.json"))
 STATS_PATH = Path(os.environ.get("STATS_PATH", "/data/ai_usage.json"))
 SERVER_PATH = Path(os.environ.get("SERVER_PATH", "/data/server.json"))
 
+# Smart grouping: per-account "own row from N mails" (mailops.build_smart).
+SMART_MIN_DEFAULT = 10
+SMART_MIN_RANGE = (2, 50)
+
+
+def clamp_smart_min(value) -> int:
+    try:
+        n = int(value)
+    except (TypeError, ValueError):
+        return SMART_MIN_DEFAULT
+    return max(SMART_MIN_RANGE[0], min(SMART_MIN_RANGE[1], n))
+
 
 def config_path() -> Path:
     return tenants.current().file("config.json", CONFIG_PATH)
@@ -70,6 +82,9 @@ ENV_IMAP = {
     # "local" uses an opt-in keyed word index (backend/bodyindex.py; needs
     # MAILBROOM_SECRET_KEY), "disabled" keeps search metadata-only.
     "body_search": "server",
+    # Smart grouping: a sender with at least this many mails keeps its own
+    # row, the rest is pooled (mailops.build_smart). Range 2-50.
+    "smart_min": SMART_MIN_DEFAULT,
 }
 
 # Blank slate for ADDITIONAL accounts - env values (e.g. the Bridge
@@ -87,6 +102,9 @@ NEUTRAL_IMAP = {
     # "local" uses an opt-in keyed word index (backend/bodyindex.py; needs
     # MAILBROOM_SECRET_KEY), "disabled" keeps search metadata-only.
     "body_search": "server",
+    # Smart grouping: a sender with at least this many mails keeps its own
+    # row, the rest is pooled (mailops.build_smart). Range 2-50.
+    "smart_min": SMART_MIN_DEFAULT,
 }
 
 _ENV_AUTH_CACHE: dict | None = None
@@ -364,6 +382,7 @@ def _load_accounts(saved: dict, env_first: bool = True) -> dict[str, dict]:
         # tolerate a pre-body-search config (missing key) or a junk value
         if out[name].get("body_search") not in BODY_SEARCH_MODES:
             out[name]["body_search"] = "server"
+        out[name]["smart_min"] = clamp_smart_min(out[name].get("smart_min"))
     return out
 
 
@@ -498,6 +517,8 @@ def _apply_imap(block: dict, imap_in: dict) -> None:
             raise ValueError("the local search index needs "
                              "MAILBROOM_SECRET_KEY to be set")
         block["body_search"] = imap_in["body_search"]
+    if "smart_min" in imap_in:
+        block["smart_min"] = clamp_smart_min(imap_in["smart_min"])
     if isinstance(imap_in.get("auto_scan"), dict):
         a = imap_in["auto_scan"]
         auto_scan = dict(block.get("auto_scan")

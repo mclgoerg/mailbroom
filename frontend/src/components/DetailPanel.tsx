@@ -5,8 +5,9 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { api } from "../api";
 import { t } from "../i18n";
 import { actionVerb, planMailAction } from "../mailActions";
-import { fmtSize, fmtUsd, mailKey, olderThan, sieveSnippet,
+import { fmtSize, fmtUsd, mailKey, olderThan, shortcutTarget, sieveSnippet,
   type SieveAction } from "../lib";
+import { smartWhy } from "../smart";
 import type { AppState, Group, Grouping, GroupUnsub, Mail } from "../types";
 import { MailRows, MessageView } from "./MailList";
 import { ThreadView } from "./ThreadView";
@@ -27,7 +28,7 @@ const RATING_FILTERS: { key: string; label: string }[] = [
 
 export function DetailPanel({ grouping, group, aiEnabled, protectedNow,
   unsubscribedNow, onTrash, onProtect, onBlock, onUnblock, blocked, folders,
-  sieve = true, onClose, onEmptied, onDeleted, variant = "modal", hideGroupActions = false }: {
+  sieve = true, smartMin = 10, onClose, onEmptied, onDeleted, variant = "modal", hideGroupActions = false }: {
   grouping: Grouping;
   group: Group;
   aiEnabled: boolean;
@@ -38,12 +39,13 @@ export function DetailPanel({ grouping, group, aiEnabled, protectedNow,
   // if the user declined the confirmation, in which case the panel stays
   // open instead of closing on a no-op.
   onTrash: (g: Group) => Promise<boolean>;
-  onProtect?: (g: Group) => void;        // absent in subject mode
-  onBlock?: (g: Group) => void;          // sender/domain groupings only
+  onProtect?: (g: Group) => void;        // rows with a sender/domain only
+  onBlock?: (g: Group) => void;          // rows with a sender/domain only
   onUnblock?: (g: Group) => void;
   blocked?: boolean;
   folders: AppState["folders_raw"];
   sieve?: boolean;                       // Sieve export is Proton-only
+  smartMin?: number;                     // Smart rows: the account's threshold
   onClose: () => void;
   // The group has been emptied by an action in here (Trash all, or every
   // mail trashed one by one). Defaults to closing; the split pane moves on
@@ -343,6 +345,11 @@ export function DetailPanel({ grouping, group, aiEnabled, protectedNow,
     ? mails.filter((m) => !m.pinned).length
     : group.count - (group.pinned ?? 0);
 
+  // The address / domain the Sieve snippet is about (Smart bucket rows,
+  // subject and thread rows have none).
+  const sieveTarget = shortcutTarget(grouping, group);
+  const why = smartWhy(group, smartMin);
+
   const content = (
     <>
       <PanelHeader
@@ -379,6 +386,8 @@ export function DetailPanel({ grouping, group, aiEnabled, protectedNow,
       ) : (
         <>
           <div className="flex flex-col gap-2 border-b border-line px-4 py-2">
+            {/* Smart pools: one plain line on why these mails are together. */}
+            {why && <p className="type-meta text-muted">{why}</p>}
             {/* Row 1: rating filter chips (exclusive, like a segmented
                 control) - its own row since it already wraps onto 2 lines
                 at phone width; anything sharing the row with `ml-auto`
@@ -532,7 +541,7 @@ export function DetailPanel({ grouping, group, aiEnabled, protectedNow,
                     {t("pin.group_off")}
                   </MenuItem>
                 )}
-                {sieve && (grouping === "sender" || grouping === "domain") && (
+                {sieve && sieveTarget && (
                   <MenuItem onClick={() => setSieveOpen(!sieveOpen)}>
                     {t("sieve.button")}
                   </MenuItem>
@@ -543,7 +552,7 @@ export function DetailPanel({ grouping, group, aiEnabled, protectedNow,
               )}
             </div>
 
-            {sieve && sieveOpen && (grouping === "sender" || grouping === "domain") && (
+            {sieve && sieveOpen && sieveTarget && (
               <div className="rounded-card border border-line bg-panel2 p-3">
                 <div className="mb-2 flex flex-wrap items-center gap-2">
                   <span className="type-meta text-muted">{t("sieve.intro")}</span>
@@ -561,7 +570,8 @@ export function DetailPanel({ grouping, group, aiEnabled, protectedNow,
                   )}
                   <Button variant="secondary" onClick={() => {
                     navigator.clipboard?.writeText(sieveSnippet(
-                      grouping, group.key, sieveAction, sieveFolder));
+                      sieveTarget.kind, sieveTarget.value, sieveAction,
+                      sieveFolder));
                     setNote(t("sieve.copied"));
                   }}>{t("Copy")}</Button>
                   <a className={`type-meta ${LINK_ACCENT}`}
@@ -572,7 +582,8 @@ export function DetailPanel({ grouping, group, aiEnabled, protectedNow,
                 </div>
                 <pre className="overflow-x-auto rounded-control bg-surface p-2
                   type-meta leading-relaxed">
-                  {sieveSnippet(grouping, group.key, sieveAction, sieveFolder)}
+                  {sieveSnippet(sieveTarget.kind, sieveTarget.value,
+                    sieveAction, sieveFolder)}
                 </pre>
               </div>
             )}

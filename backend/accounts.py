@@ -14,7 +14,9 @@ import time
 from . import config as cfgmod
 from . import tenants
 
-GROUPINGS = ("sender", "domain", "subject", "thread")
+# "smart" pools the long tail of small senders (mailops.build_smart); it is
+# derived from the sender records, never built from the mails directly.
+GROUPINGS = ("sender", "smart", "domain", "subject", "thread")
 
 
 def _initial_state() -> dict:
@@ -72,6 +74,9 @@ class AccountState:
         # UIDs of the delete job currently being processed (guarded by
         # `lock`) - new jobs dedup against these too, not just the queue.
         self.inflight: dict[str, set[int]] = {}
+        # (smart_min, protected list) the smart groups were last built
+        # with - a settings save only rebuilds them when this changed.
+        self.smart_sig: tuple | None = None
 
 
 # Keyed (tenant id, account name) - two tenants may both call an account
