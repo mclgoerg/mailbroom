@@ -246,7 +246,7 @@ test("blocking a company row trashes only the pool, not the whole domain",
 test("a company pool spanning several domains has no shortcuts", async () => {
   await openSmart();
   openRow("example.co.uk");
-  await screen.findByText(/Several small senders from example.co.uk/);
+  await screen.findByText(/Several senders of example.co.uk/);
   expect(screen.queryByRole("button", { name: /Protect/ })).toBeNull();
   expect(screen.queryByRole("button", { name: "Block sender" })).toBeNull();
 });

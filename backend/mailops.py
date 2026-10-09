@@ -1161,12 +1161,17 @@ def build_smart(sender_recs: dict, mails, smart_min: int = SMART_MIN_DEFAULT,
     of the sender grouping, `mails` the index's mail dicts (only addr and
     subject are read). Placement is per SENDER, first match wins:
 
-      1 >= smart_min mails        own row `s:<addr>`
-      2 protected                 `k:protected`
-      3 replied to                `k:replied`
-      4 company pool              `o:<registrable domain>` when its small
-                                  senders total >= smart_min mails (never
-                                  for freemail domains)
+      1 protected                 own row `s:<addr>` when >= smart_min
+                                  mails, else `k:protected` (a protected
+                                  sender is never pooled with others)
+      2 replied to                never pooled by company: own row when
+                                  >= smart_min mails, else `k:replied`
+      3 company                   `o:<registrable domain>` when 2+ of the
+                                  remaining senders share it (never for
+                                  freemail) and together have >=
+                                  smart_min mails - ALL of them, big ones
+                                  included: a company is always one row
+      4 >= smart_min mails        own row `s:<addr>`
       5 mostly account mails      `k:accounts` (subjects match
                                   ACCOUNT_SUBJECT_RE in >= half the mails)
       6 first category tag        `k:cat:<name>`
@@ -1181,36 +1186,53 @@ def build_smart(sender_recs: dict, mails, smart_min: int = SMART_MIN_DEFAULT,
     cat_names = {c for c, _ in (categories or CATEGORY_RULES)}
     out: dict[str, dict] = {}
     placed: dict[str, tuple[str, str, str]] = {}   # sender -> (key, kind, label)
-    rest: list[dict] = []                          # small, not yet placed
 
+    def own_row(addr: str, rec: dict) -> None:
+        out[f"s:{addr}"] = {
+            **rec, "key": f"s:{addr}", "kind": "sender", "addr": addr,
+            "n_senders": 1, "members": [], "ai": None,
+            "tags": list(rec["tags"]), "samples": list(rec["samples"]),
+            "folders": {f: list(u) for f, u in rec["folders"].items()}}
+
+    # 1-2: protected / replied senders are never pooled by company.
+    free: list[dict] = []                          # candidates for a company
     for addr in sorted(sender_recs):
         rec = sender_recs[addr]
-        if rec["count"] >= smart_min:
-            own = {**rec, "key": f"s:{addr}", "kind": "sender", "addr": addr,
-                   "n_senders": 1, "members": [], "ai": None,
-                   "tags": list(rec["tags"]), "samples": list(rec["samples"]),
-                   "folders": {f: list(u) for f, u in rec["folders"].items()}}
-            out[own["key"]] = own
-        elif cfgmod.is_protected(addr, protected):
-            placed[addr] = ("k:protected", "protected", "")
+        big = rec["count"] >= smart_min
+        if cfgmod.is_protected(addr, protected):
+            if big:
+                own_row(addr, rec)
+            else:
+                placed[addr] = ("k:protected", "protected", "")
         elif rec.get("replied"):
-            placed[addr] = ("k:replied", "replied", "")
+            if big:
+                own_row(addr, rec)
+            else:
+                placed[addr] = ("k:replied", "replied", "")
         else:
-            rest.append(rec)
+            free.append(rec)
 
-    # 4: company pools (domain totals over the small senders left so far).
+    # 3: company pools, ahead of the size rule: DocMorris is one row even
+    # when one of its senders is big.
     by_company: dict[str, list[dict]] = {}
-    for rec in rest:
+    for rec in free:
         domain = rec["key"].rsplit("@", 1)[-1] if "@" in rec["key"] else ""
         if domain and not is_freemail(domain):
             by_company.setdefault(registrable_domain(domain), []).append(rec)
     pooled: set[str] = set()
     for reg, recs in by_company.items():
-        if sum(r["count"] for r in recs) >= smart_min:
+        if len(recs) >= 2 and sum(r["count"] for r in recs) >= smart_min:
             for r in recs:
                 placed[r["key"]] = (f"o:{reg}", "company", reg)
                 pooled.add(r["key"])
-    rest = [r for r in rest if r["key"] not in pooled]
+    rest: list[dict] = []                          # small or big, no company
+    for rec in free:
+        if rec["key"] in pooled:
+            continue
+        if rec["count"] >= smart_min:
+            own_row(rec["key"], rec)               # 4
+        else:
+            rest.append(rec)
 
     # 5: needs the subjects of the remaining small senders only.
     wanted = {r["key"] for r in rest}

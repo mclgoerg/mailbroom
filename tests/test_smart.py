@@ -155,7 +155,7 @@ def test_clamp_smart_min():
 # -------------------------------------------------------------- placement
 
 def test_big_sender_keeps_its_own_row_with_sender_tab_data():
-    msgs = many("big@shop.example", 10) + many("small@shop.example", 2)
+    msgs = many("big@shop.example", 10) + many("small@other.example", 2)
     groups = mailops.build_groups(msgs, set(), None, 10, [])
     own = groups["smart"]["s:big@shop.example"]
     base = groups["sender"]["big@shop.example"]
@@ -218,22 +218,57 @@ def test_placement_order_first_match_wins():
     assert rows["o:acme.example"]["n_senders"] == 3
 
 
-def test_company_pool_threshold_counts_only_the_remaining_small_senders():
-    # protected/replied mails do not count towards the pool total
+def test_company_pool_is_ahead_of_the_size_rule_and_holds_big_senders():
+    # DocMorris: one big sender + two small ones -> ONE row, at any N
+    msgs = (many("auftrag@order.docmorris.de", 31)
+            + many("info@mail.docmorris.de", 4)
+            + many("kunde@customer.docmorris.de", 1))
+    for n in (2, 4, 5, 10, 36):
+        rows = smart(msgs, smart_min=n)
+        assert list(rows) == ["o:docmorris.de"], n
+        assert rows["o:docmorris.de"]["count"] == 36
+        assert rows["o:docmorris.de"]["n_senders"] == 3
+    # below the domain total's reach the company dissolves again
+    rows = smart(msgs, smart_min=50)
+    assert "o:docmorris.de" not in rows
+    assert placement(rows)["auftrag@order.docmorris.de"] != "o:docmorris.de"
+
+
+def test_company_needs_two_senders_a_lone_big_sender_keeps_its_row():
+    rows = smart(many("news@acme-store.example", 214) + many("x@y.example", 1))
+    assert "s:news@acme-store.example" in rows
+    assert not [k for k in rows if k.startswith("o:")]
+
+
+def test_company_total_counts_protected_and_replied_out():
+    # protected / replied senders are never pooled by company and their
+    # mails do not count towards the pool total
     msgs = (many("a@acme.example", 4) + many("b@acme.example", 4)
-            + many("prot@acme.example", 5))
-    rows = smart(msgs, protected=["prot@acme.example"])
+            + many("prot@acme.example", 5) + many("friend@acme.example", 5))
+    rows = smart(msgs, protected=["prot@acme.example"],
+                 replied={"friend@acme.example"})
     place = placement(rows)
     assert place["prot@acme.example"] == "k:protected"
+    assert place["friend@acme.example"] == "k:replied"
     assert "o:acme.example" not in rows          # 8 < 10
     msgs += many("c@acme.example", 2)
-    rows = smart(msgs, protected=["prot@acme.example"])
+    rows = smart(msgs, protected=["prot@acme.example"],
+                 replied={"friend@acme.example"})
     assert placement(rows)["a@acme.example"] == "o:acme.example"
-    # an own-row sender of the company is not pooled either
-    rows = smart(msgs + many("big@acme.example", 10),
-                 protected=["prot@acme.example"])
-    assert placement(rows)["big@acme.example"] == "s:big@acme.example"
     assert rows["o:acme.example"]["n_senders"] == 3
+    # big protected / replied senders keep their own row, not the pool's
+    rows = smart(msgs + many("vip@acme.example", 10)
+                 + many("pal@acme.example", 12),
+                 protected=["prot@acme.example", "vip@acme.example"],
+                 replied={"friend@acme.example", "pal@acme.example"})
+    assert "s:vip@acme.example" in rows and "s:pal@acme.example" in rows
+    assert rows["o:acme.example"]["n_senders"] == 3
+
+
+def test_company_row_holds_every_mail_of_its_senders():
+    msgs = many("big@acme.example", 20) + many("small@acme.example", 1)
+    rows = smart(msgs)
+    assert rows["o:acme.example"]["count"] == 21
 
 
 def test_company_pool_uses_registrable_domain_with_multi_label_suffixes():

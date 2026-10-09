@@ -1010,7 +1010,7 @@ export const DE: Record<string, string> = {
   "smart.kind.other": "Sonstige Absender",
   "smart.cat": "Kategorie: {name}",
   "smart.why.company":
-    "Mehrere kleine Absender von {domain}, jeder mit weniger als {min} Mails.",
+    "Mehrere Absender von {domain}, als eine Firma gebündelt, weil sie zusammen mindestens {min} Mails haben.",
   "smart.why.protected":
     "Absender mit weniger als {min} Mails, die du geschützt hast.",
   "smart.why.replied":
