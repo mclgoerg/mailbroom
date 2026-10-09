@@ -997,4 +997,14 @@ export const DE: Record<string, string> = {
   "rule.f_retention_n": "Anzahl",
   "rule.f_dest": "Ordner",
   "rule.f_name": "Name",
+
+  "ai.rerate_action": "KI neu bewerten",
+  "ai.rerate_title": "Mit KI neu bewerten?",
+  "ai.rerate_body":
+    "Die ausgewählten Gruppen, die schon eine KI-Bewertung haben, werden "
+    + "erneut an die KI geschickt und ihre Bewertung wird ersetzt. Das "
+    + "verbraucht erneut Tokens (und Budget). Gruppen ohne Bewertung bleiben "
+    + "hier unberührt - dafür gibt es \u201eKI-Prüfung\u201c.",
+  "ai.rerate_btn": "Neu bewerten ({n})",
+  "ai.rerate_btn_one": "Neu bewerten (1)",
 };

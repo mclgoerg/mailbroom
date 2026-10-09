@@ -405,6 +405,7 @@ def post_oauth_imap_disconnect(account: str = Query(...)):
 class GroupingBody(BaseModel):
     grouping: str = "sender"
     keys: list[str] | None = None    # None = every unrated group (default)
+    rerate: bool = False             # with keys: also replace existing verdicts
 
 
 class DeleteBody(BaseModel):
@@ -647,7 +648,8 @@ def post_ai(body: GroupingBody, account: str | None = Query(None)):
     _check_grouping(body.grouping)
     acc = _acc(account)
     try:
-        aihelper.start_group_review(body.grouping, acc, body.keys)
+        aihelper.start_group_review(body.grouping, acc, body.keys,
+                                    rerate=body.rerate)
     except ValueError as exc:
         raise HTTPException(400, str(exc))
     except RuntimeError as exc:

@@ -526,7 +526,43 @@ test("the bar's Action… offers AI review (only when AI is enabled) and " +
   fireEvent.change(screen.getByDisplayValue("Action…"),
     { target: { value: "ai_review" } });
   await waitFor(() => expect(aiReview).toHaveBeenCalledWith(
-    "sender", [groupFixture.key]));
+    "sender", [groupFixture.key], false));
+});
+
+test("AI re-rate: offered only for rated selections, confirms, then sends " +
+  "rerate=true for the rated groups", async () => {
+  cfg = { ...singleCfg, ai: { ...singleCfg.ai, available: true } };
+  localStorage.setItem("pmc_account", "proton");
+  localStorage.setItem("pmc_ai_ack", "1");
+  const rated = { ...groupFixture,
+    ai: { verdict: "review" as const, reason: "x" } };
+  state = { ...baseState, status: "done",
+    groups: { sender: { [groupFixture.key]: groupFixture },
+              smart: {}, domain: {}, subject: {}, thread: {} } };
+  const view = render(<ToastProvider><DialogProvider><App /></DialogProvider></ToastProvider>);
+  await waitFor(() => expect(screen.getAllByText("DHL Paket").length)
+    .toBeGreaterThan(0));
+  await selectRowCheckbox();
+  await waitFor(() => expect(screen.getByText(/^Trash \d+$/)).toBeTruthy());
+  // unrated selection: plain AI review only
+  expect(screen.queryByRole("option", { name: "AI re-rate" })).toBeNull();
+  view.unmount();
+
+  state = { ...baseState, status: "done",
+    groups: { sender: { [rated.key]: rated },
+              smart: {}, domain: {}, subject: {}, thread: {} } };
+  render(<ToastProvider><DialogProvider><App /></DialogProvider></ToastProvider>);
+  await waitFor(() => expect(screen.getAllByText("DHL Paket").length)
+    .toBeGreaterThan(0));
+  await selectRowCheckbox();
+  await waitFor(() => expect(screen.getByText(/^Trash \d+$/)).toBeTruthy());
+  fireEvent.change(screen.getByDisplayValue("Action…"),
+    { target: { value: "ai_rerate" } });
+  expect((await findDialog()).textContent).toContain("tokens");
+  expect(aiReview).not.toHaveBeenCalled();           // not before confirming
+  await pressDialog("Re-rate (1)");
+  await waitFor(() => expect(aiReview).toHaveBeenCalledWith(
+    "sender", [rated.key], true));
 });
 
 test("the bar's CSV export link is scoped to the current selection", async () => {

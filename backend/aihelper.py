@@ -189,7 +189,8 @@ def _ai_call(cfg: dict, model: str, system: str, payload: dict, schema: dict):
         response.usage.output_tokens
 
 
-def _run_ai(grouping: str, acc=None, keys: set[str] | None = None) -> None:
+def _run_ai(grouping: str, acc=None, keys: set[str] | None = None,
+            rerate: bool = False) -> None:
     acc = acc or accounts.get()
     cfg = cfgmod.load_config()
     # Tenants without their own key run on the admin's shared server key
@@ -218,7 +219,8 @@ def _run_ai(grouping: str, acc=None, keys: set[str] | None = None) -> None:
                  **({"replied": True} if r.get("replied") else {}),
                  **({"protected": True} if r["key"] in prot_keys else {})}
                 for r in STATE["groups"][grouping].values()
-                if r["ai"] is None and (keys is None or r["key"] in keys)]
+                if (r["ai"] is None or (rerate and keys is not None))
+                and (keys is None or r["key"] in keys)]
         system = AI_SYSTEM.format(grouping=grouping) + (
             AI_PROTECTED_NOTE if prot_keys else "")
 
@@ -302,10 +304,12 @@ def _run_ai(grouping: str, acc=None, keys: set[str] | None = None) -> None:
 
 
 def start_group_review(grouping: str, acc=None,
-                       keys: list[str] | None = None) -> None:
+                       keys: list[str] | None = None,
+                       rerate: bool = False) -> None:
     """Review every unrated group in `grouping`, or (when `keys` is given)
     just those - e.g. the user's current selection instead of the whole
-    view."""
+    view. `rerate` (only with `keys`) also sends groups that already have
+    a verdict and replaces it: an explicit, billed second opinion."""
     acc = acc or accounts.get()
     cfg = cfgmod.load_config()
     ai_eff, ai_source = cfgmod.effective_ai(cfg)
@@ -323,7 +327,7 @@ def start_group_review(grouping: str, acc=None,
         acc.cancel["ai"] = False
     threading.Thread(target=tenants.call_in,
                      args=(acc.tenant, _run_ai, grouping, acc,
-                           set(keys) if keys else None),
+                           set(keys) if keys else None, rerate),
                      daemon=True).start()
 
 
