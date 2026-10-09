@@ -45,6 +45,9 @@ BODY_CHAR_LIMIT = 50_000
 GROUPINGS = accounts.GROUPINGS
 SMART_MIN_DEFAULT = cfgmod.SMART_MIN_DEFAULT   # per-account, 10
 clamp_smart_min = cfgmod.clamp_smart_min
+# Bump when build_smart's placement rules change: snapshots (and the sig
+# below) built with another version are re-derived on restore.
+SMART_RULES_VERSION = 2
 SMART_MEMBERS_CAP = 300            # member addresses shipped per bucket row
 
 # Order matters: the first matching category becomes the primary tag.
@@ -202,8 +205,8 @@ def save_snapshot(acc) -> None:
             "index": list(acc.index.values()),
             "groups": acc.state["groups"],
             # what the smart groups were built with (restore compares)
-            "smart_sig": [acc.smart_sig[0], list(acc.smart_sig[1])]
-            if acc.smart_sig else None,
+            "smart_sig": [acc.smart_sig[0], list(acc.smart_sig[1]),
+                          acc.smart_sig[2]] if acc.smart_sig else None,
         }
         blob = json.dumps(data)
     try:
@@ -246,8 +249,8 @@ def load_snapshot(acc) -> bool:
             # (and the state's own empty ones must not leak through).
             acc.state["groups"].setdefault("smart", {})
             sig = data.get("smart_sig")
-            acc.smart_sig = ((sig[0], tuple(sig[1]))
-                             if isinstance(sig, list) and len(sig) == 2
+            acc.smart_sig = ((sig[0], tuple(sig[1]), sig[2])
+                             if isinstance(sig, list) and len(sig) == 3
                              and isinstance(sig[1], list) else None)
         # No-op when the snapshot's smart groups were built with today's
         # threshold + protected list; otherwise they are derived again.
@@ -1298,7 +1301,7 @@ def rebuild_smart(acc, cfg: dict | None = None, force: bool = False) -> bool:
     unrelated settings save never reshuffles rows the user is working on.
     Deletes do NOT call this: _apply_removal patches every grouping."""
     smart_min, plist, cats = smart_params(acc, cfg)
-    sig = (smart_min, tuple(plist))
+    sig = (smart_min, tuple(plist), SMART_RULES_VERSION)
     with acc.lock:
         if acc.state["status"] != "done":
             return False
@@ -1524,7 +1527,7 @@ def run_scan(acc=None) -> None:
                 for m in messages:
                     acc.index[ikey(m["folder"], m["uid"])] = m
                 acc.state["groups"] = groups
-                acc.smart_sig = (smart_min, tuple(plist))
+                acc.smart_sig = (smart_min, tuple(plist), SMART_RULES_VERSION)
                 acc.state["status"] = "done"
                 acc.state["progress"] = ""
                 acc.state["trash_count"] = trash_count

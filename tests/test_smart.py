@@ -643,7 +643,7 @@ def test_snapshot_built_with_another_threshold_is_rebuilt(tail):
     acc = accountsmod.get()
     path = mailops._snap_path(acc.name)
     data = json.loads(path.read_text())
-    data["smart_sig"] = [30, []]                  # was 30 when saved
+    data["smart_sig"] = [30, [], mailops.SMART_RULES_VERSION]   # was 30
     data["groups"]["smart"] = {}
     path.write_text(json.dumps(data))
     accountsmod.reset()
@@ -774,3 +774,17 @@ def test_pin_group_works_on_pooled_rows(tail):
                                             "key": "k:other"})
     assert r.status_code == 200 and r.json()["changed"] == 4
     assert smart_state()["k:other"]["pinned"] == 4
+
+
+def test_snapshot_built_with_older_placement_rules_is_rebuilt(tail):
+    acc = accountsmod.get()
+    path = mailops._snap_path(acc.name)
+    data = json.loads(path.read_text())
+    data["smart_sig"][2] = mailops.SMART_RULES_VERSION - 1
+    data["groups"]["smart"] = {"k:stale": data["groups"]["smart"]["k:other"]}
+    path.write_text(json.dumps(data))
+    accountsmod.reset()
+    acc2 = accountsmod.get()
+    assert mailops.load_snapshot(acc2)
+    rows = mailops.public_state(acc2)["groups"]["smart"]
+    assert "k:stale" not in rows and "o:paypal.de" in rows
