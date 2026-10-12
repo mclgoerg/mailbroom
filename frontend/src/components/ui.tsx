@@ -696,6 +696,16 @@ const trapStops = (dialog: HTMLElement): HTMLElement[] => {
 const MODAL_WIDTH = { sm: "sm:max-w-md", md: "sm:max-w-2xl",
   lg: "sm:max-w-3xl" };   // 448 / 672 / 768 px
 
+/** Hand focus back to what opened a dialog. Not to a <select> on a touch
+ *  device: there, focusing a select opens its picker (iOS), so the bulk
+ *  bar's Action menu popped open again right after a confirmed action. */
+function refocus(el: HTMLElement | null | undefined): void {
+  if (!el) return;
+  if (el instanceof HTMLSelectElement
+      && window.matchMedia?.("(pointer: coarse)").matches) return;
+  el.focus?.();
+}
+
 /** Dialog shell. `sm` (448) is a bottom sheet on phones, `md` (672) /
  *  `lg` (768) are full-screen there. `full` = `lg` at a fixed 88vh; other
  *  modals shrink to their content. `label` / `labelledBy` / `describedBy` name it for AT. */
@@ -765,7 +775,7 @@ export function Modal({ children, onClose, full = false, size, label,
       const to = back?.isConnected ? back
         : home?.isConnected ? home
         : document.querySelector<HTMLElement>("[data-focus-return]");
-      to?.focus?.();
+      refocus(to);
     };
   }, []);
   const shape = sz === "sm"
@@ -1359,7 +1369,7 @@ export function DialogProvider({ children }: { children: ReactNode }) {
   const hadCur = useRef(false);
   useEffect(() => {
     if (!cur && hadCur.current) {
-      opener.current?.focus?.();
+      refocus(opener.current);
       opener.current = null;
     }
     hadCur.current = !!cur;

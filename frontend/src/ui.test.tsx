@@ -683,6 +683,31 @@ test("DialogProvider returns focus to the opener and settles pending on unmount"
   expect(await prompt).toBeNull();
 });
 
+test("a closed dialog does not refocus a <select> on a touch device " +
+  "(it would reopen the picker), but does with a mouse", async () => {
+  const run = async (coarse: boolean) => {
+    vi.stubGlobal("matchMedia", (q: string) => ({
+      matches: coarse && q.includes("coarse"), media: q,
+      addEventListener: () => {}, removeEventListener: () => {} }));
+    const { unmount } = render(<DialogProvider>
+      <select aria-label="Action"><option>a</option></select></DialogProvider>);
+    const select = screen.getByLabelText("Action");
+    select.focus();
+    const p = confirmDialog({ title: "Sure?", confirmLabel: "Yes" });
+    await screen.findByText("Sure?");
+    await armed();
+    fireEvent.click(screen.getByText("Yes"));
+    expect(await p).toBe(true);
+    await waitFor(() => expect(screen.queryByText("Sure?")).toBeNull());
+    const focused = document.activeElement === select;
+    unmount();
+    vi.unstubAllGlobals();
+    return focused;
+  };
+  expect(await run(true)).toBe(false);
+  expect(await run(false)).toBe(true);
+});
+
 test("queued dialogs are removed by id and shown one after another", async () => {
   render(<DialogProvider><span>app</span></DialogProvider>);
   const a = confirmDialog({ title: "First", confirmLabel: "Yes" });
