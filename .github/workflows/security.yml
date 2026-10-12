@@ -23,7 +23,7 @@ jobs:
       - name: gitleaks (full history)
         run: |
           docker run --rm -v "$PWD:/repo" zricethezav/gitleaks:latest \
-            git /repo --no-banner --redact
+            git /repo --no-banner --redact -v
 
   dependencies:
     runs-on: ubuntu-latest
