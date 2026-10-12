@@ -3,3 +3,7 @@
 # markers, but old commits predate them).
 dc0f597a7c3e53c9350ff72a607c661d5894b91e:tests/test_secretbox.py:generic-api-key:13
 dc0f597a7c3e53c9350ff72a607c661d5894b91e:tests/test_secretbox.py:generic-api-key:40
+
+# Fake thread key in a frontend test fixture (App.mails.test.tsx); the
+# 16-hex-digit value next to "key:" trips generic-api-key.
+abb945ef96784547fa38f45ae84b1dce380ed2d1:frontend/src/App.mails.test.tsx:generic-api-key:106
