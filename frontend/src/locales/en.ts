@@ -833,4 +833,10 @@ export const EN: Record<string, string> = {
   "rule.f_retention_n": "Number",
   "rule.f_dest": "Folder",
   "rule.f_name": "Name",
+
+  "ai.review_body":
+    "Already rated: {rated} of {total}. Re-rating sends them to the AI again, "
+    + "replaces their verdicts and uses tokens (and budget) again.",
+  "ai.review_new": "Review new only ({n})",
+  "ai.review_rerate": "Re-rate all ({n})",
 };

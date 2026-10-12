@@ -106,8 +106,11 @@ export const api = {
   pinGroup: (grouping: Grouping, key: string, pinned: boolean) =>
     req<{ ok: boolean; pinned: boolean; changed: number; skipped: number }>(
       "/api/pin_group", { grouping, key, pinned }),
-  aiReview: (grouping: Grouping, keys?: string[]) =>
-    req<{ ok: boolean }>("/api/ai", { grouping, keys: keys ?? null }),
+  // `rerate` (with keys): also send groups that already have a verdict and
+  // replace it - an explicit second opinion, billed again.
+  aiReview: (grouping: Grouping, keys?: string[], rerate = false) =>
+    req<{ ok: boolean }>("/api/ai",
+      { grouping, keys: keys ?? null, rerate }),
   aiGroup: (grouping: Grouping, key: string, offset = 0, limit = 200,
       uids?: [string, number][]) =>
     req<AiGroupResult>("/api/ai_group",

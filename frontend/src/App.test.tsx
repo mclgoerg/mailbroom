@@ -526,7 +526,109 @@ test("the bar's Action… offers AI review (only when AI is enabled) and " +
   fireEvent.change(screen.getByDisplayValue("Action…"),
     { target: { value: "ai_review" } });
   await waitFor(() => expect(aiReview).toHaveBeenCalledWith(
-    "sender", [groupFixture.key]));
+    "sender", [groupFixture.key], false));
+});
+
+// AI review asks first only when rated groups are in scope: new-only vs
+// re-rate everything; Cancel starts nothing. No separate menu entry.
+const second = { ...groupFixture, key: "news@shop.example", label: "Shop News",
+  sub: "news@shop.example" };
+const ratedAi = { verdict: "review" as const, reason: "x" };
+
+const renderAiScope = async (groups: Record<string, unknown>) => {
+  cfg = { ...singleCfg, ai: { ...singleCfg.ai, available: true } };
+  localStorage.setItem("pmc_account", "proton");
+  localStorage.setItem("pmc_ai_ack", "1");
+  state = { ...baseState, status: "done",
+    groups: { sender: groups, smart: {}, domain: {}, subject: {},
+              thread: {} } };
+  render(<ToastProvider><DialogProvider><App /></DialogProvider></ToastProvider>);
+  await waitFor(() => expect(screen.getAllByText("DHL Paket").length)
+    .toBeGreaterThan(0));
+};
+const selectAll = async () => {
+  for (const label of ["DHL Paket", "Shop News"]) {
+    fireEvent.click(screen.getAllByLabelText(`Select ${label}`)[0]);
+  }
+  await waitFor(() => expect(screen.getByText(/^Trash \d+$/)).toBeTruthy());
+};
+const mixed = () => renderAiScope({
+  [groupFixture.key]: { ...groupFixture, ai: ratedAi },
+  [second.key]: second });
+
+test("the Action menu has no separate re-rate entry", async () => {
+  await mixed();
+  await selectAll();
+  expect(screen.queryByRole("option", { name: /re-rate/i })).toBeNull();
+});
+
+test("AI review of a mixed selection asks: new only, or re-rate all", async () => {
+  await mixed();
+  await selectAll();
+  fireEvent.change(screen.getByDisplayValue("Action…"),
+    { target: { value: "ai_review" } });
+  expect((await findDialog()).textContent).toContain("Already rated: 1 of 2");
+  expect(aiReview).not.toHaveBeenCalled();            // nothing before choosing
+  await pressDialog("Review new only (1)");
+  await waitFor(() => expect(aiReview).toHaveBeenCalledWith(
+    "sender", expect.arrayContaining([groupFixture.key, second.key]), false));
+});
+
+test("choosing Re-rate all sends every group in scope with rerate=true",
+  async () => {
+  await mixed();
+  await selectAll();
+  fireEvent.change(screen.getByDisplayValue("Action…"),
+    { target: { value: "ai_review" } });
+  await findDialog();
+  await pressDialog("Re-rate all (2)");
+  await waitFor(() => expect(aiReview).toHaveBeenCalledWith(
+    "sender", expect.arrayContaining([groupFixture.key, second.key]), true));
+});
+
+test("cancelling the AI review question starts nothing", async () => {
+  await mixed();
+  await selectAll();
+  fireEvent.change(screen.getByDisplayValue("Action…"),
+    { target: { value: "ai_review" } });
+  await findDialog();
+  await cancelDialog();
+  await expectNoDialog();
+  expect(aiReview).not.toHaveBeenCalled();
+});
+
+test("when every group is rated only re-rating is offered", async () => {
+  await renderAiScope({ [groupFixture.key]: { ...groupFixture, ai: ratedAi } });
+  await selectRowCheckbox();
+  await waitFor(() => expect(screen.getByText(/^Trash \d+$/)).toBeTruthy());
+  fireEvent.change(screen.getByDisplayValue("Action…"),
+    { target: { value: "ai_review" } });
+  await findDialog();
+  expect(screen.queryByRole("button", { name: /Review new only/ })).toBeNull();
+  await pressDialog("Re-rate all (1)");
+  await waitFor(() => expect(aiReview).toHaveBeenCalledWith(
+    "sender", [groupFixture.key], true));
+});
+
+test("Tools > AI review with rated groups asks the same question for the " +
+  "whole grouping", async () => {
+  await mixed();
+  fireEvent.click(screen.getByRole("button", { name: "Tools" }));
+  fireEvent.click(screen.getByRole("menuitem", { name: /^AI review/ }));
+  expect((await findDialog()).textContent).toContain("Already rated: 1 of 2");
+  await pressDialog("Review new only (1)");
+  await waitFor(() => expect(aiReview).toHaveBeenCalledWith(
+    "sender", undefined, false));
+});
+
+test("Tools > AI review with nothing rated starts right away", async () => {
+  await renderAiScope({ [groupFixture.key]: groupFixture,
+                        [second.key]: second });
+  fireEvent.click(screen.getByRole("button", { name: "Tools" }));
+  fireEvent.click(screen.getByRole("menuitem", { name: /^AI review/ }));
+  await waitFor(() => expect(aiReview).toHaveBeenCalledWith(
+    "sender", undefined, false));
+  await expectNoDialog();
 });
 
 test("the bar's CSV export link is scoped to the current selection", async () => {

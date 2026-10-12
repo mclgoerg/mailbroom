@@ -1180,6 +1180,9 @@ export type ConfirmOptions = {
   /** Replaces "Cancel" where declining isn't a cancel (e.g. "Only block"). */
   cancelLabel?: string;
 };
+/** A confirm with a second, equal-weight way forward (see choiceDialog):
+ *  Cancel / Esc still do nothing. */
+export type ChoiceOptions = ConfirmOptions & { altLabel: string };
 export type PromptOptions = {
   title: string; label: string; initial?: string; confirmLabel?: string;
   /** Return an error message, or null when the value is acceptable. */
@@ -1201,8 +1204,10 @@ const useArmed = () => {
 
 /** Confirm sheet. Danger dialogs focus Cancel, the safe choice. */
 export function ConfirmDialog({ title, body, bullets, confirmLabel,
-  cancelLabel, tone = "primary", onResult }: ConfirmOptions & {
+  cancelLabel, altLabel, tone = "primary", onResult, onAlt }: ConfirmOptions & {
+  altLabel?: string;
   onResult: (ok: boolean) => void;
+  onAlt?: () => void;
 }) {
   const safe = useRef<HTMLButtonElement>(null);
   const ok = useRef<HTMLButtonElement>(null);
@@ -1230,10 +1235,16 @@ export function ConfirmDialog({ title, body, bullets, confirmLabel,
           </div>
         )}
       </div>
-      <div className="flex justify-end gap-2 border-t border-line px-4 py-3
-        sm:px-5">
+      <div className="flex flex-wrap justify-end gap-2 border-t border-line
+        px-4 py-3 sm:px-5">
         <Button ref={safe} variant="secondary"
           onClick={() => onResult(false)}>{cancelLabel ?? t("Cancel")}</Button>
+        {altLabel && (
+          <Button variant="secondary"
+            onClick={(e) => { if (armed(e.detail === 0)) onAlt?.(); }}>
+            {altLabel}
+          </Button>
+        )}
         <Button ref={ok} variant={tone === "danger" ? "danger" : "primary"}
           onClick={(e) => { if (armed(e.detail === 0)) onResult(true); }}>
           {confirmLabel}
@@ -1296,6 +1307,8 @@ export function PromptDialog({ title, label, initial = "", confirmLabel,
 
 type DialogRequest = { id?: number } & (
   | { kind: "confirm"; opts: ConfirmOptions; resolve: (ok: boolean) => void }
+  | { kind: "choice"; opts: ChoiceOptions;
+      resolve: (v: "confirm" | "alt" | null) => void }
   | { kind: "prompt"; opts: PromptOptions;
       resolve: (v: string | null) => void });
 
@@ -1313,6 +1326,14 @@ export const confirmDialog = (opts: ConfirmOptions): Promise<boolean> =>
     ? new Promise((resolve) => pushDialog!({ kind: "confirm", opts, resolve }))
     : needProvider();
 
+/** Like confirmDialog with a second forward button: resolves "confirm" (the
+ *  primary one), "alt", or null on Cancel / Esc / backdrop. */
+export const choiceDialog = (opts: ChoiceOptions):
+  Promise<"confirm" | "alt" | null> =>
+  pushDialog
+    ? new Promise((resolve) => pushDialog!({ kind: "choice", opts, resolve }))
+    : needProvider();
+
 /** Resolves the entered text, or null when cancelled. */
 export const promptDialog = (opts: PromptOptions): Promise<string | null> =>
   pushDialog
@@ -1320,7 +1341,7 @@ export const promptDialog = (opts: PromptOptions): Promise<string | null> =>
     : needProvider();
 
 const cancelRequest = (r: DialogRequest) =>
-  r.kind === "confirm" ? r.resolve(false) : r.resolve(null);
+  r.kind === "confirm" ? r.resolve(false) : r.resolve(null);   // choice: null
 
 /** Mount once at the app root (main.tsx). Dialogs queue if several are
  *  requested; pending ones settle as cancelled on unmount, and focus goes
@@ -1363,6 +1384,11 @@ export function DialogProvider({ children }: { children: ReactNode }) {
       {cur?.kind === "confirm" && (
         <ConfirmDialog key={cur.id} {...cur.opts}
           onResult={(ok) => done(cur, () => cur.resolve(ok))} />
+      )}
+      {cur?.kind === "choice" && (
+        <ConfirmDialog key={cur.id} {...cur.opts}
+          onResult={(ok) => done(cur, () => cur.resolve(ok ? "confirm" : null))}
+          onAlt={() => done(cur, () => cur.resolve("alt"))} />
       )}
       {cur?.kind === "prompt" && (
         <PromptDialog key={cur.id} {...cur.opts}

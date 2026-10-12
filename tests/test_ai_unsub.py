@@ -84,6 +84,52 @@ def test_group_review_can_be_scoped_to_keys(ai_ready):
     assert sent_keys == {"noreply@dhl.example"}
 
 
+def test_rerate_replaces_verdicts_of_the_selected_groups_only(ai_ready):
+    verdict = {"v": "review"}
+
+    def payload(sent):
+        return {"verdicts": [
+            {"key": g["key"], "verdict": verdict["v"], "reason": "t"}
+            for g in sent["groups"]]}
+    client = FakeClient(payload)
+    ai_ready.setattr(aihelper, "ai_client", lambda cfg: client)
+    aihelper._run_ai("sender")                       # rate everything once
+    senders = mailops.STATE["groups"]["sender"]
+    assert {r["ai"]["verdict"] for r in senders.values()} == {"review"}
+    n_calls = len(client.calls)
+
+    # a plain run (or a keyed one) never re-bills a rated group...
+    aihelper._run_ai("sender", keys={"noreply@dhl.example"})
+    assert len(client.calls) == n_calls
+
+    # ...an explicit re-rate does, for the selected keys only
+    verdict["v"] = "delete_safe"
+    aihelper._run_ai("sender", keys={"noreply@dhl.example"}, rerate=True)
+    assert len(client.calls) == n_calls + 1
+    sent = {g["key"] for g in json.loads(
+        client.calls[-1]["messages"][0]["content"])["groups"]}
+    assert sent == {"noreply@dhl.example"}
+    assert senders["noreply@dhl.example"]["ai"]["verdict"] == "delete_safe"
+    assert senders["alice@friends.example"]["ai"]["verdict"] == "review"
+    # ...and the cache follows, so a rescan keeps the new verdict
+    stored = verdictstore.load_account()["sender"]
+    assert stored["noreply@dhl.example"]["verdict"] == "delete_safe"
+    mailops.run_scan()
+    assert mailops.STATE["groups"]["sender"]["noreply@dhl.example"][
+        "ai"]["verdict"] == "delete_safe"
+
+
+def test_rerate_without_keys_does_not_rebill_everything(ai_ready):
+    client = FakeClient(lambda sent: {"verdicts": [
+        {"key": g["key"], "verdict": "keep", "reason": "t"}
+        for g in sent["groups"]]})
+    ai_ready.setattr(aihelper, "ai_client", lambda cfg: client)
+    aihelper._run_ai("sender")
+    n = len(client.calls)
+    aihelper._run_ai("sender", rerate=True)          # no selection: a no-op
+    assert len(client.calls) == n
+
+
 def test_ai_group_rates_and_caches(ai_ready):
     def payload(sent):
         items = [{"uid": m["uid"], "folder_i": m["folder_i"],

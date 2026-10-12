@@ -997,4 +997,11 @@ export const DE: Record<string, string> = {
   "rule.f_retention_n": "Anzahl",
   "rule.f_dest": "Ordner",
   "rule.f_name": "Name",
+
+  "ai.review_body":
+    "Schon bewertet: {rated} von {total}. Beim Neubewerten gehen sie erneut "
+    + "an die KI, ihre Bewertungen werden ersetzt und es werden erneut "
+    + "Tokens (und Budget) verbraucht.",
+  "ai.review_new": "Nur neue prüfen ({n})",
+  "ai.review_rerate": "Alle neu bewerten ({n})",
 };

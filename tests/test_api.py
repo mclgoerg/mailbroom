@@ -145,12 +145,17 @@ def test_post_ai_threads_keys_through_to_start_group_review(bridge, monkeypatch)
     mailops.run_scan()
     captured = {}
     monkeypatch.setattr(aihelper, "start_group_review",
-        lambda grouping, acc=None, keys=None:
-            captured.update(grouping=grouping, keys=keys))
+        lambda grouping, acc=None, keys=None, rerate=False:
+            captured.update(grouping=grouping, keys=keys, rerate=rerate))
 
     assert client.post("/api/ai", json={"grouping": "sender",
         "keys": ["noreply@dhl.example"]}).json() == {"ok": True}
-    assert captured == {"grouping": "sender", "keys": ["noreply@dhl.example"]}
+    assert captured == {"grouping": "sender", "keys": ["noreply@dhl.example"],
+                        "rerate": False}
+
+    client.post("/api/ai", json={"grouping": "sender", "rerate": True,
+                                 "keys": ["noreply@dhl.example"]})
+    assert captured["rerate"] is True
 
     client.post("/api/ai", json={"grouping": "sender"})
     assert captured["keys"] is None   # omitted -> every unrated group
