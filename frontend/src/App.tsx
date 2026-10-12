@@ -22,7 +22,7 @@ import { StatsPanel } from "./components/StatsPanel";
 import { QueryBuilder } from "./components/QueryBuilder";
 import { TrashPanel } from "./components/TrashPanel";
 import { AccountAvatar, applyTheme, BAR_ICON_BTN, BulkBar, Button, Chip, ChipGroup, ChipSegment,
-  confirmDialog, currentTheme, EmptyState, ensureAiAck, FILTER_ROW, Input, isModalOpen, LINK,
+  choiceDialog, confirmDialog, currentTheme, EmptyState, ensureAiAck, FILTER_ROW, Input, isModalOpen, LINK,
   LINK_ACCENT, Menu, MenuDivider, MenuHeading, MenuItem, Notice, ProgressBar,
   promptDialog, Segmented, Select, Spinner, useToast,
   type ToastVariant } from "./components/ui";
@@ -940,25 +940,38 @@ export default function App() {
     catch (e: any) { fail(e); }
   };
 
-  // Selected groups that already carry an AI verdict: what a re-rate replaces.
-  const ratedSelected = [...selected].filter((k) => state?.groups[mode]?.[k]?.ai);
-  // A plain "AI review" skips rated groups (no double billing); this is the
-  // explicit second opinion on just the selected ones.
-  const rerateSelected = async () => {
-    if (!ratedSelected.length) return;
-    if (!await confirmDialog({
-      title: t("ai.rerate_title"), body: t("ai.rerate_body"),
-      confirmLabel: t("ai.rerate_btn", { n: ratedSelected.length }),
-    })) return;
-    startAi(ratedSelected, true);
+  // AI review of `keys` (undefined = the whole grouping). Plain review
+  // skips groups that already have a verdict (no double billing); when some
+  // in scope are rated, ask whether to review only the new ones or to re-rate
+  // everything (a billed second opinion). Cancel / Esc start nothing.
+  const reviewWithAi = async (keys?: string[]) => {
+    const all = state?.groups[mode] ?? {};
+    const scope = keys ?? Object.keys(all);
+    const rated = scope.filter((k) => all[k]?.ai).length;
+    if (!rated) return startAi(keys);
+    const unrated = scope.length - rated;
+    const opts = {
+      title: t("AI review"),
+      body: t("ai.review_body", { rated, total: scope.length }),
+    };
+    const rerateLabel = t("ai.review_rerate", { n: scope.length });
+    if (!unrated) {          // nothing new to review: only re-rating is left
+      if (await confirmDialog({ ...opts, confirmLabel: rerateLabel }))
+        startAi(scope, true);
+      return;
+    }
+    const choice = await choiceDialog({ ...opts,
+      confirmLabel: t("ai.review_new", { n: unrated }),
+      altLabel: rerateLabel });
+    if (choice === "confirm") startAi(keys);
+    else if (choice === "alt") startAi(scope, true);
   };
 
   const onAction = (v: string) => {
     if (!selected.size) return;
     if (v === "move") setMoveDest("?");
     else if (v === "unsubscribe") unsubscribeSelected();
-    else if (v === "ai_review") startAi([...selected]);
-    else if (v === "ai_rerate") rerateSelected();
+    else if (v === "ai_review") reviewWithAi([...selected]);
     else act([...selected], v, "", ...retentionParams());
   };
 
@@ -1298,7 +1311,7 @@ export default function App() {
             </MenuItem>
             <MenuDivider />
             {aiEnabled && (
-              <MenuItem onClick={() => startAi()}
+              <MenuItem onClick={() => reviewWithAi()}
                 disabled={scanning || aiRunning || state?.status !== "done"}>
                 <Wand2 size={16} className="mr-1 inline align-text-bottom" />
                 {t("AI review")}
@@ -1520,9 +1533,6 @@ export default function App() {
               <option value="unsubscribe">{t("Unsubscribe")}</option>
               {aiEnabled && (
                 <option value="ai_review">{t("AI review")}</option>
-              )}
-              {aiEnabled && ratedSelected.length > 0 && (
-                <option value="ai_rerate">{t("ai.rerate_action")}</option>
               )}
             </Select>
             {moveDest === "?" && (

@@ -9,7 +9,7 @@ import { afterEach, expect, test, vi } from "vitest";
 
 import {
   isModalOpen, AccountAvatar, BulkBar, Button, Checkbox, Chip, ChipGroup, ChipSegment,
-  ConfirmDialog, DIALOG_ARM_MS, DialogProvider, PromptDialog, EmptyState, MailRow, Menu, MenuDivider,
+  ConfirmDialog, DIALOG_ARM_MS, choiceDialog, DialogProvider, PromptDialog, EmptyState, MailRow, Menu, MenuDivider,
   MenuHeading, MenuItem, Modal, Notice, ProgressBar, Segmented, ToastProvider,
   confirmDialog,
   LINK, RatingChips, Tag, ensureAiAck, promptDialog, ProtectButton, useToast,
@@ -361,6 +361,36 @@ test("a keyboard-activated confirm (click detail 0) is not swallowed by the guar
     fireEvent.click(screen.getByText("Delete"), { detail: 0 });
     expect(onResult).toHaveBeenCalledWith(true);
   } finally { vi.useRealTimers(); }
+});
+
+test("choiceDialog resolves confirm / alt, and null on Cancel or Esc; both " +
+  "forward buttons wait for the arm delay", async () => {
+  render(<DialogProvider><span>app</span></DialogProvider>);
+  const open = () => choiceDialog({ title: "Which?", confirmLabel: "New only",
+    altLabel: "Re-rate all" });
+  const press = async (name: string) => {
+    await new Promise((r) => setTimeout(r, DIALOG_ARM_MS + 30));
+    fireEvent.click(screen.getByRole("button", { name }), { detail: 1 });
+  };
+  let p = open();
+  await screen.findByText("Which?");
+  fireEvent.click(screen.getByRole("button", { name: "Re-rate all" }),
+    { detail: 1 });                                  // too early: ignored
+  expect(screen.getByText("Which?")).toBeTruthy();
+  await press("Re-rate all");
+  expect(await p).toBe("alt");
+  p = open();
+  await screen.findByText("Which?");
+  await press("New only");
+  expect(await p).toBe("confirm");
+  p = open();
+  await screen.findByText("Which?");
+  fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+  expect(await p).toBeNull();
+  p = open();
+  await screen.findByText("Which?");
+  fireEvent.keyDown(document.body, { key: "Escape" });
+  expect(await p).toBeNull();
 });
 
 test("PromptDialog ignores a submit (Enter / tap) right after opening", () => {
