@@ -17,6 +17,7 @@ from backend import aihelper
 from backend import config as cfgmod
 from backend import mailops
 from backend import rules as rulesmod
+from backend import smartkinds
 from backend import verdictstore
 from backend.main import app
 from conftest import FakeIMAP, make_msg, wait_delete_done
@@ -85,14 +86,18 @@ def membership(senders):
     ("payco.example", "payco.example"),
     ("mail.payco.example", "payco.example"),
     ("a.b.c.payco.example", "payco.example"),
-    ("shop.example.co.uk", "example.co.uk"),
-    ("example.co.uk", "example.co.uk"),
-    ("mail.shopjp.co.jp", "shopjp.co.jp"),
     ("localhost", "localhost"),
     ("EXAMPLE.com.", "example.com"),
 ])
 def test_registrable_domain(domain, expected):
     assert mailops.registrable_domain(domain) == expected
+
+
+@pytest.mark.parametrize("suffix", sorted(smartkinds.MULTI_SUFFIXES))
+def test_registrable_domain_under_a_multi_part_suffix(suffix):
+    # one label more than under a plain TLD, for every suffix of the list
+    assert mailops.registrable_domain(f"mail.shop.{suffix}") == f"shop.{suffix}"
+    assert mailops.registrable_domain(f"shop.{suffix}") == f"shop.{suffix}"
 
 
 @pytest.mark.parametrize("domain", [
@@ -110,14 +115,14 @@ def test_freemail_domains(domain):
 
 
 @pytest.mark.parametrize("domain", [
-    "payco.example", "bigshop.example", "mail.example.co.uk", "streamco.example",
+    "payco.example", "bigshop.example", "mail.bigshop.example", "streamco.example",
     "outlooktips.example", "yahooinc.example", "gmxshop.example"])
 def test_company_domains_are_not_freemail(domain):
     assert not mailops.is_freemail(domain)
 
 
 ACCOUNT_YES = [
-    "Welcome to Dropbox", "Willkommen bei Spotify", "Please verify your email",
+    "Welcome to Acme", "Willkommen bei Globex", "Please verify your email",
     "Verification code: 123456", "Bitte verifizieren Sie Ihr Konto",
     "Confirm your email address", "Confirm your account",
     "Email address confirmation", "Account confirmation instructions",
@@ -288,17 +293,18 @@ def test_company_row_holds_every_mail_of_its_senders():
 
 
 def test_company_pool_uses_registrable_domain_with_multi_label_suffixes():
-    msgs = (many("a@shop.example.co.uk", 4) + many("b@mail.example.co.uk", 3)
-            + many("c@example.co.uk", 3)
+    sfx = "co.uk"
+    msgs = (many(f"a@shop.hub.{sfx}", 4) + many(f"b@mail.hub.{sfx}", 3)
+            + many(f"c@hub.{sfx}", 3)
             # same suffix, different company: must not merge
-            + many("d@other.co.uk", 6))
+            + many(f"d@other.{sfx}", 6))
     rows = smart(msgs)
     place = placement(rows)
-    assert place["a@shop.example.co.uk"] == "o:example.co.uk"
-    assert place["b@mail.example.co.uk"] == "o:example.co.uk"
-    assert "o:co.uk" not in rows
-    assert place["d@other.co.uk"] != "o:co.uk"
-    assert place["d@other.co.uk"] == "k:other"
+    assert place[f"a@shop.hub.{sfx}"] == f"o:hub.{sfx}"
+    assert place[f"b@mail.hub.{sfx}"] == f"o:hub.{sfx}"
+    assert f"o:{sfx}" not in rows
+    assert place[f"d@other.{sfx}"] != f"o:{sfx}"
+    assert place[f"d@other.{sfx}"] == "k:other"
 
 
 def test_freemail_domains_are_never_pooled():

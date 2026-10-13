@@ -41,9 +41,10 @@ FREEMAIL_BRANDS = frozenset({
 
 
 def registrable_domain(domain: str) -> str:
-    """`mail.payco.example` -> `payco.example`, `shop.example.co.uk` ->
-    `example.co.uk`. A small built-in suffix list, no public-suffix
-    dependency."""
+    """`mail.payco.example` -> `payco.example`; under a multi-part suffix
+    from MULTI_SUFFIXES (`co.uk`, ...) the registrable domain is one label
+    more (`mail.shop` + suffix -> `shop` + suffix). A small built-in suffix
+    list, no public-suffix dependency."""
     labels = [p for p in domain.lower().strip(".").split(".") if p]
     if len(labels) <= 2:
         return ".".join(labels)
@@ -106,7 +107,7 @@ def platform_of(domain: str) -> tuple[str, str] | None:
 def company_id(domain: str) -> str | None:
     """The company a sender domain identifies, or None when it identifies
     none (freemail, a shared platform host, a tenant platform's own host).
-    Normal domains: the registrable domain (`mail.amazon.de` -> `amazon.de`);
+    Normal domains: the registrable domain (`mail.shop.example` -> `shop.example`);
     tenant platforms: the tenant's full host (`acme.zendesk.com`)."""
     domain = (domain or "").lower().strip(".")
     if not domain or is_freemail(domain):

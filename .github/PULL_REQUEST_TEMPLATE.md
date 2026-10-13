@@ -24,3 +24,7 @@
 - [ ] Persisted-format change? Read-side migration + migration test
       included
 - [ ] README updated if behavior or setup changed
+- [ ] No real mailbox data anywhere in the diff, commit messages or this
+      description: names, addresses, subjects, labels (invented `.example`
+      data only; see "Privacy" in CONTRIBUTING.md and run
+      `scripts/prepush_leak_scan.py`)
