@@ -1098,7 +1098,8 @@ export const DE: Record<string, string> = {
   "aisort.cleared_none": "KI-Sortierung entfernt.",
   "aisort.clear": "KI-Sortierung entfernen",
   "aisort.cleared": "KI-Sortierung entfernt: {n} Absender sind wieder dort, wo die Regeln sie hingelegt haben.",
-  "aisort.clear_confirm": "Die KI-Sortierung von {n} Absendern entfernen?",
+  "aisort.clear_confirm":
+    "Die KI-Sortierung von {n} Absendern entfernen? Behaltene Antworten bleiben eingeordnet.",
   "aisort.started": "KI-Sortierung gestartet.",
   "notice.ai_sort_done": "KI-Sortierung fertig: {placed} von {total} Gruppen eingeordnet.",
   "notice.ai_sort_cancelled": "KI-Sortierung nach {done}/{total} Gruppen abgebrochen; was sortiert ist, bleibt.",
@@ -1128,6 +1129,9 @@ export const DE: Record<string, string> = {
   "smart.reason.ai_other_sure": "Von der KI geprüft: gehört zu den sonstigen Absendern.",
   "smart.reason.notification":
     "Automatische Benachrichtigungen aus einem Forum oder Entwickler-Tool.",
+  "smart.reason.rule": "Du hast diesen Absender unter {what} einsortiert.",
+  "smart.reason.rule_co": "Du hast seine Firma unter {what} einsortiert.",
+  "smart.reason.kept_ai": "Unter {what} einsortiert durch eine behaltene KI-Antwort.",
   "smart.reason.none": "In seinen Mails steht nichts, worum es geht.",
   "smart.reason.with_company":
     "Zusammen mit den anderen Absendern von {co} eingeordnet.",
@@ -1157,4 +1161,78 @@ export const DE: Record<string, string> = {
     + "eigene Zeile; kleinere Absender werden nach Firma und nach dem "
     + "Inhalt ihrer Mails gebündelt. 2\u201350, Standard 10. Gilt sofort, "
     + "kein neuer Scan nötig.",
+  // Private Absender-Kenntnisse: Absender in Smart einordnen, KI-Antworten behalten.
+  "know.file_action": "In Smart einordnen als…",
+  "know.file_help": "Es wird keine Mail verschoben.",
+  "know.blocked.company":
+    "Firmenzeilen werden nach ihrer Struktur eingeordnet, hier wirkt Einordnen nicht.",
+  "know.blocked.protected":
+    "Geschützte Absender bleiben in ihrem eigenen Bereich, hier wirkt Einordnen nicht.",
+  "know.blocked.replied":
+    "Menschen, denen du schreibst, bleiben in ihrem eigenen Bereich, hier wirkt Einordnen nicht.",
+  "know.scope_title": "Nur die markierten Absender einordnen oder ganze Firmen?",
+  "know.scope_body":
+    "Einige der markierten Absender gehören zu einer Firmengruppe. Ordnest du "
+    + "nur die markierten ein, verlassen sie die Gruppe; ordnest du die Firma "
+    + "ein, wird alles von dieser Firma verschoben, auch Absender, die später "
+    + "schreiben.",
+  "know.scope_sender": "Nur die markierten Absender",
+  "know.scope_company": "Die ganze Firma ({n} Absender)",
+  "know.scope_company_one": "Die ganze Firma (1 Absender)",
+  "know.filed": "{n} Absender in {kind} einsortiert.",
+  "know.filed_one": "1 Absender in {kind} einsortiert.",
+  "know.undone": "Einordnung rückgängig gemacht.",
+  "know.kind_category": "Kategorie „{name}“",
+  "know.keep_btn": "Diese Antworten behalten ({n})",
+  "know.keep_title": "Die KI-Antworten für {n} Absender behalten?",
+  "know.keep_title_one": "Die KI-Antwort für 1 Absender behalten?",
+  "know.keep_b_rules":
+    "Sie werden deine eigenen Regeln für diese Absender und bleiben, bis du "
+    + "sie entfernst.",
+  "know.keep_b_clearer":
+    "Eindeutigere Hinweise in ihren Mails setzen sich weiterhin gegen eine "
+    + "behaltene Antwort durch.",
+  "know.keep_b_only":
+    "„KI-Sortierung entfernen“ rührt behaltene Antworten nicht an. "
+    + "Es wird keine Mail verschoben.",
+  "know.keep_go": "{n} Antworten behalten",
+  "know.keep_go_one": "1 Antwort behalten",
+  "know.kept": "{n} KI-Antworten behalten.",
+  "know.kept_one": "1 KI-Antwort behalten.",
+  "know.kept_none": "Gerade gilt keine KI-Antwort.",
+  "know.box_title": "So ordnet Mailbroom diesen Absender ein",
+  "know.box_now": "Gerade in „{row}“.",
+  "know.box_select": "Diesen Absender einordnen unter",
+  "know.box_auto": "Automatisch",
+  "know.src_user": "Von dir eingeordnet",
+  "know.src_ai": "Behaltene KI-Antwort",
+  "know.box_company": "Deine Regel für seine Firma entscheidet.",
+  "know.reset": "Auf automatisch zurücksetzen",
+  "know.reset_company": "Seine Firma auf automatisch zurücksetzen",
+  "know.reset_done": "Wieder automatisch.",
+  "know.no_effect": "Deine Einordnung wirkt gerade nicht: {why}",
+  "know.no_effect_ai": "Die behaltene KI-Antwort wirkt gerade nicht: {why}",
+  "know.reason.own_row": "dieser Absender hat genug Mails für eine eigene Zeile.",
+  "know.reason.company_row": "seine Firma hat eine eigene Zeile.",
+  "know.reason.protected": "dieser Absender ist geschützt.",
+  "know.reason.replied": "du hast diesem Absender geschrieben.",
+  "know.reason.rules_confident": "die Regeln sind sich jetzt sicher.",
+  "know.reason.decided_by_rules":
+    "die Regeln haben es schon entschieden (Newsletter, private Adresse oder Benachrichtigung).",
+  "know.reason.shadowed": "eine genauere Regel von dir entscheidet.",
+  "know.reason.freemail":
+    "eine KI-Antwort gibt einer privaten Adresse nie einen Zweck.",
+  "know.reason.in_company_group":
+    "er gehört zu einer Firmengruppe, die eine behaltene Antwort nie aufteilt.",
+  "know.reason.not_applied": "sie wird hier nicht angewendet.",
+  "know.reason.inactive_category": "ihre Kategorie gibt es nicht mehr.",
+  "know.reason.invalid_key": "sie nennt keine Firma und keine Adresse mehr.",
+  "know.reason.invalid_kind": "ihre Art ist nicht bekannt.",
+  "know.err.bad_request": "Die Anfrage wurde nicht verstanden.",
+  "know.err.bad_key": "Das ist keine Absenderadresse und keine Firma.",
+  "know.err.bad_kind": "Diese Art ist nicht verfügbar (vielleicht gibt es die Kategorie nicht mehr).",
+  "know.err.bad_note": "Die Notiz ist zu lang (höchstens 200 Zeichen).",
+  "know.err.full": "Die Liste der eingeordneten Absender ist voll.",
+  "know.err.ai_running": "Ein KI-Lauf ist aktiv – versuche es nach dem Ende noch einmal.",
+  "know.err.unscanned": "Scanne zuerst jedes Konto.",
 };

@@ -119,6 +119,13 @@ presets.
   recent subject lines (plus your own instructions from Settings, which you
   can edit), places senders without moving or deleting any mail, caches each
   answer until that sender's mails change, and can be removed again.
+- **Filing senders in Smart** - tick senders in a pooled row and choose
+  "File in Smart as…" (a kind, or one of your own categories) to decide
+  where a sender - or its whole company - belongs. It only places the
+  sender: no mail is moved, it is remembered (per user, on your server
+  only, never sent to an AI), undoable, and a sender's detail view shows
+  how it is filed and why. After an AI sorting run you can keep its answers
+  as your own rules too; clearer mail still wins over a kept answer.
 - **Attachment explorer** - an on-demand BODYSTRUCTURE pass (structure
   only, no content downloaded) lists mails by attachment size with file
   names, adds a 📎 aggregate to groups, and enables the `att:>10m` filter.

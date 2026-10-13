@@ -10,7 +10,7 @@ import { fmtSize, fmtUsd, mailKey, olderThan, shortcutTarget, sieveSnippet,
 import { isPooled, smartContent, smartWhy } from "../smart";
 import type { AppState, Group, Grouping, GroupUnsub, Mail } from "../types";
 import { MailRows, MessageView } from "./MailList";
-import { SenderList, type SenderAction } from "./SenderList";
+import { SenderList, type FileEntry, type SenderAction } from "./SenderList";
 import { ThreadView } from "./ThreadView";
 import { Button, Chip, confirmDialog, ensureAiAck, Input, LINK, LINK_ACCENT, Loading, Menu,
   MenuItem, Modal, PanelHeader, PinButton, ProtectButton, Segmented, Select,
@@ -31,7 +31,7 @@ export function DetailPanel({ grouping, group, aiEnabled, protectedNow,
   unsubscribedNow, onTrash, onProtect, onBlock, onUnblock, blocked, folders,
   sieve = true, smartMin = 10, onClose, onEmptied, onDeleted, variant = "modal", hideGroupActions = false,
   senders, onSenderAct, onSenderProtect, renderSender, onAckUnsub, backLabel,
-  aiSort }: {
+  aiSort, onFile, categories, filingBox }: {
   grouping: Grouping;
   group: Group;
   aiEnabled: boolean;
@@ -74,7 +74,13 @@ export function DetailPanel({ grouping, group, aiEnabled, protectedNow,
   // Pooled Smart rows: AI sorting of what the rules left in Other. `onSort`
   // only when an AI is configured; `total` = senders the AI sorted so far.
   aiSort?: { total: number; checked: number; busy: boolean;
-    onSort?: () => void; onClear: () => void };
+    onSort?: () => void; onClear: () => void; onKeep?: () => void };
+  // Pooled Smart rows: "File in Smart as..." for ticked senders, and the
+  // user's own categories they can be filed into. One sender opened inside
+  // a pool shows `filingBox` ("How Mailbroom files this sender") on top.
+  onFile?: (entries: FileEntry[], senders: number) => Promise<boolean>;
+  categories?: string[];
+  filingBox?: ReactNode;
 }) {
   const hasSenders = !!senders && !!onSenderAct && !!onSenderProtect
     && !!renderSender && isPooled(group) && senders.length > 0;
@@ -382,6 +388,8 @@ export function DetailPanel({ grouping, group, aiEnabled, protectedNow,
   const canAiClear = !!aiSort && aiSort.total + aiSort.checked > 0
     && (group.kind === "other"
     || (senders ?? []).some((g) => g.smart_why?.r === "ai"));
+  // Keeping an answer needs one that applies: the AI PLACED something.
+  const canKeep = canAiClear && !!aiSort?.onKeep && aiSort.total > 0;
   // A pooled Smart row has no one sender to unsubscribe from: the endpoint
   // would act on its newest sender only. No button there (DECISIONS
   // 2026-10-12); own rows behave like Sender-tab rows.
@@ -424,6 +432,7 @@ export function DetailPanel({ grouping, group, aiEnabled, protectedNow,
           actions={mailActions(view)} />
       ) : (
         <>
+          {filingBox}
           {/* Smart pools: one plain line on why these senders are together,
               what a company's mails are about, and the Senders | Mails
               switch (the senders are the point; the mails stay one tap away). */}
@@ -445,6 +454,13 @@ export function DetailPanel({ grouping, group, aiEnabled, protectedNow,
                       {aiSort!.total
                         ? t("aisort.sorted_n", { n: aiSort!.total })
                         : t("aisort.checked_n", { n: aiSort!.checked })}{" "}
+                      {canKeep && (
+                        <>
+                          <button className={LINK} onClick={aiSort!.onKeep}>
+                            {t("know.keep_btn", { n: aiSort!.total })}
+                          </button>{" "}
+                        </>
+                      )}
                       <button className={LINK} onClick={aiSort!.onClear}>
                         {t("aisort.clear")}
                       </button>
@@ -467,6 +483,7 @@ export function DetailPanel({ grouping, group, aiEnabled, protectedNow,
             <div {...tabPanelProps("pool", "senders")}
               className="flex min-h-0 flex-1 flex-col">
               <SenderList senders={senders!} folders={folders}
+                rowKind={group.kind} categories={categories} onFile={onFile}
                 onAct={onSenderAct!} onProtect={onSenderProtect!}
                 onInspect={setInspect} onSelectedChange={setSenderSel}
                 onAckUnsub={onAckUnsub ?? (() => {})} />

@@ -14,6 +14,9 @@ const protectMany = vi.fn().mockResolvedValue({ protected: [] });
 const aiSortEstimate = vi.fn();
 const aiSort = vi.fn().mockResolvedValue({ units: 3, senders: 5 });
 const aiSortClear = vi.fn().mockResolvedValue({ cleared: 2 });
+const knowledge = vi.fn();
+const knowledgePut = vi.fn();
+const knowledgeKeepAi = vi.fn();
 const unsubscribeBulk = vi.fn().mockResolvedValue({ queued: 1,
   skipped_protected: 0, skipped_done: 0, capped: 0 });
 const block = vi.fn().mockResolvedValue({ rule: { id: "r1" } });
@@ -33,6 +36,9 @@ vi.mock("./api", () => ({
     aiSortEstimate: (...a: unknown[]) => aiSortEstimate(...a),
     aiSort: (...a: unknown[]) => aiSort(...a),
     aiSortClear: (...a: unknown[]) => aiSortClear(...a),
+    knowledge: (...a: unknown[]) => knowledge(...a),
+    knowledgePut: (...a: unknown[]) => knowledgePut(...a),
+    knowledgeKeepAi: (...a: unknown[]) => knowledgeKeepAi(...a),
     block: (...a: unknown[]) => block(...a),
     deleteGroups: (...a: unknown[]) => deleteGroups(...a),
     group: (...a: unknown[]) => groupMails(...a),
@@ -145,6 +151,8 @@ beforeEach(() => {
   setLang("en");
   localStorage.setItem("pmc_account", "proton");
   state = baseState;
+  knowledge.mockResolvedValue({ entries: [], complete: true, unscanned: [],
+    categories: [], max: 5000, ai_running: false });
 });
 afterEach(() => {
   cleanup();
@@ -156,7 +164,11 @@ afterEach(() => {
   aiSortEstimate.mockReset();
   aiSort.mockClear();
   aiSortClear.mockClear();
+  knowledge.mockReset();
+  knowledgePut.mockReset();
+  knowledgeKeepAi.mockReset();
   cfg.ai.available = false;
+  cfg.categories = {};
   block.mockClear();
   deleteGroups.mockClear();
   groupMails.mockClear();
@@ -774,7 +786,9 @@ test("what the AI sorted says so, and can be removed again", async () => {
   expect(screen.getByText(/1 senders were sorted by AI\./)).toBeTruthy();
   fireEvent.click(screen.getByRole("button", { name: "Remove AI sorting" }));
   const dlg = await findDialog();
-  expect(within(dlg).getByText("Remove the AI sorting of 3 senders?")).toBeTruthy();
+  expect(within(dlg).getByText(
+    "Remove the AI sorting of 3 senders? Answers you kept stay filed."))
+    .toBeTruthy();
   await pressDialog("Remove AI sorting");
   await waitFor(() => expect(aiSortClear).toHaveBeenCalledTimes(1));
   expect(await screen.findByText(
@@ -904,4 +918,311 @@ test("the sorting button is German in the German UI", async () => {
     .toBeGreaterThan(0));
   openRow("Sonstige Absender");
   expect(await screen.findByRole("button", { name: "Mit KI sortieren" })).toBeTruthy();
+});
+
+
+// ------------------------------------------- private sender knowledge (filing)
+
+const noKnowledge = () => knowledge.mockResolvedValue({ entries: [],
+  complete: true, unscanned: [], categories: [], max: 5000, ai_running: false });
+const saved = (previous: Record<string, unknown>) => ({ ok: true, saved: 1,
+  removed: 0, previous });
+const fileSelect = () => screen.getAllByRole("combobox").find((c) =>
+  [...(c as HTMLSelectElement).options].some((o) => o.value === "file"))!;
+
+test("filing a ticked sender is one call with its exact address, moves no "
+  + "mail, and the toast's Undo restores the previous entry", async () => {
+  noKnowledge();
+  knowledgePut.mockResolvedValueOnce(saved({ "a:promo@lone.example": null }));
+  await openSmart();
+  openRow("Newsletters");
+  await screen.findByRole("tab", { name: "Senders (2)" });
+  tick("promo@lone.example");
+  pickAction("file");
+  expect(screen.getByText("No mail is moved.")).toBeTruthy();
+  fireEvent.change(screen.getByRole("combobox", { name: "File in Smart as…" }),
+    { target: { value: "orders" } });
+  await waitFor(() => expect(knowledgePut).toHaveBeenCalledTimes(1));
+  expect(knowledgePut).toHaveBeenCalledWith({ entries: [
+    { key: "a:promo@lone.example", kind: "orders" }] });
+  expect(deleteGroups).not.toHaveBeenCalled();
+  expect(await screen.findByText("Filed 1 sender under Orders & deliveries."))
+    .toBeTruthy();
+  // Undo: the entry did not exist before, so it is removed again
+  knowledgePut.mockResolvedValueOnce({ ok: true, saved: 0, removed: 1,
+    previous: {} });
+  fireEvent.click(screen.getByRole("button", { name: "Undo" }));
+  await waitFor(() => expect(knowledgePut).toHaveBeenCalledTimes(2));
+  expect(knowledgePut).toHaveBeenLastCalledWith(
+    { entries: undefined, remove: ["a:promo@lone.example"] });
+  expect(await screen.findByText("Filing undone.")).toBeTruthy();
+});
+
+test("Undo puts a previous entry back exactly as it was", async () => {
+  noKnowledge();
+  const before = { kind: "support", src: "user", ts: 7, note: "my note" };
+  knowledgePut.mockResolvedValueOnce(saved({ "a:promo@lone.example": before }));
+  await openSmart();
+  openRow("Newsletters");
+  await screen.findByRole("tab", { name: "Senders (2)" });
+  tick("promo@lone.example");
+  pickAction("file");
+  fireEvent.change(screen.getByRole("combobox", { name: "File in Smart as…" }),
+    { target: { value: "jobs" } });
+  await screen.findByText("Filed 1 sender under Job applications.");
+  knowledgePut.mockResolvedValueOnce(saved({}));
+  fireEvent.click(screen.getByRole("button", { name: "Undo" }));
+  await waitFor(() => expect(knowledgePut).toHaveBeenCalledTimes(2));
+  expect(knowledgePut).toHaveBeenLastCalledWith({ entries: [
+    { key: "a:promo@lone.example", ...before }], remove: undefined });
+});
+
+test("a refused filing says why in words, not as a code", async () => {
+  noKnowledge();
+  knowledgePut.mockRejectedValueOnce(
+    new Error("That kind is not available (a category may be gone)."));
+  await openSmart();
+  openRow("Newsletters");
+  await screen.findByRole("tab", { name: "Senders (2)" });
+  tick("promo@lone.example");
+  pickAction("file");
+  fireEvent.change(screen.getByRole("combobox", { name: "File in Smart as…" }),
+    { target: { value: "support" } });
+  expect(await screen.findByText(/That kind is not available/)).toBeTruthy();
+  expect(screen.getByText("1 of 2 senders selected (3 mails)")).toBeTruthy();
+});
+
+test("a ticked sender of a company group asks: just it, or the whole company",
+  async () => {
+    const acme = [senderRec("amy@acme.example", "k:newsletter",
+      { smart_why: { r: "newsletter", co: "acme.example" } }),
+    senderRec("bob@acme.example", "k:newsletter",
+      { smart_why: { r: "newsletter", co: "acme.example" } })];
+    state = { ...baseState, groups: { ...baseState.groups,
+      smart: { ...baseState.groups.smart, "k:newsletter": { ...newsletters,
+        members: acme.map((g) => g.key), n_senders: 2 } },
+      sender: { ...baseState.groups.sender,
+        ...Object.fromEntries(acme.map((g) => [g.key, g])) } } };
+    noKnowledge();
+    knowledgePut.mockResolvedValue(saved({}));
+    await openSmart();
+    openRow("Newsletters");
+    await screen.findByRole("tab", { name: /^Senders/ });
+    tick("amy@acme.example");
+    pickAction("file");
+    fireEvent.change(screen.getByRole("combobox", { name: "File in Smart as…" }),
+      { target: { value: "accounts" } });
+    const dlg = await findDialog();
+    expect(within(dlg).getByText("File only the ticked senders, or whole companies?"))
+      .toBeTruthy();
+    await pressDialog("The whole company (2 senders)");
+    await waitFor(() => expect(knowledgePut).toHaveBeenCalledWith({ entries: [
+      { key: "co:acme.example", kind: "accounts" }] }));
+  });
+
+test("in a company row the action is disabled and says why", async () => {
+  await openSmart();
+  openRow("payco.example");
+  await screen.findByRole("tab", { name: /^Senders/ });
+  tick("a@payco.example");
+  expect([...(fileSelect() as HTMLSelectElement).options]
+    .find((o) => o.value === "file")!.disabled).toBe(true);
+  expect(screen.getByText("Company rows are placed by their structure, so "
+    + "filing has no effect here.")).toBeTruthy();
+});
+
+test("one sender opens with the box 'How Mailbroom files this sender'; "
+  + "choosing a kind files that sender, Reset puts it back", async () => {
+  knowledge.mockResolvedValue({ entries: [{ key: "a:hello@zine.example",
+    kind: "newsletter", src: "user", ts: 1, note: "", status: "active",
+    reason: "", senders: 1, rows: ["k:newsletter"] }], complete: true,
+  unscanned: [], categories: [], max: 5000, ai_running: false });
+  knowledgePut.mockResolvedValue(saved({}));
+  await openSmart();
+  openRow("Newsletters");
+  await screen.findByRole("tab", { name: "Senders (2)" });
+  fireEvent.click(screen.getByRole("button", { name: "hello@zine.example" }));
+  expect(await screen.findByText("How Mailbroom files this sender")).toBeTruthy();
+  expect(screen.getByText(/^Now in “Newsletters”\. /)).toBeTruthy();
+  await screen.findByText("Filed by you");
+  const sel = screen.getByRole("combobox", { name: "File this sender under" });
+  fireEvent.change(sel, { target: { value: "support" } });
+  await waitFor(() => expect(knowledgePut).toHaveBeenCalledWith({ entries: [
+    { key: "a:hello@zine.example", kind: "support" }] }));
+  fireEvent.click(screen.getByRole("button", { name: "Reset to automatic" }));
+  await waitFor(() => expect(knowledgePut).toHaveBeenCalledWith(
+    { remove: ["a:hello@zine.example"] }));
+  expect(await screen.findByText("Back to automatic.")).toBeTruthy();
+});
+
+test("the box is German in the German UI", async () => {
+  setLang("de");
+  noKnowledge();
+  render(<ToastProvider><DialogProvider><App /></DialogProvider></ToastProvider>);
+  fireEvent.click(await screen.findByRole("tab", { name: "Smart" }));
+  await waitFor(() => expect(screen.getAllByText("Big Shop").length)
+    .toBeGreaterThan(0));
+  openRow("Newsletter");
+  await screen.findByRole("tab", { name: "Absender (2)" });
+  fireEvent.click(screen.getByRole("button", { name: "hello@zine.example" }));
+  expect(await screen.findByText("So ordnet Mailbroom diesen Absender ein"))
+    .toBeTruthy();
+  expect(screen.getByText(/^Gerade in „Newsletter“\. /)).toBeTruthy();
+});
+
+test("the user's own categories can be filed into", async () => {
+  cfg.categories = { hobby: ["zzz"], empty: [] };
+  noKnowledge();
+  knowledgePut.mockResolvedValue(saved({}));
+  await openSmart();
+  openRow("Newsletters");
+  await screen.findByRole("tab", { name: "Senders (2)" });
+  tick("promo@lone.example");
+  pickAction("file");
+  const picker = screen.getByRole("combobox", { name: "File in Smart as…" });
+  expect([...(picker as HTMLSelectElement).options].map((o) => o.value))
+    .toContain("cat:hobby");
+  expect([...(picker as HTMLSelectElement).options].map((o) => o.value))
+    .not.toContain("cat:empty");
+  fireEvent.change(picker, { target: { value: "cat:hobby" } });
+  await waitFor(() => expect(knowledgePut).toHaveBeenCalledWith({ entries: [
+    { key: "a:promo@lone.example", kind: "cat:hobby" }] }));
+  expect(await screen.findByText("Filed 1 sender under Category “hobby”."))
+    .toBeTruthy();
+});
+
+// ---------------------------------------------------- keeping the AI's answers
+
+const withSortedOrders = () => {
+  cfg.ai.available = true;
+  const ordersRow = { ...orders, members: ["order@shop-a.example",
+    sortedOrders.key] };
+  state = { ...baseState, groups: { ...baseState.groups,
+    smart: { ...baseState.groups.smart, [orders.key]: ordersRow },
+    sender: { ...baseState.groups.sender, ...senderGroup([ordersRow]),
+      [sortedOrders.key]: sortedOrders } } };
+};
+
+test("'Keep these answers' sits next to 'Remove AI sorting', confirms with "
+  + "the count, and keeps them once", async () => {
+  withSortedOrders();
+  noKnowledge();
+  knowledgeKeepAi.mockResolvedValue({ ok: true, kept: 1 });
+  await openSmart();
+  openRow("Orders & deliveries");
+  await screen.findByRole("tab", { name: /^Senders/ });
+  expect(screen.getByRole("button", { name: "Remove AI sorting" })).toBeTruthy();
+  fireEvent.click(screen.getByRole("button", { name: "Keep these answers (1)" }));
+  const dlg = await findDialog();
+  expect(within(dlg).getByText("Keep the AI’s answer for 1 sender?")).toBeTruthy();
+  expect(within(dlg).getByText(
+    "“Remove AI sorting” does not touch kept answers. No mail is moved."))
+    .toBeTruthy();
+  await pressDialog("Keep 1 answer");
+  await waitFor(() => expect(knowledgeKeepAi).toHaveBeenCalledTimes(1));
+  expect(await screen.findByText("Kept 1 AI answer.")).toBeTruthy();
+});
+
+test("declining the confirmation keeps nothing", async () => {
+  withSortedOrders();
+  noKnowledge();
+  await openSmart();
+  openRow("Orders & deliveries");
+  await screen.findByRole("tab", { name: /^Senders/ });
+  fireEvent.click(screen.getByRole("button", { name: "Keep these answers (1)" }));
+  await findDialog();
+  await pressDialog("Cancel");
+  await expectNoDialog();
+  expect(knowledgeKeepAi).not.toHaveBeenCalled();
+});
+
+test("a refused keep (an AI run is going) shows the reason in words", async () => {
+  withSortedOrders();
+  noKnowledge();
+  knowledgeKeepAi.mockRejectedValue(
+    new Error("An AI run is going - try again when it is done."));
+  await openSmart();
+  openRow("Orders & deliveries");
+  await screen.findByRole("tab", { name: /^Senders/ });
+  fireEvent.click(screen.getByRole("button", { name: "Keep these answers (1)" }));
+  await findDialog();
+  await pressDialog("Keep 1 answer");
+  expect(await screen.findByText(/An AI run is going/)).toBeTruthy();
+});
+
+test("there is nothing to keep when the AI placed nobody", async () => {
+  cfg.ai.available = true;
+  state = { ...baseState, groups: { ...baseState.groups,
+    smart: { ...baseState.groups.smart, [otherRow.key]: { ...otherRow,
+      members: ["unsure@mystery.example"] } },
+    sender: { ...baseState.groups.sender, ...senderGroup([otherRow]),
+      [sortedOther.key]: sortedOther } } };
+  await openSmart();
+  openRow("Other senders");
+  await screen.findByRole("tab", { name: /^Senders/ });
+  expect(screen.getByRole("button", { name: "Remove AI sorting" })).toBeTruthy();
+  expect(screen.queryByRole("button", { name: /Keep these answers/ })).toBeNull();
+});
+
+test("keeping answers is German in the German UI", async () => {
+  setLang("de");
+  withSortedOrders();
+  noKnowledge();
+  knowledgeKeepAi.mockResolvedValue({ ok: true, kept: 2 });
+  render(<ToastProvider><DialogProvider><App /></DialogProvider></ToastProvider>);
+  fireEvent.click(await screen.findByRole("tab", { name: "Smart" }));
+  await waitFor(() => expect(screen.getAllByText("Big Shop").length)
+    .toBeGreaterThan(0));
+  openRow("Bestellungen & Lieferungen");
+  await screen.findByRole("tab", { name: /^Absender \(/ });
+  fireEvent.click(screen.getByRole("button",
+    { name: "Diese Antworten behalten (1)" }));
+  const dlg = await findDialog();
+  expect(within(dlg).getByText("Die KI-Antwort für 1 Absender behalten?"))
+    .toBeTruthy();
+  await pressDialog("1 Antwort behalten");
+  expect(await screen.findByText("2 KI-Antworten behalten.")).toBeTruthy();
+});
+
+
+test("the open panel of a pooled row is named in the user's language too",
+  async () => {
+    setLang("de");
+    withOther();
+    noKnowledge();
+    render(<ToastProvider><DialogProvider><App /></DialogProvider></ToastProvider>);
+    fireEvent.click(await screen.findByRole("tab", { name: "Smart" }));
+    await waitFor(() => expect(screen.getAllByText("Sonstige Absender").length)
+      .toBeGreaterThan(0));
+    openRow("Sonstige Absender");
+    await screen.findByRole("tab", { name: /^Absender \(/ });
+    // (the server ships an English fallback label: it must not reach the header)
+    expect(screen.queryByText("Other senders")).toBeNull();
+  });
+
+
+test("a finished AI sorting run offers to keep its answers right in the notice",
+  async () => {
+    withSortedOrders();
+    state = { ...state, notice: { key: "ai_sort_done",
+      params: { placed: 1, total: 2 } } };
+    noKnowledge();
+    knowledgeKeepAi.mockResolvedValue({ ok: true, kept: 1 });
+    await mount();
+    const keep = await screen.findByRole("button",
+      { name: "Keep these answers (1)" });
+    expect(within(keep.closest("[role=status]") as HTMLElement).getByText(
+      /AI sorting done: 1 of 2 groups placed\./)).toBeTruthy();
+    fireEvent.click(keep);
+    await findDialog();
+    await pressDialog("Keep 1 answer");
+    await waitFor(() => expect(knowledgeKeepAi).toHaveBeenCalledTimes(1));
+  });
+
+test("no keep link in the notice when the AI placed nobody", async () => {
+  state = { ...baseState, notice: { key: "ai_sort_done",
+    params: { placed: 0, total: 2 } } };
+  await mount();
+  await screen.findByText(/AI sorting done: 0 of 2 groups placed\./);
+  expect(screen.queryByRole("button", { name: /Keep these answers/ })).toBeNull();
 });

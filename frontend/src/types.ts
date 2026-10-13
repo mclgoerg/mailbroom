@@ -11,8 +11,10 @@ export type SmartKind = "sender" | "company" | "protected" | "replied"
 export interface SmartWhy {
   r: string;        // own | protected | replied | company | purpose | weak |
                     // competing | category | category_conflict | newsletter |
-                    // individual | notification | ai | none
-  k?: string;       // purpose (r = purpose / weak)
+                    // individual | notification | ai | rule | kept_ai | none
+  k?: string;       // purpose (r = purpose / weak), kind (r = rule / kept_ai)
+  by?: "a" | "co";  // r = rule / kept_ai: filed by this sender's own entry or its company's
+  entry?: string;   // r = rule / kept_ai: key of the knowledge entry that decided it
   n?: number;       // mails matching ...
   of?: number;      // ... of this many mails
   name?: string;    // category name
@@ -20,6 +22,38 @@ export interface SmartWhy {
   sure?: boolean;   // r = ai: the AI was confident (for "other": it belongs there)
 }
 export type Verdict = "delete_safe" | "review" | "keep";
+
+/** Private sender knowledge (GET /api/knowledge): where the user filed a
+ *  sender (`a:<address>`) or a company (`co:<company>`) in Smart. */
+export type KnowledgeSrc = "user" | "ai";
+export interface KnowledgeStored {
+  kind: string;               // a fixed kind, or `cat:<name>` of an own category
+  src: KnowledgeSrc;          // "ai": an AI answer the user chose to keep
+  ts: number;
+  note: string;
+}
+export interface KnowledgeEntry extends KnowledgeStored {
+  key: string;
+  // active | no_effect | inactive | inert | unused | unknown
+  status: string;
+  reason: string;             // why it has no effect (see know.reason.*)
+  senders: number;            // matching senders in the loaded mailboxes
+  rows: string[];             // Smart rows they sit in now
+}
+export interface KnowledgeList {
+  entries: KnowledgeEntry[];
+  complete: boolean;          // every account has a finished scan
+  unscanned: string[];
+  categories: string[];       // the user's own categories (can be filed into)
+  max: number;
+  ai_running: boolean;
+}
+export interface KnowledgeSaved {
+  ok: boolean;
+  saved: number;
+  removed: number;
+  previous: Record<string, KnowledgeStored | null>;   // what an Undo restores
+}
 
 export interface GroupAi {
   verdict: Verdict;

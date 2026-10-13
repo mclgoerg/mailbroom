@@ -929,7 +929,8 @@ export const EN: Record<string, string> = {
   "aisort.cleared_none": "AI sorting removed.",
   "aisort.clear": "Remove AI sorting",
   "aisort.cleared": "AI sorting removed: {n} senders are back where the rules put them.",
-  "aisort.clear_confirm": "Remove the AI sorting of {n} senders?",
+  "aisort.clear_confirm":
+    "Remove the AI sorting of {n} senders? Answers you kept stay filed.",
   "aisort.started": "AI sorting started.",
   "notice.ai_sort_done": "AI sorting done: {placed} of {total} groups placed.",
   "notice.ai_sort_cancelled": "AI sorting cancelled after {done}/{total} groups; what was sorted stays.",
@@ -957,6 +958,9 @@ export const EN: Record<string, string> = {
   "smart.reason.ai_other_sure": "Checked by AI: belongs in Other.",
   "smart.reason.notification":
     "Automatic notifications from a forum or developer tool.",
+  "smart.reason.rule": "You filed this sender under {what}.",
+  "smart.reason.rule_co": "You filed its company under {what}.",
+  "smart.reason.kept_ai": "Filed under {what} by a kept AI answer.",
   "smart.reason.none": "Nothing in its mails says what it is about.",
   "smart.reason.with_company":
     "Placed together with the other senders of {co}.",
@@ -986,4 +990,74 @@ export const EN: Record<string, string> = {
     + "row; smaller senders are pooled by company and by what their mails "
     + "are about. 2\u201350, default 10. Applies right away, no rescan "
     + "needed.",
+  // Private sender knowledge: filing senders in Smart and keeping AI answers.
+  "know.file_action": "File in Smart as…",
+  "know.file_help": "No mail is moved.",
+  "know.blocked.company":
+    "Company rows are placed by their structure, so filing has no effect here.",
+  "know.blocked.protected":
+    "Protected senders stay in their own bucket, so filing has no effect here.",
+  "know.blocked.replied":
+    "People you write to stay in their own bucket, so filing has no effect here.",
+  "know.scope_title": "File only the ticked senders, or whole companies?",
+  "know.scope_body":
+    "Some of the ticked senders belong to a company group. Filing only the "
+    + "ticked ones takes them out of the group; filing the company moves "
+    + "everything of that company, senders that write later included.",
+  "know.scope_sender": "Just the ticked senders",
+  "know.scope_company": "The whole company ({n} senders)",
+  "know.scope_company_one": "The whole company (1 sender)",
+  "know.filed": "Filed {n} senders under {kind}.",
+  "know.filed_one": "Filed 1 sender under {kind}.",
+  "know.undone": "Filing undone.",
+  "know.kind_category": "Category “{name}”",
+  "know.keep_btn": "Keep these answers ({n})",
+  "know.keep_title": "Keep the AI’s answers for {n} senders?",
+  "know.keep_title_one": "Keep the AI’s answer for 1 sender?",
+  "know.keep_b_rules":
+    "They become your own rules for these senders and stay until you remove "
+    + "them.",
+  "know.keep_b_clearer":
+    "Clearer evidence in their mails still wins over a kept answer.",
+  "know.keep_b_only":
+    "“Remove AI sorting” does not touch kept answers. No mail is moved.",
+  "know.keep_go": "Keep {n} answers",
+  "know.keep_go_one": "Keep 1 answer",
+  "know.kept": "Kept {n} AI answers.",
+  "know.kept_one": "Kept 1 AI answer.",
+  "know.kept_none": "No AI answer applies right now.",
+  "know.box_title": "How Mailbroom files this sender",
+  "know.box_now": "Now in “{row}”.",
+  "know.box_select": "File this sender under",
+  "know.box_auto": "Automatic",
+  "know.src_user": "Filed by you",
+  "know.src_ai": "Kept AI answer",
+  "know.box_company": "Your rule for its company decides.",
+  "know.reset": "Reset to automatic",
+  "know.reset_company": "Reset its company to automatic",
+  "know.reset_done": "Back to automatic.",
+  "know.no_effect": "Your filing has no effect right now: {why}",
+  "know.no_effect_ai": "The kept AI answer has no effect right now: {why}",
+  "know.reason.own_row": "this sender has enough mails for its own row.",
+  "know.reason.company_row": "its company has a row of its own.",
+  "know.reason.protected": "this sender is protected.",
+  "know.reason.replied": "you have written to this sender.",
+  "know.reason.rules_confident": "the rules are sure about it now.",
+  "know.reason.decided_by_rules":
+    "the rules already decided it (newsletter, private address or notification).",
+  "know.reason.shadowed": "a more specific rule of yours decides.",
+  "know.reason.freemail": "an AI answer never gives a private address a purpose.",
+  "know.reason.in_company_group":
+    "it belongs to a company group, which a kept answer never splits.",
+  "know.reason.not_applied": "it is not applied here.",
+  "know.reason.inactive_category": "its category no longer exists.",
+  "know.reason.invalid_key": "it no longer names a company or an address.",
+  "know.reason.invalid_kind": "its kind is not known.",
+  "know.err.bad_request": "That request was not understood.",
+  "know.err.bad_key": "That is not a sender address or a company.",
+  "know.err.bad_kind": "That kind is not available (a category may be gone).",
+  "know.err.bad_note": "The note is too long (200 characters at most).",
+  "know.err.full": "The list of filed senders is full.",
+  "know.err.ai_running": "An AI run is going - try again when it is done.",
+  "know.err.unscanned": "Scan every account first.",
 };

@@ -1,10 +1,10 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it } from "vitest";
-import { setLang } from "./i18n";
+import { setLang, t } from "./i18n";
 import { DE } from "./locales/de";
 import { EN } from "./locales/en";
-import { isPooled, purposeSummary, smartContent, smartLabel, smartView,
-  smartWhy } from "./smart";
+import { filedKindName, FILE_KINDS, isPooled, purposeSummary, smartContent,
+  smartLabel, smartReason, smartView, smartWhy } from "./smart";
 import type { Group, SmartKind } from "./types";
 
 const row = (over: Partial<Group>): Group => ({
@@ -125,6 +125,39 @@ describe("Smart wording", () => {
       "smart.min_help", "smart.protected_moved"]) {
       expect(EN[k], k).toBeTruthy();
       expect(DE[k], k).toBeTruthy();
+    }
+  });
+});
+
+
+describe("what the user filed", () => {
+  it("words a filing and a kept AI answer in both languages", () => {
+    const rule = { r: "rule", k: "orders", by: "a" as const };
+    const company = { r: "rule", k: "support", by: "co" as const, co: "x.example" };
+    const kept = { r: "kept_ai", k: "jobs", by: "a" as const };
+    const cat = { r: "rule", k: "category", name: "hobby", by: "a" as const };
+    setLang("en");
+    expect(smartReason(rule)).toBe("You filed this sender under Orders & deliveries.");
+    expect(smartReason(company)).toBe("You filed its company under Support & inquiries.");
+    expect(smartReason(kept)).toBe("Filed under Job applications by a kept AI answer.");
+    expect(smartReason(cat)).toBe("You filed this sender under Category “hobby”.");
+    setLang("de");
+    expect(smartReason(rule)).toBe(
+      `Du hast diesen Absender unter ${t("smart.kind.orders")} einsortiert.`);
+    expect(smartReason(kept)).toContain("behaltene KI-Antwort");
+    expect(smartReason(cat)).toContain("Kategorie „hobby“");
+  });
+
+  it("names every kind a sender can be filed under, in both languages", () => {
+    expect(FILE_KINDS).toHaveLength(8);
+    for (const lang of ["en", "de"] as const) {
+      setLang(lang);
+      const names = FILE_KINDS.map(filedKindName);
+      expect(new Set(names).size).toBe(8);
+      for (const k of FILE_KINDS) {
+        expect(filedKindName(k), k).not.toBe(`smart.kind.${k}`);
+      }
+      expect(filedKindName("cat:hobby")).toContain("hobby");
     }
   });
 });

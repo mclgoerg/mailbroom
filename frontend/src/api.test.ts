@@ -100,3 +100,37 @@ test("an unknown error detail still passes through untouched", async () => {
   }));
   await expect(api.pin("INBOX", 1, true)).rejects.toThrow("unknown message");
 });
+
+
+test("the sender knowledge calls use PUT and POST, carry the account, and a "
+  + "stable error code becomes translated text", async () => {
+  const fetchMock = vi.fn().mockResolvedValue({ ok: true,
+    json: () => Promise.resolve({ ok: true }) });
+  vi.stubGlobal("fetch", fetchMock);
+  setAccount("work");
+  await api.knowledge();
+  await api.knowledgePut({ entries: [{ key: "a:x@y.example", kind: "jobs" }] });
+  await api.knowledgePut({ remove: ["a:x@y.example"] });
+  await api.knowledgeKeepAi();
+  const calls = fetchMock.mock.calls.map(([url, init]) =>
+    [url, init?.method, init?.body]);
+  expect(calls).toEqual([
+    ["/api/knowledge?account=work", "GET", undefined],
+    ["/api/knowledge?account=work", "PUT",
+      JSON.stringify({ entries: [{ key: "a:x@y.example", kind: "jobs" }] })],
+    ["/api/knowledge?account=work", "PUT",
+      JSON.stringify({ remove: ["a:x@y.example"] })],
+    ["/api/knowledge/keep_ai?account=work", "POST",
+      JSON.stringify({ all: true })]]);
+  for (const [code, text] of [
+    ["knowledge_ai_running", "An AI run is going - try again when it is done."],
+    ["knowledge_bad_kind",
+      "That kind is not available (a category may be gone)."],
+    ["knowledge_full", "The list of filed senders is full."]]) {
+    fetchMock.mockResolvedValue({ ok: false,
+      text: () => Promise.resolve(JSON.stringify({ detail: code })) });
+    await expect(api.knowledgePut({ remove: ["a:x@y.example"] }))
+      .rejects.toThrow(text);
+  }
+  setAccount("");
+});

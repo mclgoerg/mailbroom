@@ -64,7 +64,8 @@ def _fixture(*a, **k):
 sys.modules.setdefault("pytest", types.SimpleNamespace(fixture=_fixture))
 
 from conftest import FakeIMAP, make_msg          # noqa: E402
-from backend import accounts, mailops, rules, verdictstore  # noqa: E402
+from backend import (accounts, knowledgestore, mailops, rules,   # noqa: E402
+                     verdictstore)
 
 random.seed(7)
 NOW = time.time()
@@ -365,6 +366,27 @@ Path(os.environ["STATS_HISTORY_PATH"]).write_text(json.dumps(history))
 Path(os.environ["STATS_PATH"]).write_text(json.dumps(
     {"input_tokens": 412_331, "output_tokens": 60_112, "cost": 1.43,
      "runs": 9, "months": {time.strftime("%Y-%m"): 0.38}}))
+
+# Sender knowledge (what the user filed in Smart): a regular bill filed under
+# Other, a sign-up sender under Accounts, a company entry that has no effect
+# (the company has a row of its own), a kept AI answer and an entry nobody
+# matches - every status the Settings table can show.
+_NOW = int(NOW)
+knowledgestore.modify(lambda entries: entries.update({
+    "a:billing@juniper-pay.example": {
+        "kind": "other", "src": "user", "ts": _NOW - 86400 * 5,
+        "note": "regular bill"},
+    "a:noreply@cobalt-app.example": {
+        "kind": "accounts", "src": "user", "ts": _NOW - 86400 * 3, "note": ""},
+    "co:paymate.example": {
+        "kind": "support", "src": "user", "ts": _NOW - 86400 * 2,
+        "note": "company with its own row"},
+    "a:noreply@dune-app.example": {
+        "kind": "support", "src": "ai", "ts": _NOW - 86400, "note": ""},
+    "a:ghost@nowhere.example": {
+        "kind": "jobs", "src": "user", "ts": _NOW - 86400 * 30,
+        "note": "left the mailbox"},
+}))
 
 # Pre-scan both accounts (incl. attachments) so screenshots are instant.
 for name in ("proton", "icloud"):
