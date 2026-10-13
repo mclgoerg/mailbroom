@@ -261,11 +261,14 @@ SKIP_DIRS = frozenset({".git", "node_modules", "dist", "__pycache__",
 
 
 def tracked_files(root: Path) -> list[str]:
-    """`git ls-files`; without git (a bare container) every file below
-    `root` except the usual build / cache directories."""
+    """The tracked files plus new ones not yet added (so a local run sees
+    what CI will); without git (a bare container) every file below `root`
+    except the usual build / cache directories."""
     try:
-        raw = subprocess.run(["git", "-C", str(root), "ls-files", "-z"],
-                             capture_output=True, check=True, timeout=60)
+        raw = subprocess.run(
+            ["git", "-C", str(root), "ls-files", "-z", "--cached", "--others",
+             "--exclude-standard"], capture_output=True, check=True,
+            timeout=60)
         return sorted(p for p in raw.stdout.decode().split("\0") if p)
     except (OSError, subprocess.SubprocessError):
         return sorted(
