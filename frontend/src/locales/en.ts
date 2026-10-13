@@ -19,6 +19,11 @@ export const EN: Record<string, string> = {
   "confirm.act_mails_one": "{verb}: 1 selected mail?",
   "confirm.unsubscribe":
     "Unsubscribe from the senders of {n} selected groups?",
+  "confirm.unsub_pooled_skipped":
+    "{n} pooled rows are skipped: open one to unsubscribe from a single sender.",
+  "toast.unsub_pooled":
+    "Unsubscribing works one sender at a time: open a pooled row and use "
+    + "its sender's Unsubscribe.",
   "confirm.unsubscribe_one":
     "Unsubscribe from the senders of the selected group?",
   "confirm.restore": "Restore {count} mails ({label})?",
@@ -315,7 +320,11 @@ export const EN: Record<string, string> = {
     + "sender names and addresses, "
     + "mail counts, sizes, dates, read state, category tags, subject "
     + "lines, protected-sender markers and whether you ever replied to a "
-    + "sender. Mail bodies and attachments are NEVER sent.",
+    + "sender. Mail bodies and attachments are NEVER sent. AI sorting of "
+    + "the Other row sends, per sender, its name and address, its mail "
+    + "count, whether it offers an unsubscribe link and up to three "
+    + "recent subject lines - plus your own sorting instructions from "
+    + "Settings.",
   "ai.data_note":
     "Sent to the AI provider: sender names/addresses, counts, sizes, "
     + "dates, read state, tags, subject lines, protected-sender markers "
@@ -576,7 +585,9 @@ export const EN: Record<string, string> = {
     "One category per line: \"name: keyword1, keyword2\". A name matching "
     + "a built-in category (shipping, finance, shopping, social, travel, "
     + "dev/cloud) replaces its keywords; an empty keyword list disables "
-    + "it; new names add categories. Applies on the next scan.",
+    + "it; new names add categories. A category you define or edit also "
+    + "decides the rows of the Smart tab. Applies right away to the Sender "
+    + "and Smart tabs, to the other tabs on the next scan.",
   "new_sender.window_label": "\"New\" sender window (days)",
   "new_sender.window_help":
     "How many days a sender stays flagged \"New\" (is:new, the New badge) "
@@ -839,4 +850,140 @@ export const EN: Record<string, string> = {
     + "replaces their verdicts and uses tokens (and budget) again.",
   "ai.review_new": "Review new only ({n})",
   "ai.review_rerate": "Re-rate all ({n})",
+
+  // Smart grouping (the "Smart" tab: big senders keep a row, the long tail
+  // of small senders is pooled by company / by what their mails are about).
+  "smart.kind.protected": "Protected senders",
+  "smart.kind.replied": "People you write to",
+  "smart.kind.orders": "Orders & deliveries",
+  "smart.kind.appointments": "Appointments & bookings",
+  "smart.kind.jobs": "Job applications",
+  "smart.kind.support": "Support & inquiries",
+  "smart.kind.accounts": "Accounts & security",
+  "smart.kind.newsletter": "Newsletters",
+  "smart.kind.individuals": "Individuals",
+  "smart.kind.other": "Other senders",
+  "smart.cat": "Category: {name}",
+  "smart.why.company":
+    "Several senders of {domain}, grouped as one company because together they have at least {min} mails.",
+  "smart.why.protected":
+    "Senders with fewer than {min} mails that you have protected.",
+  "smart.why.replied":
+    "Senders with fewer than {min} mails that you have written to.",
+  "smart.why.orders":
+    "Senders with fewer than {min} mails, mostly about orders, shipping and "
+    + "invoices.",
+  "smart.why.appointments":
+    "Senders with fewer than {min} mails, mostly about appointments, "
+    + "reservations and bookings.",
+  "smart.why.jobs":
+    "Senders with fewer than {min} mails, mostly about job applications.",
+  "smart.why.support":
+    "Senders with fewer than {min} mails, mostly support requests and "
+    + "inquiries.",
+  "smart.why.accounts":
+    "Senders with fewer than {min} mails, mostly sign-ups and security codes.",
+  "smart.why.category":
+    "Senders with fewer than {min} mails in the category \u201c{name}\u201d.",
+  "smart.why.newsletter":
+    "Senders with fewer than {min} mails that offer an unsubscribe link or "
+    + "send promotions.",
+  "smart.why.individuals":
+    "Senders with fewer than {min} mails writing from a private address "
+    + "(Gmail, Outlook, GMX, \u2026).",
+  "smart.why.other":
+    "Senders with fewer than {min} mails whose mails are unclear or about "
+    + "several things at once.",
+  "smart.purposes": "What the mails are about: {list}",
+  "smart.purpose.orders": "Orders",
+  "smart.purpose.appointments": "Appointments",
+  "smart.purpose.jobs": "Applications",
+  "smart.purpose.support": "Support",
+  "smart.purpose.accounts": "Accounts",
+  "smart.purpose.newsletter": "Newsletters",
+  "smart.purpose.unclassified": "Unclassified",
+  "smart.protected_moved":
+    "{label} is protected now - its mails moved to \u201cProtected senders\u201d.",
+  // Smart sender list (what is inside a pooled row, and why).
+  "smart.about.orders": "orders and deliveries",
+  "smart.about.appointments": "appointments and bookings",
+  "smart.about.jobs": "job applications",
+  "smart.about.support": "support and inquiries",
+  "smart.about.accounts": "accounts and security",
+  "smart.about.newsletter": "newsletters and promotions",
+  "smart.about.individuals": "private correspondence",
+  "smart.about.other": "nothing in particular",
+  "aisort.btn": "Sort with AI",
+  "aisort.title": "Sort the senders left in Other with AI?",
+  "aisort.nothing": "Nothing left to sort: the AI has seen every sender in Other.",
+  "aisort.b_units":
+    "{senders} senders ({units} groups) the rules could not place",
+  "aisort.b_cost": "About {tin} tokens in, {tout} out - roughly {cost}",
+  "aisort.b_instructions": "Your own instructions from Settings are included",
+  "aisort.b_only":
+    "It only picks one of the fixed kinds. No mail is moved or deleted, "
+    + "and you can remove the sorting again.",
+  "aisort.go": "Sort {n} senders",
+  "aisort.sorted_n": "{n} senders were sorted by AI.",
+  "aisort.checked_n": "The AI looked at {n} senders and left them in Other.",
+  "aisort.cleared_none": "AI sorting removed.",
+  "aisort.clear": "Remove AI sorting",
+  "aisort.cleared": "AI sorting removed: {n} senders are back where the rules put them.",
+  "aisort.clear_confirm": "Remove the AI sorting of {n} senders?",
+  "aisort.started": "AI sorting started.",
+  "notice.ai_sort_done": "AI sorting done: {placed} of {total} groups placed.",
+  "notice.ai_sort_cancelled": "AI sorting cancelled after {done}/{total} groups; what was sorted stays.",
+  "notice.ai_sort_budget": "Monthly AI budget reached after {done}/{total} groups; what was sorted stays.",
+  "ai.sort_instructions": "Your instructions for AI sorting (optional)",
+  "ai.sort_instructions_help":
+    "Added to the fixed instructions when the AI sorts the senders left in "
+    + "Other, e.g. \"Mails from my landlord are support, not individuals.\" "
+    + "The AI still only picks one of the fixed kinds. Sent to your AI "
+    + "provider together with the sender data; up to 1500 characters.",
+  "smart.reason.own": "Has enough mails for its own row.",
+  "smart.reason.protected": "You protected this sender.",
+  "smart.reason.replied": "You have written to this sender.",
+  "smart.reason.company":
+    "Part of {co}: together its senders have enough mails for one row.",
+  "smart.reason.purpose": "{n} of {of} mails are about {what}.",
+  "smart.reason.weak": "Only {n} of {of} mails are about {what} - too few to say.",
+  "smart.reason.competing": "Its mails are about several things at once.",
+  "smart.reason.category": "In your category \u201c{name}\u201d.",
+  "smart.reason.category_conflict": "Matches several of your categories.",
+  "smart.reason.newsletter": "Offers an unsubscribe link or sends promotions.",
+  "smart.reason.individual": "Writes from a private address.",
+  "smart.reason.ai": "Sorted by AI as {what}.",
+  "smart.reason.ai_other": "Checked by AI: the subjects do not make it clear.",
+  "smart.reason.ai_other_sure": "Checked by AI: belongs in Other.",
+  "smart.reason.notification":
+    "Automatic notifications from a forum or developer tool.",
+  "smart.reason.none": "Nothing in its mails says what it is about.",
+  "smart.reason.with_company":
+    "Placed together with the other senders of {co}.",
+  "senders.tab": "Senders ({n})",
+  "senders.mails_tab": "Mails ({n})",
+  "senders.view": "What to show",
+  "senders.search": "Search senders\u2026",
+  "senders.sort": "Sort senders",
+  "senders.sort_count": "Most mails",
+  "senders.sort_last": "Newest",
+  "senders.sort_size": "Largest",
+  "senders.sort_label": "Name",
+  "senders.none": "No senders match.",
+  "senders.select_shown": "Select all {n} shown",
+  "senders.selected": "{n} of {total} senders selected ({mails} mails)",
+  "senders.protect": "Protect",
+  "senders.back": "Back to the senders",
+  "senders.protected_toast":
+    "{n} senders protected \u2013 their mails moved to \u201cProtected senders\u201d.",
+  "confirm.b_mails_senders": "{n} mails from {k} senders will be affected",
+  "confirm.b_mails_one_sender": "{n} mails from 1 sender will be affected",
+  "confirm.b_protected_senders_skipped": "{n} protected senders skipped",
+  "smart.title": "Smart grouping",
+  "smart.min_label": "Own row from N mails",
+  "smart.min_help":
+    "In the Smart tab a sender with at least this many mails keeps its own "
+    + "row; smaller senders are pooled by company and by what their mails "
+    + "are about. 2\u201350, default 10. Applies right away, no rescan "
+    + "needed.",
 };

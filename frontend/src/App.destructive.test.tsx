@@ -95,7 +95,7 @@ let cfg: Config = singleCfg;
 const baseState: AppState = {
   account: "proton", status: "idle", scanned_ts: null, groups_rev: 0,
   progress: "", error: "", folders: [],
-  groups: { sender: {}, domain: {}, subject: {}, thread: {} },
+  groups: { sender: {}, smart: {}, domain: {}, subject: {}, thread: {} },
   ai: { status: "idle", grouping: "sender", progress: "", error: "",
     usage: null },
   delete: { status: "idle", progress: "", error: "", moved: 0 },
@@ -130,7 +130,7 @@ const mount = async (over: Partial<AppState> = {},
   localStorage.setItem("pmc_account", "proton");
   state = { ...baseState, status: "done", trash_count: 5,
     groups: { sender: { [groupFixture.key]: groupFixture },
-              domain: {}, subject: {}, thread: {} }, ...over };
+              smart: {}, domain: {}, subject: {}, thread: {} }, ...over };
   render(<ToastProvider><DialogProvider><App /></DialogProvider></ToastProvider>);
   await waitFor(() => expect(screen.getAllByText("DHL Paket").length)
     .toBeGreaterThan(0));

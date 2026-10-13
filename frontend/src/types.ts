@@ -1,4 +1,24 @@
-export type Grouping = "sender" | "domain" | "subject" | "thread";
+// "domain" is no longer a tab (Smart replaced it) but stays a grouping for
+// rules, `domain:` filters and the block/protect shortcuts.
+export type Grouping = "sender" | "smart" | "domain" | "subject" | "thread";
+/** What a Smart row is: an own row for a big sender, a company pool, or a
+ *  bucket of small senders (see backend mailops.build_smart). */
+export type SmartKind = "sender" | "company" | "protected" | "replied"
+  | "orders" | "appointments" | "jobs" | "support" | "accounts" | "category"
+  | "newsletter" | "individuals" | "other";
+/** Why a sender sits in its Smart row (SENDER records only; the backend
+ *  ships a structured reason, the UI words it - see smart.ts smartReason). */
+export interface SmartWhy {
+  r: string;        // own | protected | replied | company | purpose | weak |
+                    // competing | category | category_conflict | newsletter |
+                    // individual | notification | ai | none
+  k?: string;       // purpose (r = purpose / weak)
+  n?: number;       // mails matching ...
+  of?: number;      // ... of this many mails
+  name?: string;    // category name
+  co?: string;      // placed with the other senders of this company
+  sure?: boolean;   // r = ai: the AI was confident (for "other": it belongs there)
+}
 export type Verdict = "delete_safe" | "review" | "keep";
 
 export interface GroupAi {
@@ -42,6 +62,18 @@ export interface Group {
   new: boolean;
   pinned: number;   // mails of this group protected from bulk actions
   engagement: number;   // 0-100, see lib.ts engagementTier()
+  // Smart grouping only. The backend ships fields, the UI words them
+  // (lib.ts smartView): `sub` is empty and `label` is an English fallback
+  // for pooled rows.
+  kind?: SmartKind;
+  n_senders?: number;
+  members?: string[];   // sender addresses, capped - NOT the full membership
+  smart_key?: string;   // SENDER records: key of the Smart row they landed in
+  smart_why?: SmartWhy; // SENDER records: why they landed there
+  purposes?: Record<string, number>;   // company rows: mails per purpose, live
+  addr?: string;        // own rows: the sender's address
+  domain?: string;      // company rows: the ONE exact domain, else ""
+  category?: string;    // category rows: the category name
 }
 
 export interface AiUsage {
@@ -276,6 +308,7 @@ export interface UnsubBulkResult {
   skipped_protected: number;
   skipped_done: number;
   capped: number;
+  skipped_pooled?: number;   // Smart only: pooled rows are never unsubscribed in one go
 }
 
 export type Security = "ssl" | "starttls";
@@ -355,6 +388,7 @@ export interface ImapAccount {
   digest: DigestSettings;
   auto_scan: AutoScanSettings;
   body_search?: BodySearchMode;   // absent from older backends = "server"
+  smart_min?: number;             // Smart: own row from N mails (default 10)
 }
 
 export type OauthProvider = "google" | "microsoft";
@@ -445,6 +479,7 @@ export interface Config {
     price_in: number;
     price_out: number;
     budget_usd: number;
+    sort_instructions?: string;        // the user's own text for AI sorting
     month_cost: number;
     prices_effective: [number, number];
     api_key: string;
@@ -460,4 +495,18 @@ export interface Config {
     cost: number;
     runs: number;
   };
+}
+
+/** What AI sorting of the Other row would send and cost (nothing is sent). */
+export interface SortEstimate {
+  units: number;
+  senders: number;
+  tokens_in: number;
+  tokens_out: number;
+  cost: number;
+  sorted: number;             // senders the AI placed
+  checked: number;            // senders it looked at and left in Other
+  blocked: string;            // set: why a run cannot start (budget used up)
+  available: boolean;
+  has_instructions: boolean;
 }

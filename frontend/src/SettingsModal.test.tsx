@@ -483,6 +483,29 @@ test("mail-text search mode defaults to server and saves the chosen mode",
     expect(saveCalls[0].imap.body_search).toBe("disabled");
   });
 
+test("the Smart threshold defaults to 10 and saves clamped to 2-50", () => {
+  render(<SettingsModal cfg={cfg} account="default" onClose={() => {}}
+    onSaved={() => {}} onAccountsChanged={() => {}} />);
+  const n = screen.getByLabelText("Own row from N mails") as HTMLInputElement;
+  expect(n.value).toBe("10");
+  for (const [typed, sent] of [["25", 25], ["1", 2], ["999", 50], ["", 10]] as
+    [string, number][]) {
+    fireEvent.change(n, { target: { value: typed } });
+    saveCalls.length = 0;
+    fireEvent.click(screen.getByText("Save"));
+    expect(saveCalls[0].imap.smart_min, typed).toBe(sent);
+  }
+});
+
+test("the Smart threshold is read from the account being edited", () => {
+  const custom: Config = { ...cfg, accounts: { ...cfg.accounts,
+    default: { ...acct, smart_min: 4 } } };
+  render(<SettingsModal cfg={custom} account="default" onClose={() => {}}
+    onSaved={() => {}} onAccountsChanged={() => {}} />);
+  expect((screen.getByLabelText("Own row from N mails") as HTMLInputElement)
+    .value).toBe("4");
+});
+
 test("mail-text search mode is read from the account being edited", () => {
   const off: Config = { ...cfg, accounts: { ...cfg.accounts,
     default: { ...acct, body_search: "disabled" } } };
@@ -577,4 +600,21 @@ test("resetting spend names the amounts it clears", async () => {
   fireEvent.click(screen.getByText("Reset spend…"));
   expect((await findDialog()).textContent).toContain("this month's spend");
   await cancelDialog();
+});
+
+test("the AI tab has a box for the user's own AI-sorting instructions, "
+  + "saved with the rest and capped at 1500 characters", () => {
+  saveCalls.length = 0;
+  renderWithDialogs();
+  fireEvent.click(screen.getByRole("tab", { name: "AI" }));
+  const box = screen.getByLabelText("Your instructions for AI sorting (optional)") as
+    HTMLTextAreaElement;
+  expect(box.value).toBe("");
+  expect(box.maxLength).toBe(1500);
+  expect(screen.getByText(/Added to the fixed instructions when the AI sorts/))
+    .toBeTruthy();
+  fireEvent.change(box, { target: { value: "Mails from my landlord are support." } });
+  fireEvent.click(screen.getByRole("button", { name: "Save" }));
+  expect(saveCalls.at(-1).ai.sort_instructions)
+    .toBe("Mails from my landlord are support.");
 });

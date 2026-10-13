@@ -22,6 +22,18 @@ CONFIG_PATH = Path(os.environ.get("CONFIG_PATH", "/data/config.json"))
 STATS_PATH = Path(os.environ.get("STATS_PATH", "/data/ai_usage.json"))
 SERVER_PATH = Path(os.environ.get("SERVER_PATH", "/data/server.json"))
 
+# Smart grouping: per-account "own row from N mails" (mailops.build_smart).
+SMART_MIN_DEFAULT = 10
+SMART_MIN_RANGE = (2, 50)
+
+
+def clamp_smart_min(value) -> int:
+    try:
+        n = int(value)
+    except (TypeError, ValueError):
+        return SMART_MIN_DEFAULT
+    return max(SMART_MIN_RANGE[0], min(SMART_MIN_RANGE[1], n))
+
 
 def config_path() -> Path:
     return tenants.current().file("config.json", CONFIG_PATH)
@@ -70,6 +82,9 @@ ENV_IMAP = {
     # "local" uses an opt-in keyed word index (backend/bodyindex.py; needs
     # MAILBROOM_SECRET_KEY), "disabled" keeps search metadata-only.
     "body_search": "server",
+    # Smart grouping: a sender with at least this many mails keeps its own
+    # row, the rest is pooled (mailops.build_smart). Range 2-50.
+    "smart_min": SMART_MIN_DEFAULT,
 }
 
 # Blank slate for ADDITIONAL accounts - env values (e.g. the Bridge
@@ -87,6 +102,9 @@ NEUTRAL_IMAP = {
     # "local" uses an opt-in keyed word index (backend/bodyindex.py; needs
     # MAILBROOM_SECRET_KEY), "disabled" keeps search metadata-only.
     "body_search": "server",
+    # Smart grouping: a sender with at least this many mails keeps its own
+    # row, the rest is pooled (mailops.build_smart). Range 2-50.
+    "smart_min": SMART_MIN_DEFAULT,
 }
 
 _ENV_AUTH_CACHE: dict | None = None
@@ -238,10 +256,19 @@ DEFAULT_CONFIG = {
         "price_in": 0.0,                  # USD per 1M input tokens; 0 = auto
         "price_out": 0.0,                 # USD per 1M output tokens; 0 = auto
         "budget_usd": 0.0,                # monthly AI spend cap; 0 = none
+        # The user's own instructions for the AI sorting of Smart's Other
+        # row (appended to the fixed prompt; aisort.system_prompt).
+        "sort_instructions": "",
     },
 }
 
 AI_PROVIDERS = ("anthropic", "foundry", "openai", "ollama")
+SORT_INSTRUCTIONS_MAX = 1500          # chars (the Settings box has the same cap)
+
+
+def clean_sort_instructions(text: object) -> str:
+    """The user's own AI-sorting instructions as they are stored and sent."""
+    return str(text or "").replace("\r", "").strip()[:SORT_INSTRUCTIONS_MAX]
 IMAP_SECURITY = ("ssl", "starttls")
 SMTP_SECURITY = ("auto", "ssl", "starttls")
 PRESETS = ("proton", "gmail", "outlook", "icloud", "fastmail", "gmx",
@@ -281,16 +308,24 @@ def is_protected(addr: str, protected: list[str]) -> bool:
 
 def set_protected(entry: str, on: bool) -> list[str]:
     """Add or remove one protected entry; returns the saved list."""
-    norm = normalize_protected([entry])
+    return set_protected_many([entry], on)
+
+
+def set_protected_many(entries: list[str], on: bool) -> list[str]:
+    """Add or remove several protected entries in ONE save (a bulk protect
+    from the sender list must not rewrite the config - and re-derive Smart -
+    once per sender); returns the saved list."""
+    norm = normalize_protected(entries)
     if not norm:
         raise ValueError("empty protected entry")
     with _LOCK:
         cfg = load_config()
         plist = normalize_protected(cfg.get("protected"))
-        if on and norm[0] not in plist:
-            plist.append(norm[0])
-        elif not on:
-            plist = [e for e in plist if e != norm[0]]
+        if on:
+            plist += [e for e in norm if e not in plist]
+        else:
+            gone = set(norm)
+            plist = [e for e in plist if e not in gone]
         cfg["protected"] = plist
         _write_tenant_config(cfg)
         return plist
@@ -364,6 +399,7 @@ def _load_accounts(saved: dict, env_first: bool = True) -> dict[str, dict]:
         # tolerate a pre-body-search config (missing key) or a junk value
         if out[name].get("body_search") not in BODY_SEARCH_MODES:
             out[name]["body_search"] = "server"
+        out[name]["smart_min"] = clamp_smart_min(out[name].get("smart_min"))
     return out
 
 
@@ -498,6 +534,8 @@ def _apply_imap(block: dict, imap_in: dict) -> None:
             raise ValueError("the local search index needs "
                              "MAILBROOM_SECRET_KEY to be set")
         block["body_search"] = imap_in["body_search"]
+    if "smart_min" in imap_in:
+        block["smart_min"] = clamp_smart_min(imap_in["smart_min"])
     if isinstance(imap_in.get("auto_scan"), dict):
         a = imap_in["auto_scan"]
         auto_scan = dict(block.get("auto_scan")
@@ -689,6 +727,9 @@ def update_config(body: dict) -> dict:
                     cfg["ai"][key] = max(0.0, float(ai_in[key] or 0))
                 except (TypeError, ValueError):
                     pass
+        if "sort_instructions" in ai_in:
+            cfg["ai"]["sort_instructions"] = clean_sort_instructions(
+                ai_in["sort_instructions"])
         if ai_in.get("api_key"):
             cfg["ai"]["api_key"] = str(ai_in["api_key"])
         _write_tenant_config(cfg)
@@ -747,6 +788,7 @@ def masked_config(cfg: dict) -> dict:
                "price_in": cfg["ai"].get("price_in") or 0,
                "price_out": cfg["ai"].get("price_out") or 0,
                "budget_usd": cfg["ai"].get("budget_usd") or 0,
+               "sort_instructions": cfg["ai"].get("sort_instructions") or "",
                "month_cost": month_cost(),
                "prices_effective": effective_prices(ai_eff),
                "api_key": "", "api_key_set": bool(cfg["ai"]["api_key"]),

@@ -144,6 +144,9 @@ def unsubscribe(grouping: str, key: str, acc=None) -> dict:
         rec = acc.state["groups"][grouping].get(key)
         if not rec:
             raise RuntimeError("unknown group")
+        if _pooled(grouping, rec):
+            raise RuntimeError("a pooled row has no single sender to "
+                               "unsubscribe from - open one of its senders")
         newest = None
         for m in mails:  # newest first
             idx = acc.index.get(mailops.ikey(m["folder"], m["uid"]))
@@ -192,11 +195,18 @@ def forget(addr: str, acc=None) -> dict:
 
 # ----------------------------------------------------------- bulk unsubscribe
 
-def _targets(grouping: str, keys: list[str], acc) -> tuple[list, int, int]:
+def _pooled(grouping: str, rec: dict) -> bool:
+    """A pooled Smart row (a company or a bucket of senders), as opposed to a
+    big sender's own row: unsubscribing is a per-sender action, so a pool
+    never unsubscribes everyone in it at once."""
+    return grouping == "smart" and rec.get("kind") not in (None, "sender")
+
+
+def _targets(grouping: str, keys: list[str], acc) -> tuple[list, int, int, int]:
     """Senders of the selected groups that still need an unsubscribe
     (lock held): -> ([(addr, header, one_click)], skipped_protected,
     skipped_done). Protected senders are left alone exactly like they are
-    in bulk trash and rule runs."""
+    in bulk trash and rule runs. Pooled Smart rows are skipped (counted)."""
     plist = cfgmod.normalize_protected(cfgmod.load_config().get("protected"))
     handled = {a for a, e in unsubstore.load_account(acc.name).items()
                if e["status"] == "done"}
@@ -204,9 +214,13 @@ def _targets(grouping: str, keys: list[str], acc) -> tuple[list, int, int]:
     targets: dict[str, tuple[str, bool]] = {}
     skipped_protected: set[str] = set()
     skipped_done: set[str] = set()
+    pooled = 0
     for key in keys:
         rec = recs.get(key)
         if not rec:
+            continue
+        if _pooled(grouping, rec):
+            pooled += 1
             continue
         for addr, (header, one_click) in \
                 mailops.group_unsub_senders(rec, acc).items():
@@ -220,7 +234,7 @@ def _targets(grouping: str, keys: list[str], acc) -> tuple[list, int, int]:
             else:
                 targets[addr] = (header, one_click)
     items = [(a, h, oc) for a, (h, oc) in sorted(targets.items())]
-    return items, len(skipped_protected), len(skipped_done)
+    return items, len(skipped_protected), len(skipped_done), pooled
 
 
 def _run_bulk(acc, items: list) -> None:
@@ -272,11 +286,14 @@ def start_bulk(grouping: str, keys: list[str], acc=None) -> dict:
             raise RuntimeError("busy: scan running")
         if acc.state["unsub"]["status"] == "running":
             raise RuntimeError("busy: unsubscribe running")
-        items, skipped_protected, skipped_done = _targets(grouping, keys, acc)
+        items, skipped_protected, skipped_done, pooled = _targets(
+            grouping, keys, acc)
         capped = max(0, len(items) - JOB_CAP)
         items = items[:JOB_CAP]
         out = {"queued": len(items), "skipped_protected": skipped_protected,
                "skipped_done": skipped_done, "capped": capped}
+        if grouping == "smart":
+            out["skipped_pooled"] = pooled
         if not items:
             return out
         acc.state["unsub"] = {

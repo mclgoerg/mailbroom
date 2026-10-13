@@ -98,6 +98,7 @@ export function SettingsModal({ cfg, account, onClose, onSaved,
       autoScanValue: String(im.auto_scan?.value ?? 6),
       autoScanAlign: String(im.auto_scan?.align_minute ?? 0),
       bodySearch: (im.body_search ?? "server") as BodySearchMode,
+      smartMin: String(im.smart_min ?? 10),
     };
   };
   const [f, setF] = useState({
@@ -109,6 +110,7 @@ export function SettingsModal({ cfg, account, onClose, onSaved,
     priceIn: cfg.ai.price_in ? String(cfg.ai.price_in) : "",
     priceOut: cfg.ai.price_out ? String(cfg.ai.price_out) : "",
     budget: cfg.ai.budget_usd ? String(cfg.ai.budget_usd) : "",
+    sortInstructions: cfg.ai.sort_instructions ?? "",
     authMode: cfg.auth.mode as AuthMode,
     authPassword: "",
     // Server-level fields: only the admin receives them (cfg.auth.oidc /
@@ -191,7 +193,8 @@ export function SettingsModal({ cfg, account, onClose, onSaved,
   useEffect(() => { discoverFolders(editAcct); }, [editAcct]);
 
   const set = (k: keyof typeof f) =>
-    (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
+    (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement
+      | HTMLTextAreaElement>) =>
       setF({ ...f, [k]: e.target.value });
 
   const PRESET_OAUTH: Partial<Record<Preset, OauthProvider>> =
@@ -248,6 +251,7 @@ export function SettingsModal({ cfg, account, onClose, onSaved,
             value: +f.autoScanValue || 1,
             align_minute: +f.autoScanAlign || 0 },
           body_search: f.bodySearch,
+          smart_min: Math.min(50, Math.max(2, Math.round(+f.smartMin) || 10)),
           ...(f.password ? { password: f.password } : {}),
           ...(oauthProvider ? { oauth: { provider: oauthProvider,
             client_id: f.oauthClientId,
@@ -262,6 +266,7 @@ export function SettingsModal({ cfg, account, onClose, onSaved,
           foundry_endpoint: f.endpoint,
           price_in: +f.priceIn || 0, price_out: +f.priceOut || 0,
           budget_usd: +f.budget || 0,
+          sort_instructions: f.sortInstructions,
           ...(f.apiKey ? { api_key: f.apiKey } : {}) },
         // Server-level settings ride along for the admin only - the
         // backend rejects them (403) from anyone else.
@@ -891,6 +896,17 @@ export function SettingsModal({ cfg, account, onClose, onSaved,
           )}
         </div>
 
+        <div className="sm:col-span-2 rounded-card border border-line
+          bg-panel2 p-3">
+          <SectionLabel className="mb-2">{t("smart.title")}</SectionLabel>
+          <Field label={t("smart.min_label")}>
+            <Input className="w-full sm:w-32" type="number" min={2} max={50}
+              inputMode="numeric" value={f.smartMin}
+              onChange={set("smartMin")} />
+          </Field>
+          <p className="mt-1 type-meta text-muted">{t("smart.min_help")}</p>
+        </div>
+
         {Object.keys(cfg.accounts).length > 1 && (
         <div className="sm:col-span-2 border-t border-line pt-4">
           <SectionLabel>{t("account.remove_title")}</SectionLabel>
@@ -1219,6 +1235,17 @@ export function SettingsModal({ cfg, account, onClose, onSaved,
         </Field>
         <div className="self-end pb-2 type-meta text-muted">
           {t("budget.month", { spent: fmtUsd(cfg.ai.month_cost ?? 0) })}
+        </div>
+
+        <div className="sm:col-span-2">
+          <Field label={t("ai.sort_instructions")}>
+            <TextArea className="!min-h-16" maxLength={1500}
+              value={f.sortInstructions}
+              onChange={set("sortInstructions")} />
+          </Field>
+          <p className="mt-1 type-meta text-muted">
+            {t("ai.sort_instructions_help")}
+          </p>
         </div>
 
         <div className="sm:col-span-2 rounded-card border border-line

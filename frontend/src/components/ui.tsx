@@ -412,9 +412,12 @@ export function Field({ label, children }: {
 
 /** Standard panel/modal header: title (+optional subtitle) left, optional
  *  action elements, close button right. Used by every modal. */
-export function PanelHeader({ title, sub, actions, onClose }: {
+export function PanelHeader({ title, sub, actions, onClose, closeLabel,
+  closeIcon }: {
   title: ReactNode; sub?: ReactNode; actions?: ReactNode;
   onClose: () => void;
+  /** A panel that opens inside another goes BACK instead of closing. */
+  closeLabel?: string; closeIcon?: ReactNode;
 }) {
   return (
     <div className="flex items-center gap-3 border-b border-line px-4 py-3">
@@ -425,9 +428,9 @@ export function PanelHeader({ title, sub, actions, onClose }: {
         )}
       </div>
       {actions}
-      <Button variant="secondary" size="icon" label={t("Close")}
+      <Button variant="secondary" size="icon" label={closeLabel ?? t("Close")}
         onClick={onClose}>
-        <X size={18} />
+        {closeIcon ?? <X size={18} />}
       </Button>
     </div>
   );

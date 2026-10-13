@@ -26,6 +26,7 @@ from backend import stats as statsmod         # noqa: E402
 from backend import tenants as tenantsmod     # noqa: E402
 from backend import unsubstore                # noqa: E402
 from backend import verdictstore              # noqa: E402
+from backend import aisortstore               # noqa: E402
 
 
 @pytest.fixture(autouse=True)
@@ -39,6 +40,7 @@ def isolate(tmp_path, monkeypatch):
     monkeypatch.setattr(tenantsmod, "TENANTS_DIR", tmp_path / "tenants")
     monkeypatch.setattr(verdictstore, "VERDICTS_PATH",
                         tmp_path / "verdicts.json")
+    monkeypatch.setattr(aisortstore, "AI_SORT_PATH", tmp_path / "ai_sort.json")
     monkeypatch.setattr(unsubstore, "UNSUB_STATE_PATH",
                         tmp_path / "unsub_state.json")
     monkeypatch.setattr(mailops, "REPLIED_PATH", tmp_path / "replied.json")

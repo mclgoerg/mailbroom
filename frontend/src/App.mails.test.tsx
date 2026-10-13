@@ -57,7 +57,7 @@ const cfg = {
 const baseState: AppState = {
   account: "proton", status: "done", scanned_ts: 1, groups_rev: 1,
   progress: "", error: "", folders: ["INBOX"],
-  groups: { sender: {}, domain: {}, subject: {}, thread: {} },
+  groups: { sender: {}, smart: {}, domain: {}, subject: {}, thread: {} },
   ai: { status: "idle", grouping: "sender", progress: "", error: "",
     usage: null },
   delete: { status: "idle", progress: "", error: "", moved: 0 },

@@ -144,6 +144,132 @@ describe("DetailPanel", () => {
     expect(screen.getByRole("button", { name: "Unsubscribe" })).toBeTruthy();
   });
 
+  describe("Unsubscribe on Smart rows", () => {
+    const pooled = (kind: Group["kind"]) => mkGroup({
+      key: `k:${kind}`, kind, unsub: true, n_senders: 3,
+      domain: kind === "company" ? "payco.example" : undefined });
+    const ownRow = mkGroup({ key: "s:s@x.example", kind: "sender",
+      addr: "s@x.example", unsub: true, n_senders: 1 });
+    const statuses = [
+      null,
+      { n: 0, of: 3, status: "failed" as const, link: "", addr: "a@x.example" },
+      { n: 0, of: 3, status: "link" as const, link: "https://x.example/u",
+        addr: "a@x.example" },
+      { n: 3, of: 3, status: "done" as const, link: "", addr: "" },
+    ];
+    const anyUnsubControl = () => [
+      screen.queryByRole("button", { name: "Unsubscribe" }),
+      screen.queryByRole("button", { name: "Retry unsubscribe" }),
+      screen.queryByRole("button", { name: "Open unsubscribe page" }),
+      screen.queryByRole("button", { name: "Mark as done" }),
+      screen.queryByText("Unsubscribed"),
+    ].filter(Boolean);
+
+    it.each(["company", "newsletter", "other", "category"] as const)(
+      "a pooled %s row has none, in any status", async (kind) => {
+        for (const unsubscribedNow of statuses) {
+          renderPanel([mkMail(1)], { grouping: "smart",
+            group: pooled(kind), unsubscribedNow });
+          await waitFor(() => screen.getByText("Mail 1"));
+          expect(anyUnsubControl(), String(unsubscribedNow?.status))
+            .toHaveLength(0);
+          cleanup();
+        }
+      });
+
+    it("a pooled row has none in the phone's ⋯ menu either", async () => {
+      vi.stubGlobal("matchMedia", (q: string) => ({
+        matches: true, media: q, addEventListener: () => {},
+        removeEventListener: () => {},
+      }));
+      try {
+        renderPanel([mkMail(1)], { grouping: "smart",
+          group: pooled("newsletter") });
+        await waitFor(() => screen.getByText("Mail 1"));
+        fireEvent.click(screen.getByRole("button", { name: "More" }));
+        expect(screen.queryByRole("menuitem", { name: /unsubscribe/i }))
+          .toBeNull();
+      } finally { vi.unstubAllGlobals(); }
+    });
+
+    it("an own row keeps it, like a Sender-tab row", async () => {
+      renderPanel([mkMail(1)], { grouping: "smart", group: ownRow });
+      await waitFor(() => screen.getByText("Mail 1"));
+      expect(screen.getByRole("button", { name: "Unsubscribe" })).toBeTruthy();
+      cleanup();
+      renderPanel([mkMail(1)], { grouping: "smart", group: ownRow,
+        unsubscribedNow: statuses[1] });
+      await waitFor(() => screen.getByText("Mail 1"));
+      expect(screen.getByRole("button", { name: "Retry unsubscribe" }))
+        .toBeTruthy();
+    });
+
+    it("an own row keeps it in the phone's ⋯ menu", async () => {
+      vi.stubGlobal("matchMedia", (q: string) => ({
+        matches: true, media: q, addEventListener: () => {},
+        removeEventListener: () => {},
+      }));
+      try {
+        renderPanel([mkMail(1)], { grouping: "smart", group: ownRow });
+        await waitFor(() => screen.getByText("Mail 1"));
+        fireEvent.click(screen.getByRole("button", { name: "More" }));
+        expect(screen.getByRole("menuitem", { name: "Unsubscribe" }))
+          .toBeTruthy();
+      } finally { vi.unstubAllGlobals(); }
+    });
+  });
+
+  describe("pooled Smart rows: senders first, mails on request", () => {
+    const pool = mkGroup({ key: "k:newsletter", kind: "newsletter",
+      n_senders: 2, count: 6 });
+    const two = [mkGroup({ key: "a@x.example", label: "A" }),
+      mkGroup({ key: "b@y.example", label: "B" })];
+    const common = { grouping: "smart" as const, group: pool, senders: two,
+      onSenderAct: async () => true, onSenderProtect: async () => true,
+      renderSender: (g: Group, back: () => void) =>
+        <div><span>inspecting {g.key}</span><button onClick={back}>back</button></div> };
+
+    it("opens on the Senders tab and loads no mails yet", async () => {
+      renderPanel([mkMail(1)], common);
+      const senders = await screen.findByRole("tab", { name: "Senders (2)" });
+      expect(senders.getAttribute("aria-selected")).toBe("true");
+      expect(screen.getByRole("tab", { name: "Mails (6)" })).toBeTruthy();
+      expect(screen.getByRole("button", { name: "A" })).toBeTruthy();
+      expect(group_).not.toHaveBeenCalled();
+    });
+
+    it("the Mails tab loads the pool's mails once", async () => {
+      renderPanel([mkMail(1), mkMail(2)], common);
+      fireEvent.click(await screen.findByRole("tab", { name: "Mails (6)" }));
+      await waitFor(() => screen.getByText("Mail 1"));
+      expect(group_).toHaveBeenCalledWith("smart", "k:newsletter");
+      expect(group_).toHaveBeenCalledTimes(1);
+    });
+
+    it("a click on a sender opens it in place and Back returns", async () => {
+      renderPanel([mkMail(1)], common);
+      fireEvent.click(await screen.findByRole("button", { name: "A" }));
+      expect(screen.getByText("inspecting a@x.example")).toBeTruthy();
+      fireEvent.click(screen.getByRole("button", { name: "back" }));
+      expect(screen.queryByText(/^inspecting/)).toBeNull();
+      expect(screen.getByRole("tab", { name: "Senders (2)" })).toBeTruthy();
+    });
+
+    it("a pool without senders (all gone) shows its mails instead",
+      async () => {
+        renderPanel([mkMail(1)], { ...common, senders: [] });
+        await waitFor(() => screen.getByText("Mail 1"));
+        expect(screen.queryByRole("tab", { name: /^Senders/ })).toBeNull();
+      });
+
+    it("rows that are not pooled never get the tabs", async () => {
+      renderPanel([mkMail(1)], { ...common,
+        group: mkGroup({ key: "s:a@x.example", kind: "sender", addr: "a@x.example" }) });
+      await waitFor(() => screen.getByText("Mail 1"));
+      expect(screen.queryByRole("tab", { name: /^Senders/ })).toBeNull();
+    });
+  });
+
   it("has no bulk-action chrome until a mail is selected", async () => {
     renderPanel([mkMail(1), mkMail(2)]);
     await waitFor(() => screen.getByText("Mail 1"));
