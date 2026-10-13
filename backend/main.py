@@ -14,6 +14,8 @@ import logging
 import os
 
 from fastapi import FastAPI, HTTPException, Query, Request
+from fastapi.exception_handlers import request_validation_exception_handler
+from fastapi.exceptions import RequestValidationError
 from fastapi.responses import (FileResponse, JSONResponse, RedirectResponse,
                                StreamingResponse)
 from fastapi.staticfiles import StaticFiles
@@ -50,6 +52,28 @@ logging.basicConfig(
     format="%(asctime)s %(levelname)-7s %(name)s: %(message)s",
     datefmt="%Y-%m-%d %H:%M:%S")
 
+
+class _RedactKnowledgeKeys(logging.Filter):
+    """The sender knowledge is never logged. `DELETE /api/knowledge/<key>`
+    carries a sender address or a company in its URL, so uvicorn's access
+    line is rewritten before it is emitted."""
+
+    PREFIX = "/api/knowledge/"
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        args = record.args
+        # uvicorn: (client, method, path, http version, status)
+        if isinstance(args, tuple) and len(args) >= 3 \
+                and isinstance(args[2], str) and args[2].startswith(self.PREFIX) \
+                and not args[2].startswith(self.PREFIX + "keep_ai") \
+                and not args[2].startswith(self.PREFIX + "forget_ai") \
+                and not args[2].startswith(self.PREFIX + "remove_unused"):
+            record.args = (*args[:2], self.PREFIX + "<key>", *args[3:])
+        return True
+
+
+logging.getLogger("uvicorn.access").addFilter(_RedactKnowledgeKeys())
+
 from contextlib import asynccontextmanager
 
 
@@ -77,6 +101,16 @@ async def _lifespan(app: FastAPI):
 
 app = FastAPI(title="mailbroom", docs_url=None, redoc_url=None,
               lifespan=_lifespan)
+
+
+@app.exception_handler(RequestValidationError)
+async def _validation_error(request: Request, exc: RequestValidationError):
+    # FastAPI's default answer echoes the offending body; for the sender
+    # knowledge that body is a list of addresses - answer with the stable code.
+    if request.url.path.startswith("/api/knowledge"):
+        return JSONResponse({"detail": knowledgestore.BAD_REQUEST},
+                            status_code=400)
+    return await request_validation_exception_handler(request, exc)
 
 STATIC_DIR = Path(os.environ.get(
     "STATIC_DIR", Path(__file__).resolve().parent.parent / "static"))

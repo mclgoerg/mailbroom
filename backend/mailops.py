@@ -1397,11 +1397,13 @@ def rebuild_smart(acc, cfg: dict | None = None, force: bool = False) -> bool:
     nothing relevant changed since the last build, so an unrelated settings
     save never reshuffles rows the user is working on. Deletes do NOT call
     this: _apply_removal patches every grouping."""
-    params = smart_params(acc, cfg)
-    sig = smart_sig(params)
     with acc.lock:
         if acc.state["status"] != "done":
             return False
+        # Read under the lock: two overlapping rebuilds must not install an
+        # older reading of the settings after a newer one.
+        params = smart_params(acc, cfg)
+        sig = smart_sig(params)
         if not force and acc.smart_sig == sig \
                 and acc.state["groups"].get("smart"):
             return False

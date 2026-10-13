@@ -589,7 +589,8 @@ def valid_address_key(addr: str) -> bool:
     local, at, domain = addr.partition("@")
     return (at == "@" and bool(local) and bool(domain) and "@" not in domain
             and addr == addr.lower() and len(addr) <= 254
-            and not any(c.isspace() or c == ":" for c in addr))
+            and not any(c.isspace() or c == ":" or ord(c) < 32
+                        or ord(c) == 127 for c in addr))
 
 
 class Filing(NamedTuple):
@@ -650,7 +651,7 @@ def filing_for_unit(knowledge: dict, members: list[Member], company: str,
 
 def _filed(f: Filing, src: str) -> Verdict:
     why = {"r": "rule" if src == USER_SRC else "kept_ai", "k": f.kind,
-           "by": f.by}
+           "by": f.by, "entry": f.key}
     if f.kind == "category":
         why["name"] = f.name
     return Verdict(f.kind, f.name, why)

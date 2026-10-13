@@ -36,6 +36,7 @@ KNOWLEDGE_PATH = Path(os.environ.get("SENDER_KNOWLEDGE_PATH",
 VERSION = 1
 MAX_ENTRIES = 5000
 NOTE_MAX = 200
+MAX_TS = 32_503_680_000            # the year 3000: anything later is no date
 USER, AI = sk.USER_SRC, sk.KEPT_SRC
 
 # Stable error codes (HTTP detail; frontend api.ts ERROR_CODES).
@@ -121,7 +122,7 @@ def build_entry(key, kind, src, user_cats, note=None, ts=None) -> tuple[str, dic
     key = normalize_key(key)
     kind = check_kind(kind, src, user_cats)
     stamp = ts if isinstance(ts, int) and not isinstance(ts, bool) \
-        and ts > 0 else int(time.time())
+        and 0 < ts <= MAX_TS else int(time.time())
     return key, {"kind": kind, "src": src, "ts": stamp,
                  "note": clean_note(note)}
 
@@ -138,7 +139,8 @@ def _read_entry(raw) -> dict | None:
     ts = raw.get("ts")
     note = raw.get("note")
     return {"kind": raw["kind"], "src": src,
-            "ts": ts if isinstance(ts, int) and not isinstance(ts, bool) else 0,
+            "ts": ts if isinstance(ts, int) and not isinstance(ts, bool)
+            and 0 <= ts <= MAX_TS else 0,
             "note": note[:NOTE_MAX] if isinstance(note, str) else ""}
 
 

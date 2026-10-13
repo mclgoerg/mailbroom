@@ -80,7 +80,8 @@ def test_a_user_filing_beats_a_confident_purpose():
     k = {"a:shop@lone.example": entry("newsletter")}
     assert place(msgs, knowledge=k)["shop@lone.example"] == "k:newsletter"
     assert why(msgs, "shop@lone.example", knowledge=k) == {
-        "r": "rule", "k": "newsletter", "by": "a"}
+        "r": "rule", "k": "newsletter", "by": "a",
+        "entry": "a:shop@lone.example"}
 
 
 def test_a_user_filing_beats_a_user_category_and_a_category_filing_works():
@@ -98,7 +99,8 @@ def test_a_user_filing_beats_a_user_category_and_a_category_filing_works():
     assert rows["sender"]["y@other.example"]["smart_key"] == "k:cat:hobby"
     assert rows["smart"]["k:cat:hobby"]["category"] == "hobby"
     assert rows["sender"]["y@other.example"]["smart_why"] == {
-        "r": "rule", "k": "category", "by": "a", "name": "hobby"}
+        "r": "rule", "k": "category", "by": "a", "name": "hobby",
+        "entry": "a:y@other.example"}
 
 
 def test_a_user_filing_beats_the_freemail_exemption():
@@ -121,7 +123,8 @@ def test_the_precedence_chain_user_category_purpose_kept_cached():
     assert place(msgs, ai_kinds=cached, knowledge=kept)[
         "x@lone.example"] == "k:support"
     assert why(msgs, "x@lone.example", ai_kinds=cached, knowledge=kept) == {
-        "r": "kept_ai", "k": "support", "by": "a"}
+        "r": "kept_ai", "k": "support", "by": "a",
+        "entry": "a:x@lone.example"}
     # a user filing outranks both
     both = {**kept, key: entry("accounts")}
     assert place(msgs, ai_kinds=cached, knowledge=both)[
@@ -245,7 +248,9 @@ def test_a_sender_entry_beats_the_company_entry_for_that_sender():
     p = place(msgs, knowledge=k)
     assert (p["a@acme.example"], p["b@acme.example"]) == ("k:support", "k:jobs")
     assert why(msgs, "a@acme.example", knowledge=k)["by"] == "co"
+    assert why(msgs, "a@acme.example", knowledge=k)["entry"] == "co:acme.example"
     assert why(msgs, "b@acme.example", knowledge=k)["by"] == "a"
+    assert why(msgs, "b@acme.example", knowledge=k)["entry"] == "a:b@acme.example"
 
 
 def test_a_kept_ai_answer_never_splits_a_unit():
@@ -793,7 +798,8 @@ def test_keeping_an_answer_is_a_move_not_a_copy(sorted_box):
     # the placement is the same, now by the kept answer
     assert where("mystery@one.example") == "k:support"
     assert mailops.STATE["groups"]["sender"]["mystery@one.example"][
-        "smart_why"] == {"r": "kept_ai", "k": "support", "by": "a"}
+        "smart_why"] == {"r": "kept_ai", "k": "support", "by": "a",
+                         "entry": "a:mystery@one.example"}
     # it survives "Remove AI sorting", which only touches the cache
     assert client.post("/api/ai_sort/clear").status_code == 200
     assert where("mystery@one.example") == "k:support"
@@ -1011,12 +1017,128 @@ def test_nothing_about_the_knowledge_is_logged(mailbox, caplog, monkeypatch):
             if not r.name.startswith(("uvicorn", "httpx", "httpcore"))), secret
 
 
-def test_no_knowledge_in_the_audit_log(mailbox):
+def test_no_knowledge_in_the_audit_log(mailbox, monkeypatch):
     from backend import auditlog
+    recorded = []
+    monkeypatch.setattr(auditlog, "record",
+                        lambda *a, **k: recorded.append((a, k)))
     put(key="a:mystery@one.example", kind="support")
+    client.post("/api/knowledge/keep_ai", json={"all": True})
+    client.post("/api/knowledge/forget_ai")
     client.delete("/api/knowledge/a:mystery@one.example")
+    assert recorded == []
     assert not auditlog.AUDIT_PATH.exists() \
         or "mystery" not in auditlog.AUDIT_PATH.read_text()
+
+
+def test_the_access_log_does_not_carry_a_deleted_key(caplog):
+    # `DELETE /api/knowledge/<key>` has the key in its URL: uvicorn's access
+    # line is redacted (the filter sits on the logger, as in production).
+    access = logging.getLogger("uvicorn.access")
+    caplog.set_level(logging.INFO, logger="uvicorn.access")
+    for path in ("/api/knowledge/a%3Ajane%40filed.example",
+                 "/api/knowledge/co%3Afiled.example"):
+        access.info('%s - "%s %s HTTP/%s" %d', "127.0.0.1:5", "DELETE", path,
+                    "1.1", 200)
+    for path in ("/api/knowledge", "/api/knowledge/keep_ai", "/api/state"):
+        access.info('%s - "%s %s HTTP/%s" %d', "127.0.0.1:5", "POST", path,
+                    "1.1", 200)
+    text = "\n".join(r.getMessage() for r in caplog.records
+                     if r.name == "uvicorn.access")
+    assert "jane" not in text and "filed.example" not in text
+    assert text.count("DELETE /api/knowledge/<key>") == 2
+    assert "POST /api/knowledge/keep_ai" in text and "POST /api/state" in text
+
+
+def test_a_real_uvicorn_server_logs_a_delete_without_the_key():
+    import threading
+    import time as timemod
+    import httpx
+    import uvicorn
+
+    lines: list[str] = []
+
+    class Grab(logging.Handler):
+        def emit(self, record):
+            lines.append(record.getMessage())
+    grab = Grab()
+    # (uvicorn configures its loggers when the Config is built: attach after)
+    server = uvicorn.Server(uvicorn.Config(
+        app, host="127.0.0.1", port=0, log_level="info"))
+    access = logging.getLogger("uvicorn.access")
+    access.addHandler(grab)
+    thread = threading.Thread(target=server.run, daemon=True)
+    thread.start()
+    try:
+        for _ in range(100):
+            if server.started and server.servers:
+                break
+            timemod.sleep(0.05)
+        port = server.servers[0].sockets[0].getsockname()[1]
+        r = httpx.delete(f"http://127.0.0.1:{port}/api/knowledge/"
+                         "a%3Ajane%40filed.example")
+        assert r.status_code == 200
+        timemod.sleep(0.1)
+    finally:
+        server.should_exit = True
+        thread.join(5)
+        access.removeHandler(grab)
+    assert any("DELETE /api/knowledge/<key>" in line for line in lines), lines
+    assert not any("jane" in line or "filed.example" in line for line in lines)
+
+
+@pytest.mark.parametrize("body", [["a:x@y.example"], "a:x@y.example", 5, None])
+def test_a_malformed_body_is_a_stable_code_and_echoes_nothing(mailbox, body):
+    for call in (lambda: client.put("/api/knowledge", json=body),
+                 lambda: client.post("/api/knowledge/keep_ai", json=body)):
+        r = call()
+        assert r.status_code == 400
+        assert r.json() == {"detail": ks.BAD_REQUEST}
+        assert "x@y.example" not in r.text
+
+
+def test_other_endpoints_keep_their_default_validation_answer(mailbox):
+    r = client.post("/api/pin", json=["nope"])
+    assert r.status_code == 422
+
+
+def test_keeping_never_overwrites_an_own_filing_that_is_inactive_for_now(
+        sorted_box):
+    cfgmod.update_config({"categories": {"hobby": ["zzz"]}})
+    assert put(key="a:mystery@one.example", kind="cat:hobby",
+               note="mine").status_code == 200
+    cfgmod.update_config({"categories": {}})           # the category is gone
+    mailops.rebuild_smart_all()
+    assert where("mystery@one.example") == "k:support"  # the cached AI answer
+    r = client.post("/api/knowledge/keep_ai", json={"all": True})
+    assert r.json()["kept"] == 1                        # only the duo company
+    e = ks.load()["a:mystery@one.example"]
+    assert (e["src"], e["kind"], e["note"]) == ("user", "cat:hobby", "mine")
+    assert "a:mystery@one.example" in aisortstore.load_account(
+        accountsmod.get().name)                         # its cache copy stays
+
+
+def test_the_settings_are_read_under_the_account_lock(mailbox, monkeypatch):
+    acc = accountsmod.get()
+    seen = []
+    real = mailops.smart_params
+    monkeypatch.setattr(mailops, "smart_params", lambda a, c=None: (
+        seen.append(a.lock.locked()), real(a, c))[1])
+    mailops.rebuild_smart(acc, force=True)
+    assert seen == [True]
+
+
+def test_keys_with_control_characters_and_absurd_times_are_refused_or_clamped(
+        mailbox):
+    for key in ("a:x\u0001@y.example", "a:x@y.\u007fexample", "a:x@y\nz.example"):
+        assert put(key=key, kind="orders").status_code == 400
+    r = put(entries=[{"key": "a:mystery@one.example", "kind": "jobs",
+                      "ts": 10 ** 30}])
+    assert r.status_code == 200
+    assert listing()["a:mystery@one.example"]["ts"] <= ks.MAX_TS
+    client.post("/api/import_config", json={"knowledge": {"entries": {
+        "a:imp@x.example": {"kind": "jobs", "ts": 10 ** 30}}}})
+    assert 0 < listing()["a:imp@x.example"]["ts"] <= ks.MAX_TS
 
 
 # ------------------------------------------------------ the property test

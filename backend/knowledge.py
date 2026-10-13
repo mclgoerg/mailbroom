@@ -128,20 +128,26 @@ def keep_ai(acc, keys=None, everything: bool = False) -> dict:
         {k for k in keys if isinstance(k, str)} & applying
     chosen = {k: cached[k]["kind"] for k in sorted(wanted)
               if k in cached and cached[k]["kind"] in sk.SORT_KINDS
-              and cached[k]["kind"] != "other"}
+              and cached[k]["kind"] != "other" and ks.is_valid_key(k)}
     if not chosen:
         return {"ok": True, "kept": 0}
     now = int(time.time())
 
-    def change(entries: dict) -> None:
-        for key, kind in chosen.items():
-            entries[key] = {"kind": kind, "src": ks.AI, "ts": now, "note": ""}
+    def change(entries: dict) -> list[str]:
+        # (an own filing of the same key - possibly inactive for now - is
+        # never overwritten by an AI answer)
+        kept = [k for k in chosen if entries.get(k, {}).get("src") != ks.USER]
+        for key in kept:
+            entries[key] = {"kind": chosen[key], "src": ks.AI, "ts": now,
+                            "note": ""}
+        return kept
 
-    ks.modify(change)
-    aisortstore.drop(list(chosen), acc.name)            # a move, not a copy
-    log.info("sender knowledge: %d AI answers kept", len(chosen))
-    mailops.rebuild_smart_all()
-    return {"ok": True, "kept": len(chosen)}
+    kept = ks.modify(change)
+    aisortstore.drop(kept, acc.name)                    # a move, not a copy
+    log.info("sender knowledge: %d AI answers kept", len(kept))
+    if kept:
+        mailops.rebuild_smart_all()
+    return {"ok": True, "kept": len(kept)}
 
 
 def forget_ai() -> dict:
