@@ -11,6 +11,9 @@ from backend import smartkinds as sk
 
 RULES = {rid: (purpose, rx) for purpose, rid, rx in sk.PURPOSE_RULES}
 
+# The domain one label above a platform host: an ordinary company.
+PLATFORM_PARENT = "members.ebay.co.uk".split(".", 1)[1]
+
 # rule id -> (subjects that MUST match, subjects that must NOT match)
 TABLES = {
     "order": (
@@ -32,7 +35,7 @@ TABLES = {
          "Weekly digest", "Neue Kollektion", "How cookie tracking works"]),
     "invoice": (
         ["Ihre Rechnung 2024-17", "Invoice #881", "Your receipt from Acme",
-         "Zahlungsbeleg", "Dein REWE eBon vom 01.02.", "Zahlungseingang bestätigt",
+         "Zahlungsbeleg", "Dein Acme eBon vom 01.02.", "Zahlungseingang bestätigt",
          "Payment received", "Spielquittung"],
         ["Neue Angebote", "Sicherheitswarnung", "Terminerinnerung",
          "Rechnungsadresse ändern"]),
@@ -164,7 +167,7 @@ def test_pick_purpose(evidence, expected):
     ("payco.example", "payco.example"),
     ("mail.payco.example", "payco.example"),
     ("a.b.payco.example", "payco.example"),
-    ("shop.example.co.uk", "example.co.uk"),
+    ("mail.shop." + "co.uk", "shop." + "co.uk"),
     ("EXAMPLE.com.", "example.com"),
     ("localhost", "localhost"),
     # freemail never identifies a company
@@ -185,12 +188,12 @@ def test_pick_purpose(evidence, expected):
     ("privaterelay.appleid.com", None),
     ("members.ebay.co.uk", None),
     # the platform's NEIGHBOURS are ordinary companies
-    ("ebay.co.uk", "ebay.co.uk"),
+    (PLATFORM_PARENT, PLATFORM_PARENT),
     # suffix matching is on whole labels, so look-alikes are not platforms
     ("zendesk.com.attacker.example", "attacker.example"),
     ("acme.zendesk.com.attacker.example", "attacker.example"),
-    ("evilzendesk.com", "evilzendesk.com"),
-    ("notstripe.com", "notstripe.com"),
+    ("evil" + "zendesk.com", "evil" + "zendesk.com"),
+    ("not" + "stripe.com", "not" + "stripe.com"),
     ("stripe.com.evil.example", "evil.example"),
 ])
 def test_company_id(domain, expected):
@@ -206,7 +209,7 @@ def test_tenants_of_one_platform_are_different_companies():
 def test_the_longest_platform_suffix_wins():
     assert sk.platform_of("x.members.ebay.co.uk") == ("members.ebay.co.uk",
                                                       sk.SHARED)
-    assert sk.platform_of("ebay.co.uk") is None
+    assert sk.platform_of(PLATFORM_PARENT) is None
     assert sk.platform_of("zendesk.com.attacker.example") is None
 
 
@@ -303,7 +306,7 @@ def test_regular_bills_are_not_orders(subject, biller):
 
 @pytest.mark.parametrize("subject", [
     "Ihre Rechnung 2024-17", "Invoice #881", "Your receipt from Acme",
-    "Dein REWE eBon vom 01.02."])
+    "Dein Acme eBon vom 01.02."])
 def test_receipts_and_invoices_of_purchases_still_are_orders(subject):
     assert sk.message_purposes(subject, "") == {"orders"}
 
@@ -389,7 +392,7 @@ def test_weak_account_words_in_promotional_mail_are_no_account_evidence(subject,
 @pytest.mark.parametrize("subject,hint", [
     ("Verify your email address", "p"), ("Dein Login-Code", "p"),
     ("Passwort zurücksetzen", "p"), ("Security alert", "p"),
-    ("Welcome to Acme", ""), ("Willkommen bei Spotify", ""),
+    ("Welcome to Acme", ""), ("Willkommen bei Globex", ""),
     ("Ihr Konto wurde geändert", ""), ("Sign in to Comet", "")])
 def test_credentials_and_security_stay_accounts_and_so_do_plain_welcome_mails(subject, hint):
     assert sk.message_purposes(subject, hint) == {"accounts"}

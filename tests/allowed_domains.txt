@@ -1,0 +1,25 @@
+# Hosts the privacy guard (tests/test_no_real_names.py) accepts on top of the
+# RFC 2606 names, the freemail / platform lists imported from
+# backend/smartkinds.py and the built-in keyword categories imported from
+# mailops.CATEGORY_RULES.
+#
+# One host per line:  host  # reason   (an entry without a reason fails the
+# test). An entry also allows every host below it. Only public infrastructure
+# the project itself points at belongs here - never a company or an address
+# because it shows up in somebody's mailbox (CONTRIBUTING.md "Privacy").
+
+github.com                # the project's own repository, release links, GitHub documentation
+githubusercontent.com     # JSON schema reference of release-please-config.json
+shields.io                # README status badges
+scorecard.dev             # README: OpenSSF Scorecard badge
+securityscorecards.dev    # README: OpenSSF Scorecard badge
+bestpractices.dev         # README: OpenSSF best-practices badge
+conventionalcommits.org   # CONTRIBUTING / CLAUDE: the commit-title specification
+w3.org                    # SVG XML namespace in frontend/public/icon.svg
+microsoft.com             # setup documentation: Microsoft Entra app registration for OAuth
+microsoftonline.com       # OAuth endpoints of the Microsoft sign-in flow (backend/oauthflow.py)
+office.com                # OAuth scope / IMAP host of the Microsoft flow
+office365.com             # IMAP / SMTP host presets for Microsoft accounts
+googleapis.com            # OAuth token endpoint of the Google sign-in flow
+fastmail.help             # README: link to the provider's app-password instructions
+azure.com                 # Settings hint: endpoint form of an Azure-hosted model

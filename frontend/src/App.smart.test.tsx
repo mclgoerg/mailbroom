@@ -88,9 +88,9 @@ const company = mk({ key: "o:payco.example", label: "payco.example", count: 10,
   kind: "company", n_senders: 3, domain: "payco.example",
   purposes: { orders: 6, accounts: 3, unclassified: 1 },
   members: ["a@payco.example", "b@payco.example", "c@payco.example"] });
-const mixedCompany = mk({ key: "o:example.co.uk", label: "example.co.uk",
+const mixedCompany = mk({ key: "o:hub.example", label: "hub.example",
   count: 12, kind: "company", n_senders: 2, domain: "",
-  members: ["a@shop.example.co.uk", "b@mail.example.co.uk"] });
+  members: ["a@shop.hub.example", "b@mail.hub.example"] });
 const newsletters = mk({ key: "k:newsletter", label: "Newsletters",
   count: 20, kind: "newsletter", n_senders: 12,
   members: ["promo@lone.example", "hello@zine.example"] });
@@ -263,8 +263,8 @@ test("the free-text filter matches a bucket's member addresses", async () => {
     .toBeGreaterThan(0));
   expect(screen.queryAllByText("Newsletters")).toHaveLength(0);
   // `domain:` is the exact mail domain, so it reaches subdomain senders too
-  fireEvent.change(box, { target: { value: "domain:mail.example.co.uk" } });
-  await waitFor(() => expect(screen.getAllByText("example.co.uk").length)
+  fireEvent.change(box, { target: { value: "domain:mail.hub.example" } });
+  await waitFor(() => expect(screen.getAllByText("hub.example").length)
     .toBeGreaterThan(0));
   expect(screen.queryAllByText("payco.example")).toHaveLength(0);
 });
@@ -349,8 +349,8 @@ test("blocking a company row trashes only the pool, not the whole domain",
 
 test("a company pool spanning several domains has no shortcuts", async () => {
   await openSmart();
-  openRow("example.co.uk");
-  await screen.findByText(/Several senders of example.co.uk/);
+  openRow("hub.example");
+  await screen.findByText(/Several senders of hub.example/);
   expect(screen.queryByRole("button", { name: /Protect/ })).toBeNull();
   expect(screen.queryByRole("button", { name: "Block sender" })).toBeNull();
 });

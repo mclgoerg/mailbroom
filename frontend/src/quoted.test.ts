@@ -28,7 +28,7 @@ describe("splitQuoted", () => {
   });
 
   it("handles German attributions", () => {
-    const t = "Passt.\n\nAm 03.03.2024 um 10:00 schrieb Boss <b@x.de>:\n> Frage\n";
+    const t = "Passt.\n\nAm 03.03.2024 um 10:00 schrieb Boss <b@x.example>:\n> Frage\n";
     expect(visible(t)).toBe("Passt.");
   });
 
