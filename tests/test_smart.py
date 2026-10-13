@@ -1245,7 +1245,7 @@ def test_the_snapshot_signature_covers_the_categories(acme):
     data = json.loads(path.read_text())
     mailops.save_snapshot(acc)
     data = json.loads(path.read_text())
-    assert len(data["smart_sig"]) == 5 and data["smart_sig"][2] == \
+    assert len(data["smart_sig"]) == 6 and data["smart_sig"][2] == \
         mailops.SMART_RULES_VERSION
     # categories edited while the app was down: restore re-tags and rebuilds
     cfgmod.update_config({"categories": {}})

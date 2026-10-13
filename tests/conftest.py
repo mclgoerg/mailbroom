@@ -17,6 +17,7 @@ from backend import auth as authmod            # noqa: E402
 from backend import autoscan as autoscanmod   # noqa: E402
 from backend import config as cfgmod          # noqa: E402
 from backend import digest as digestmod       # noqa: E402
+from backend import knowledgestore            # noqa: E402
 from backend import knownsenders              # noqa: E402
 from backend import mailops                   # noqa: E402
 from backend import pinstore                  # noqa: E402
@@ -41,6 +42,8 @@ def isolate(tmp_path, monkeypatch):
     monkeypatch.setattr(verdictstore, "VERDICTS_PATH",
                         tmp_path / "verdicts.json")
     monkeypatch.setattr(aisortstore, "AI_SORT_PATH", tmp_path / "ai_sort.json")
+    monkeypatch.setattr(knowledgestore, "KNOWLEDGE_PATH",
+                        tmp_path / "sender_knowledge.json")
     monkeypatch.setattr(unsubstore, "UNSUB_STATE_PATH",
                         tmp_path / "unsub_state.json")
     monkeypatch.setattr(mailops, "REPLIED_PATH", tmp_path / "replied.json")

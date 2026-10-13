@@ -35,6 +35,7 @@ from . import config as cfgmod
 from . import knownsenders
 from . import pinstore
 from . import aisortstore
+from . import knowledgestore
 from . import smartkinds
 from . import stats as statsmod
 from . import tenants
@@ -251,7 +252,7 @@ def load_snapshot(acc) -> bool:
             acc.state["groups"].setdefault("smart", {})
             sig = data.get("smart_sig")
             acc.smart_sig = ((sig[0], tuple(sig[1]), *sig[2:])
-                             if isinstance(sig, list) and len(sig) == 5
+                             if isinstance(sig, list) and len(sig) == 6
                              and isinstance(sig[1], list) else None)
         # No-op when the snapshot's smart groups were built with today's
         # threshold + protected list; otherwise they are derived again - as
@@ -991,7 +992,8 @@ def build_groups(messages: list, replied_to: set[str] | None = None,
                  smart_min: int = SMART_MIN_DEFAULT,
                  protected: list[str] | None = None,
                  user_categories=None,
-                 ai_kinds: dict[str, dict] | None = None) -> dict:
+                 ai_kinds: dict[str, dict] | None = None,
+                 knowledge: dict[str, dict] | None = None) -> dict:
     """Every grouping from the scanned mails. `categories` decide the tags
     (all of them); `user_categories` - the NAMES of the categories the user
     defined or edited (SmartParams.user) - decide which tags may place a
@@ -1059,7 +1061,7 @@ def build_groups(messages: list, replied_to: set[str] | None = None,
             rec["engagement"] = group_engagement(rec, now)
     groups["smart"] = build_smart(groups["sender"], messages, smart_min,
                                   protected or [], user_categories, now,
-                                  ai_kinds)
+                                  ai_kinds, knowledge)
     return groups
 
 
@@ -1132,7 +1134,8 @@ def _smart_rec(key: str, label: str, kind: str, members: list[dict],
 def build_smart(sender_recs: dict, mails, smart_min: int = SMART_MIN_DEFAULT,
                 protected: list[str] | None = None,
                 user_categories=None, now: float | None = None,
-                ai_kinds: dict[str, dict] | None = None) -> dict:
+                ai_kinds: dict[str, dict] | None = None,
+                knowledge: dict[str, dict] | None = None) -> dict:
     """The "smart" grouping: {key: record}. `sender_recs` are the records
     of the sender grouping, `mails` the index's mail dicts (only addr and
     subject are read), `user_categories` the names of the categories the
@@ -1171,6 +1174,15 @@ def build_smart(sender_recs: dict, mails, smart_min: int = SMART_MIN_DEFAULT,
     sorting decided for units the rules left in Other for lack of a confident
     answer; an entry applies only while its fingerprint (the sample subjects
     the AI saw) still matches.
+
+    `knowledge` (knowledgestore, per tenant): what the user filed - or kept
+    from an AI answer - by sender address or company, looked up by IDENTITY
+    (smartkinds.classify_unit has the precedence: user filing > category >
+    confident purpose > kept AI answer > cached AI answer > fallbacks). It
+    only reaches step 5: protected, replied, company and own rows are
+    decided by structure alone. A user filing on ONE sender of a small
+    company takes that sender out of the company's unit (the one deliberate
+    exception to "a unit is never split"); the rest is classified without it.
     """
     smart_min = clamp_smart_min(smart_min)
     protected = protected or []
@@ -1239,6 +1251,25 @@ def build_smart(sender_recs: dict, mails, smart_min: int = SMART_MIN_DEFAULT,
         else:
             units.append(("", [rec]))
 
+    # 5a: a user filing of ONE sender takes it out of its small-company unit
+    # (a sender filed by its company's entry stays; kept AI answers never
+    # split a unit).
+    if knowledge:
+        split: list[tuple[str, list[dict]]] = []
+        for cid, recs in units:
+            alone = {r["key"] for r in recs if cid
+                     and smartkinds.own_filing(knowledge, r["key"], user)}
+            if not alone:
+                split.append((cid, recs))
+                continue
+            split.extend(("", [r]) for r in recs if r["key"] in alone)
+            rest = [r for r in recs if r["key"] not in alone]
+            if len(rest) > 1:
+                split.append((cid, rest))
+            elif rest:
+                split.append(("", rest))
+        units = split
+
     # 5: needs the subjects of the units' senders only.
     wanted = {r["key"] for _, recs in units for r in recs}
     dated: dict[str, list[tuple[int, str]]] = {}
@@ -1252,7 +1283,7 @@ def build_smart(sender_recs: dict, mails, smart_min: int = SMART_MIN_DEFAULT,
             bool(r["unsub"]), tuple(r["tags"]),
             smartkinds.sample_subjects(dated.get(r["key"], ())))
             for r in recs]
-        verdict = smartkinds.classify_unit(members, user)
+        verdict = smartkinds.classify_unit(members, user, knowledge, cid)
         if ai_kinds and verdict.kind == "other" \
                 and verdict.why.get("r") in smartkinds.AI_ELIGIBLE:
             entry = ai_kinds.get(smartkinds.unit_key(cid, members))
@@ -1301,30 +1332,46 @@ class SmartParams(NamedTuple):
     digest: str                               # of the user's category config
     ai_kinds: dict                            # AI-sorted units (aisortstore)
     ai_digest: str
+    knowledge: dict                           # the tenant's sender knowledge
+    knowledge_digest: str
+
+
+def _custom_categories(cfg: dict) -> dict[str, list[str]]:
+    return {str(k): [str(p) for p in v if p]
+            for k, v in (cfg.get("categories") or {}).items()
+            if isinstance(v, list)}
+
+
+def user_categories(cfg: dict) -> frozenset:
+    """The names of the categories the user defined or edited (a built-in
+    category with an emptied keyword list does not count)."""
+    return frozenset(k for k, v in _custom_categories(cfg).items() if v)
 
 
 def smart_params(acc, cfg: dict | None = None) -> SmartParams:
     """Everything Smart placement reads from the current config."""
     cfg = cfg or cfgmod.load_config()
     block = cfg["accounts"].get(acc.name) or {}
-    custom = {str(k): [str(p) for p in v if p]
-              for k, v in (cfg.get("categories") or {}).items()
-              if isinstance(v, list)}
+    custom = _custom_categories(cfg)
     ai_kinds = aisortstore.load_account(acc.name)
+    knowledge = knowledgestore.load()
     return SmartParams(
         clamp_smart_min(block.get("smart_min", SMART_MIN_DEFAULT)),
         cfgmod.normalize_protected(cfg.get("protected")),
         effective_categories(cfg.get("categories")),
-        frozenset(k for k, v in custom.items() if v),
+        user_categories(cfg),
         hashlib.sha1(json.dumps(sorted(custom.items())).encode())
         .hexdigest()[:12],
-        ai_kinds, aisortstore.digest(ai_kinds))
+        ai_kinds, aisortstore.digest(ai_kinds),
+        knowledge, knowledgestore.digest(knowledge))
 
 
 def smart_sig(p: SmartParams) -> tuple:
-    """What the smart groups were built with (snapshots keep it)."""
+    """What the smart groups were built with (snapshots keep it). The last
+    part digests the sender knowledge by key, kind and source only: editing a
+    note must not reshuffle rows."""
     return (p.smart_min, tuple(p.protected), SMART_RULES_VERSION, p.digest,
-            p.ai_digest)
+            p.ai_digest, p.knowledge_digest)
 
 
 def retag_senders(acc, categories: list[tuple[str, list[str]]]) -> None:
@@ -1362,7 +1409,8 @@ def rebuild_smart(acc, cfg: dict | None = None, force: bool = False) -> bool:
             retag_senders(acc, params.categories)
         smart = build_smart(acc.state["groups"]["sender"], acc.index.values(),
                             params.smart_min, params.protected, params.user,
-                            ai_kinds=params.ai_kinds)
+                            ai_kinds=params.ai_kinds,
+                            knowledge=params.knowledge)
         verdictstore.apply_to_groups({"smart": smart}, acc.name)
         acc.state["groups"]["smart"] = smart
         acc.smart_sig = sig
@@ -1599,7 +1647,7 @@ def run_scan(acc=None) -> None:
             sp = smart_params(acc)
             groups = build_groups(messages, replied, sp.categories,
                                   sp.smart_min, sp.protected, sp.user,
-                                  sp.ai_kinds)
+                                  sp.ai_kinds, sp.knowledge)
             cached = verdictstore.apply_to_groups(groups, acc.name)
             with acc.lock:
                 acc.index.clear()
@@ -1618,6 +1666,15 @@ def run_scan(acc=None) -> None:
                                "progress": "", "error": "", "usage": None}
                 acc.state["scanned_ts"] = int(time.time())
                 acc.state["groups_rev"] += 1
+            # A categories / protected list / sender knowledge change made
+            # while this scan ran found no finished scan to re-derive (and
+            # smart_params above was read before it): catch up now. A no-op
+            # when the signature still matches.
+            try:
+                rebuild_smart(acc)
+            except Exception:
+                log.exception("[%s] could not re-derive the smart rows "
+                              "after the scan", acc.name)
             log.info("[%s] scan done: %d folders, %d mails, %d senders, "
                      "%d replied-to addrs%s in %.1fs",
                      acc.name, len(folders), len(messages),

@@ -342,7 +342,7 @@ def test_the_answer_comes_back_after_a_restart(mailbox, monkeypatch):
     accountsmod.reset()
     acc3 = accountsmod.get()
     assert mailops.load_snapshot(acc3)
-    assert acc3.smart_sig == acc2.smart_sig and len(acc3.smart_sig) == 5
+    assert acc3.smart_sig == acc2.smart_sig and len(acc3.smart_sig) == 6
 
 
 def test_remove_ai_sorting_puts_everyone_back(mailbox, monkeypatch):
