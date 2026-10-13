@@ -866,6 +866,25 @@ def test_verdict_cache_stores_a_member_fingerprint(tail, monkeypatch):
     assert smart_state()["k:other"]["ai"]["verdict"] == "delete_safe"
 
 
+def test_the_group_review_asks_for_low_reasoning_effort(tail, monkeypatch):
+    cfgmod.update_config({"ai": {"api_key": "k"}})
+    seen = []
+
+    def create(**kw):
+        seen.append(kw["output_config"].get("effort"))
+        payload = json.loads(kw["messages"][0]["content"])
+        return types.SimpleNamespace(
+            stop_reason="end_turn",
+            content=[types.SimpleNamespace(type="text", text=json.dumps({
+                "verdicts": [{"key": g["key"], "verdict": "review", "reason": "t"}
+                             for g in payload["groups"]]}))],
+            usage=types.SimpleNamespace(input_tokens=1, output_tokens=1))
+    monkeypatch.setattr(aihelper, "ai_client", lambda cfg: types.SimpleNamespace(
+        messages=types.SimpleNamespace(create=create)))
+    aihelper._run_ai("smart")
+    assert seen and set(seen) == {"low"} == {aihelper.REVIEW_EFFORT}
+
+
 def test_verdict_is_dropped_when_the_members_changed(tail, monkeypatch):
     cfgmod.update_config({"ai": {"api_key": "k"}})
     _fake_ai(monkeypatch, [])

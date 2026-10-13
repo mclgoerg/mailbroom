@@ -23,6 +23,8 @@ from . import verdictstore
 log = logging.getLogger("pmc.ai")
 
 AI_BATCH = 80
+REVIEW_EFFORT = "low"                    # group review: a verdict + a short reason per group needs
+                                         # little reasoning (see _ai_call: default thinking is billed)
 AI_GROUP_MAX = 400                       # hard cap per fine-grained AI call
 
 AI_SYSTEM = """You help clean up a cluttered personal mailbox. You get a list
@@ -284,7 +286,8 @@ def _run_ai(grouping: str, acc=None, keys: set[str] | None = None,
                 batch = batch_src[start:start + AI_BATCH]
                 t0 = time.time()
                 data, tin, tout = _ai_call(
-                    cfg, model, system, {"groups": batch}, AI_SCHEMA)
+                    cfg, model, system, {"groups": batch}, AI_SCHEMA,
+                    effort=REVIEW_EFFORT)
                 log.info("group review batch: %d groups, %d/%d tokens, %.1fs "
                          "(%s/%s)", len(batch), tin, tout, time.time() - t0,
                          cfg["ai"]["provider"], model)
