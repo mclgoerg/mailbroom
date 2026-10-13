@@ -413,9 +413,37 @@ class Verdict(NamedTuple):
     why: dict                   # structured reason, translated by the UI
 
 
-def classify_unit(members: list[Member],
+def classify_unit(members: list[Member], user_cats: Iterable[str] = (),
+                  knowledge: dict | None = None,
+                  company: str = "") -> Verdict:
+    """The kind of one unit: the rules (`rules_verdict`) with the user's
+    private sender knowledge around them (DECISIONS 2026-10-13). `company` is
+    the unit's company id ("" for a lone sender).
+      1 a user filing (src "user") of the unit's sender or company - beats
+        everything below, user categories and the freemail exemption included
+      2-3 the rules: user category, confident purpose from the mails,
+        newsletter / individuals / notification / Other
+      4 a KEPT AI answer (src "ai"), only where the rules are not confident
+        (the eligibility of a cached AI answer: why none / weak / competing)
+    Knowledge is looked up by identity (an address, a company), never by the
+    key of the unit it happens to be in."""
+    user = frozenset(user_cats)
+    if knowledge:
+        f = filing_for_unit(knowledge, members, company, USER_SRC, user)
+        if f:
+            return _filed(f, USER_SRC)
+    verdict = rules_verdict(members, user)
+    if knowledge and verdict.kind == "other" \
+            and verdict.why.get("r") in AI_ELIGIBLE:
+        f = filing_for_unit(knowledge, members, company, KEPT_SRC, user)
+        if f and not _freemail_blocks(f.kind, members):
+            return _filed(f, KEPT_SRC)
+    return verdict
+
+
+def rules_verdict(members: list[Member],
                   user_cats: Iterable[str] = ()) -> Verdict:
-    """The kind of one unit. Order (DECISIONS 2026-10-12):
+    """The kind of one unit by the rules alone. Order (DECISIONS 2026-10-12):
       1 an explicit user category (several different ones: Other - a unit is
         never split to settle a category conflict)
       2 a confident purpose from the mails
@@ -520,7 +548,118 @@ def ai_kind_for(entry: dict | None, members: list[Member]) -> str | None:
             or entry.get("kind") not in SORT_KINDS:
         return None
     kind = entry["kind"]
-    if kind in PURPOSES and not FREEMAIL_PURPOSES \
-            and all(is_freemail(m.addr.rpartition("@")[2]) for m in members):
+    if _freemail_blocks(kind, members):
         return None
     return kind
+
+
+def _freemail_blocks(kind: str, members: list[Member]) -> bool:
+    """An AI answer - cached or kept - never gives a purpose to freemail
+    senders (they are people, not shops); a USER filing may. Checked when an
+    answer is APPLIED, so it also holds for answers kept earlier."""
+    return (kind in PURPOSES and not FREEMAIL_PURPOSES
+            and all(is_freemail(m.addr.rpartition("@")[2]) for m in members))
+
+
+# ------------------------------------------------------- sender knowledge
+# What the user - or an AI answer the user chose to keep - filed, per
+# tenant: {"co:<company id>" | "a:<address>": {"kind": a fixed kind or
+# "cat:<name>", "src": "user" | "ai", ...}} (backend/knowledgestore.py). It
+# is looked up by IDENTITY: a sender's address and its company id
+# (`company_id`), never the key of the unit the sender is in today - units
+# change shape as senders come and go. Pure helpers only; no file access.
+
+USER_SRC, KEPT_SRC = "user", "ai"
+CATEGORY_PREFIX = "cat:"
+
+
+def sender_company(addr: str) -> str:
+    """The company id of a sender address ("" for freemail, shared platforms
+    and a tenant platform's own hosts)."""
+    return company_id(addr.rpartition("@")[2]) or ""
+
+
+def valid_company_key(cid: str) -> bool:
+    """A `co:` key names a company_id exactly (lowercase, registrable)."""
+    return bool(cid) and cid == cid.lower() and company_id(cid) == cid
+
+
+def valid_address_key(addr: str) -> bool:
+    """An `a:` key is one lowercase address."""
+    local, at, domain = addr.partition("@")
+    return (at == "@" and bool(local) and bool(domain) and "@" not in domain
+            and addr == addr.lower() and len(addr) <= 254
+            and not any(c.isspace() or c == ":" or ord(c) < 32
+                        or ord(c) == 127 for c in addr))
+
+
+class Filing(NamedTuple):
+    """A knowledge entry that applies right now."""
+    key: str        # the entry's key
+    kind: str       # a fixed kind, or "category"
+    name: str       # the category's name when kind == "category"
+    by: str         # "a" (this sender's own entry) | "co" (its company's)
+
+
+def _usable(entry, user_cats, src: str) -> tuple[str, str] | None:
+    """(kind, category name) when the entry has this source and its kind can
+    be applied now: a fixed kind, or (user filings only) one of the user's
+    current categories - a deleted or renamed category deactivates it."""
+    if not isinstance(entry, dict) or entry.get("src") != src:
+        return None
+    kind = entry.get("kind")
+    if kind in SORT_KINDS:
+        return kind, ""
+    if src == USER_SRC and isinstance(kind, str) \
+            and kind.startswith(CATEGORY_PREFIX) \
+            and kind[len(CATEGORY_PREFIX):] in user_cats:
+        return "category", kind[len(CATEGORY_PREFIX):]
+    return None
+
+
+def own_filing(knowledge: dict, addr: str, user_cats) -> Filing | None:
+    """The user's filing of exactly this address (the one that takes a
+    sender out of its small-company unit)."""
+    key = f"a:{addr}"
+    used = _usable(knowledge.get(key), user_cats, USER_SRC)
+    return Filing(key, used[0], used[1], "a") if used else None
+
+
+def filing_for_sender(knowledge: dict, addr: str, src: str,
+                      user_cats) -> Filing | None:
+    """The entry of this source that files one sender: its own `a:` entry,
+    else its company's `co:` entry (the `a:` entry wins when both apply)."""
+    cid = sender_company(addr)
+    for by, key in (("a", f"a:{addr}"), ("co", f"co:{cid}" if cid else "")):
+        used = _usable(knowledge.get(key), user_cats, src) if key else None
+        if used:
+            return Filing(key, used[0], used[1], by)
+    return None
+
+
+def filing_for_unit(knowledge: dict, members: list[Member], company: str,
+                    src: str, user_cats) -> Filing | None:
+    """The entry that files a unit: a lone sender by its address or company;
+    several senders by their company (a user filing on ONE of them has taken
+    it out of the unit already, a kept AI answer never splits a unit)."""
+    if len(members) == 1:
+        return filing_for_sender(knowledge, members[0].addr, src, user_cats)
+    key = f"co:{company}" if company else ""
+    used = _usable(knowledge.get(key), user_cats, src) if key else None
+    return Filing(key, used[0], used[1], "co") if used else None
+
+
+def _filed(f: Filing, src: str) -> Verdict:
+    why = {"r": "rule" if src == USER_SRC else "kept_ai", "k": f.kind,
+           "by": f.by, "entry": f.key}
+    if f.kind == "category":
+        why["name"] = f.name
+    return Verdict(f.kind, f.name, why)
+
+
+def knowledge_digest(entries: dict[str, dict]) -> str:
+    """Fingerprint of what placement reads from the knowledge: key, kind and
+    source - not the note or the time, so editing a note reshuffles nothing."""
+    items = sorted((k, v.get("kind"), v.get("src"))
+                   for k, v in entries.items())
+    return hashlib.sha1(json.dumps(items).encode()).hexdigest()[:12]

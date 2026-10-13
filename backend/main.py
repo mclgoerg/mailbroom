@@ -14,6 +14,8 @@ import logging
 import os
 
 from fastapi import FastAPI, HTTPException, Query, Request
+from fastapi.exception_handlers import request_validation_exception_handler
+from fastapi.exceptions import RequestValidationError
 from fastapi.responses import (FileResponse, JSONResponse, RedirectResponse,
                                StreamingResponse)
 from fastapi.staticfiles import StaticFiles
@@ -27,6 +29,8 @@ from . import bodyindex
 from . import autoscan as autoscanmod
 from . import config as cfgmod
 from . import digest as digestmod
+from . import knowledge as knowledgemod
+from . import knowledgestore
 from . import knownsenders
 from . import mailops
 from . import oauthflow
@@ -47,6 +51,28 @@ logging.basicConfig(
     level=os.environ.get("LOG_LEVEL", "INFO").upper(),
     format="%(asctime)s %(levelname)-7s %(name)s: %(message)s",
     datefmt="%Y-%m-%d %H:%M:%S")
+
+
+class _RedactKnowledgeKeys(logging.Filter):
+    """The sender knowledge is never logged. `DELETE /api/knowledge/<key>`
+    carries a sender address or a company in its URL, so uvicorn's access
+    line is rewritten before it is emitted."""
+
+    PREFIX = "/api/knowledge/"
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        args = record.args
+        # uvicorn: (client, method, path, http version, status)
+        if isinstance(args, tuple) and len(args) >= 3 \
+                and isinstance(args[2], str) and args[2].startswith(self.PREFIX) \
+                and not args[2].startswith(self.PREFIX + "keep_ai") \
+                and not args[2].startswith(self.PREFIX + "forget_ai") \
+                and not args[2].startswith(self.PREFIX + "remove_unused"):
+            record.args = (*args[:2], self.PREFIX + "<key>", *args[3:])
+        return True
+
+
+logging.getLogger("uvicorn.access").addFilter(_RedactKnowledgeKeys())
 
 from contextlib import asynccontextmanager
 
@@ -75,6 +101,16 @@ async def _lifespan(app: FastAPI):
 
 app = FastAPI(title="mailbroom", docs_url=None, redoc_url=None,
               lifespan=_lifespan)
+
+
+@app.exception_handler(RequestValidationError)
+async def _validation_error(request: Request, exc: RequestValidationError):
+    # FastAPI's default answer echoes the offending body; for the sender
+    # knowledge that body is a list of addresses - answer with the stable code.
+    if request.url.path.startswith("/api/knowledge"):
+        return JSONResponse({"detail": knowledgestore.BAD_REQUEST},
+                            status_code=400)
+    return await request_validation_exception_handler(request, exc)
 
 STATIC_DIR = Path(os.environ.get(
     "STATIC_DIR", Path(__file__).resolve().parent.parent / "static"))
@@ -686,6 +722,70 @@ def post_ai_sort_clear(account: str | None = Query(None)):
         raise HTTPException(409, str(exc))
 
 
+# ------------------------------------------------ private sender knowledge
+# Per tenant, shared by all its accounts (backend/knowledge.py). Refusals are
+# stable codes (knowledgestore.*) - never a message naming a key.
+
+def _knowledge_refusal(exc: knowledgestore.KnowledgeError) -> HTTPException:
+    busy = exc.code in (knowledgestore.AI_RUNNING, knowledgestore.UNSCANNED)
+    return HTTPException(409 if busy else 400, exc.code)
+
+
+@app.get("/api/knowledge")
+def get_knowledge():
+    """Every entry with what it does right now (matching senders, row, why
+    it has no effect)."""
+    return knowledgemod.listing()
+
+
+@app.put("/api/knowledge")
+def put_knowledge(body: dict):
+    """File one entry ({key, kind, note?}), many ({entries: [...]}), and / or
+    remove some ({remove: [...]}) in one atomic request. Returns `previous`
+    (what an Undo restores)."""
+    try:
+        return knowledgemod.put(body)
+    except knowledgestore.KnowledgeError as exc:
+        raise _knowledge_refusal(exc)
+
+
+@app.delete("/api/knowledge/{key:path}")
+def delete_knowledge(key: str):
+    try:
+        return knowledgemod.forget(key)
+    except knowledgestore.KnowledgeError as exc:
+        raise _knowledge_refusal(exc)
+
+
+@app.post("/api/knowledge/keep_ai")
+def post_knowledge_keep_ai(body: dict, account: str | None = Query(None)):
+    """Keep chosen cached AI answers of one account ({keys: [...]} or
+    {all: true}): they move into the knowledge as `src: "ai"`."""
+    try:
+        return knowledgemod.keep_ai(_acc(account), body.get("keys"),
+                                    body.get("all") is True)
+    except knowledgestore.KnowledgeError as exc:
+        raise _knowledge_refusal(exc)
+
+
+@app.post("/api/knowledge/forget_ai")
+def post_knowledge_forget_ai():
+    """Remove every kept AI answer; the user's own filings stay."""
+    try:
+        return knowledgemod.forget_ai()
+    except knowledgestore.KnowledgeError as exc:
+        raise _knowledge_refusal(exc)
+
+
+@app.post("/api/knowledge/remove_unused")
+def post_knowledge_remove_unused():
+    """Remove entries no sender matches - only when every account is scanned."""
+    try:
+        return knowledgemod.remove_unused()
+    except knowledgestore.KnowledgeError as exc:
+        raise _knowledge_refusal(exc)
+
+
 @app.post("/api/ai_group")
 def post_ai_group(body: AiGroupBody, account: str | None = Query(None)):
     _check_grouping(body.grouping)
@@ -1192,6 +1292,9 @@ def get_export_config():
         "unsub": unsubstore.load(),
         "replied": {n: sorted(mailops.load_replied(accountsmod.get(n)))
                     for n in accountsmod.names()},
+        # sender addresses the user filed in Smart (private; see the export
+        # note in the UI - `replied` and the AI verdicts list addresses too)
+        "knowledge": knowledgemod.export_section(),
     }
     return StreamingResponse(
         iter([json.dumps(data, indent=1)]), media_type="application/json",
@@ -1216,7 +1319,11 @@ def post_import_config(body: dict):
         cfgmod.update_config(update)
     except ValueError as exc:
         raise HTTPException(400, str(exc))
-    # Imported protected entries / categories change Smart placement.
+    # The sender knowledge goes in AFTER the config (a `cat:` entry needs its
+    # category) and BEFORE the rebuild below. Absent in older backups.
+    nknowledge = knowledgemod.import_section(body.get("knowledge"))
+    # Imported protected entries / categories / knowledge change Smart
+    # placement.
     mailops.rebuild_smart_all()
 
     nrules = 0
@@ -1284,9 +1391,10 @@ def post_import_config(body: dict):
 
     logging.getLogger("pmc.mail").info(
         "config import: %d rules, %d verdicts, %d replied addrs, "
-        "%d unsubscribed senders", nrules, nverdicts, nreplied, nunsub)
+        "%d unsubscribed senders, %d knowledge entries", nrules, nverdicts,
+        nreplied, nunsub, nknowledge)
     return {"ok": True, "rules": nrules, "verdicts": nverdicts,
-            "replied": nreplied, "unsub": nunsub}
+            "replied": nreplied, "unsub": nunsub, "knowledge": nknowledge}
 
 
 @app.get("/api/events")

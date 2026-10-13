@@ -35,6 +35,7 @@ os.environ.update(
     STATS_PATH=str(DATA / "ai_usage.json"),
     VERDICTS_PATH=str(DATA / "ai_verdicts.json"),
     AI_SORT_PATH=str(DATA / "ai_sort.json"),
+    SENDER_KNOWLEDGE_PATH=str(DATA / "sender_knowledge.json"),
     UNSUB_STATE_PATH=str(DATA / "unsub_state.json"),
     REPLIED_PATH=str(DATA / "replied.json"),
     RULES_PATH=str(DATA / "rules.json"),
