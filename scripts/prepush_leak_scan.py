@@ -18,10 +18,10 @@ Token files in that directory (searched recursively):
 Matching is a case-insensitive substring test; tokens shorter than
 `--min-length` (default 4) are ignored, they would match everything.
 
-What is scanned: the lines added by your branch (`git diff BASE...HEAD`,
-BASE defaults to `origin/main`), its commit messages and branch name, and -
-with `--pr N` - the title, description and comments of that pull request
-(needs the `gh` CLI).
+What is scanned: the lines and file names added by your branch (`git diff
+BASE...HEAD`, BASE defaults to `origin/main`), its commit messages and branch
+name, and - with `--pr N` - the title, description, comments, reviews and
+inline review comments of that pull request (needs the `gh` CLI).
 
 Output: counts and LOCATIONS (file:line, commit, PR part) - never the
 surrounding text. The matching tokens are shown only with `--show-tokens`.
@@ -105,18 +105,24 @@ def _run(args: list[str], cwd: str | None = None) -> str:
 
 def added_lines(base: str, cwd: str | None = None) -> Iterator[tuple[str, int, str]]:
     """(path, line number in the new file, text) of every line the branch
-    adds relative to BASE (merge-base diff, no context lines)."""
+    adds relative to BASE (merge-base diff, no context lines). The path alone
+    is yielded once per changed file with line 0 and the path as text, so
+    file names are scanned too."""
     out = _run(["git", "diff", "--unified=0", "--no-color", "--no-ext-diff",
                 f"{base}...HEAD"], cwd)
-    path, line = "", 0
+    path, line, in_hunk = "", 0, False
     for raw in out.splitlines():
-        if raw.startswith("+++ "):
-            path = raw[4:].removeprefix("b/")
+        if raw.startswith("diff --git "):
+            in_hunk = False
+        elif not in_hunk and raw.startswith("+++ "):
+            path = raw[4:].split("\t")[0].removeprefix("b/")
+            if path != "/dev/null":
+                yield path, 0, path
         elif raw.startswith("@@"):
             # @@ -a,b +c,d @@
             plus = raw.split("+", 1)[1].split(" ", 1)[0]
-            line = int(plus.split(",")[0])
-        elif raw.startswith("+") and not raw.startswith("+++"):
+            line, in_hunk = int(plus.split(",")[0]), True
+        elif in_hunk and raw.startswith("+"):
             yield path, line, raw[1:]
             line += 1
 
@@ -134,7 +140,8 @@ def branch_name(cwd: str | None = None) -> str:
 
 
 def pr_texts(number: int, cwd: str | None = None) -> Iterator[tuple[str, str]]:
-    """(part, text) of the PR: title, description, every comment and review."""
+    """(part, text) of the PR: title, description, every comment, review and
+    inline review comment."""
     out = _run(["gh", "pr", "view", str(number), "--json",
                 "title,body,comments,reviews"], cwd)
     data = json.loads(out)
@@ -144,6 +151,11 @@ def pr_texts(number: int, cwd: str | None = None) -> Iterator[tuple[str, str]]:
         yield f"comment {n}", c.get("body") or ""
     for n, r in enumerate(data.get("reviews") or [], 1):
         yield f"review {n}", r.get("body") or ""
+    inline = json.loads(_run(["gh", "api", "--paginate",
+                              f"repos/{{owner}}/{{repo}}/pulls/{number}/comments"],
+                             cwd) or "[]")
+    for n, c in enumerate(inline if isinstance(inline, list) else [], 1):
+        yield f"inline comment {n}", c.get("body") or ""
 
 
 # ------------------------------------------------------------------- scan
@@ -159,7 +171,7 @@ def scan(tokens: list[str], base: str = DEFAULT_BASE, pr: int | None = None,
             hits.append((location, found))
 
     for path, line, text in added_lines(base, cwd):
-        check(f"diff {path}:{line}", text)
+        check(f"file name {path}" if line == 0 else f"diff {path}:{line}", text)
     for sha, body in commit_messages(base, cwd):
         check(f"commit {sha}", body)
     check("branch name", branch_name(cwd))

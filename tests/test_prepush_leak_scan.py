@@ -148,14 +148,36 @@ def test_pr_text_is_scanned(repo, tokens_dir, monkeypatch, capsys):
     page = {"title": "feat: fine", "body": f"## Summary\n{TOKEN}\n",
             "comments": [{"body": "ok"}, {"body": f"and {OTHER}"}],
             "reviews": [{"body": ""}]}
-    monkeypatch.setattr(scanner, "_run", lambda args, cwd=None: (
-        json.dumps(page) if args[0] == "gh"
-        else subprocess.run(args, cwd=cwd, capture_output=True, text=True,
-                            check=True).stdout))
+    inline = [{"body": "fine"}, {"body": f"inline {TOKEN}"}]
+
+    def fake_run(args, cwd=None):
+        if args[:2] == ["gh", "pr"]:
+            return json.dumps(page)
+        if args[0] == "gh":
+            return json.dumps(inline)
+        return subprocess.run(args, cwd=cwd, capture_output=True, text=True,
+                              check=True).stdout
+    monkeypatch.setattr(scanner, "_run", fake_run)
     assert run_scan(repo, tokens_dir, monkeypatch, "--pr", "7") == 1
     out = capsys.readouterr().out
     assert "HIT PR #7 description" in out and "HIT PR #7 comment 2" in out
-    assert "title" not in out and "review" not in out
+    assert "HIT PR #7 inline comment 2" in out
+    assert "title" not in out and "review 1" not in out
+
+
+@NEEDS_GIT
+def test_added_file_names_are_scanned(repo, tokens_dir, monkeypatch, capsys):
+    commit(repo, f"{TOKEN}.txt", "fine\n")
+    assert run_scan(repo, tokens_dir, monkeypatch) == 1
+    assert "HIT file name" in capsys.readouterr().out
+
+
+@NEEDS_GIT
+def test_a_line_that_looks_like_a_diff_header_is_still_a_line(
+        repo, tokens_dir, monkeypatch, capsys):
+    commit(repo, "new.txt", f"++ {TOKEN}\n")      # the diff shows "+++ ..."
+    assert run_scan(repo, tokens_dir, monkeypatch) == 1
+    assert "HIT diff new.txt:1" in capsys.readouterr().out
 
 
 def test_missing_private_data_dir_exits_two(monkeypatch, capsys):

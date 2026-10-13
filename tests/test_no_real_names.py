@@ -128,13 +128,20 @@ def category_hosts() -> set[str]:
             if re.fullmatch(HOST, p)}
 
 
+# Invented company names that may stand in front of a tenant platform's host
+# (`acme.<helpdesk host>`): on those platforms the leftmost label IS a company.
+PLACEHOLDER_TENANTS = frozenset({"acme", "globex", "shop", "demo"})
+
+
 def allowed_hosts(extra: dict[str, str] | None = None) -> frozenset[str]:
-    """Hosts the guard accepts, together with everything below them."""
+    """Hosts the guard accepts, together with everything below them. Tenant
+    platforms are not in this set: see host_allowed."""
     if extra is None:
         extra = parse_allowlist(ALLOWED_FILE.read_text("utf-8"))[0]
-    return frozenset(
-        {*RFC2606_HOSTS, *smartkinds.FREEMAIL_DOMAINS,
-         *smartkinds.MAIL_PLATFORMS, *category_hosts(), *extra})
+    shared = {h for h, mode in smartkinds.MAIL_PLATFORMS.items()
+              if mode == smartkinds.SHARED}
+    return frozenset({*RFC2606_HOSTS, *smartkinds.FREEMAIL_DOMAINS, *shared,
+                      *category_hosts(), *extra})
 
 
 def host_allowed(host: str, allowed: frozenset[str]) -> bool:
@@ -146,6 +153,13 @@ def host_allowed(host: str, allowed: frozenset[str]) -> bool:
     # nothing below it is allowed.
     if host in smartkinds.MULTI_SUFFIXES or smartkinds.is_freemail(host):
         return True
+    platform = smartkinds.platform_of(host)
+    if platform and platform[1] == smartkinds.TENANT:
+        # `support.<helpdesk host>` is the platform's own; `<name>.<helpdesk
+        # host>` names a company unless the name is an invented one.
+        tenant = host[:-len(platform[0]) - 1].split(".")[-1]
+        return (smartkinds.company_id(host) is None
+                or tenant in PLACEHOLDER_TENANTS)
     return any(host == a or host.endswith("." + a) for a in allowed)
 
 
@@ -182,13 +196,15 @@ def scan_segment(text: str, first_line: int, bare: bool,
 
 
 def python_segments(text: str) -> Iterator[tuple[str, int]]:
-    """Every string constant (docstrings included) and every comment of a
-    Python source. An f-string is read as one string with each `{...}` as a
+    """Every string / bytes constant (docstrings included) and every comment
+    of a Python source. An f-string is read as one string with each `{...}` as a
     neutral `x`, so a name assembled from parts is judged as a whole instead
     of by its first fragment."""
     nested: set[int] = set()
     for node in ast.walk(ast.parse(text)):
-        if isinstance(node, ast.JoinedStr):
+        if isinstance(node, ast.Constant) and isinstance(node.value, bytes):
+            yield node.value.decode("utf-8", "replace"), node.lineno
+        elif isinstance(node, ast.JoinedStr):
             yield "".join(
                 v.value if isinstance(v, ast.Constant) else "x"
                 for v in node.values), node.lineno
@@ -256,24 +272,25 @@ def scan_files(root: Path, paths: list[str],
     return out
 
 
-SKIP_DIRS = frozenset({".git", "node_modules", "dist", "__pycache__",
-                       ".pytest_cache", ".venv", "venv", ".mypy_cache"})
+SKIP_DIRS = frozenset({".git", "node_modules", "dist", "build", "coverage",
+                       "__pycache__", ".pytest_cache", ".venv", "venv",
+                       ".mypy_cache"})
 
 
 def tracked_files(root: Path) -> list[str]:
     """The tracked files plus new ones not yet added (so a local run sees
-    what CI will); without git (a bare container) every file below `root`
-    except the usual build / cache directories."""
+    what CI will); without git (a bare container) every file below `root`.
+    Build / cache / environment directories are never scanned."""
     try:
         raw = subprocess.run(
             ["git", "-C", str(root), "ls-files", "-z", "--cached", "--others",
              "--exclude-standard"], capture_output=True, check=True,
             timeout=60)
-        return sorted(p for p in raw.stdout.decode().split("\0") if p)
+        found = [p for p in raw.stdout.decode().split("\0") if p]
     except (OSError, subprocess.SubprocessError):
-        return sorted(
-            p.relative_to(root).as_posix() for p in root.rglob("*")
-            if p.is_file() and not SKIP_DIRS & set(p.relative_to(root).parts))
+        found = [p.relative_to(root).as_posix() for p in root.rglob("*")
+                 if p.is_file()]
+    return sorted(p for p in found if not SKIP_DIRS & set(p.split("/")[:-1]))
 
 
 # ---------------------------------------------------------- the real tree
@@ -283,7 +300,9 @@ def test_the_repository_names_no_real_domain_or_address():
     found = scan_files(ROOT, tracked_files(ROOT), allowed)
     assert not found, (
         "real-looking addresses / hosts in tracked files - use invented "
-        "`.example` data (CONTRIBUTING.md 'Privacy'):\n  "
+        "`.example` data (CONTRIBUTING.md 'Privacy'); a public host the "
+        "project itself points at goes, with a reason, into "
+        "tests/allowed_domains.txt:\n  "
         + "\n  ".join(map(str, found)))
 
 
@@ -326,6 +345,8 @@ def scan_one(tmp_path, rel: str, content: str) -> list[Finding]:
     ("frontend/src/a.test.tsx", f'const m = {{ from: "x@{PLANT}" }};\n'),
     ("frontend/src/a.test.tsx", f"const u = `https://{PLANT}/x`;\n"),
     ("frontend/src/a.test.tsx", f'const s = "{PLANT}";\n'),
+    ("tests/t.py", f'FROM = b"From: jane@{PLANT}"\n'),
+    ("tests/t.py", f'H = "support.{dom("realco", "zendesk", "com")}"\n'),
     ("frontend/src/locales/en.ts", f'  "k": "ask jane@{PLANT}",\n'),
     ("frontend/src/locales/en.ts", f'  "k": "see https://{PLANT}/p",\n'),
     ("scripts/demo.py", f'N = "bob@{dom("planted", "io")}"\n'),
@@ -347,6 +368,8 @@ def test_a_real_registrable_domain_is_not_an_example(tmp_path):
     ("tests/t.py", 'A = "jane@shop.example"\nB = "https://news.example/x"\n'),
     ("tests/t.py", 'A = "x@gmail.com"; B = "web.de"; C = "me@proton.me"\n'),
     ("tests/t.py", f'A = "{dom("mail", "example", "com")}"; B = "localhost:8765"\n'),
+    ("tests/t.py", 'A = "acme.zendesk.com"; B = "mail.zendesk.com"\n'
+                   'C = "shop.myshopify.com"; D = "help.globex.zendesk.com"\n'),
     ("tests/t.py", 'A = "http://127.0.0.1:8765/x"; B = "http://localhost/"\n'),
     ("tests/t.py", 'A = "https://stripe.com/x"; B = "noreply@members.ebay.de"\n'),
     ("tests/t.py", 'A = "icon@2x.png"; B = "@pytest.mark.slow"\n'),
@@ -399,7 +422,10 @@ def test_allowlist_parser_rejects_an_entry_without_a_reason():
 def test_imported_lists_are_allowed_without_being_copied():
     allowed = allowed_hosts({})
     assert smartkinds.FREEMAIL_DOMAINS <= allowed
-    assert set(smartkinds.MAIL_PLATFORMS) <= allowed
+    for host, mode in smartkinds.MAIL_PLATFORMS.items():
+        assert host_allowed(host, allowed)              # every platform's own host
+        if mode == smartkinds.SHARED:
+            assert host in allowed
     assert category_hosts() and category_hosts() <= allowed
     assert host_allowed("outlook.de", allowed)          # brand under any TLD
     assert host_allowed(dom("www", "example", "net"), allowed)

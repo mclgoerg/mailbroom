@@ -119,7 +119,8 @@ fixtures, the demo, docs, commit messages, branch names, PR titles,
 descriptions and comments use **invented `.example` data and generic words
 only** - no real company, sender address, domain or subject line, and no
 labels or AI answers taken from a mailbox. Rules never name companies
-(company knowledge is per-user data on an instance, not code). Aggregate
+(company knowledge is per-user data on an instance, not code; the built-in
+keyword categories predate this rule and stay as they are). Aggregate
 numbers are fine; per-sender data is not. This includes *selection*: don't
 keep or drop a company, domain or address in anything public because of
 which senders it matched in a private mailbox.
@@ -135,7 +136,8 @@ which senders it matched in a private mailbox.
   need a multi-part suffix such as `co.uk` build the name from invented
   labels and the suffix list instead of writing a real domain.
 - **What the guard cannot see:** a company named without its domain,
-  subject lines, labels, anything in a PR description. For that, scan before
+  subject lines, labels, whose address a freemail one is (`jane@gmail.com`
+  passes - use `.example`), anything in a PR description. For that, scan before
   every push with your own list of private tokens (kept outside the
   repository, one token per line or JSON):
 
