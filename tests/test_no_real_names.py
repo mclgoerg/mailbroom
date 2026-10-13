@@ -184,8 +184,8 @@ def scan_segment(text: str, first_line: int, bare: bool,
 def python_segments(text: str) -> Iterator[tuple[str, int]]:
     """Every string constant (docstrings included) and every comment of a
     Python source. An f-string is read as one string with each `{...}` as a
-    neutral `x`, so `f"a@shop.acme.{suffix}"` is not mistaken for a host
-    ending in a dot."""
+    neutral `x`, so a name assembled from parts is judged as a whole instead
+    of by its first fragment."""
     nested: set[int] = set()
     for node in ast.walk(ast.parse(text)):
         if isinstance(node, ast.JoinedStr):
@@ -299,6 +299,7 @@ def dom(*labels: str) -> str:
 
 
 PLANT = dom("acme-planted", "com")
+NO = "no"                                  # a TLD that is also a common word
 
 
 def scan_one(tmp_path, rel: str, content: str) -> list[Finding]:
@@ -348,8 +349,8 @@ def test_a_real_registrable_domain_is_not_an_example(tmp_path):
     ("tests/t.py", 'A = "icon@2x.png"; B = "@pytest.mark.slow"\n'),
     ("docs/a.md", "See `smart.reason.ai`, `pmc.ai`, changelog.md and x.example\n"),
     ("frontend/src/a.test.tsx", 'const k = t("smart.reason.ai"); // pmc.ai\n'),
-    ("frontend/src/locales/en.ts", '  "smart.reason.ai": "Filed by AI",\n'
-                                   '  "a.b.no": "Only keys here",\n'),
+    ("frontend/src/locales/en.ts", f'  "smart.reason.ai": "Filed by AI",\n'
+                                   f'  "a.b.{NO}": "Only keys here",\n'),
     ("frontend/src/App.tsx", 'const a = ["jane@shop.example", "a.example"];\n'),
     ("CHANGELOG.md", f"* see https://{PLANT}/x and jane@{PLANT}\n"),
     ("frontend/package-lock.json", f'{{"resolved": "https://{PLANT}/x.tgz"}}\n'),
