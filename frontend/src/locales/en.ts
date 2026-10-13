@@ -1002,8 +1002,9 @@ export const EN: Record<string, string> = {
   "know.scope_title": "File only the ticked senders, or whole companies?",
   "know.scope_body":
     "Some of the ticked senders belong to a company group. Filing only the "
-    + "ticked ones takes them out of the group; filing the company moves "
-    + "everything of that company, senders that write later included.",
+    + "ticked ones takes them out of the group; filing the company files "
+    + "everything of that company, senders that write later included. No "
+    + "mail is moved either way.",
   "know.scope_sender": "Just the ticked senders",
   "know.scope_company": "The whole company ({n} senders)",
   "know.scope_company_one": "The whole company (1 sender)",

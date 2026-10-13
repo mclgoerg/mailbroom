@@ -1174,8 +1174,8 @@ export const DE: Record<string, string> = {
   "know.scope_body":
     "Einige der markierten Absender gehören zu einer Firmengruppe. Ordnest du "
     + "nur die markierten ein, verlassen sie die Gruppe; ordnest du die Firma "
-    + "ein, wird alles von dieser Firma verschoben, auch Absender, die später "
-    + "schreiben.",
+    + "ein, wird alles von dieser Firma eingeordnet, auch Absender, die später "
+    + "schreiben. Es wird in beiden Fällen keine Mail verschoben.",
   "know.scope_sender": "Nur die markierten Absender",
   "know.scope_company": "Die ganze Firma ({n} Absender)",
   "know.scope_company_one": "Die ganze Firma (1 Absender)",

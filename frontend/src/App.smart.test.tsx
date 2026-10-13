@@ -1049,10 +1049,16 @@ test("one sender opens with the box 'How Mailbroom files this sender'; "
   fireEvent.change(sel, { target: { value: "support" } });
   await waitFor(() => expect(knowledgePut).toHaveBeenCalledWith({ entries: [
     { key: "a:hello@zine.example", kind: "support" }] }));
+  const before = { kind: "newsletter", src: "user", ts: 1, note: "" };
+  knowledgePut.mockResolvedValueOnce(saved({ "a:hello@zine.example": before }));
   fireEvent.click(screen.getByRole("button", { name: "Reset to automatic" }));
   await waitFor(() => expect(knowledgePut).toHaveBeenCalledWith(
     { remove: ["a:hello@zine.example"] }));
   expect(await screen.findByText("Back to automatic.")).toBeTruthy();
+  // Undo (the newest toast's) puts the entry back exactly as it was
+  fireEvent.click(screen.getAllByRole("button", { name: "Undo" }).at(-1)!);
+  await waitFor(() => expect(knowledgePut).toHaveBeenLastCalledWith({
+    entries: [{ key: "a:hello@zine.example", ...before }], remove: undefined }));
 });
 
 test("the box is German in the German UI", async () => {

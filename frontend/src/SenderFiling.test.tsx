@@ -154,6 +154,42 @@ describe("the box", () => {
     expect(select().value).toBe("auto");
   });
 
+  it("while the entries cannot be loaded, the sender's own reason still "
+    + "fills the select and offers Reset", async () => {
+    knowledge.mockRejectedValue(new Error("offline"));
+    mount(sender({ smart_key: "k:support", smart_why: { r: "rule",
+      k: "support", by: "a", entry: "a:a@solo.example" } }));
+    await waitFor(() => expect(knowledge).toHaveBeenCalled());
+    expect(select().value).toBe("support");
+    fireEvent.click(screen.getByRole("button", { name: "Reset to automatic" }));
+    await waitFor(() => expect(onReset).toHaveBeenCalledWith(["a:a@solo.example"]));
+  });
+
+  it("when the company's rule decides, Reset removes THAT rule even though "
+    + "the sender has an own entry that does not apply", async () => {
+    list([entry({ key: "co:solo.example", kind: "support" }),
+      entry({ src: "ai", status: "no_effect", reason: "shadowed" })]);
+    mount(sender({ smart_key: "k:support", smart_why: { r: "rule",
+      k: "support", by: "co", co: "solo.example", entry: "co:solo.example" } }));
+    await screen.findByText("Filed by you");
+    fireEvent.click(screen.getByRole("button",
+      { name: "Reset its company to automatic" }));
+    await waitFor(() => expect(onReset).toHaveBeenCalledWith(["co:solo.example"]));
+  });
+
+  it("takes one change at a time: a second pick while the first is out is ignored",
+    async () => {
+      let done: (ok: boolean) => void = () => {};
+      onFile.mockImplementation(() => new Promise<boolean>((r) => { done = r; }));
+      mount(sender());
+      fireEvent.change(select(), { target: { value: "support" } });
+      await waitFor(() => expect(select().disabled).toBe(true));
+      fireEvent.change(select(), { target: { value: "jobs" } });
+      expect(onFile).toHaveBeenCalledTimes(1);
+      done(true);
+      await waitFor(() => expect(select().disabled).toBe(false));
+    });
+
   it("reloads the entries when the mailbox state changes", async () => {
     const { rerender } = mount(sender());
     await waitFor(() => expect(knowledge).toHaveBeenCalledTimes(1));
