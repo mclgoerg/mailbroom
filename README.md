@@ -12,7 +12,7 @@ Mailbroom sweeps any IMAP mailbox - built with love for
 [Proton Mail Bridge](https://proton.me/mail/bridge).
 
 Declutter a mailbox: scan everything over IMAP, group mails **by
-sender, domain, subject, or conversation thread** with counts, sizes, and unread ratios, drill
+sender, smart pools, subject, or conversation thread** with counts, sizes, and unread ratios, drill
 into any group down to the full mail text (or browse everything in a flat,
 date-sorted "All mails" list, or read a whole conversation as one thread -
 including your own replies from Sent), and move whole groups or single
@@ -81,8 +81,15 @@ presets.
 
 ## Features
 
-- **Grouping tabs** - switch between Sender, Domain (catches `noreply@`,
-  `news@`, … of the same company), Subject (normalized: merges
+- **Grouping tabs** - switch between Sender, Smart (every big sender keeps
+  its own row; the long tail of small senders is pooled by company - all
+  `noreply@`, `news@`, … of one domain - and by what their mails are
+  about: orders & deliveries, appointments & bookings, job applications,
+  support & inquiries, accounts & security, newsletters, people you write
+  to, …, so hundreds of rows become ~50. A company row says what its mails
+  are about; open a pooled row to see its senders and act on just some of
+  them. The per-account threshold is "Own row from N mails", default 10),
+  Subject (normalized: merges
   `Order 123` / `Order 456`, strips Re:/Fwd:), Thread (whole
   conversations) and a flat "All mails" list. The All mails view is
   remembered; the grouping starts at Sender.
@@ -104,6 +111,14 @@ presets.
   Providers: Anthropic API, OpenAI, Claude on Microsoft Foundry, or any
   OpenAI-compatible local endpoint (Ollama, LM Studio, vLLM). Token usage
   and cost are tracked with a built-in price table.
+- **AI sorting of Smart's "Other" row (optional)** - a button on that row
+  asks your AI to pick one of the fixed kinds (orders, appointments,
+  applications, support, accounts, newsletters, individuals, other) for the
+  senders the rules could not place. It shows the scope and cost first,
+  sends only the sender's name and address, mail count and up to three
+  recent subject lines (plus your own instructions from Settings, which you
+  can edit), places senders without moving or deleting any mail, caches each
+  answer until that sender's mails change, and can be removed again.
 - **Attachment explorer** - an on-demand BODYSTRUCTURE pass (structure
   only, no content downloaded) lists mails by attachment size with file
   names, adds a 📎 aggregate to groups, and enables the `att:>10m` filter.

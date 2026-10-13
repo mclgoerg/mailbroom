@@ -23,6 +23,7 @@ import threading
 import time
 from email.utils import getaddresses, parseaddr
 from pathlib import Path
+from typing import NamedTuple
 
 import imaplib
 imaplib._MAXLINE = 10_000_000  # bulk FETCH responses exceed the default 1MB
@@ -33,6 +34,8 @@ from . import bodyindex
 from . import config as cfgmod
 from . import knownsenders
 from . import pinstore
+from . import aisortstore
+from . import smartkinds
 from . import stats as statsmod
 from . import tenants
 from . import unsubstore
@@ -43,6 +46,12 @@ MOVE_CHUNK = 500
 MAX_SAMPLES = 3
 BODY_CHAR_LIMIT = 50_000
 GROUPINGS = accounts.GROUPINGS
+SMART_MIN_DEFAULT = cfgmod.SMART_MIN_DEFAULT   # per-account, 10
+clamp_smart_min = cfgmod.clamp_smart_min
+# Bump when build_smart's placement rules change: snapshots (and the sig
+# below) built with another version are re-derived on restore.
+SMART_RULES_VERSION = 4
+SMART_MEMBERS_CAP = 300            # member addresses shipped per bucket row
 
 # Order matters: the first matching category becomes the primary tag.
 CATEGORY_RULES: list[tuple[str, list[str]]] = [
@@ -66,9 +75,7 @@ CATEGORY_RULES: list[tuple[str, list[str]]] = [
                    "oracle", "proton.me", "protonmail", "google.com",
                    "microsoft", "apple.com"]),
 ]
-AUTOMATED_RE = re.compile(
-    r"^(no.?reply|do.?not.?reply|noreply|notification|notifications|"
-    r"mailer-daemon|auto[-.])", re.IGNORECASE)
+AUTOMATED_RE = smartkinds.AUTOMATED_RE
 
 log = logging.getLogger("pmc.mail")
 
@@ -198,6 +205,9 @@ def save_snapshot(acc) -> None:
             "trash_count": acc.state["trash_count"],
             "index": list(acc.index.values()),
             "groups": acc.state["groups"],
+            # what the smart groups were built with (restore compares)
+            "smart_sig": [acc.smart_sig[0], list(acc.smart_sig[1]),
+                          *acc.smart_sig[2:]] if acc.smart_sig else None,
         }
         blob = json.dumps(data)
     try:
@@ -236,6 +246,20 @@ def load_snapshot(acc) -> bool:
             acc.state["scanned_ts"] = data.get("ts")
             acc.state["status"] = "done"
             acc.state["groups_rev"] += 1
+            # Snapshots from before smart grouping have no `smart` groups
+            # (and the state's own empty ones must not leak through).
+            acc.state["groups"].setdefault("smart", {})
+            sig = data.get("smart_sig")
+            acc.smart_sig = ((sig[0], tuple(sig[1]), *sig[2:])
+                             if isinstance(sig, list) and len(sig) == 5
+                             and isinstance(sig[1], list) else None)
+        # No-op when the snapshot's smart groups were built with today's
+        # threshold + protected list; otherwise they are derived again - as
+        # they are when the sender records predate `smart_key` (the UI
+        # derives a row's membership from it).
+        stamped = all("smart_key" in r and "smart_why" in r
+                      for r in data["groups"].get("sender", {}).values())
+        rebuild_smart(acc, force="smart" not in data["groups"] or not stamped)
         log.info("[%s] scan snapshot restored: %d mails, %d senders "
                  "(scanned %s), %d cached verdicts", acc.name,
                  len(data["index"]), len(data["groups"].get("sender", {})),
@@ -964,7 +988,14 @@ def assign_threads(messages: list) -> list[tuple[str, str]]:
 
 def build_groups(messages: list, replied_to: set[str] | None = None,
                  categories: list[tuple[str, list[str]]] | None = None,
-                 ) -> dict:
+                 smart_min: int = SMART_MIN_DEFAULT,
+                 protected: list[str] | None = None,
+                 user_categories=None,
+                 ai_kinds: dict[str, dict] | None = None) -> dict:
+    """Every grouping from the scanned mails. `categories` decide the tags
+    (all of them); `user_categories` - the NAMES of the categories the user
+    defined or edited (SmartParams.user) - decide which tags may place a
+    Smart row. Omitting it means: no category row, whatever the tags."""
     replied_to = replied_to or set()
     now = time.time()
     groups: dict = {g: {} for g in GROUPINGS}
@@ -1026,7 +1057,345 @@ def build_groups(messages: list, replied_to: set[str] | None = None,
             else:
                 rec["sub"] = f"{nsenders} sender{'s' if nsenders != 1 else ''}"
             rec["engagement"] = group_engagement(rec, now)
+    groups["smart"] = build_smart(groups["sender"], messages, smart_min,
+                                  protected or [], user_categories, now,
+                                  ai_kinds)
     return groups
+
+
+# ------------------------------------------------------------ smart grouping
+#
+# "Smart" keeps every big sender as its own row and pools the long tail of
+# small senders into a few rows (a company per registrable domain, then
+# kind buckets), so a mailbox with hundreds of sender rows becomes ~50-60.
+# Each sender - with ALL its mails - lands in exactly one row (counts add
+# up, deleting one row never touches another). Derived from the sender
+# records, no extra IMAP data. See DECISIONS.md 2026-10-09.
+
+# Domain and purpose helpers live in smartkinds (pure, shared with the
+# evaluation harness); re-exported here for the callers and tests that use them.
+registrable_domain = smartkinds.registrable_domain
+is_freemail = smartkinds.is_freemail
+ACCOUNT_SUBJECT_RE = smartkinds.ACCOUNT_SUBJECT_RE
+
+# Bucket kinds -> English fallback label. The UI translates by `kind`; the
+# fallback only reaches server-side text (undo history, audit log, AI).
+SMART_KIND_LABELS = {
+    "protected": "Protected senders",
+    "replied": "People you write to",
+    "orders": "Orders & deliveries",
+    "appointments": "Appointments & bookings",
+    "jobs": "Job applications",
+    "support": "Support & inquiries",
+    "accounts": "Accounts & security",
+    "newsletter": "Newsletters",
+    "individuals": "Individuals",
+    "other": "Other senders",
+}
+
+
+def _member_fp(addrs: list[str]) -> str:
+    """Fingerprint of a pooled row's member set: a verdict is only valid for
+    the members it was made on."""
+    return hashlib.sha256("\n".join(sorted(addrs)).encode()).hexdigest()[:16]
+
+
+def _smart_rec(key: str, label: str, kind: str, members: list[dict],
+               now: float) -> dict:
+    """One pooled row (company or bucket) aggregated from sender records."""
+    members = sorted(members, key=lambda r: (-r["count"], r["key"]))
+    addrs = [r["key"] for r in members]
+    rec = {
+        "key": key, "label": label, "sub": "", "kind": kind,
+        "count": sum(r["count"] for r in members),
+        "size": sum(r["size"] for r in members),
+        "unread": sum(r["unread"] for r in members),
+        "first": min((r["first"] for r in members if r["first"]), default=""),
+        "last": max((r["last"] for r in members if r["last"]), default=""),
+        "tags": list(dict.fromkeys(t for r in members for t in r["tags"])),
+        "samples": addrs[:MAX_SAMPLES],
+        "bulk": any(r["bulk"] for r in members),
+        "unsub": any(r["unsub"] for r in members),
+        "replied": any(r.get("replied") for r in members),
+        "att_size": sum(r.get("att_size", 0) for r in members),
+        "folders": {}, "ai": None,
+        "n_senders": len(members), "members": addrs[:SMART_MEMBERS_CAP],
+        "fp": _member_fp(addrs),
+    }
+    for r in members:
+        for folder, uids in r["folders"].items():
+            rec["folders"].setdefault(folder, []).extend(uids)
+    rec["engagement"] = group_engagement(rec, now)
+    return rec
+
+
+def build_smart(sender_recs: dict, mails, smart_min: int = SMART_MIN_DEFAULT,
+                protected: list[str] | None = None,
+                user_categories=None, now: float | None = None,
+                ai_kinds: dict[str, dict] | None = None) -> dict:
+    """The "smart" grouping: {key: record}. `sender_recs` are the records
+    of the sender grouping, `mails` the index's mail dicts (only addr and
+    subject are read), `user_categories` the names of the categories the
+    user defined or edited (untouched built-in ones play no part).
+    Placement is per SENDER, or per small company as ONE unit, first match
+    wins (DECISIONS 2026-10-09 / 2026-10-12):
+
+      1 protected                 own row `s:<addr>` when >= smart_min
+                                  mails, else `k:protected` (a protected
+                                  sender is never pooled with others)
+      2 replied to                never pooled by company: own row when
+                                  >= smart_min mails, else `k:replied`
+      3 company                   `o:<company>` when 2+ of the remaining
+                                  senders share a company identity
+                                  (smartkinds.company_id: registrable
+                                  domain, tenant host on tenant platforms,
+                                  none for freemail / shared platforms) and
+                                  together have >= smart_min mails - ALL of
+                                  them, big ones included
+      4 >= smart_min mails        own row `s:<addr>`
+      5 everything else           classified as a UNIT - a lone sender, or
+                                  the small senders of one company together
+                                  (never split): smartkinds.classify_unit ->
+                                  `k:cat:<name>` (explicit user category) /
+                                  `k:orders|appointments|jobs|support|
+                                  accounts` (what the mails are about) /
+                                  `k:newsletter` / `k:individuals` /
+                                  `k:other`
+
+    Side effect: each sender record is stamped with `smart_key` (the row its
+    mails landed in) and `smart_why` (a structured reason the UI words).
+    `public_state` strips the UID lists and a row's `members` is capped, so
+    the UI derives a row's FULL membership from these stamps.
+
+    `ai_kinds` ({unit key: {"kind", "fp"}}, aisortstore): what the optional AI
+    sorting decided for units the rules left in Other for lack of a confident
+    answer; an entry applies only while its fingerprint (the sample subjects
+    the AI saw) still matches.
+    """
+    smart_min = clamp_smart_min(smart_min)
+    protected = protected or []
+    user = frozenset(user_categories or ())
+    now = now if now is not None else time.time()
+    out: dict[str, dict] = {}
+    # sender -> (row key, kind, name, why)
+    placed: dict[str, tuple[str, str, str, dict]] = {}
+
+    def own_row(addr: str, rec: dict) -> None:
+        out[f"s:{addr}"] = {
+            **{k: v for k, v in rec.items()
+               if k not in ("smart_key", "smart_why")},
+            "key": f"s:{addr}", "kind": "sender", "addr": addr,
+            "n_senders": 1, "members": [], "ai": None,
+            "tags": list(rec["tags"]), "samples": list(rec["samples"]),
+            "folders": {f: list(u) for f, u in rec["folders"].items()}}
+        placed[addr] = (f"s:{addr}", "sender", "", {"r": "own"})
+
+    # 1-2: protected / replied senders are never pooled by company.
+    free: list[dict] = []                          # candidates for a company
+    for addr in sorted(sender_recs):
+        rec = sender_recs[addr]
+        big = rec["count"] >= smart_min
+        if cfgmod.is_protected(addr, protected):
+            if big:
+                own_row(addr, rec)
+            else:
+                placed[addr] = ("k:protected", "protected", "",
+                                {"r": "protected"})
+        elif rec.get("replied"):
+            if big:
+                own_row(addr, rec)
+            else:
+                placed[addr] = ("k:replied", "replied", "", {"r": "replied"})
+        else:
+            free.append(rec)
+
+    # 3: company pools, ahead of the size rule: a shop with several senders is one row even
+    # when one of its senders is big. A company below the threshold is not
+    # a row but one unit for step 5.
+    by_company: dict[str, list[dict]] = {}
+    for rec in free:
+        domain = rec["key"].rsplit("@", 1)[-1] if "@" in rec["key"] else ""
+        cid = smartkinds.company_id(domain)
+        if cid:
+            by_company.setdefault(cid, []).append(rec)
+    taken: set[str] = set()
+    units: list[tuple[str, list[dict]]] = []       # (company id or "", senders)
+    for cid in sorted(by_company):
+        recs = by_company[cid]
+        if len(recs) < 2:
+            continue
+        taken.update(r["key"] for r in recs)
+        if sum(r["count"] for r in recs) >= smart_min:
+            for r in recs:
+                placed[r["key"]] = (f"o:{cid}", "company", cid,
+                                    {"r": "company", "co": cid})
+        else:
+            units.append((cid, recs))
+    for rec in free:
+        if rec["key"] in taken:
+            continue
+        if rec["count"] >= smart_min:
+            own_row(rec["key"], rec)               # 4
+        else:
+            units.append(("", [rec]))
+
+    # 5: needs the subjects of the units' senders only.
+    wanted = {r["key"] for _, recs in units for r in recs}
+    dated: dict[str, list[tuple[int, str]]] = {}
+    for m in mails:
+        if m["addr"] in wanted:
+            dated.setdefault(m["addr"], []).append(
+                (m.get("ts") or 0, m["subject"] or ""))
+    for cid, recs in units:
+        members = [smartkinds.Member(
+            r["key"], tuple(s for _, s in dated.get(r["key"], ())),
+            bool(r["unsub"]), tuple(r["tags"]),
+            smartkinds.sample_subjects(dated.get(r["key"], ())))
+            for r in recs]
+        verdict = smartkinds.classify_unit(members, user)
+        if ai_kinds and verdict.kind == "other" \
+                and verdict.why.get("r") in smartkinds.AI_ELIGIBLE:
+            entry = ai_kinds.get(smartkinds.unit_key(cid, members))
+            kind = smartkinds.ai_kind_for(entry, members)
+            if kind:
+                verdict = smartkinds.Verdict(kind, "", {
+                    "r": "ai", "k": kind,
+                    **({"sure": True} if kind == "other" and entry.get("sure")
+                       else {})})
+        key = (f"k:cat:{verdict.name}" if verdict.kind == "category"
+               else f"k:{verdict.kind}")
+        why = {**verdict.why, **({"co": cid} if cid else {})}
+        for r in recs:
+            placed[r["key"]] = (key, verdict.kind, verdict.name, why)
+
+    pools: dict[str, list[str]] = {}
+    for addr, (key, kind, _, _) in placed.items():
+        if kind != "sender":
+            pools.setdefault(key, []).append(addr)
+    for key, addrs in pools.items():
+        _, kind, name, _ = placed[addrs[0]]
+        label = {"company": name, "category": name}.get(
+            kind) or SMART_KIND_LABELS[kind]
+        rec = _smart_rec(key, label, kind, [sender_recs[a] for a in addrs],
+                         now)
+        if kind == "company":
+            # Domain shortcuts (protect @domain, block, Sieve) need ONE
+            # exact domain: `is_protected` matches @domain exactly, so a
+            # pool of subdomains must not offer them.
+            exact = {a.rsplit("@", 1)[-1] for a in addrs}
+            rec["domain"] = exact.pop() if len(exact) == 1 else ""
+        if kind == "category":
+            rec["category"] = name
+        out[key] = rec
+    for addr, (key, _, _, why) in placed.items():
+        sender_recs[addr]["smart_key"] = key
+        sender_recs[addr]["smart_why"] = why
+    return out
+
+
+class SmartParams(NamedTuple):
+    smart_min: int
+    protected: list[str]
+    categories: list[tuple[str, list[str]]]   # effective: tags of every kind
+    user: frozenset                           # categories the user defined/edited
+    digest: str                               # of the user's category config
+    ai_kinds: dict                            # AI-sorted units (aisortstore)
+    ai_digest: str
+
+
+def smart_params(acc, cfg: dict | None = None) -> SmartParams:
+    """Everything Smart placement reads from the current config."""
+    cfg = cfg or cfgmod.load_config()
+    block = cfg["accounts"].get(acc.name) or {}
+    custom = {str(k): [str(p) for p in v if p]
+              for k, v in (cfg.get("categories") or {}).items()
+              if isinstance(v, list)}
+    ai_kinds = aisortstore.load_account(acc.name)
+    return SmartParams(
+        clamp_smart_min(block.get("smart_min", SMART_MIN_DEFAULT)),
+        cfgmod.normalize_protected(cfg.get("protected")),
+        effective_categories(cfg.get("categories")),
+        frozenset(k for k, v in custom.items() if v),
+        hashlib.sha1(json.dumps(sorted(custom.items())).encode())
+        .hexdigest()[:12],
+        ai_kinds, aisortstore.digest(ai_kinds))
+
+
+def smart_sig(p: SmartParams) -> tuple:
+    """What the smart groups were built with (snapshots keep it)."""
+    return (p.smart_min, tuple(p.protected), SMART_RULES_VERSION, p.digest,
+            p.ai_digest)
+
+
+def retag_senders(acc, categories: list[tuple[str, list[str]]]) -> None:
+    """Re-derive every SENDER record's category tags from the index with the
+    current categories (lock held) - the same haystack build_groups uses -
+    so a category edit applies to the sender records, and so to Smart,
+    without a rescan. The domain / subject / thread records keep the tags of
+    the last scan until the next one."""
+    hay: dict[str, str] = {}
+    for m in acc.index.values():
+        a = m["addr"]
+        if len(hay.get(a, "")) < 600:
+            hay[a] = hay.get(a, "") + f" {a} {m['name']} {m['subject']}"
+    for addr, rec in acc.state["groups"]["sender"].items():
+        rec["tags"] = categorize(hay.get(addr, ""), addr.split("@", 1)[0],
+                                 rec["bulk"], categories)
+
+
+def rebuild_smart(acc, cfg: dict | None = None, force: bool = False) -> bool:
+    """Re-derive one account's smart groups from its current sender groups
+    (threshold, protected list or categories changed, or an old snapshot had
+    none). A category edit first re-tags the sender records. Skipped when
+    nothing relevant changed since the last build, so an unrelated settings
+    save never reshuffles rows the user is working on. Deletes do NOT call
+    this: _apply_removal patches every grouping."""
+    params = smart_params(acc, cfg)
+    sig = smart_sig(params)
+    with acc.lock:
+        if acc.state["status"] != "done":
+            return False
+        if not force and acc.smart_sig == sig \
+                and acc.state["groups"].get("smart"):
+            return False
+        if acc.smart_sig is None or acc.smart_sig[3] != params.digest:
+            retag_senders(acc, params.categories)
+        smart = build_smart(acc.state["groups"]["sender"], acc.index.values(),
+                            params.smart_min, params.protected, params.user,
+                            ai_kinds=params.ai_kinds)
+        verdictstore.apply_to_groups({"smart": smart}, acc.name)
+        acc.state["groups"]["smart"] = smart
+        acc.smart_sig = sig
+        acc.state["groups_rev"] += 1
+    return True
+
+
+def rebuild_smart_all(cfg: dict | None = None) -> None:
+    """rebuild_smart for every account of the current tenant that has a
+    finished scan in memory."""
+    cfg = cfg or cfgmod.load_config()
+    for name in cfg["accounts"]:
+        rebuild_smart(accounts.get(name), cfg)
+
+
+def purpose_summary(rec: dict, acc) -> dict[str, int]:
+    """Mails of a group per purpose / newsletter / unclassified, counted from
+    the CURRENT mails (lock held): the content summary of a company row. It
+    moves with deletes, unlike the row's placement."""
+    counts: dict[str, int] = {}
+    for folder, uids in rec["folders"].items():
+        for uid in uids:
+            m = acc.index.get(ikey(folder, uid))
+            if m:
+                k = smartkinds.message_kind(
+                    m["subject"] or "",
+                    smartkinds.sender_hint(m["addr"], bool(m.get("unsub"))))
+                counts[k] = counts.get(k, 0) + 1
+    rest = counts.pop("unclassified", 0)
+    out = dict(sorted(counts.items(), key=lambda kv: (-kv[1], kv[0])))
+    if rest:
+        out["unclassified"] = rest
+    return out
 
 
 def _rating_counts(rec: dict, mail_verdicts: dict, acc) -> dict | None:
@@ -1166,7 +1535,11 @@ def public_state(acc=None) -> dict:
                     # scan-time one (and absent in old snapshots).
                     "engagement": group_engagement(rec, now),
                     "pinned": sum(len(u) for u in
-                                  pinned_uids(rec, acc, pinned).values())}
+                                  pinned_uids(rec, acc, pinned).values()),
+                    # a company row's content summary (live: it follows
+                    # deletes, unlike the row's placement)
+                    **({"purposes": purpose_summary(rec, acc)}
+                       if rec.get("kind") == "company" else {})}
                 for k, rec in recs.items()}
             for g, recs in acc.state["groups"].items()}
         return out
@@ -1221,14 +1594,19 @@ def run_scan(acc=None) -> None:
                 replied |= new_replied
                 save_replied(acc)
             knownsenders.update_scan(acc.name, {m["addr"] for m in messages})
-            groups = build_groups(messages, replied,
-                                  effective_categories(cfg.get("categories")))
+            # Re-read: the threshold/protected list may have changed during
+            # a long scan.
+            sp = smart_params(acc)
+            groups = build_groups(messages, replied, sp.categories,
+                                  sp.smart_min, sp.protected, sp.user,
+                                  sp.ai_kinds)
             cached = verdictstore.apply_to_groups(groups, acc.name)
             with acc.lock:
                 acc.index.clear()
                 for m in messages:
                     acc.index[ikey(m["folder"], m["uid"])] = m
                 acc.state["groups"] = groups
+                acc.smart_sig = smart_sig(sp)
                 acc.state["status"] = "done"
                 acc.state["progress"] = ""
                 acc.state["trash_count"] = trash_count
@@ -1322,6 +1700,38 @@ def start_scan(acc=None, notice: dict | None = None) -> None:
 
 # ------------------------------------------------------------------ deletes
 
+def _refresh_smart_members(acc) -> None:
+    """After mails left (lock held): a pooled smart row's senders, their
+    count and its member fingerprint follow the senders that still have
+    mail, while the PLACEMENT stays put (rows never reshuffle during a
+    cleanup). A row whose member set changed loses its AI verdict - it was
+    made on other members (the cached one is dropped with it)."""
+    smart = acc.state["groups"].get("smart")
+    if not smart:
+        return
+    live: dict[str, list[dict]] = {}
+    for rec in acc.state["groups"]["sender"].values():
+        if rec.get("smart_key"):
+            live.setdefault(rec["smart_key"], []).append(rec)
+    stale: list[str] = []
+    for key, row in smart.items():
+        if row.get("kind") == "sender":
+            continue
+        recs = sorted(live.get(key, []), key=lambda r: (-r["count"], r["key"]))
+        addrs = [r["key"] for r in recs]
+        row["n_senders"] = len(addrs)
+        row["members"] = addrs[:SMART_MEMBERS_CAP]
+        row["samples"] = addrs[:MAX_SAMPLES]
+        fp = _member_fp(addrs)
+        if fp != row.get("fp"):
+            row["fp"] = fp
+            if row.get("ai") is not None:
+                row["ai"] = None
+                stale.append(key)
+    if stale:
+        verdictstore.drop_verdicts({"smart": stale}, acc.name)
+
+
 def _apply_removal(moved_uids: dict[str, set[int]], acc) -> dict:
     """Drop moved messages from every grouping and the index (lock held).
     Returns the removed messages' metadata (for the undo log)."""
@@ -1361,6 +1771,7 @@ def _apply_removal(moved_uids: dict[str, set[int]], acc) -> dict:
             rec["att_size"] = max(0, rec.get("att_size", 0) - removed_att)
             if rec["count"] <= 0:
                 recs.pop(key)
+    _refresh_smart_members(acc)
     acc.state["groups_rev"] += 1
     return meta
 

@@ -3,7 +3,8 @@ import type {
   AdminTenantStats, AiGroupResult, AppState, AttMail, AuditResp, AuthProbe,
   Config, ConversationResp, DupSet, FilterPreset, FoldersResp, Grouping, IndexInfo,
   Mail, MessageDetail,
-  MailsResp, Rule, RuleRun, SearchResp, StatsResp, TrashResp, UnsubBulkResult, UnsubResult,
+  MailsResp, Rule, RuleRun, SearchResp, SortEstimate, StatsResp, TrashResp,
+  UnsubBulkResult, UnsubResult,
 } from "./types";
 
 /* Active account: every API call is scoped to exactly one account (strict
@@ -96,6 +97,11 @@ export const api = {
         older_than_days: olderThanDays }),
   protect: (entry: string, on: boolean) =>
     req<{ protected: string[] }>("/api/protect", { entry, on }),
+  aiSortEstimate: () => req<SortEstimate>("/api/ai_sort/estimate"),
+  aiSort: () => req<{ units: number; senders: number }>("/api/ai_sort", {}),
+  aiSortClear: () => req<{ cleared: number }>("/api/ai_sort/clear", {}),
+  protectMany: (entries: string[], on: boolean) =>
+    req<{ protected: string[] }>("/api/protect", { entries, on }),
   deleteMessages: (items: [string, number][], action = "trash", dest = "",
                    force = false) =>
     req<{ ok: boolean; queued: number }>("/api/delete_messages",

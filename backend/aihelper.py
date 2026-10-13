@@ -55,6 +55,13 @@ AI_PROTECTED_NOTE = """
 Groups marked "protected": true contain senders the user explicitly
 protects. NEVER rate a protected group delete_safe - use review or keep."""
 
+# Appended for the "smart" grouping: pooled rows hold many small senders.
+AI_SMART_NOTE = """
+Some groups pool many small senders (the label says which kind; the samples
+are some of their addresses). Rate such a group as a whole and stay careful:
+a pooled group is only delete_safe when it is clearly all marketing or
+automated mail."""
+
 AI_GROUP_PROTECTED_NOTE = """
 Mails marked "protected": true are from senders the user explicitly
 protects. NEVER rate a protected mail delete_safe - use review or keep."""
@@ -147,8 +154,15 @@ def _openai_client(cfg: dict):
     return openai.OpenAI(api_key=ai["api_key"])
 
 
-def _ai_call(cfg: dict, model: str, system: str, payload: dict, schema: dict):
-    """Run one structured-output call; returns (data, tokens_in, tokens_out)."""
+def _ai_call(cfg: dict, model: str, system: str, payload: dict, schema: dict,
+             effort: str | None = None):
+    """Run one structured-output call; returns (data, tokens_in, tokens_out).
+
+    `effort` ("low" ... "max", Claude only) caps how much the model reasons
+    before answering. Current Claude models think adaptively BY DEFAULT and
+    bill that as output tokens - for a small classification that is most of
+    the time and cost. Models that do not know the parameter (older ones)
+    answer 400; the call is then repeated without it."""
     user = json.dumps(payload, ensure_ascii=False)
 
     if cfg["ai"]["provider"] in ("openai", "ollama"):
@@ -174,19 +188,33 @@ def _ai_call(cfg: dict, model: str, system: str, payload: dict, schema: dict):
         return (data, getattr(usage, "prompt_tokens", 0) or 0,
                 getattr(usage, "completion_tokens", 0) or 0)
 
+    import anthropic
     client = ai_client(cfg)
-    response = client.messages.create(
-        model=model,
-        max_tokens=16000,
-        system=system,
-        messages=[{"role": "user", "content": user}],
-        output_config={"format": {"type": "json_schema", "schema": schema}},
-    )
+    fmt = {"format": {"type": "json_schema", "schema": schema}}
+    call = dict(model=model, max_tokens=16000, system=system,
+                messages=[{"role": "user", "content": user}])
+    try:
+        response = client.messages.create(
+            **call, output_config={**fmt, **({"effort": effort}
+                                             if effort else {})})
+    except anthropic.BadRequestError:
+        if not effort:
+            raise
+        log.info("%s does not take effort=%r - repeating without it",
+                 model, effort)
+        response = client.messages.create(**call, output_config=fmt)
+    thinking = sum(1 for b in response.content
+                   if b.type in ("thinking", "redacted_thinking"))
+    log.info("AI call: %d out tokens, %d thinking block(s), effort=%s",
+             response.usage.output_tokens, thinking, effort or "default")
     if response.stop_reason not in ("end_turn", "stop_sequence"):
         raise RuntimeError(f"unexpected stop_reason {response.stop_reason!r}")
     text = next(b.text for b in response.content if b.type == "text")
     return json.loads(text), response.usage.input_tokens, \
         response.usage.output_tokens
+
+
+ai_call = _ai_call                       # public name for other modules (aisort)
 
 
 def _run_ai(grouping: str, acc=None, keys: set[str] | None = None,
@@ -221,8 +249,12 @@ def _run_ai(grouping: str, acc=None, keys: set[str] | None = None,
                 for r in STATE["groups"][grouping].values()
                 if (r["ai"] is None or (rerate and keys is not None))
                 and (keys is None or r["key"] in keys)]
+            # Pooled rows (smart): the member set the batch was built from.
+            fps = {r["key"]: r["fp"]
+                   for r in STATE["groups"][grouping].values() if "fp" in r}
         system = AI_SYSTEM.format(grouping=grouping) + (
-            AI_PROTECTED_NOTE if prot_keys else "")
+            AI_PROTECTED_NOTE if prot_keys else "") + (
+            AI_SMART_NOTE if grouping == "smart" else "")
 
         if not batch_src:
             with STATE_LOCK:
@@ -263,7 +295,15 @@ def _run_ai(grouping: str, acc=None, keys: set[str] | None = None,
                     recs = STATE["groups"][grouping]
                     for v in data["verdicts"]:
                         rec = recs.get(v["key"]) or recs.get(v["key"].lower())
-                        if rec:
+                        if rec and rec["key"] in fps \
+                                and rec.get("fp") != fps[rec["key"]]:
+                            # The row was re-derived while the call was out
+                            # (protect / threshold / scan): this verdict was
+                            # made on other members - same rule as a cached
+                            # verdict (verdictstore.apply_to_groups).
+                            log.info("dropped verdict for %r: members "
+                                     "changed during the review", rec["key"])
+                        elif rec:
                             verdict = v["verdict"]
                             if verdict == "delete_safe" \
                                     and rec["key"] in prot_keys:
@@ -272,7 +312,10 @@ def _run_ai(grouping: str, acc=None, keys: set[str] | None = None,
                                 verdict = "review"
                             rec["ai"] = {"verdict": verdict,
                                          "reason": v["reason"][:160]}
-                            applied[rec["key"]] = rec["ai"]
+                            stored = dict(rec["ai"])
+                            if "fp" in rec:        # pooled row: see verdictstore
+                                stored["fp"] = rec["fp"]
+                            applied[rec["key"]] = stored
                     done += len(batch)
                     STATE["ai"]["progress"] = f"{done}/{len(batch_src)} groups"
                     STATE["groups_rev"] += 1

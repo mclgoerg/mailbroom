@@ -25,7 +25,7 @@ vi.mock("./api", () => ({
 const baseState: AppState = {
   account: "proton", status: "idle", scanned_ts: null, groups_rev: 0,
   progress: "", error: "", folders: [],
-  groups: { sender: {}, domain: {}, subject: {}, thread: {} },
+  groups: { sender: {}, smart: {}, domain: {}, subject: {}, thread: {} },
   ai: { status: "idle", grouping: "sender", progress: "", error: "",
     usage: null },
   delete: { status: "idle", progress: "", error: "", moved: 0 },

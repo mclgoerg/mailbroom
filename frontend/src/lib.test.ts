@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { applyStatus, fmtDate, ENGAGEMENT_HIGH_MIN, ENGAGEMENT_LOW_MAX,
   engagementTier, fmtAgo, fmtSize, fmtUsd, mailKey, matchGroup, olderThan,
-  parseFilter, parseProgress, retainedMailKeys, sieveSnippet } from "./lib";
+  parseFilter, parseProgress, retainedMailKeys, shortcutTarget,
+  sieveSnippet, smartMembers } from "./lib";
 import type { Group } from "./types";
 
 const g = (over: Partial<Group> = {}): Group => ({
@@ -368,5 +369,142 @@ describe("fmtDate", () => {
   });
   it("keeps years below 100 as they are", () => {
     expect(fmtDate("0050-03-04", now)).toContain("50");
+  });
+});
+
+describe("Smart rows", () => {
+  const own = g({ key: "s:a@x.example", kind: "sender", addr: "a@x.example",
+    label: "A", sub: "a@x.example", members: [] });
+  const pool = g({ key: "o:payco.example", kind: "company", domain: "payco.example",
+    label: "payco.example", sub: "3 senders", n_senders: 3 });
+  const bucket = g({ key: "k:other", kind: "other", domain: undefined,
+    label: "Other senders", sub: "2 senders" });
+  // Sender records, each saying which Smart row it landed in.
+  const sender = (addr: string, smart_key?: string): Group =>
+    g({ key: addr, label: addr, sub: "", smart_key });
+  const senders = Object.fromEntries([
+    sender("a@x.example", "s:a@x.example"),
+    sender("a@payco.example", "o:payco.example"),
+    sender("news@mail.payco.example", "o:payco.example"),
+    sender("zed@lone.example", "k:other"),
+    sender("amy@one.example", "k:other"),
+    sender("unstamped@old.example"),
+  ].map((r) => [r.key, r]));
+  const members = smartMembers(senders);
+  const f = (q: string) => parseFilter(q);
+  const match = (row: Group, q: string, m = members) =>
+    matchGroup(row, f(q), Date.now(), m);
+
+  it("smartMembers groups the sender records by the row they landed in", () => {
+    expect([...members.keys()].sort())
+      .toEqual(["k:other", "o:payco.example", "s:a@x.example"]);
+    expect(members.get("o:payco.example")!.map((r) => r.key))
+      .toEqual(["a@payco.example", "news@mail.payco.example"]);
+    expect(members.get("k:other")!.map((r) => r.key))
+      .toEqual(["zed@lone.example", "amy@one.example"]);
+    // records without a key (older state) and no records at all are fine
+    expect([...members.values()].flat().map((r) => r.key))
+      .not.toContain("unstamped@old.example");
+    expect(smartMembers(undefined).size).toBe(0);
+    expect(smartMembers({}).size).toBe(0);
+  });
+
+  it("free text also matches the members", () => {
+    expect(match(bucket, "lone")).toBe(true);
+    expect(match(bucket, "amy@one")).toBe(true);
+    expect(match(bucket, "nobody")).toBe(false);
+    expect(match(bucket, "payco")).toBe(false);   // another row's sender
+    expect(match(pool, "mail.payco")).toBe(true);
+    // rows without members behave as before
+    expect(matchGroup(g(), f("lone"))).toBe(false);
+    expect(match(g(), "lone")).toBe(false);
+  });
+
+  it("the row's own capped `members` list is never consulted", () => {
+    const capped = { ...bucket, members: ["only-in-the-capped-list@x.example"] };
+    expect(match(capped, "only-in-the-capped")).toBe(false);
+    expect(matchGroup(capped, f("only-in-the-capped"))).toBe(false);
+    expect(match(capped, "zed@lone")).toBe(true);
+  });
+
+  it("from: and domain: reach a row's senders", () => {
+    expect(match(own, "from:a@x.example")).toBe(true);
+    expect(match(own, "from:b@x.example")).toBe(false);
+    expect(match(bucket, "from:zed@lone.example")).toBe(true);
+    expect(match(bucket, "from:a@payco.example")).toBe(false);
+    expect(match(pool, "domain:payco.example")).toBe(true);
+    expect(match(pool, "domain:mail.payco.example")).toBe(true);
+    expect(match(bucket, "domain:one.example")).toBe(true);
+    expect(match(bucket, "domain:other.example")).toBe(false);
+    // plain Sender / Domain rows keep matching on their key
+    expect(match(g(), "from:noreply@dhl.example")).toBe(true);
+    expect(match(g({ key: "dhl.example" }), "domain:dhl.example")).toBe(true);
+  });
+
+  describe("with far more senders than the capped list holds", () => {
+    const CAP = 300;                       // mailops.SMART_MEMBERS_CAP
+    const N = 1200;
+    const addr = (i: number) => `s${i}@rnd${i}.example`;
+    const many = Array.from({ length: N }, (_, i) =>
+      sender(addr(i), "k:other"));
+    const big = g({ key: "k:other", kind: "other", label: "Other senders",
+      sub: `${N} senders`, n_senders: N,
+      members: many.slice(0, CAP).map((r) => r.key) });   // capped, as shipped
+    const idx = smartMembers(Object.fromEntries(many.map((r) => [r.key, r])));
+
+    it("finds a sender beyond the cap by text, from: and domain:", () => {
+      for (const i of [0, CAP - 1, CAP, 777, N - 1]) {
+        expect(matchGroup(big, f(`s${i}@rnd${i}.`), Date.now(), idx), String(i))
+          .toBe(true);
+        expect(matchGroup(big, f(`from:${addr(i)}`), Date.now(), idx),
+          String(i)).toBe(true);
+        expect(matchGroup(big, f(`domain:rnd${i}.example`), Date.now(), idx),
+          String(i)).toBe(true);
+      }
+      expect(matchGroup(big, f("s1200@rnd1200"), Date.now(), idx)).toBe(false);
+      expect(matchGroup(big, f("from:s1200@rnd1200.example"), Date.now(), idx))
+        .toBe(false);
+      // the capped list alone would have missed it
+      expect(big.members).not.toContain(addr(777));
+    });
+
+    it("stays fast: 5000 members, the whole filter pass in well under a "
+      + "second", () => {
+      const M = 5000;
+      const recs = Array.from({ length: M }, (_, i) =>
+        sender(addr(i), `k:b${i % 4}`));
+      const t0 = performance.now();
+      const index = smartMembers(Object.fromEntries(recs.map((r) => [r.key, r])));
+      const built = performance.now() - t0;
+      const rows = [0, 1, 2, 3].map((n) => g({ key: `k:b${n}`,
+        kind: "other", label: `Bucket ${n}`, sub: "" }));
+      const now = Date.now();
+      const t1 = performance.now();
+      let hits = 0;
+      for (let rep = 0; rep < 100; rep++) {   // 100 keystrokes
+        const q = f(rep % 2 ? "zzz-no-such-sender" : `s${M - 1}@rnd`);
+        for (const row of rows) if (matchGroup(row, q, now, index)) hits++;
+      }
+      const filtered = performance.now() - t1;
+      expect(hits).toBe(50);                  // only s4999 (bucket 3) matches
+      expect(built).toBeLessThan(1000);
+      expect(filtered).toBeLessThan(1000);
+    });
+  });
+
+  it("shortcutTarget: sender / domain rows, own rows, one-domain pools", () => {
+    expect(shortcutTarget("sender", g()))
+      .toEqual({ kind: "sender", value: "noreply@dhl.example" });
+    expect(shortcutTarget("domain", g({ key: "dhl.example" })))
+      .toEqual({ kind: "domain", value: "dhl.example" });
+    expect(shortcutTarget("smart", own))
+      .toEqual({ kind: "sender", value: "a@x.example" });
+    expect(shortcutTarget("smart", pool))
+      .toEqual({ kind: "domain", value: "payco.example" });
+    // several domains (subdomains included): no shortcuts
+    expect(shortcutTarget("smart", { ...pool, domain: "" })).toBeNull();
+    expect(shortcutTarget("smart", bucket)).toBeNull();
+    expect(shortcutTarget("subject", g())).toBeNull();
+    expect(shortcutTarget("thread", g())).toBeNull();
   });
 });

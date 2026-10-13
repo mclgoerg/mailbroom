@@ -1,6 +1,6 @@
 /* Pure helpers - kept dependency-free so they are unit-testable. */
 
-import type { Group } from "./types";
+import type { Grouping, Group } from "./types";
 
 export const fmtSize = (b: number): string =>
   b >= 1048576 ? `${(b / 1048576).toFixed(1)} MB`
@@ -207,12 +207,64 @@ export function parseFilter(q: string): ParsedFilter {
   return out;
 }
 
-export function matchGroup(g: Group, f: ParsedFilter, now = Date.now()): boolean {
-  if (f.fromAddr !== null && g.key !== f.fromAddr) return false;
-  if (f.domain !== null && g.key !== f.domain) return false;
+/** What a group row's protect / block / Sieve shortcuts act on: the exact
+ *  address or domain, or null when the row has none (subject / thread rows,
+ *  Smart bucket rows, a Smart company pool spanning several domains).
+ *  Smart company rows only qualify with ONE exact domain: `@domain`
+ *  protect entries match that domain exactly, not its subdomains. */
+export function shortcutTarget(grouping: Grouping, g: Group):
+  { kind: "sender" | "domain"; value: string } | null {
+  if (grouping === "sender") return { kind: "sender", value: g.key };
+  if (grouping === "domain") return { kind: "domain", value: g.key };
+  if (grouping === "smart") {
+    if (g.kind === "sender" && g.addr) return { kind: "sender", value: g.addr };
+    if (g.kind === "company" && g.domain) {
+      return { kind: "domain", value: g.domain };
+    }
+  }
+  return null;
+}
+
+/** The sender records behind each Smart row, by row key. The state strips
+ *  per-mail UID lists and a pooled row's own `members` list is capped, so
+ *  the FULL membership is derived from the sender records the UI already
+ *  has: each carries `smart_key`, the key of the row its mails landed in. */
+export type SmartMembers = Map<string, Group[]>;
+
+export function smartMembers(senders: Record<string, Group> | undefined):
+    SmartMembers {
+  const out: SmartMembers = new Map();
+  for (const rec of Object.values(senders ?? {})) {
+    if (!rec.smart_key) continue;
+    const list = out.get(rec.smart_key);
+    if (list) list.push(rec);
+    else out.set(rec.smart_key, [rec]);
+  }
+  return out;
+}
+
+/** Does any sender a Smart row stands for pass `test`? An own row stands
+ *  for its one address, a pooled row for every sender record in `members`
+ *  (none for other groupings). */
+const someAddr = (g: Group, members: SmartMembers | undefined,
+    test: (addr: string) => boolean): boolean => {
+  if (g.addr) return test(g.addr);
+  for (const r of members?.get(g.key) ?? []) if (test(r.key)) return true;
+  return false;
+};
+
+/** `members` (Smart tab only) lets `from:`, `domain:` and free text reach
+ *  every sender pooled into a row, however many there are. */
+export function matchGroup(g: Group, f: ParsedFilter, now = Date.now(),
+    members?: SmartMembers): boolean {
+  if (f.fromAddr !== null && g.key !== f.fromAddr
+      && !someAddr(g, members, (a) => a === f.fromAddr)) return false;
+  if (f.domain !== null && g.key !== f.domain && g.domain !== f.domain
+      && !someAddr(g, members, (a) => a.endsWith(`@${f.domain}`))) return false;
   for (const t of f.text) {
     if (!g.key.includes(t) && !g.label.toLowerCase().includes(t) &&
-        !g.sub.toLowerCase().includes(t)) return false;
+        !g.sub.toLowerCase().includes(t) &&
+        !someAddr(g, members, (a) => a.includes(t))) return false;
   }
   for (const t of f.tags) {
     if (!g.tags.some((tag) => tag.includes(t))) return false;

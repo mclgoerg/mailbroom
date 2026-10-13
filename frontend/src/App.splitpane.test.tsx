@@ -90,7 +90,7 @@ const baseState: AppState = {
   account: "proton", status: "done", scanned_ts: null, groups_rev: 0,
   progress: "", error: "", folders: [],
   groups: { sender: { [A.key]: A, [B.key]: B, [C.key]: C },
-    domain: {}, subject: {}, thread: {} },
+    smart: {}, domain: {}, subject: {}, thread: {} },
   ai: { status: "idle", grouping: "sender", progress: "", error: "",
     usage: null },
   delete: { status: "idle", progress: "", error: "", moved: 0 },

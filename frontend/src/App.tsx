@@ -29,17 +29,23 @@ import { AccountAvatar, applyTheme, BAR_ICON_BTN, BulkBar, Button, Chip, ChipGro
 import { t } from "./i18n";
 import { usePaneHeight, useSplitPane } from "./splitPane";
 import { applyStatus, fmtAgo, fmtSize, fmtUsd, matchGroup, parseFilter,
-  parseProgress, retainedMailKeys } from "./lib";
+  parseProgress, retainedMailKeys, shortcutTarget, smartMembers } from "./lib";
+import { isPooled, smartView } from "./smart";
+import type { SenderAction } from "./components/SenderList";
 import type { AppState, AuthProbe, Config, FilterPreset, Group, Grouping,
   StatusMsg } from "./types";
 
 const GROUPING_LABEL: Record<Grouping, string> = {
-  sender: "Sender", domain: "Domain", subject: "Subject",
+  sender: "Sender", smart: "Smart", domain: "Domain", subject: "Subject",
   thread: "Thread",
 };
-// Groupings keyed by something that is neither an address nor a domain:
-// no protect/block/Sieve shortcuts (those need a sender or a domain).
-const KEYED_BY_MAIL = (g: Grouping) => g === "subject" || g === "thread";
+// The grouping tabs: Smart took the Domain tab's slot. "domain" stays a
+// grouping (rules, `domain:` filters, existing block/protect entries) but
+// is no longer shown as a tab.
+const TAB_GROUPINGS: Grouping[] = ["sender", "smart", "subject", "thread"];
+// Protect / block / Sieve shortcuts need a sender or a domain, so they are
+// per row (lib.ts shortcutTarget): subject / thread rows and Smart bucket
+// rows have none.
 
 const SORT_OPTIONS: { k: SortKey; label: string }[] = [
   { k: "count", label: "Sort: mails" },
@@ -408,35 +414,59 @@ export default function App() {
   // reflect the same full mailbox regardless of whatever filter is
   // currently showing - otherwise filtering down to one chip's
   // condition can make an UNRELATED chip disappear or change its count.
-  const allGroups = useMemo(() =>
-    Object.values(state?.groups?.[mode] ?? {}), [state, mode]);
+  // Smart's pooled rows are worded here (translated label + "N senders"),
+  // so the table, the filter, sorting and the dialogs all see the same text.
+  const modeGroups = useMemo(() => {
+    const raw = state?.groups?.[mode] ?? {};
+    return mode === "smart"
+      ? Object.fromEntries(Object.entries(raw)
+        .map(([k, g]) => [k, smartView(g)]))
+      : raw;
+  }, [state, mode]);
+  const allGroups = useMemo(() => Object.values(modeGroups), [modeGroups]);
+  // Smart: every sender behind each pooled row, so the filter reaches all
+  // of them (built once per state refresh, not per keystroke).
+  const members = useMemo(
+    () => mode === "smart" ? smartMembers(state?.groups?.sender) : undefined,
+    [state, mode]);
 
   const groups = useMemo(() => {
     const f = parseFilter(filter);
-    const filtered = allGroups.filter((g) => matchGroup(g, f));
+    const now = Date.now();
+    const filtered = allGroups.filter((g) => matchGroup(g, f, now, members));
     return filtered.sort((a, b) => {
       const va = sortValue(a, sortK), vb = sortValue(b, sortK);
       const cmp = va < vb ? -1 : va > vb ? 1 : 0;
       return cmp * sortDir || b.count - a.count;
     });
-  }, [allGroups, filter, sortK, sortDir]);
+  }, [allGroups, members, filter, sortK, sortDir]);
 
   // Block rules are visible, ordinary rules: a "block:<key>" query is
   // `from:<key>`/`domain:<key>` with origin "block" - derive which group
   // keys are currently blocked (and their rule id, for one-click unblock)
   // so rows/detail can show a badge+Unblock button and hide the Block one.
-  const blockedRules = useMemo(() => {
-    const map = new Map<string, string>();
-    if (KEYED_BY_MAIL(mode)) return map;
-    const prefix = mode === "sender" ? "from:" : "domain:";
+  // "<rule grouping>:<value>" -> rule id; each row then looks up the
+  // address/domain its shortcuts act on (a Smart own row is a sender, a
+  // company row a domain).
+  const blockRuleIds = useMemo(() => {
+    const rules = new Map<string, string>();
     for (const r of state?.rules ?? []) {
-      if (r.origin === "block" && r.grouping === mode
-          && r.query.startsWith(prefix)) {
-        map.set(r.query.slice(prefix.length), r.id);
+      const prefix = r.grouping === "sender" ? "from:" : "domain:";
+      if (r.origin === "block" && r.query.startsWith(prefix)) {
+        rules.set(`${r.grouping}:${r.query.slice(prefix.length)}`, r.id);
       }
     }
+    return rules;
+  }, [state?.rules]);
+  const blockedRules = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const g of allGroups) {
+      const tg = shortcutTarget(mode, g);
+      const id = tg && blockRuleIds.get(`${tg.kind}:${tg.value}`);
+      if (id) map.set(g.key, id);
+    }
     return map;
-  }, [state?.rules, mode]);
+  }, [blockRuleIds, allGroups, mode]);
 
   // How many mails `keys` would actually move: the full group counts when
   // no retention restriction applies, or (when one does) the real count
@@ -446,8 +476,8 @@ export default function App() {
   // of the count too (`skipPinned`).
   const retentionAdjustedCount = async (keys: string[],
       keepLatest: number | null, olderThanDays: number | null,
-      skipPinned = true): Promise<number> => {
-    const all = state?.groups[mode] ?? {};
+      skipPinned = true, grouping: Grouping = mode): Promise<number> => {
+    const all = state?.groups[grouping] ?? {};
     const naive = (k: string) =>
       (all[k]?.count ?? 0) - (skipPinned ? all[k]?.pinned ?? 0 : 0);
     if (!keepLatest && !olderThanDays) {
@@ -455,7 +485,7 @@ export default function App() {
     }
     const counts = await Promise.all(keys.map(async (k) => {
       try {
-        const mails = await api.group(mode, k);
+        const mails = await api.group(grouping, k);
         return mails.length - retainedMailKeys(
           mails, keepLatest, olderThanDays, skipPinned).size;
       } catch {
@@ -605,10 +635,13 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [groups, paneOpen]);
   // The open group vanished from the mailbox itself (not merely filtered
-  // out): same as after Trash all.
+  // out): same as after Trash all. (Protecting or trashing every sender of a
+  // pooled Smart row from its sender list does this too.) The modal has no
+  // next group to show, so it just closes.
   useEffect(() => {
-    if (paneOpen && detail && state && !state.groups[mode]?.[detail.key])
-      advancePane(detail, prevGroups.current);
+    if (!detail || !state || state.groups[mode]?.[detail.key]) return;
+    if (paneOpen) advancePane(detail, prevGroups.current);
+    else setDetail(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state?.groups_rev]);
   useEffect(() => { prevGroups.current = groups; });
@@ -638,6 +671,55 @@ export default function App() {
     }
     catch (e: any) { fail(e, "err.ai"); }
     setPending("");
+  };
+
+  // AI sorting of what the rules left in Smart's Other row: a manual, billed
+  // action - consent, then the exact scope and cost, then one more confirm.
+  const [aiSortedCount, aiCheckedCount] = useMemo(() => {
+    let placed = 0, checked = 0;
+    for (const g of Object.values(state?.groups?.sender ?? {})) {
+      if (g.smart_why?.r !== "ai") continue;
+      if (g.smart_why.k === "other") checked++;
+      else placed++;
+    }
+    return [placed, checked];
+  }, [state?.groups?.sender]);
+  const aiSortOther = async () => {
+    if (!await ensureAiAck()) return;
+    try {
+      const est = await api.aiSortEstimate();
+      if (est.blocked) { fail(new Error(est.blocked), "err.ai"); return; }
+      if (!est.units) { notify(t("aisort.nothing")); return; }
+      const bullets = [
+        t("aisort.b_units", { senders: est.senders, units: est.units }),
+        t("aisort.b_cost", { tin: est.tokens_in.toLocaleString(),
+          tout: est.tokens_out.toLocaleString(), cost: fmtUsd(est.cost) }),
+        ...(est.has_instructions ? [t("aisort.b_instructions")] : []),
+        t("aisort.b_only")];
+      if (!await confirmDialog({ title: t("aisort.title"),
+        body: t("ai.data_note"), bullets, tone: "primary",
+        confirmLabel: t("aisort.go", { n: est.senders }) })) return;
+      await api.aiSort();
+      if (seenJobs.current) seenJobs.current.a = "running";   // see effect
+      notify(t("aisort.started"));
+      refresh();
+    } catch (e: any) { fail(e, "err.ai"); }
+  };
+  const aiSortClear = async () => {
+    if (!await confirmDialog({
+      title: t("aisort.clear_confirm", { n: aiSortedCount + aiCheckedCount }),
+      confirmLabel: t("aisort.clear") })) return;
+    try {
+      await api.aiSortClear();
+      notify(aiSortedCount
+        ? t("aisort.cleared", { n: aiSortedCount }) : t("aisort.cleared_none"),
+      "success");
+      await refresh();
+      // Pressed in a row the AI had filled (Orders, ...): the senders went
+      // back to Other, where the Sort button lives - follow them there.
+      const other = stateRef.current?.groups.smart?.["k:other"];
+      if (other && detail && detail.key !== other.key) swapDetail(other);
+    } catch (e: any) { fail(e); }
   };
 
   const cancel = async () => {
@@ -735,7 +817,8 @@ export default function App() {
     }
     const f = parseFilter(query);
     const matchingKeys = allGroups
-      .filter((g) => matchGroup(g, f) && !g.protected).map((g) => g.key);
+      .filter((g) => matchGroup(g, f, Date.now(), members) && !g.protected)
+      .map((g) => g.key);
     const next = new Set(selected);
     if (activeChip.step === "filtered") {
       matchingKeys.forEach((k) => next.add(k));
@@ -795,10 +878,12 @@ export default function App() {
   // declined the confirmation, or every selected group turned out
   // protected) - callers that need to react afterward (e.g. closing a
   // panel once its group is gone) check this instead of assuming success.
-  const act = async (keys: string[], action: string, dest = "",
+  // `noun` words the confirmation (the Smart sender list acts on senders).
+  const actOn = async (grouping: Grouping, all: Record<string, Group>,
+      keys: string[], action: string, dest = "",
       keepLatest: number | null = null,
-      olderThanDays: number | null = null): Promise<boolean> => {
-    const all = state?.groups[mode] ?? {};
+      olderThanDays: number | null = null,
+      noun: "groups" | "senders" = "groups"): Promise<boolean> => {
     let force = false;
     let effective = keys;
     if (action === "trash") {
@@ -824,18 +909,20 @@ export default function App() {
     const pins = skipPinned
       ? effective.reduce((n, k) => n + (all[k]?.pinned ?? 0), 0) : 0;
     const n = await retentionAdjustedCount(
-      effective, keepLatest, olderThanDays, skipPinned);
+      effective, keepLatest, olderThanDays, skipPinned, grouping);
     if (n === 0 && pins > 0) {
       notify(t("toast.all_pinned"));
       return false;
     }
     const verb = actionVerb(action) + (dest ? ` → ${dest}` : "");
     const bullets = [effective.length === 1
-      ? t("confirm.b_mails_one_group", { n })
-      : t("confirm.b_mails_groups", { n, k: effective.length })];
+      ? t(noun === "senders" ? "confirm.b_mails_one_sender"
+        : "confirm.b_mails_one_group", { n })
+      : t(noun === "senders" ? "confirm.b_mails_senders"
+        : "confirm.b_mails_groups", { n, k: effective.length })];
     if (effective.length !== keys.length) {
-      bullets.push(t("confirm.b_protected_groups_skipped",
-        { n: keys.length - effective.length }));
+      bullets.push(t(noun === "senders" ? "confirm.b_protected_senders_skipped"
+        : "confirm.b_protected_groups_skipped", { n: keys.length - effective.length }));
     }
     if (pins) bullets.push(t("confirm.b_pinned_kept", { n: pins }));
     if (!force && !await confirmDialog({ title: verb, bullets,
@@ -843,9 +930,8 @@ export default function App() {
       confirmLabel: t("confirm.btn_n", { verb, n }) }))
       return false;
     try {
-      await api.deleteGroups(mode, effective, action, dest, force,
+      await api.deleteGroups(grouping, effective, action, dest, force,
         keepLatest, olderThanDays);
-      setSelected(new Set());
       if (seenJobs.current) seenJobs.current.d = "running";   // see effect
       refresh();   // runs in the background; SSE/polling follows it
       return true;
@@ -855,15 +941,54 @@ export default function App() {
     }
   };
 
+  const act = async (keys: string[], action: string, dest = "",
+      keepLatest: number | null = null,
+      olderThanDays: number | null = null): Promise<boolean> => {
+    const ok = await actOn(mode, modeGroups, keys, action, dest, keepLatest,
+      olderThanDays);
+    if (ok) setSelected(new Set());
+    return ok;
+  };
+
+  // The Smart sender list: every action resolves to the exact sender
+  // addresses ticked there, through the same reversible, UIDVALIDITY-checked,
+  // protection- and pin-aware moves as the Sender tab.
+  const actOnSenders = (keys: string[], action: SenderAction, dest = "") =>
+    actOn("sender", state?.groups?.sender ?? {}, keys, action, dest, null,
+      null, "senders");
+  const protectSenders = async (keys: string[]): Promise<boolean> => {
+    try {
+      const r = await api.protectMany(keys, true);
+      setCfg((c) => (c ? { ...c, protected: r.protected } : c));
+      notify(t("senders.protected_toast", { n: keys.length }));
+      refresh();
+      return true;
+    } catch (e: any) {
+      fail(e);
+      return false;
+    }
+  };
+
   // Unlike act() (move/trash), the selection is deliberately kept afterward:
   // "select -> Unsubscribe -> Trash" stays a two-click flow on the same set.
+  // Smart: a pooled row is not ONE sender, so a selection unsubscribes only
+  // from its own rows (single big senders); a pool's senders are unsubscribed
+  // one by one, in their own detail view.
+  const unsubKeys = (keys: string[]) => mode !== "smart" ? keys
+    : keys.filter((k) => !modeGroups[k] || !isPooled(modeGroups[k]));
   const unsubscribeSelected = async () => {
-    if (!selected.size) return;
+    const keys = unsubKeys([...selected]);
+    const pooled = selected.size - keys.length;
+    if (!keys.length) {
+      if (pooled) notify(t("toast.unsub_pooled"));
+      return;
+    }
     if (!await confirmDialog({
-      title: t("confirm.unsubscribe", { n: selected.size }),
+      title: t("confirm.unsubscribe", { n: keys.length }),
+      body: pooled ? t("confirm.unsub_pooled_skipped", { n: pooled }) : undefined,
       confirmLabel: t("confirm.unsubscribe_btn") })) return;
     try {
-      const r = await api.unsubscribeBulk(mode, [...selected]);
+      const r = await api.unsubscribeBulk(mode, keys);
       const skipped = r.skipped_protected + r.skipped_done + r.capped;
       const id = toast.show(r.queued
         ? t("toast.unsub_started", { n: r.queued })
@@ -880,22 +1005,31 @@ export default function App() {
     }
   };
 
-  // Sender mode protects the exact address, domain mode the whole domain.
-  // Subject groups have no stable sender, so they get no protect toggle.
-  const toggleProtect = KEYED_BY_MAIL(mode) ? undefined : async (g: Group) => {
-    const entry = mode === "domain" ? `@${g.key}` : g.key;
+  // Protect / block act on what the row stands for (shortcutTarget): the
+  // exact address, or the whole domain for a domain row. Subject / thread
+  // rows and Smart bucket rows have no target, so they get no shortcuts.
+  const toggleProtect = async (g: Group, grouping: Grouping = mode) => {
+    const tg = shortcutTarget(grouping, g);
+    if (!tg) return;
+    const entry = tg.kind === "domain" ? `@${tg.value}` : tg.value;
     try {
       const r = await api.protect(entry, !g.protected);
       setCfg((c) => (c ? { ...c, protected: r.protected } : c));
+      // A Smart company row dissolves into "Protected senders" (the
+      // backend re-derives the pools): say where its mails went.
+      if (grouping === "smart" && g.kind === "company") {
+        setDetail(null);
+        notify(t("smart.protected_moved", { label: g.label }));
+      }
       refresh();
     } catch (e: any) {
       fail(e);
     }
   };
 
-  // Sender/domain only (same restriction as protect - subject groups have
-  // no stable sender to build a from:/domain: rule from).
-  const blockGroup = KEYED_BY_MAIL(mode) ? undefined : async (g: Group) => {
+  const blockGroup = async (g: Group, grouping: Grouping = mode) => {
+    const tg = shortcutTarget(grouping, g);
+    if (!tg) return;
     if (!await confirmDialog({
       title: t("confirm.block_title", { label: g.label }),
       body: t("confirm.block_body"), tone: "danger",
@@ -907,8 +1041,14 @@ export default function App() {
         tone: "danger", cancelLabel: t("confirm.block_only"),
         confirmLabel: t("confirm.btn_n",
           { verb: actionVerb("trash"), n: g.count }) });
+    // A Smart company row holds only the domain's SMALL senders: trash
+    // exactly that row (the count the user confirmed), not the whole
+    // domain group the block endpoint would empty.
+    const poolOnly = grouping === "smart" && tg.kind === "domain";
     try {
-      await api.block(mode, g.key, g.label, trashExisting);
+      await api.block(tg.kind, tg.value, g.label,
+        trashExisting && !poolOnly);
+      if (trashExisting && poolOnly) await api.deleteGroups(grouping, [g.key]);
       notify(t("toast.blocked", { label: g.label }), "success");
       refresh();
     } catch (e: any) {
@@ -919,8 +1059,7 @@ export default function App() {
   // Unblock = delete the standing rule the Block action created (same
   // reversible path as deleting any other rule in the Rules modal, just
   // reachable with one click from the group itself).
-  const unblockGroup = KEYED_BY_MAIL(mode) ? undefined : async (g: Group) => {
-    const ruleId = blockedRules.get(g.key);
+  const unblockGroup = async (g: Group, ruleId = blockedRules.get(g.key)) => {
     if (!ruleId) return;
     if (!await confirmDialog({
       title: t("confirm.unblock_title", { label: g.label }),
@@ -1107,7 +1246,45 @@ export default function App() {
       onLogin={() => setAuth({ ...auth, authed: true })} />;
   }
 
-  const renderDetail = (variant: "modal" | "pane") => detail && (
+  // One sender of a pooled Smart row, opened inside the pool's own panel:
+  // the full Sender-tab detail (mails, trash, protect, block, Sieve and the
+  // explicit single-sender Unsubscribe) with a header that goes back.
+  const renderSender = (sender: Group, back: () => void) => {
+    const live = state?.groups.sender[sender.key];
+    return (
+      <DetailPanel variant="inline" key={sender.key} grouping="sender"
+        group={sender} aiEnabled={aiEnabled}
+        protectedNow={live?.protected ?? sender.protected}
+        unsubscribedNow={live?.unsubscribed ?? sender.unsubscribed}
+        onTrash={(g) => actOn("sender", state?.groups?.sender ?? {}, [g.key],
+          "trash")}
+        onProtect={(g) => toggleProtect(g, "sender")}
+        onBlock={(g) => blockGroup(g, "sender")}
+        onUnblock={(g) => unblockGroup(g,
+          blockRuleIds.get(`sender:${g.key}`))}
+        blocked={blockRuleIds.has(`sender:${sender.key}`)}
+        smartMin={acct?.smart_min ?? 10}
+        folders={state?.folders_raw ?? []}
+        sieve={(acct?.preset ?? "proton") === "proton"}
+        onClose={back} backLabel={t("senders.back")} onEmptied={back}
+        onDeleted={refresh} />
+    );
+  };
+
+  // (a group that is gone from the mailbox is not rendered for the tick before
+  // the effect above closes or advances the panel: no fetch for a dead key)
+  // A pooled Smart row changes under an open panel (AI sorting, a removal
+  // of it, senders trashed from its list): its header, counts and the Trash
+  // all label follow the live row; everything else stays the snapshot taken
+  // when it was opened.
+  const liveGroup = (g: Group): Group => {
+    const live = state?.groups[mode]?.[g.key];
+    return live && isPooled(g) ? { ...g, kind: live.kind, label: live.label,
+      count: live.count, size: live.size, pinned: live.pinned,
+      n_senders: live.n_senders } : g;
+  };
+  const renderDetail = (variant: "modal" | "pane") => detail
+    && state?.groups[mode]?.[detail.key] && (
     <DetailPanel
       // The pane swaps groups in place: remount so selection, filters and an
       // open message never leak from one group into the next.
@@ -1117,19 +1294,29 @@ export default function App() {
       // group actions step aside so two red scopes never stack.
       hideGroupActions={variant === "pane" && selected.size > 0}
       grouping={mode}
-      group={detail}
+      group={liveGroup(detail)}
       aiEnabled={aiEnabled}
       protectedNow={state?.groups[mode][detail.key]?.protected
         ?? detail.protected}
       unsubscribedNow={state?.groups[mode][detail.key]?.unsubscribed
         ?? detail.unsubscribed}
       onTrash={(g) => act([g.key], "trash")}
-      onProtect={toggleProtect}
-      onBlock={blockGroup}
-      onUnblock={unblockGroup}
+      onProtect={shortcutTarget(mode, detail) ? toggleProtect : undefined}
+      onBlock={shortcutTarget(mode, detail) ? blockGroup : undefined}
+      onUnblock={shortcutTarget(mode, detail) ? unblockGroup : undefined}
       blocked={blockedRules.has(detail.key)}
+      smartMin={acct?.smart_min ?? 10}
       folders={state?.folders_raw ?? []}
       sieve={(acct?.preset ?? "proton") === "proton"}
+      senders={mode === "smart" && isPooled(detail)
+        ? members?.get(detail.key) : undefined}
+      onSenderAct={actOnSenders} onSenderProtect={protectSenders}
+      renderSender={renderSender} onAckUnsub={ackUnsub}
+      aiSort={mode === "smart" && isPooled(detail) ? {
+        total: aiSortedCount, checked: aiCheckedCount,
+        busy: aiRunning || scanning,
+        onSort: aiEnabled ? aiSortOther : undefined,
+        onClear: aiSortClear } : undefined}
       onClose={variant === "pane" ? closePane
         : () => { setDetail(null); refresh(); }}
       onEmptied={variant === "pane" ? () => advancePane(detail) : undefined}
@@ -1268,7 +1455,7 @@ export default function App() {
             className="md:w-auto"
             value={flat ? "flat" : mode}
             options={[
-              ...(Object.keys(GROUPING_LABEL) as Grouping[]).map((g) =>
+              ...TAB_GROUPINGS.map((g) =>
                 ({ value: g as Grouping | "flat", label: t(GROUPING_LABEL[g]) })),
               { value: "flat", label: t("view.all_mails") },
             ]}
@@ -1530,7 +1717,10 @@ export default function App() {
               <option value="archive">{t("Archive")}</option>
               <option value="move">{t("Move to folder…")}</option>
               <option value="mark_read">{t("Mark read")}</option>
-              <option value="unsubscribe">{t("Unsubscribe")}</option>
+              <option value="unsubscribe"
+                disabled={!unsubKeys([...selected]).length}>
+                {t("Unsubscribe")}
+              </option>
               {aiEnabled && (
                 <option value="ai_review">{t("AI review")}</option>
               )}

@@ -39,6 +39,8 @@ from . import tenants
 from . import unsub
 from . import unsubstore
 from . import verdictstore
+from . import aisort
+from . import aisortstore
 from .mailops import GROUPINGS
 
 logging.basicConfig(
@@ -657,6 +659,33 @@ def post_ai(body: GroupingBody, account: str | None = Query(None)):
     return {"ok": True}
 
 
+@app.get("/api/ai_sort/estimate")
+def get_ai_sort_estimate(account: str | None = Query(None)):
+    """What AI sorting of the Other row would send and cost (nothing is sent)."""
+    return aisort.estimate(_acc(account))
+
+
+@app.post("/api/ai_sort")
+def post_ai_sort(account: str | None = Query(None)):
+    """Ask the AI to sort the senders the rules left in Other (a manual,
+    billed action; see aisort.py)."""
+    try:
+        return aisort.start_sort(_acc(account))
+    except ValueError as exc:
+        raise HTTPException(400, str(exc))
+    except RuntimeError as exc:
+        raise HTTPException(409, str(exc))
+
+
+@app.post("/api/ai_sort/clear")
+def post_ai_sort_clear(account: str | None = Query(None)):
+    """Remove every AI answer: the senders return to where the rules put them."""
+    try:
+        return aisort.clear(_acc(account))
+    except RuntimeError as exc:
+        raise HTTPException(409, str(exc))
+
+
 @app.post("/api/ai_group")
 def post_ai_group(body: AiGroupBody, account: str | None = Query(None)):
     _check_grouping(body.grouping)
@@ -927,20 +956,26 @@ def post_block(body: BlockBody, account: str | None = Query(None)):
 
 
 class ProtectBody(BaseModel):
-    entry: str                     # "user@example.com" or "@example.com"
+    entry: str = ""                # "user@example.com" or "@example.com"
+    entries: list[str] | None = None   # several at once (one save, one rebuild)
     on: bool = True
 
 
 @app.post("/api/protect")
 def post_protect(body: ProtectBody):
+    entries = body.entries if body.entries is not None else [body.entry]
+    if len(entries) > 5000:
+        raise HTTPException(400, "too many entries")
     try:
-        protected = cfgmod.set_protected(body.entry, body.on)
+        protected = cfgmod.set_protected_many(entries, body.on)
     except ValueError as exc:
         raise HTTPException(400, str(exc))
     logging.getLogger("pmc.mail").info(
-        "protected list %s %r (%d entries)",
-        "add" if body.on else "remove", body.entry.strip().lower(),
-        len(protected))
+        "protected list %s %d entr%s (%d entries)",
+        "add" if body.on else "remove", len(entries),
+        "y" if len(entries) == 1 else "ies", len(protected))
+    # Smart rows keep a protected sender in the protected bucket: re-derive.
+    mailops.rebuild_smart_all()
     return {"protected": protected}
 
 
@@ -1181,6 +1216,8 @@ def post_import_config(body: dict):
         cfgmod.update_config(update)
     except ValueError as exc:
         raise HTTPException(400, str(exc))
+    # Imported protected entries / categories change Smart placement.
+    mailops.rebuild_smart_all()
 
     nrules = 0
     if isinstance(body.get("rules"), list):
@@ -1295,6 +1332,7 @@ def post_config(body: dict):
         mailops.drop_snapshot(str(body["delete_account"]))
         bodyindex.drop(str(body["delete_account"]))
         unsubstore.drop_account(str(body["delete_account"]))
+        aisortstore.drop_account(str(body["delete_account"]))
         presetsmod.drop_account(str(body["delete_account"]))
         digestmod.drop_account(str(body["delete_account"]))
         knownsenders.drop_account(str(body["delete_account"]))
@@ -1311,6 +1349,7 @@ def post_config(body: dict):
             mailops.rename_snapshot(old, new)
             bodyindex.rename(old, new)
             verdictstore.rename_account(old, new)
+            aisortstore.rename_account(old, new)
             unsubstore.rename_account(old, new)
             mailops.rename_replied_account(old, new)
             statsmod.rename_account(old, new)
@@ -1325,6 +1364,9 @@ def post_config(body: dict):
                 "account renamed: %r -> %r (state, verdicts, unsubscribes, "
                 "replied, stats, rules, presets, digest, known senders, "
                 "pins, auto-scan, audit log migrated)", old, new)
+    # Own-row threshold or protected list changed -> smart rows re-derive
+    # (no-op otherwise, so unrelated saves never reshuffle the list).
+    mailops.rebuild_smart_all()
     return cfgmod.masked_config(cfg)
 
 

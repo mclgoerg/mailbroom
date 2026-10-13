@@ -1,8 +1,10 @@
-import { ArrowDown, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight,
-  MessagesSquare } from "lucide-react";
+import { ArrowDown, Briefcase, Building2, CalendarCheck, ChevronLeft,
+  ChevronRight, ChevronsLeft, ChevronsRight, KeyRound, LifeBuoy,
+  MessagesSquare, Newspaper, Package, Reply, Shapes, Shield, Tag as TagIcon,
+  Users, type LucideIcon } from "lucide-react";
 import { useEffect, useRef, useState, type MouseEvent } from "react";
 import { fmtSize } from "../api";
-import type { Group, Grouping } from "../types";
+import type { Group, Grouping, SmartKind } from "../types";
 import { t } from "../i18n";
 import { AiTag, Avatar, Button, Checkbox, EngagementMeter, PinBadge, RatingChips, ShortDate, Tag, Select, isModalOpen } from "./ui";
 
@@ -33,6 +35,12 @@ interface Props {
   groupLabel: string;
   grouping?: Grouping;   // "thread" rows show a sender / neutral avatar
   resetSignal: string;   // page resets to 1 when this changes (mode/filter)
+  // One extra line under a row's own lines (the Smart sender list says why a
+  // sender sits in its row). Empty / absent = no line.
+  rowNote?: (g: Group) => string;
+  // Always the card layout (a list inside the detail panel, which is narrow
+  // beside the list at any viewport width).
+  cards?: boolean;
 }
 
 /** Thread / subject groups carry an English summary from the backend
@@ -46,10 +54,29 @@ export function localizedSub(sub: string): string {
   return m[1] ? `${t("n.mails", { n: Number(m[1]) })}, ${senders}` : senders;
 }
 
+// Smart pools have no single sender to take a letter from: each kind gets
+// an icon (DESIGN.md Icons) on the same neutral avatar disc as thread rows.
+const KIND_ICON: Record<Exclude<SmartKind, "sender">, LucideIcon> = {
+  company: Building2, protected: Shield, replied: Reply, orders: Package,
+  appointments: CalendarCheck, jobs: Briefcase, support: LifeBuoy,
+  accounts: KeyRound, category: TagIcon, newsletter: Newspaper,
+  individuals: Users, other: Shapes,
+};
+
 /** The row's avatar. A thread's label is its subject, and a subject's
  *  first letter says nothing - so thread rows show their first sender, or a
- *  neutral icon avatar when there is none. */
+ *  neutral icon avatar when there is none. A Smart company / bucket row
+ *  shows its kind's icon. */
 function RowAvatar({ g, grouping }: { g: Group; grouping?: Grouping }) {
+  if (grouping === "smart" && g.kind && g.kind !== "sender") {
+    const Icon = KIND_ICON[g.kind];
+    return (
+      <span aria-hidden className="inline-flex size-8 shrink-0 items-center
+        justify-center rounded-full bg-chip text-muted">
+        <Icon size={16} />
+      </span>
+    );
+  }
   if (grouping !== "thread") {
     return <Avatar name={g.label || g.key} size="md" />;
   }
@@ -128,7 +155,7 @@ function UnsubBadge({ g, onAck }: { g: Group; onAck: (addr: string) => void }) {
    grouping mode (and with it the content) changes. */
 function DesktopTable({ slice, baseIdx, selected, focusedKey, openKey, compact, onToggle,
   onToggleAll, onOpen, blockedKeys,
-  onAckUnsub, sortK, sortDir, onSort, groupLabel, grouping
+  onAckUnsub, sortK, sortDir, onSort, groupLabel, grouping, rowNote
 }: PageProps) {
   // Sort indicator, inline after the label: the active column shows an
   // accent arrow that ROTATES between directions; inactive sortable columns
@@ -237,6 +264,10 @@ function DesktopTable({ slice, baseIdx, selected, focusedKey, openKey, compact, 
                   {localizedSub(g.sub)}
                 </div>
               )}
+              {rowNote?.(g) && (
+                <div className="truncate type-meta text-muted"
+                  title={rowNote(g)}>{rowNote(g)}</div>
+              )}
               <div className="truncate type-meta text-muted">
                 <ShortDate iso={g.first} /> → <ShortDate iso={g.last} /> ·{" "}
                 {unreadPct(g)}% {t("unread")}
@@ -305,7 +336,7 @@ function DesktopTable({ slice, baseIdx, selected, focusedKey, openKey, compact, 
 
 /* Mobile: a card list - no table semantics, no horizontal squeeze. */
 function MobileCards({ slice, baseIdx, selected, focusedKey, onToggle,
-  onOpen, blockedKeys, onAckUnsub, grouping
+  onOpen, blockedKeys, onAckUnsub, grouping, rowNote
 }: PageProps) {
   return (
     <div>
@@ -335,6 +366,9 @@ function MobileCards({ slice, baseIdx, selected, focusedKey, onToggle,
                 <div className="truncate type-meta text-muted">
                   {localizedSub(g.sub)}
                 </div>
+              )}
+              {rowNote?.(g) && (
+                <div className="type-meta text-muted">{rowNote(g)}</div>
               )}
               <div className="truncate type-meta text-muted">
                 {t("n.mails", { n: g.count })} · <ShortDate iso={g.last} /> ·{" "}
@@ -438,10 +472,12 @@ export function GroupTable(props: Props) {
     // Focus falls back here when a dialog's opener row is gone (Modal).
     <div ref={root} data-focus-return tabIndex={-1}
       className="outline-none">
-      <div className="hidden md:block">
-        <DesktopTable {...props} slice={slice} baseIdx={baseIdx} />
-      </div>
-      <div className="md:hidden">
+      {!props.cards && (
+        <div className="hidden md:block">
+          <DesktopTable {...props} slice={slice} baseIdx={baseIdx} />
+        </div>
+      )}
+      <div className={props.cards ? "" : "md:hidden"}>
         <MobileCards {...props} slice={slice} baseIdx={baseIdx} />
       </div>
       {(groups.length > Math.min(perPage, ...PAGE_SIZES)) && (

@@ -419,6 +419,19 @@ describe("GroupTable avatars and phone cards", () => {
     expect(av.className).toContain("bg-chip");
   });
 
+  it("Smart pools get a kind icon, own rows keep the letter", () => {
+    const pooled = { ...mk(0), label: "Newsletters", kind: "newsletter" as const,
+      n_senders: 12, members: [] };
+    const { container } = renderTable({ groups: [pooled], grouping: "smart" });
+    const av = avatars(container)[0];
+    expect(av.textContent).toBe("");
+    expect(av.querySelector("svg")).toBeTruthy();
+    const own = { ...mk(0), label: "Shop", kind: "sender" as const,
+      addr: "a@x.example" };
+    const o = renderTable({ groups: [own], grouping: "smart" });
+    expect(avatars(o.container).at(-1)!.textContent).toBe("S");
+  });
+
   it("other groupings keep the letter avatar", () => {
     const { container } = renderTable({ groups: [mk(0)], grouping: "sender" });
     expect(avatars(container)[0].textContent).toBe("S");

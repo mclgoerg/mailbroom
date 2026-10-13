@@ -41,6 +41,9 @@ RULE_CAP = int(os.environ.get("RULE_CAP", "500"))   # max mails per run
 CHECK_INTERVAL = int(os.environ.get("RULES_INTERVAL", "600"))  # seconds
 
 SCHEDULES = ("manual", "daily", "weekly")
+# Not "smart": its rows' membership depends on a per-account threshold and
+# the protected list, so a standing rule on them would shift under it.
+RULE_GROUPINGS = tuple(g for g in mailops.GROUPINGS if g != "smart")
 _DUE_AFTER = {"daily": 24 * 3600, "weekly": 7 * 24 * 3600}
 
 _LOCK = threading.Lock()          # guards the rules file
@@ -207,7 +210,7 @@ def _validate(body: dict, rule: dict) -> dict:
     if "name" in body:
         rule["name"] = str(body["name"]).strip()[:80]
     if "grouping" in body:
-        if body["grouping"] not in mailops.GROUPINGS:
+        if body["grouping"] not in RULE_GROUPINGS:
             raise ValueError("bad grouping")
         rule["grouping"] = body["grouping"]
     if "query" in body:

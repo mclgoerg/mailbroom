@@ -80,7 +80,7 @@ const group: Group = {
 const baseState: AppState = {
   account: "proton", status: "done", scanned_ts: 1, groups_rev: 1,
   progress: "", error: "", folders: ["Archive"],
-  groups: { sender: { [group.key]: group }, domain: {}, subject: {}, thread: {} },
+  groups: { sender: { [group.key]: group }, smart: {}, domain: {}, subject: {}, thread: {} },
   ai: { status: "idle", grouping: "sender", progress: "", error: "",
     usage: null },
   delete: { status: "idle", progress: "", error: "", moved: 0 },
@@ -177,7 +177,7 @@ test("an empty filter reads '0 of N' and Clear filter brings the list back",
   });
 
 test("'No scan yet' only shows when nothing was ever scanned", async () => {
-  const empty = { sender: {}, domain: {}, subject: {}, thread: {} };
+  const empty = { sender: {}, smart: {}, domain: {}, subject: {}, thread: {} };
   const { container } = await mount({ ...baseState, scanned_ts: null,
     groups: empty });
   expect(container.textContent).toContain("No scan yet");

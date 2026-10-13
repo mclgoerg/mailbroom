@@ -20,6 +20,12 @@ export const DE: Record<string, string> = {
   "confirm.act_mails_one": "{verb}: 1 ausgewählte Mail?",
   "confirm.unsubscribe":
     "Von den Absendern in {n} ausgewählten Gruppen abbestellen?",
+  "confirm.unsub_pooled_skipped":
+    "{n} gebündelte Zeilen werden übersprungen: öffne eine, um einen einzelnen "
+    + "Absender abzubestellen.",
+  "toast.unsub_pooled":
+    "Abbestellen geht pro Absender: öffne eine gebündelte Zeile und nutze das "
+    + "Abbestellen des Absenders.",
   "confirm.unsubscribe_one":
     "Von den Absendern der ausgewählten Gruppe abbestellen?",
   "confirm.restore": "{count} Mails wiederherstellen ({label})?",
@@ -53,7 +59,11 @@ export const DE: Record<string, string> = {
     + "lokales Modell): Absendernamen "
     + "und -adressen, Anzahl, Größen, Daten, Lesestatus, Kategorien, "
     + "Betreffzeilen, Schutz-Markierungen und ob Sie einem Absender je "
-    + "geantwortet haben. Mail-Inhalte und Anhänge werden NIE gesendet.",
+    + "geantwortet haben. Mail-Inhalte und Anhänge werden NIE gesendet. "
+    + "Die KI-Sortierung von „Sonstige“ sendet je Absender Name und "
+    + "Adresse, Anzahl, ob ein Abmeldelink angeboten wird und bis zu drei "
+    + "aktuelle Betreffzeilen – dazu Ihre eigenen Sortier-Anweisungen aus "
+    + "den Einstellungen.",
   "ai.data_note":
     "An den KI-Anbieter gesendet: Absendernamen/-adressen, Anzahl, "
     + "Größen, Daten, Lesestatus, Kategorien, Betreffzeilen, "
@@ -440,8 +450,10 @@ export const DE: Record<string, string> = {
     "Eine Kategorie pro Zeile: „name: stichwort1, stichwort2“. Ein Name "
     + "einer eingebauten Kategorie (shipping, finance, shopping, social, "
     + "travel, dev/cloud) ersetzt deren Stichwörter; eine leere Liste "
-    + "deaktiviert sie; neue Namen ergänzen Kategorien. Gilt ab dem "
-    + "nächsten Scan.",
+    + "deaktiviert sie; neue Namen ergänzen Kategorien. Eine Kategorie, die "
+    + "du anlegst oder änderst, bestimmt auch die Zeilen im Tab Smart. Gilt "
+    + "sofort im Tab Absender und Smart, in den anderen Tabs ab dem nächsten "
+    + "Scan.",
   "new_sender.window_label": "„Neu“-Fenster für Absender (Tage)",
   "new_sender.window_help":
     "Wie viele Tage ein Absender als „Neu“ markiert bleibt (is:new, das "
@@ -1004,4 +1016,145 @@ export const DE: Record<string, string> = {
     + "Tokens (und Budget) verbraucht.",
   "ai.review_new": "Nur neue prüfen ({n})",
   "ai.review_rerate": "Alle neu bewerten ({n})",
+
+  // Smart-Gruppierung (Tab "Smart": große Absender behalten eine Zeile, der
+  // lange Schwanz kleiner Absender wird nach Firma / Inhalt gebündelt).
+  "Smart": "Smart",
+  "smart.kind.protected": "Geschützte Absender",
+  "smart.kind.replied": "Leute, denen du schreibst",
+  "smart.kind.orders": "Bestellungen & Lieferungen",
+  "smart.kind.appointments": "Termine & Buchungen",
+  "smart.kind.jobs": "Bewerbungen",
+  "smart.kind.support": "Support & Anfragen",
+  "smart.kind.accounts": "Konten & Sicherheit",
+  "smart.kind.newsletter": "Newsletter",
+  "smart.kind.individuals": "Privatpersonen",
+  "smart.kind.other": "Sonstige Absender",
+  "smart.cat": "Kategorie: {name}",
+  "smart.why.company":
+    "Mehrere Absender von {domain}, als eine Firma gebündelt, weil sie zusammen mindestens {min} Mails haben.",
+  "smart.why.protected":
+    "Absender mit weniger als {min} Mails, die du geschützt hast.",
+  "smart.why.replied":
+    "Absender mit weniger als {min} Mails, denen du geschrieben hast.",
+  "smart.why.orders":
+    "Absender mit weniger als {min} Mails, meist zu Bestellungen, Versand "
+    + "und Rechnungen.",
+  "smart.why.appointments":
+    "Absender mit weniger als {min} Mails, meist zu Terminen, "
+    + "Reservierungen und Buchungen.",
+  "smart.why.jobs":
+    "Absender mit weniger als {min} Mails, meist zu Bewerbungen.",
+  "smart.why.support":
+    "Absender mit weniger als {min} Mails, meist Supportfälle und "
+    + "Anfragen.",
+  "smart.why.accounts":
+    "Absender mit weniger als {min} Mails, meist Anmeldungen und "
+    + "Sicherheitscodes.",
+  "smart.why.category":
+    "Absender mit weniger als {min} Mails in der Kategorie \u201e{name}\u201c.",
+  "smart.why.newsletter":
+    "Absender mit weniger als {min} Mails, die einen Abmeldelink anbieten "
+    + "oder Werbung schicken.",
+  "smart.why.individuals":
+    "Absender mit weniger als {min} Mails, die von einer privaten Adresse "
+    + "schreiben (Gmail, Outlook, GMX, \u2026).",
+  "smart.why.other":
+    "Absender mit weniger als {min} Mails, deren Mails unklar sind oder von "
+    + "mehreren Dingen handeln.",
+  "smart.purposes": "Worum es in den Mails geht: {list}",
+  "smart.purpose.orders": "Bestellungen",
+  "smart.purpose.appointments": "Termine",
+  "smart.purpose.jobs": "Bewerbungen",
+  "smart.purpose.support": "Support",
+  "smart.purpose.accounts": "Konten",
+  "smart.purpose.newsletter": "Newsletter",
+  "smart.purpose.unclassified": "Nicht zugeordnet",
+  "smart.protected_moved":
+    "{label} ist jetzt geschützt \u2013 die Mails liegen unter "
+    + "\u201eGeschützte Absender\u201c.",
+  // Smart-Absenderliste (was in einer gebündelten Zeile steckt, und warum).
+  "smart.about.orders": "Bestellungen und Lieferungen",
+  "smart.about.appointments": "Termine und Buchungen",
+  "smart.about.jobs": "Bewerbungen",
+  "smart.about.support": "Support und Anfragen",
+  "smart.about.accounts": "Konten und Sicherheit",
+  "smart.about.newsletter": "Newsletter und Werbung",
+  "smart.about.individuals": "private Korrespondenz",
+  "smart.about.other": "nichts Bestimmtes",
+  "aisort.btn": "Mit KI sortieren",
+  "aisort.title": "Die Absender in „Sonstige“ mit KI sortieren?",
+  "aisort.nothing": "Nichts mehr zu sortieren: die KI hat jeden Absender in „Sonstige“ gesehen.",
+  "aisort.b_units":
+    "{senders} Absender ({units} Gruppen), die die Regeln nicht einordnen konnten",
+  "aisort.b_cost": "Etwa {tin} Tokens rein, {tout} raus – ungefähr {cost}",
+  "aisort.b_instructions": "Deine eigenen Anweisungen aus den Einstellungen sind dabei",
+  "aisort.b_only":
+    "Sie wählt nur eine der festen Arten. Es wird keine Mail verschoben oder "
+    + "gelöscht, und du kannst die Sortierung wieder entfernen.",
+  "aisort.go": "{n} Absender sortieren",
+  "aisort.sorted_n": "{n} Absender wurden von der KI sortiert.",
+  "aisort.checked_n": "Die KI hat {n} Absender angesehen und in „Sonstige“ gelassen.",
+  "aisort.cleared_none": "KI-Sortierung entfernt.",
+  "aisort.clear": "KI-Sortierung entfernen",
+  "aisort.cleared": "KI-Sortierung entfernt: {n} Absender sind wieder dort, wo die Regeln sie hingelegt haben.",
+  "aisort.clear_confirm": "Die KI-Sortierung von {n} Absendern entfernen?",
+  "aisort.started": "KI-Sortierung gestartet.",
+  "notice.ai_sort_done": "KI-Sortierung fertig: {placed} von {total} Gruppen eingeordnet.",
+  "notice.ai_sort_cancelled": "KI-Sortierung nach {done}/{total} Gruppen abgebrochen; was sortiert ist, bleibt.",
+  "notice.ai_sort_budget": "Monatsbudget der KI nach {done}/{total} Gruppen erreicht; was sortiert ist, bleibt.",
+  "ai.sort_instructions": "Deine Anweisungen für die KI-Sortierung (optional)",
+  "ai.sort_instructions_help":
+    "Wird den festen Anweisungen hinzugefügt, wenn die KI die Absender in "
+    + "„Sonstige“ sortiert, z. B. „Mails von meinem Vermieter sind Support, "
+    + "nicht Privatpersonen.“ Die KI wählt weiterhin nur eine der festen "
+    + "Arten. Wird zusammen mit den Absenderdaten an deinen KI-Anbieter "
+    + "gesendet; bis zu 1500 Zeichen.",
+  "smart.reason.own": "Hat genug Mails für eine eigene Zeile.",
+  "smart.reason.protected": "Du hast diesen Absender geschützt.",
+  "smart.reason.replied": "Du hast diesem Absender geschrieben.",
+  "smart.reason.company":
+    "Gehört zu {co}: zusammen haben die Absender genug Mails für eine Zeile.",
+  "smart.reason.purpose": "{n} von {of} Mails handeln von {what}.",
+  "smart.reason.weak":
+    "Nur {n} von {of} Mails handeln von {what} \u2013 zu wenig für eine Aussage.",
+  "smart.reason.competing": "Seine Mails handeln von mehreren Dingen gleichzeitig.",
+  "smart.reason.category": "In deiner Kategorie \u201e{name}\u201c.",
+  "smart.reason.category_conflict": "Passt zu mehreren deiner Kategorien.",
+  "smart.reason.newsletter": "Bietet einen Abmeldelink an oder schickt Werbung.",
+  "smart.reason.individual": "Schreibt von einer privaten Adresse.",
+  "smart.reason.ai": "Von der KI einsortiert als {what}.",
+  "smart.reason.ai_other": "Von der KI geprüft: aus den Betreffs nicht klar.",
+  "smart.reason.ai_other_sure": "Von der KI geprüft: gehört zu den sonstigen Absendern.",
+  "smart.reason.notification":
+    "Automatische Benachrichtigungen aus einem Forum oder Entwickler-Tool.",
+  "smart.reason.none": "In seinen Mails steht nichts, worum es geht.",
+  "smart.reason.with_company":
+    "Zusammen mit den anderen Absendern von {co} eingeordnet.",
+  "senders.tab": "Absender ({n})",
+  "senders.mails_tab": "Mails ({n})",
+  "senders.view": "Was angezeigt wird",
+  "senders.search": "Absender suchen\u2026",
+  "senders.sort": "Absender sortieren",
+  "senders.sort_count": "Meiste Mails",
+  "senders.sort_last": "Neueste",
+  "senders.sort_size": "Größte",
+  "senders.sort_label": "Name",
+  "senders.none": "Keine Absender gefunden.",
+  "senders.select_shown": "Alle {n} angezeigten auswählen",
+  "senders.selected": "{n} von {total} Absendern ausgewählt ({mails} Mails)",
+  "senders.protect": "Schützen",
+  "senders.back": "Zurück zu den Absendern",
+  "senders.protected_toast":
+    "{n} Absender geschützt \u2013 ihre Mails liegen unter \u201eGeschützte Absender\u201c.",
+  "confirm.b_mails_senders": "{n} Mails von {k} Absendern sind betroffen",
+  "confirm.b_mails_one_sender": "{n} Mails von 1 Absender sind betroffen",
+  "confirm.b_protected_senders_skipped": "{n} geschützte Absender übersprungen",
+  "smart.title": "Smart-Gruppierung",
+  "smart.min_label": "Eigene Zeile ab N Mails",
+  "smart.min_help":
+    "Im Tab Smart behält ein Absender mit mindestens so vielen Mails eine "
+    + "eigene Zeile; kleinere Absender werden nach Firma und nach dem "
+    + "Inhalt ihrer Mails gebündelt. 2\u201350, Standard 10. Gilt sofort, "
+    + "kein neuer Scan nötig.",
 };
