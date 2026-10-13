@@ -1673,8 +1673,8 @@ def run_scan(acc=None) -> None:
             try:
                 rebuild_smart(acc)
             except Exception:
-                log.exception("[%s] could not re-derive the smart rows "
-                              "after the scan", acc.name)
+                log.exception("could not re-derive the smart rows after "
+                              "the scan")
             log.info("[%s] scan done: %d folders, %d mails, %d senders, "
                      "%d replied-to addrs%s in %.1fs",
                      acc.name, len(folders), len(messages),
