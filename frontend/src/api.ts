@@ -36,7 +36,12 @@ export async function downloadFile(url: string): Promise<void> {
   if (!res.ok) throw new Error(await res.text() || `HTTP ${res.status}`);
   const blob = await res.blob();
   const cd = res.headers.get("Content-Disposition") || "";
-  const name = /filename="?([^"]+)"?/.exec(cd)?.[1] ?? "download";
+  saveBlob(/filename="?([^"]+)"?/.exec(cd)?.[1] ?? "download", blob);
+}
+
+/** Hand a blob to the browser as a download (blob: link, so it also works in
+ *  iOS standalone mode). */
+export function saveBlob(name: string, blob: Blob): void {
   const blobUrl = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = blobUrl;
@@ -120,6 +125,15 @@ export const api = {
   // Keep the AI's cached answers of the current account as your own rules.
   knowledgeKeepAi: () =>
     req<{ ok: boolean; kept: number }>("/api/knowledge/keep_ai", { all: true }),
+  knowledgeForgetAi: () =>
+    req<{ ok: boolean; forgotten: number }>("/api/knowledge/forget_ai", {}),
+  // Refused (code knowledge_unscanned) unless every account has a finished scan.
+  knowledgeRemoveUnused: () =>
+    req<{ ok: boolean; removed: number }>("/api/knowledge/remove_unused", {}),
+  // Merge a knowledge section ({version, entries}) - just this, no settings.
+  knowledgeImport: (section: unknown) =>
+    req<{ ok: boolean; knowledge: number }>("/api/import_config",
+      { knowledge: section }),
   protectMany: (entries: string[], on: boolean) =>
     req<{ protected: string[] }>("/api/protect", { entries, on }),
   deleteMessages: (items: [string, number][], action = "trash", dest = "",

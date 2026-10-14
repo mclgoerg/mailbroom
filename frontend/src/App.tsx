@@ -2043,6 +2043,7 @@ export default function App() {
           account={account}
           onClose={() => setSettingsOpen(false)}
           onSaved={setCfg}
+          aiAnswers={aiSortedCount} onKnowledgeChanged={refresh}
           onAccountsChanged={(next, name) => {
             setCfg(next);
             if (name && next.accounts[name]) switchAccount(name);
