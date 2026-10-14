@@ -1,6 +1,7 @@
 import { t } from "./i18n";
 import type {
   AdminTenantStats, AiGroupResult, AppState, AttMail, AuditResp, AuthProbe,
+  KnowledgeList, KnowledgeSaved, KnowledgeSrc,
   Config, ConversationResp, DupSet, FilterPreset, FoldersResp, Grouping, IndexInfo,
   Mail, MessageDetail,
   MailsResp, Rule, RuleRun, SearchResp, SortEstimate, StatsResp, TrashResp,
@@ -52,11 +53,20 @@ const ERROR_CODES: Record<string, string> = {
   no_message_id: "pin.no_message_id",
   pinned_mails: "pin.refused",
   all_pinned: "toast.all_pinned",
+  // private sender knowledge (backend/knowledgestore.py)
+  knowledge_bad_request: "know.err.bad_request",
+  knowledge_bad_key: "know.err.bad_key",
+  knowledge_bad_kind: "know.err.bad_kind",
+  knowledge_bad_note: "know.err.bad_note",
+  knowledge_full: "know.err.full",
+  knowledge_ai_running: "know.err.ai_running",
+  knowledge_unscanned: "know.err.unscanned",
 };
 
-async function req<T>(path: string, body?: unknown): Promise<T> {
+async function req<T>(path: string, body?: unknown,
+                      method?: "PUT" | "DELETE"): Promise<T> {
   const res = await fetch(withAccount(path), {
-    method: body === undefined ? "GET" : "POST",
+    method: method ?? (body === undefined ? "GET" : "POST"),
     headers: body === undefined ? {} : { "Content-Type": "application/json" },
     body: body === undefined ? undefined : JSON.stringify(body),
   });
@@ -100,6 +110,16 @@ export const api = {
   aiSortEstimate: () => req<SortEstimate>("/api/ai_sort/estimate"),
   aiSort: () => req<{ units: number; senders: number }>("/api/ai_sort", {}),
   aiSortClear: () => req<{ cleared: number }>("/api/ai_sort/clear", {}),
+  // Private sender knowledge (per user, shared by all accounts).
+  knowledge: () => req<KnowledgeList>("/api/knowledge"),
+  // File entries ({key, kind, note?, src?, ts?}) and / or remove keys in one
+  // request; `previous` is what an Undo puts back.
+  knowledgePut: (body: { entries?: { key: string; kind: string;
+      note?: string; src?: KnowledgeSrc; ts?: number }[]; remove?: string[] }) =>
+    req<KnowledgeSaved>("/api/knowledge", body, "PUT"),
+  // Keep the AI's cached answers of the current account as your own rules.
+  knowledgeKeepAi: () =>
+    req<{ ok: boolean; kept: number }>("/api/knowledge/keep_ai", { all: true }),
   protectMany: (entries: string[], on: boolean) =>
     req<{ protected: string[] }>("/api/protect", { entries, on }),
   deleteMessages: (items: [string, number][], action = "trash", dest = "",

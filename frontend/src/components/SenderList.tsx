@@ -1,10 +1,10 @@
 import { X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { t } from "../i18n";
-import { smartReason } from "../smart";
+import { FILE_KINDS, smartReason } from "../smart";
 import type { Group } from "../types";
 import { GroupTable } from "./GroupTable";
-import { Button, Input, LINK, Select } from "./ui";
+import { Button, choiceDialog, Input, LINK, Select } from "./ui";
 
 type SenderSort = "count" | "last" | "size" | "label";
 // Reasons the panel's own "why" line already says for EVERY sender of the row
@@ -13,6 +13,11 @@ type SenderSort = "count" | "last" | "size" | "label";
 // placed with a small company - stay.
 const EXPLAINED_ABOVE = new Set(["company", "protected", "replied", "own"]);
 export type SenderAction = "trash" | "archive" | "move" | "mark_read";
+/** One thing to file: `a:<address>` for a sender, `co:<company>` for a
+ *  whole company, under a fixed kind or `cat:<name>`. */
+export type FileEntry = { key: string; kind: string };
+// Rows that structure alone decides: filing a sender in them changes nothing.
+const NOT_FILEABLE = new Set(["company", "protected", "replied"]);
 
 /** Newest first / biggest first; names A-Z. The address breaks ties, so a
  *  refresh never reshuffles equal rows. */
@@ -50,7 +55,7 @@ export function filterSenders(list: Group[], query: string): Group[] {
  *  account change). Unsubscribe is NOT offered here: it stays an explicit
  *  single-sender action inside one sender's own detail view. */
 export function SenderList({ senders, folders, onAct, onProtect, onInspect,
-  onAckUnsub, onSelectedChange }: {
+  onAckUnsub, onSelectedChange, rowKind, categories = [], onFile }: {
   senders: Group[];                      // live sender records of this row
   folders: string[];
   onAct: (keys: string[], action: SenderAction, dest?: string) => Promise<boolean>;
@@ -60,12 +65,20 @@ export function SenderList({ senders, folders, onAct, onProtect, onInspect,
   // How many senders are ticked (the panel hides its whole-group red button
   // while this bar owns the destructive action).
   onSelectedChange?: (n: number) => void;
+  // "File in Smart as...": the kind of the pooled row these senders are in,
+  // the user's own categories (a sender can be filed into one), and the
+  // filing itself - given the senders ticked, to word the confirmation.
+  rowKind?: string;
+  categories?: string[];
+  onFile?: (entries: FileEntry[], senders: number) => Promise<boolean>;
 }) {
   const [sel, setSel] = useState<Set<string>>(new Set());
   const [query, setQuery] = useState("");
   const [sortBy, setSortBy] = useState<SenderSort>("count");
   const [moveDest, setMoveDest] = useState("");
+  const [filing, setFiling] = useState(false);        // the kind picker is open
   const [working, setWorking] = useState(false);
+  const fileBlocked = NOT_FILEABLE.has(rowKind ?? "");
 
   // Ordinary refreshes keep the selection by sender identity; a sender that
   // is gone (trashed, protected into another row) drops out of it.
@@ -84,7 +97,9 @@ export function SenderList({ senders, folders, onAct, onProtect, onInspect,
     () => new Map(senders.map((g) => [g.key, g])), [senders]);
   const keys = useMemo(() => [...sel].filter((k) => byKey.has(k)), [sel, byKey]);
   const mails = keys.reduce((n, k) => n + (byKey.get(k)?.count ?? 0), 0);
-  useEffect(() => { if (!keys.length) setMoveDest(""); }, [keys.length]);
+  useEffect(() => {
+    if (!keys.length) { setMoveDest(""); setFiling(false); }
+  }, [keys.length]);
   useEffect(() => { onSelectedChange?.(keys.length); }, [keys.length]);   // eslint-disable-line react-hooks/exhaustive-deps
 
   const toggle = (k: string) => {
@@ -97,8 +112,35 @@ export function SenderList({ senders, folders, onAct, onProtect, onInspect,
     try { if (await task) setSel(new Set()); }
     finally { setWorking(false); }
   };
+  // File the ticked senders under `kind`. A ticked sender that belongs to a
+  // small company group asks first: just the ticked ones (they leave the
+  // group) or the whole company.
+  const fileAs = async (kind: string) => {
+    setFiling(false);
+    const picked = keys.map((k) => byKey.get(k)!);
+    const companies = new Set(picked.map((g) => g.smart_why?.co)
+      .filter((c): c is string => !!c));
+    let whole = false;
+    if (companies.size) {
+      const inGroups = senders.filter((g) => g.smart_why?.co
+        && companies.has(g.smart_why.co)).length;
+      const choice = await choiceDialog({ title: t("know.scope_title"),
+        body: t("know.scope_body"), confirmLabel: t("know.scope_sender"),
+        altLabel: t("know.scope_company", { n: inGroups }) });
+      if (choice === null) return;
+      whole = choice === "alt";
+    }
+    const entries = new Map<string, string>();
+    for (const g of picked) {
+      const co = g.smart_why?.co;
+      entries.set(whole && co ? `co:${co}` : `a:${g.key}`, kind);
+    }
+    await run(onFile!([...entries].map(([key, k]) => ({ key, kind: k })),
+      picked.length));
+  };
   const onAction = (v: string) => {
     if (v === "move") setMoveDest("?");
+    else if (v === "file") setFiling(true);
     else if (v === "protect") run(onProtect(keys));
     else if (v) run(onAct(keys, v as SenderAction));
   };
@@ -162,13 +204,18 @@ export function SenderList({ senders, folders, onAct, onProtect, onInspect,
             {/* The Action… select stays mounted while the folder picker is
                 open: swapping one select for another in place left stale
                 options in iOS' native list (same lesson as the bulk bar). */}
-            <Select value="" className="min-w-0 flex-1" disabled={working}
+            <Select value="" className="min-w-28 flex-1" disabled={working}
               onChange={(e) => onAction(e.target.value)}>
               <option value="" disabled>{t("Action…")}</option>
               <option value="archive">{t("Archive")}</option>
               <option value="move">{t("Move to folder…")}</option>
               <option value="mark_read">{t("Mark read")}</option>
               <option value="protect">{t("senders.protect")}</option>
+              {onFile && (
+                <option value="file" disabled={fileBlocked}>
+                  {t("know.file_action")}
+                </option>
+              )}
             </Select>
             {moveDest === "?" && (
               <>
@@ -186,12 +233,38 @@ export function SenderList({ senders, folders, onAct, onProtect, onInspect,
                 </Button>
               </>
             )}
+            {filing && (
+              <>
+                <Select value="" className="min-w-28 flex-1"
+                  aria-label={t("know.file_action")}
+                  onChange={(e) => { if (e.target.value) fileAs(e.target.value); }}>
+                  <option value="" disabled>{t("know.file_action")}</option>
+                  {FILE_KINDS.map((k) => (
+                    <option key={k} value={k}>{t(`smart.kind.${k}`)}</option>
+                  ))}
+                  {categories.map((c) => (
+                    <option key={c} value={`cat:${c}`}>
+                      {t("know.kind_category", { name: c })}
+                    </option>
+                  ))}
+                </Select>
+                <Button variant="secondary" size="icon" label={t("Cancel")}
+                  className="shrink-0" onClick={() => setFiling(false)}>
+                  <X size={18} />
+                </Button>
+              </>
+            )}
             <Button variant="danger" disabled={working}
               className="ml-auto shrink-0"
               onClick={() => run(onAct(keys, "trash"))}>
               {t("Trash selected")} ({keys.length})
             </Button>
           </div>
+          {onFile && (filing || fileBlocked) && (
+            <p className="mt-2 type-meta text-muted">
+              {filing ? t("know.file_help") : t(`know.blocked.${rowKind}`)}
+            </p>
+          )}
         </div>
       )}
     </>

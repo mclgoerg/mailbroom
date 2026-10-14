@@ -46,6 +46,19 @@ export function smartWhy(g: Group, min: number): string {
     domain: g.domain || g.label, n: g.n_senders ?? 0 });
 }
 
+/** The name of a kind a sender can be filed under: a fixed kind ("orders")
+ *  or `cat:<name>` of one of the user's own categories. */
+export function filedKindName(kind: string): string {
+  return kind.startsWith("cat:")
+    ? t("know.kind_category", { name: kind.slice(4) })
+    : t(`smart.kind.${kind}`);
+}
+
+/** Kinds offered when filing (backend smartkinds.SORT_KINDS), listed in
+ *  Smart's own order. */
+export const FILE_KINDS = ["orders", "appointments", "jobs", "support",
+  "accounts", "newsletter", "individuals", "other"] as const;
+
 /** What a company row's mails are about, in full (detail view). */
 export function smartContent(g: Group): string {
   const list = purposeSummary(g);
@@ -59,6 +72,16 @@ export function smartReason(why: SmartWhy | undefined): string {
   if (!why) return "";
   if (why.r === "ai" && why.k === "other") {
     return t(why.sure ? "smart.reason.ai_other_sure" : "smart.reason.ai_other");
+  }
+  if (why.r === "rule" || why.r === "kept_ai") {
+    // What the user filed (or kept from an AI answer): a plain sentence, no
+    // "placed together with" tail - the filing is the reason.
+    const what = why.k === "category"
+      ? t("know.kind_category", { name: why.name ?? "" })
+      : t(`smart.kind.${why.k ?? "other"}`);
+    return t(why.r === "kept_ai" ? "smart.reason.kept_ai"
+      : why.by === "co" ? "smart.reason.rule_co" : "smart.reason.rule",
+    { what });
   }
   const what = why.k ? t(`smart.about.${why.k}`) : "";
   const text = t(`smart.reason.${why.r}`, { n: why.n ?? 0, of: why.of ?? 0,

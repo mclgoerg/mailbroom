@@ -30,9 +30,11 @@ import { t } from "./i18n";
 import { usePaneHeight, useSplitPane } from "./splitPane";
 import { applyStatus, fmtAgo, fmtSize, fmtUsd, matchGroup, parseFilter,
   parseProgress, retainedMailKeys, shortcutTarget, smartMembers } from "./lib";
-import { isPooled, smartView } from "./smart";
-import type { SenderAction } from "./components/SenderList";
+import { filedKindName, isPooled, smartLabel, smartView } from "./smart";
+import { SenderFiling } from "./components/SenderFiling";
+import type { FileEntry, SenderAction } from "./components/SenderList";
 import type { AppState, AuthProbe, Config, FilterPreset, Group, Grouping,
+  KnowledgeStored,
   StatusMsg } from "./types";
 
 const GROUPING_LABEL: Record<Grouping, string> = {
@@ -705,6 +707,21 @@ export default function App() {
       refresh();
     } catch (e: any) { fail(e, "err.ai"); }
   };
+  // Keep the AI's answers as the user's own rules (they move out of the AI
+  // cache into the sender knowledge): a confirm with the count first.
+  const keepAnswers = async () => {
+    if (!await confirmDialog({
+      title: t("know.keep_title", { n: aiSortedCount }),
+      bullets: [t("know.keep_b_rules"), t("know.keep_b_clearer"),
+        t("know.keep_b_only")],
+      confirmLabel: t("know.keep_go", { n: aiSortedCount }) })) return;
+    try {
+      const r = await api.knowledgeKeepAi();
+      notify(r.kept ? t("know.kept", { n: r.kept }) : t("know.kept_none"),
+        r.kept ? "success" : "info");
+      refresh();
+    } catch (e: any) { fail(e); }
+  };
   const aiSortClear = async () => {
     if (!await confirmDialog({
       title: t("aisort.clear_confirm", { n: aiSortedCount + aiCheckedCount }),
@@ -956,6 +973,49 @@ export default function App() {
   const actOnSenders = (keys: string[], action: SenderAction, dest = "") =>
     actOn("sender", state?.groups?.sender ?? {}, keys, action, dest, null,
       null, "senders");
+  // Private sender knowledge: file ticked senders in Smart (no mail moves), or
+  // put them back to automatic. Both toast with an Undo that restores the
+  // PREVIOUS entries (or their absence) - it is not part of the mail undo
+  // history, which only knows moves.
+  const ownCategories = useMemo(() => Object.entries(cfg?.categories ?? {})
+    .filter(([, v]) => v.length).map(([k]) => k).sort(), [cfg?.categories]);
+  const restoreFiling = async (previous: Record<string, KnowledgeStored | null>) => {
+    const entries = Object.entries(previous).filter(([, v]) => v)
+      .map(([key, v]) => ({ key, ...v! }));
+    const remove = Object.entries(previous).filter(([, v]) => !v)
+      .map(([key]) => key);
+    try {
+      await api.knowledgePut({ entries: entries.length ? entries : undefined,
+        remove: remove.length ? remove : undefined });
+      notify(t("know.undone"));
+      refresh();
+    } catch (e: any) { fail(e); }
+  };
+  const fileSenders = async (entries: FileEntry[], senders: number): Promise<boolean> => {
+    try {
+      const r = await api.knowledgePut({ entries });
+      toast.show(t("know.filed", { n: senders,
+        kind: filedKindName(entries[0].kind) }), { variant: "success",
+        action: { label: t("Undo"), onClick: () => restoreFiling(r.previous) } });
+      refresh();
+      return true;
+    } catch (e: any) {
+      fail(e);
+      return false;
+    }
+  };
+  const resetFiling = async (keys: string[]): Promise<boolean> => {
+    try {
+      const r = await api.knowledgePut({ remove: keys });
+      toast.show(t("know.reset_done"), { variant: "success",
+        action: { label: t("Undo"), onClick: () => restoreFiling(r.previous) } });
+      refresh();
+      return true;
+    } catch (e: any) {
+      fail(e);
+      return false;
+    }
+  };
   const protectSenders = async (keys: string[]): Promise<boolean> => {
     try {
       const r = await api.protectMany(keys, true);
@@ -1266,6 +1326,12 @@ export default function App() {
         smartMin={acct?.smart_min ?? 10}
         folders={state?.folders_raw ?? []}
         sieve={(acct?.preset ?? "proton") === "proton"}
+        filingBox={state?.groups.smart?.[(live ?? sender).smart_key ?? ""] && (
+          <SenderFiling sender={live ?? sender} categories={ownCategories}
+            rowLabel={smartLabel(
+              state.groups.smart[(live ?? sender).smart_key!])}
+            rev={state.groups_rev} onFile={fileSenders} onReset={resetFiling} />
+        )}
         onClose={back} backLabel={t("senders.back")} onEmptied={back}
         onDeleted={refresh} />
     );
@@ -1279,7 +1345,7 @@ export default function App() {
   // when it was opened.
   const liveGroup = (g: Group): Group => {
     const live = state?.groups[mode]?.[g.key];
-    return live && isPooled(g) ? { ...g, kind: live.kind, label: live.label,
+    return live && isPooled(g) ? { ...g, kind: live.kind, label: smartLabel(live),
       count: live.count, size: live.size, pinned: live.pinned,
       n_senders: live.n_senders } : g;
   };
@@ -1311,12 +1377,13 @@ export default function App() {
       senders={mode === "smart" && isPooled(detail)
         ? members?.get(detail.key) : undefined}
       onSenderAct={actOnSenders} onSenderProtect={protectSenders}
+      onFile={fileSenders} categories={ownCategories}
       renderSender={renderSender} onAckUnsub={ackUnsub}
       aiSort={mode === "smart" && isPooled(detail) ? {
         total: aiSortedCount, checked: aiCheckedCount,
         busy: aiRunning || scanning,
         onSort: aiEnabled ? aiSortOther : undefined,
-        onClear: aiSortClear } : undefined}
+        onClear: aiSortClear, onKeep: keepAnswers } : undefined}
       onClose={variant === "pane" ? closePane
         : () => { setDetail(null); refresh(); }}
       onEmptied={variant === "pane" ? () => advancePane(detail) : undefined}
@@ -1807,6 +1874,14 @@ export default function App() {
         <Notice className="mb-2" icon={<Info size={14} />}
           onClose={dismissNotice}>
           {t(`notice.${state.notice.key}`, state.notice.params)}
+          {/* a finished AI sorting run: the answers can be kept right here */}
+          {state.notice.key === "ai_sort_done" && aiSortedCount > 0 && (
+            <>{" "}
+              <button className={LINK} onClick={keepAnswers}>
+                {t("know.keep_btn", { n: aiSortedCount })}
+              </button>
+            </>
+          )}
         </Notice>
       )}
 
