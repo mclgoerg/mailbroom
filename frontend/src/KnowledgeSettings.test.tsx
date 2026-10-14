@@ -37,7 +37,7 @@ import type { KnowledgeEntry, KnowledgeList } from "./types";
 
 const entry = (over: Partial<KnowledgeEntry>): KnowledgeEntry => ({
   key: "a:amy@solo.example", kind: "orders", src: "user", ts: 100, note: "",
-  status: "active", reason: "", senders: 1, rows: ["k:orders"], ...over });
+  status: "active", reason: "", senders: 1, filed: 1, rows: ["k:orders"], ...over });
 const ENTRIES: KnowledgeEntry[] = [
   entry({ key: "a:amy@solo.example", kind: "orders", ts: 300, note: "my plumber" }),
   entry({ key: "co:acme.example", kind: "support", ts: 200, senders: 3,
@@ -357,7 +357,7 @@ describe("the confirmations say what they do", () => {
     let dlg = await findDialog();
     expect(within(dlg).getByText(/This cannot be undone\./)).toBeTruthy();
     await cancelDialog();
-    fireEvent.click(screen.getByRole("button", { name: "Forget kept AI answers (1)" }));
+    fireEvent.click(screen.getByRole("button", { name: "Forget kept AI answers (1 sender)" }));
     dlg = await findDialog();
     expect(within(dlg).getByText(/gone for good/)).toBeTruthy();
     await cancelDialog();
@@ -430,15 +430,15 @@ describe("Remove unused", () => {
 
 describe("AI answers", () => {
   it("keeps all of them after a confirmation with the count", async () => {
-    knowledgeKeepAi.mockResolvedValue({ ok: true, kept: 2 });
+    knowledgeKeepAi.mockResolvedValue({ ok: true, kept: 2, senders: 3, skipped: 0 });
     mount(3);
     await screen.findByText("amy@solo.example");
     fireEvent.click(screen.getByRole("button", { name: "Keep all AI answers" }));
     const dlg = await findDialog();
     expect(within(dlg).getByText("Keep the AI’s answers for 3 senders?")).toBeTruthy();
-    await pressDialog("Keep 3 answers");
+    await pressDialog("Keep for 3 senders");
     await waitFor(() => expect(knowledgeKeepAi).toHaveBeenCalledTimes(1));
-    expect(await screen.findByText("Kept 2 AI answers.")).toBeTruthy();
+    expect(await screen.findByText("Kept the AI’s answers for 3 senders.")).toBeTruthy();
   });
 
   it("has nothing to keep without AI answers, and a declined confirm keeps nothing",
@@ -463,14 +463,42 @@ describe("AI answers", () => {
       mount();
       await screen.findByText("amy@solo.example");
       fireEvent.click(screen.getByRole("button",
-        { name: "Forget kept AI answers (1)" }));
+        { name: "Forget kept AI answers (1 sender)" }));
       const dlg = await findDialog();
-      expect(within(dlg).getByText("Forget the 1 kept AI answer?")).toBeTruthy();
+      expect(within(dlg).getByText("Forget the kept AI answer for 1 sender?")).toBeTruthy();
       expect(within(dlg).getByText("What you filed yourself stays.")).toBeTruthy();
-      await pressDialog("Forget 1 answer");
+      await pressDialog("Forget for 1 sender");
       await waitFor(() => expect(knowledgeForgetAi).toHaveBeenCalledTimes(1));
-      expect(await screen.findByText("Forgot 1 kept AI answer.")).toBeTruthy();
+      expect(await screen.findByText("Forgot the kept AI answer for 1 sender.")).toBeTruthy();
     });
+
+  it("counts the kept answers in senders - and, for answers no sender uses, "
+    + "says so", async () => {
+    list({ entries: [
+      entry({ key: "co:acme.example", kind: "support", src: "ai", senders: 4,
+        filed: 3 }),                       // 4 match, 3 are decided by it
+      entry({ key: "a:amy@solo.example", kind: "jobs", src: "ai", senders: 1,
+        filed: 1 }),
+      entry({ key: "a:ghost@nowhere.example", kind: "jobs", src: "ai",
+        senders: 0, filed: 0, status: "unused" })] });
+    knowledgeForgetAi.mockResolvedValue({ ok: true, forgotten: 3 });
+    mount();
+    fireEvent.click(await screen.findByRole("button",
+      { name: "Forget kept AI answers (4 senders)" }));   // 3 + 1 + 0 filed
+    const dlg = await findDialog();
+    expect(within(dlg).getByText("Forget the kept AI answers for 4 senders?"))
+      .toBeTruthy();
+    await cancelDialog();
+    cleanup();
+    list({ entries: [entry({ key: "a:ghost@nowhere.example", kind: "jobs",
+      src: "ai", senders: 0, filed: 0, status: "unused" })] });
+    mount();
+    fireEvent.click(await screen.findByRole("button",
+      { name: "Forget kept AI answers (1 answer)" }));
+    expect(within(await findDialog()).getByText(
+      "Forget 1 kept AI answer that currently files no sender?")).toBeTruthy();
+    await cancelDialog();
+  });
 
   it("a refusal while an AI run is going is shown in words", async () => {
     knowledgeKeepAi.mockRejectedValue(new Error(
@@ -479,7 +507,7 @@ describe("AI answers", () => {
     await screen.findByText("amy@solo.example");
     fireEvent.click(screen.getByRole("button", { name: "Keep all AI answers" }));
     await findDialog();
-    await pressDialog("Keep 2 answers");
+    await pressDialog("Keep for 2 senders");
     expect(await screen.findByText(/An AI run is going/)).toBeTruthy();
   });
 });

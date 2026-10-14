@@ -541,6 +541,24 @@ def test_the_listing_says_why_an_entry_has_no_effect(mailbox):
     assert body["max"] == ks.MAX_ENTRIES and body["ai_running"] is False
 
 
+def test_filed_counts_the_senders_an_entry_decides_not_every_match(mailbox):
+    # a company entry matches all its senders, but decides only the ones that
+    # are not a row of their own / replied / protected ...
+    put(entries=[{"key": "co:duo.example", "kind": "support"},
+                 {"key": "a:big@shop.example", "kind": "support"}])
+    got = listing()
+    assert (got["co:duo.example"]["senders"], got["co:duo.example"]["filed"]) == (2, 2)
+    # (an own row: it matches, it decides nothing)
+    assert (got["a:big@shop.example"]["senders"],
+            got["a:big@shop.example"]["filed"]) == (1, 0)
+    # a sender covered by an own entry AND its company's counts once, for the
+    # entry that wins
+    put(key="a:a@duo.example", kind="jobs")
+    got = listing()
+    assert got["a:a@duo.example"]["filed"] == 1
+    assert got["co:duo.example"]["filed"] == 1
+
+
 def test_rules_that_became_confident_and_decided_rows_are_explained(mailbox):
     # kept answers only apply where the rules are unsure
     ks.modify(lambda e: e.update({
@@ -806,9 +824,27 @@ def test_keeping_an_answer_is_a_move_not_a_copy(sorted_box):
     assert where("a@duo.example") != "k:jobs"
 
 
+def test_keep_reports_answers_senders_and_what_it_could_not_keep(sorted_box):
+    # the same unit as everywhere else: SENDERS (a company answer covers two)
+    r = client.post("/api/knowledge/keep_ai",
+                    json={"keys": ["co:duo.example"]}).json()
+    assert (r["kept"], r["senders"], r["skipped"]) == (1, 2, 0)
+    # an own filing of the same key (inactive for now: its category is gone)
+    # is never overwritten by the AI's answer - reported as skipped senders
+    cfgmod.update_config({"categories": {"hobby": ["zzz"]}})
+    assert put(key="a:mystery@one.example", kind="cat:hobby").status_code == 200
+    cfgmod.update_config({"categories": {}})
+    mailops.rebuild_smart_all()
+    assert where("mystery@one.example") == "k:support"      # the cached answer
+    r = client.post("/api/knowledge/keep_ai", json={"all": True}).json()
+    assert (r["kept"], r["senders"], r["skipped"]) == (0, 0, 1)
+    assert ks.load()["a:mystery@one.example"]["src"] == "user"
+
+
 def test_keep_all_keeps_every_answer_that_applies_once(sorted_box):
     r = client.post("/api/knowledge/keep_ai", json={"all": True})
     assert r.json()["kept"] == 2                    # mystery + the duo company
+    assert r.json()["senders"] == 3 and r.json()["skipped"] == 0
     assert set(listing()) == {"a:mystery@one.example", "co:duo.example"}
     assert all(e["src"] == "ai" for e in listing().values())
     assert aisortstore.load_account(accountsmod.get().name) == {

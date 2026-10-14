@@ -23,7 +23,7 @@ const sender = (over: Partial<Group> = {}): Group => ({
 });
 const entry = (over: Partial<KnowledgeEntry>): KnowledgeEntry => ({
   key: "a:a@solo.example", kind: "orders", src: "user", ts: 1, note: "",
-  status: "active", reason: "", senders: 1, rows: ["k:orders"], ...over,
+  status: "active", reason: "", senders: 1, filed: 1, rows: ["k:orders"], ...over,
 });
 const list = (entries: KnowledgeEntry[]) => knowledge.mockResolvedValue({
   entries, complete: true, unscanned: [], categories: [], max: 5000,

@@ -119,18 +119,22 @@ def keep_ai(acc, keys=None, everything: bool = False) -> dict:
         raise KnowledgeError(ks.BAD_REQUEST)
     cached = aisortstore.load_account(acc.name)
     with acc.lock:
-        applying = {
-            (f"co:{why['co']}" if why.get("co") else f"a:{addr}")
-            for addr, rec in acc.state["groups"]["sender"].items()
-            if (why := rec.get("smart_why") or {}).get("r") == "ai"
-            and why.get("k") != "other"}
-    wanted = applying if everything else \
-        {k for k in keys if isinstance(k, str)} & applying
+        # unit key -> senders it covers (a small company's answer covers
+        # all its senders); the user is told in senders everywhere
+        applying: dict[str, int] = {}
+        for addr, rec in acc.state["groups"]["sender"].items():
+            why = rec.get("smart_why") or {}
+            if why.get("r") == "ai" and why.get("k") != "other":
+                key = f"co:{why['co']}" if why.get("co") else f"a:{addr}"
+                applying[key] = applying.get(key, 0) + 1
+    wanted = set(applying) if everything else \
+        {k for k in keys if isinstance(k, str)} & set(applying)
     chosen = {k: cached[k]["kind"] for k in sorted(wanted)
               if k in cached and cached[k]["kind"] in sk.SORT_KINDS
               and cached[k]["kind"] != "other" and ks.is_valid_key(k)}
+    asked = sum(applying[k] for k in wanted)         # senders asked for
     if not chosen:
-        return {"ok": True, "kept": 0}
+        return {"ok": True, "kept": 0, "senders": 0, "skipped": asked}
     now = int(time.time())
 
     def change(entries: dict) -> list[str]:
@@ -144,10 +148,16 @@ def keep_ai(acc, keys=None, everything: bool = False) -> dict:
 
     kept = ks.modify(change)
     aisortstore.drop(kept, acc.name)                    # a move, not a copy
-    log.info("sender knowledge: %d AI answers kept", len(kept))
+    covered = sum(applying[k] for k in kept)
+    log.info("sender knowledge: %d AI answers kept (%d senders)", len(kept),
+             covered)
     if kept:
         mailops.rebuild_smart_all()
-    return {"ok": True, "kept": len(kept)}
+    # `kept` = answers stored, `senders` = senders they cover, `skipped` =
+    # senders asked for whose answer could not be kept (an own filing of the
+    # same key exists, or the key is not valid)
+    return {"ok": True, "kept": len(kept), "senders": covered,
+            "skipped": asked - covered}
 
 
 def forget_ai() -> dict:
@@ -197,7 +207,7 @@ def remove_unused() -> dict:
 # -------------------------------------------------------------- live info
 
 class _Live(NamedTuple):
-    rows: dict[str, dict]       # entry key -> {status, reason, senders, rows}
+    rows: dict[str, dict]       # entry key -> {status, reason, senders, filed, rows}
     complete: bool              # every configured account has a finished scan
     unscanned: list[str]
 
@@ -245,7 +255,8 @@ def _live(cfg: dict, entries: dict[str, dict]) -> _Live:
     for key, entry in entries.items():
         prefix, _, rest = key.partition(":")
         kind = entry["kind"]
-        row = {"status": "active", "reason": "", "senders": 0, "rows": []}
+        row = {"status": "active", "reason": "", "senders": 0, "filed": 0,
+               "rows": []}
         rows[key] = row
         valid = sk.valid_address_key(rest) if prefix == "a" \
             else sk.valid_company_key(rest)
@@ -267,8 +278,11 @@ def _live(cfg: dict, entries: dict[str, dict]) -> _Live:
             row.update(status="unused" if complete else "unknown")
             continue
         rank = "rule" if entry["src"] == ks.USER else "kept_ai"
-        if any(why.get("r") == rank and why.get("by") == prefix
-               for _, (_, why) in matches):
+        # `filed`: the senders this entry actually decides right now (a sender
+        # that merely matches, e.g. one with its own row, is not counted)
+        row["filed"] = len({a for a, (_, why) in matches
+                            if why.get("r") == rank and why.get("by") == prefix})
+        if row["filed"]:
             continue                                        # active
         reasons = [_reason(why, entry, sk.is_freemail(a.rpartition("@")[2]))
                    for a, (_, why) in matches]

@@ -218,7 +218,9 @@ def test_the_answer_places_units_in_the_fixed_kinds(mailbox, monkeypatch):
     assert sender("mixed@two.example")["smart_why"] == {"r": "ai", "k": "other"}
     rows = smart_rows()
     assert rows["k:orders"]["n_senders"] == 1 and rows["k:appointments"]["n_senders"] == 2
-    assert state["notice"] == {"key": "ai_sort_done", "params": {"placed": 2, "total": 4}}
+    # everything is counted in SENDERS: 3 of the 5 senders were placed (the
+    # small company's two senders count both)
+    assert state["notice"] == {"key": "ai_sort_done", "params": {"placed": 3, "total": 5}}
     assert state["ai"]["usage"]["input_tokens"] == 1000
     assert len(calls) == 1 and len(calls[0]["units"]) == 4
 
@@ -394,10 +396,15 @@ def test_a_monthly_budget_stops_a_run_between_batches(monkeypatch):
     mailops.run_scan()
     calls = fake_model(monkeypatch, lambda u: ("orders", True),
                        tokens=(2_000_000, 100))               # $4 per batch at $2/M
+    acc = accountsmod.get()
+    with acc.lock:
+        asked = sum(len(u["addrs"]) for u in aisort.collect_units(acc))
     state = run_sort()
     assert len(calls) == 1                                    # the 2nd batch was refused
     assert state["notice"]["key"] == "ai_sort_budget"
-    assert state["notice"]["params"]["done"] == aisort.SORT_BATCH
+    # the notice counts SENDERS: those answered so far of those asked about
+    assert state["notice"]["params"] == {"done": aisort.SORT_BATCH, "total": asked}
+    assert asked > aisort.SORT_BATCH
     assert len(aisortstore.load_account("default")) == aisort.SORT_BATCH
     # what was learned still applies
     assert sum(1 for r in mailops.STATE["groups"]["sender"].values()
@@ -426,6 +433,8 @@ def test_cancel_keeps_what_was_sorted_so_far(monkeypatch):
     state = run_sort()
     assert state["notice"]["key"] == "ai_sort_cancelled"
     assert len(aisortstore.load_account("default")) == aisort.SORT_BATCH
+    assert state["notice"]["params"]["done"] == aisort.SORT_BATCH   # senders
+    assert state["notice"]["params"]["total"] > aisort.SORT_BATCH
 
 
 def test_a_provider_error_is_reported_and_keeps_earlier_answers(monkeypatch, mailbox):
@@ -696,7 +705,8 @@ def test_batches_are_asked_a_few_at_a_time(monkeypatch):
         with lock:
             live["now"] -= 1
             live["last"] = time.time()
-            live["units"] += len(payload["units"])
+            live["units"] += sum(len(u["senders"]) + u["more_senders"]
+                                 for u in payload["units"])
         return types.SimpleNamespace(
             stop_reason="end_turn",
             content=[types.SimpleNamespace(type="text", text=json.dumps({"results": [
@@ -710,6 +720,7 @@ def test_batches_are_asked_a_few_at_a_time(monkeypatch):
     assert live["last"] - live["first"] < 4 * 0.15      # not one after the other
     assert state["ai"]["status"] == "done"
     assert state["ai"]["usage"]["input_tokens"] == 40   # every batch is counted
+    # (total = senders, as in every message the user reads)
     assert state["notice"]["params"]["total"] == live["units"] > 130   # none skipped
 
 
@@ -739,3 +750,55 @@ def test_one_failing_batch_in_a_wave_keeps_what_the_others_learned(monkeypatch):
     kept = aisortstore.load_account("default")
     assert 0 < len(kept) < 94                           # the two good batches stay
     assert state["ai"]["status"] != "running"
+
+
+def test_the_counts_are_senders_and_an_answer_that_does_not_apply_is_not_placed(
+        mailbox, monkeypatch):
+    # The AI answers a purpose for a free-mail sender: it is stored, but never
+    # applied - so it is neither "placed" nor offered by "Keep these answers".
+    answers = {"mystery@one.example": ("orders", True),
+               "a@duo.example": ("appointments", True),
+               "noreply@gmail.com": ("orders", True)}
+    fake_model(monkeypatch, lambda u: answers.get(first_addr(u), ("other", False)))
+    state = run_sort()
+    assert sender("noreply@gmail.com")["smart_key"] == "k:other"
+    # 5 senders asked about (4 units); 3 placed - the free-mail answer is not
+    assert state["notice"]["params"] == {"placed": 3, "total": 5}
+    placed_senders = sum(1 for r in mailops.STATE["groups"]["sender"].values()
+                         if (r.get("smart_why") or {}).get("r") == "ai"
+                         and r["smart_why"].get("k") != "other")
+    assert placed_senders == state["notice"]["params"]["placed"]
+    r = client.post("/api/knowledge/keep_ai", json={"all": True}).json()
+    assert r["senders"] == placed_senders and r["skipped"] == 0
+    assert r["kept"] == 2                      # answers: one sender + one company
+
+
+def test_progress_is_counted_in_senders(mailbox, monkeypatch):
+    monkeypatch.setattr(aisort, "SORT_BATCH", 2)
+    monkeypatch.setattr(aisort, "SORT_PARALLEL", 1)
+    seen = []
+    real = aisort._ask
+
+    def watching(cfg, model, system, batch):
+        seen.append(mailops.STATE["ai"]["progress"])   # after the previous batch
+        return real(cfg, model, system, batch)
+    fake_model(monkeypatch, lambda u: ("other", False))
+    monkeypatch.setattr(aisort, "_ask", watching)
+    run_sort()
+    assert len(seen) == 2 and seen[0] == ""            # 4 units, batches of 2
+    done, total = seen[1].split(" ")[0].split("/")
+    assert seen[1].endswith(" senders") and total == "5" and 0 < int(done) < 5
+
+
+def test_placed_falls_back_to_the_stored_answers_when_the_rows_cannot_be_rebuilt(
+        mailbox, monkeypatch):
+    answers = {"mystery@one.example": ("orders", True),
+               "a@duo.example": ("appointments", True)}
+    fake_model(monkeypatch, lambda u: answers.get(first_addr(u), ("other", False)))
+
+    def broken(*a, **k):
+        raise RuntimeError("rebuild failed")
+    monkeypatch.setattr(mailops, "rebuild_smart", broken)
+    state = run_sort()
+    # three senders hold a placing answer (one plus a company of two)
+    assert state["notice"]["params"] == {"placed": 3, "total": 5}

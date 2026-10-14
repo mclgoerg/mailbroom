@@ -2,7 +2,7 @@ import { ArrowDown, ArrowUp, Building2, Pencil, Trash2, User } from "lucide-reac
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api, saveBlob } from "../api";
 import { t } from "../i18n";
-import { FILE_KINDS, filedKindName } from "../smart";
+import { FILE_KINDS, filedKindName, keptMessage } from "../smart";
 import type { KnowledgeEntry, KnowledgeList, KnowledgeStored } from "../types";
 import { Button, Checkbox, confirmDialog, EmptyState, Input, Loading,
   SectionLabel, Select, Tag, useMediaQuery, useToast } from "./ui";
@@ -109,6 +109,9 @@ export function KnowledgeSettings({ aiAnswers, onChanged }: {
   useEffect(() => { setShown(PAGE); }, [query, sortBy, dir]);
   const unused = entries.filter((e) => e.status === "unused");
   const kept = entries.filter((e) => e.src === "ai");
+  // the kept AI answers, counted in the senders they decide right now (the
+  // unit used everywhere around AI sorting)
+  const keptSenders = kept.reduce((n, e) => n + e.filed, 0);
   const categories = data?.categories ?? [];
 
   /** Run a change, then reload and tell the app. */
@@ -176,20 +179,25 @@ export function KnowledgeSettings({ aiAnswers, onChanged }: {
       confirmLabel: t("know.keep_go", { n: aiAnswers }) })) return;
     act(async () => {
       const r = await api.knowledgeKeepAi();
-      toast.show(r.kept ? t("know.kept", { n: r.kept }) : t("know.kept_none"),
-        { variant: r.kept ? "success" : "info" });
+      toast.show(keptMessage(r), { variant: r.senders ? "success" : "info" });
     });
   };
   const forgetKept = async () => {
     if (!await confirmDialog({
-      title: t("know.forget_title", { n: kept.length }),
+      title: keptSenders
+        ? t("know.forget_title", { n: keptSenders })
+        : t("know.forget_title_unused", { n: kept.length }),
       bullets: [t("know.forget_b_back"), t("know.forget_b_own"),
         t("know.forget_b_gone")],
-      confirmLabel: t("know.forget_go", { n: kept.length }),
+      confirmLabel: keptSenders
+        ? t("know.forget_go", { n: keptSenders })
+        : t("know.forget_go_unused", { n: kept.length }),
       tone: "danger" })) return;
     act(async () => {
       const r = await api.knowledgeForgetAi();
-      toast.show(t("know.forgot", { n: r.forgotten }), { variant: "success" });
+      toast.show(keptSenders
+        ? t("know.forgot", { n: keptSenders })
+        : t("know.forgot_unused", { n: r.forgotten }), { variant: "success" });
     });
   };
   const download = () => {
@@ -358,7 +366,9 @@ export function KnowledgeSettings({ aiAnswers, onChanged }: {
             </Button>
             <Button variant="secondary" size="sm"
               disabled={busy || kept.length === 0} onClick={forgetKept}>
-              {t("know.forget_btn", { n: kept.length })}
+              {keptSenders
+                ? t("know.forget_btn", { n: keptSenders })
+                : t("know.forget_btn_unused", { n: kept.length })}
             </Button>
             <span className="ml-auto flex items-center gap-2">
               <Button variant="secondary" size="sm" disabled={!entries.length}

@@ -59,6 +59,15 @@ export function filedKindName(kind: string): string {
 export const FILE_KINDS = ["orders", "appointments", "jobs", "support",
   "accounts", "newsletter", "individuals", "other"] as const;
 
+/** The result of "Keep these answers", in senders (the unit of every number
+ *  around AI sorting): how many senders were kept, and how many were left as
+ *  they are because their answer could not be kept. */
+export function keptMessage(r: { senders: number; skipped: number }): string {
+  const kept = r.senders ? t("know.kept", { n: r.senders }) : "";
+  const left = r.skipped ? t("know.kept_skipped", { n: r.skipped }) : "";
+  return [kept, left].filter(Boolean).join(" ") || t("know.kept_none");
+}
+
 /** What a company row's mails are about, in full (detail view). */
 export function smartContent(g: Group): string {
   const list = purposeSummary(g);

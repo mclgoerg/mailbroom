@@ -30,7 +30,8 @@ import { t } from "./i18n";
 import { usePaneHeight, useSplitPane } from "./splitPane";
 import { applyStatus, fmtAgo, fmtSize, fmtUsd, matchGroup, parseFilter,
   parseProgress, retainedMailKeys, shortcutTarget, smartMembers } from "./lib";
-import { filedKindName, isPooled, smartLabel, smartView } from "./smart";
+import { filedKindName, isPooled, keptMessage, smartLabel, smartView }
+  from "./smart";
 import { SenderFiling } from "./components/SenderFiling";
 import type { FileEntry, SenderAction } from "./components/SenderList";
 import type { AppState, AuthProbe, Config, FilterPreset, Group, Grouping,
@@ -693,7 +694,7 @@ export default function App() {
       if (est.blocked) { fail(new Error(est.blocked), "err.ai"); return; }
       if (!est.units) { notify(t("aisort.nothing")); return; }
       const bullets = [
-        t("aisort.b_units", { senders: est.senders, units: est.units }),
+        t("aisort.b_units", { n: est.senders }),
         t("aisort.b_cost", { tin: est.tokens_in.toLocaleString(),
           tout: est.tokens_out.toLocaleString(), cost: fmtUsd(est.cost) }),
         ...(est.has_instructions ? [t("aisort.b_instructions")] : []),
@@ -717,8 +718,7 @@ export default function App() {
       confirmLabel: t("know.keep_go", { n: aiSortedCount }) })) return;
     try {
       const r = await api.knowledgeKeepAi();
-      notify(r.kept ? t("know.kept", { n: r.kept }) : t("know.kept_none"),
-        r.kept ? "success" : "info");
+      notify(keptMessage(r), r.senders ? "success" : "info");
       refresh();
     } catch (e: any) { fail(e); }
   };

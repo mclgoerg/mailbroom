@@ -38,6 +38,7 @@ export interface KnowledgeEntry extends KnowledgeStored {
   status: string;
   reason: string;             // why it has no effect (see know.reason.*)
   senders: number;            // matching senders in the loaded mailboxes
+  filed: number;              // ... of which this entry decides right now
   rows: string[];             // Smart rows they sit in now
 }
 export interface KnowledgeList {
