@@ -1,5 +1,28 @@
 # Changelog
 
+## [1.8.0](https://github.com/mclgoerg/mailbroom/compare/v1.7.0...v1.8.0) (2026-10-14)
+
+
+### Features
+
+* file senders in Smart and keep AI answers ([#121](https://github.com/mclgoerg/mailbroom/issues/121)) ([3301b04](https://github.com/mclgoerg/mailbroom/commit/3301b04055a10894748b26f5be9cbced5fb612e8))
+* manage what Mailbroom knows about your senders in Settings ([#122](https://github.com/mclgoerg/mailbroom/issues/122)) ([52b16d8](https://github.com/mclgoerg/mailbroom/commit/52b16d8366de239c8bdce7d7380228f462199282))
+* private sender knowledge (backend) ([#120](https://github.com/mclgoerg/mailbroom/issues/120)) ([320fb6c](https://github.com/mclgoerg/mailbroom/commit/320fb6c5561f7a60b06aa8ca16889fb80e98f259))
+* re-rate groups from the AI review entries ([#106](https://github.com/mclgoerg/mailbroom/issues/106)) ([ed73f8e](https://github.com/mclgoerg/mailbroom/commit/ed73f8eefc957df22484ac8f7500a27fb381c55f))
+* smart grouping replaces the Domain tab ([#105](https://github.com/mclgoerg/mailbroom/issues/105)) ([891713e](https://github.com/mclgoerg/mailbroom/commit/891713e995db61f8f46939cfb3554299ace089ef))
+
+
+### Bug Fixes
+
+* bump the python base image to pick up OpenSSL and PCRE2 security fixes ([#114](https://github.com/mclgoerg/mailbroom/issues/114)) ([a63dd52](https://github.com/mclgoerg/mailbroom/commit/a63dd5254f52332b8f5f768ae360b4becd57a519))
+* count AI sorting and kept answers in senders everywhere ([#123](https://github.com/mclgoerg/mailbroom/issues/123)) ([6c53989](https://github.com/mclgoerg/mailbroom/commit/6c53989dc34bf3519f5899a799b9a8eca470365d))
+* don't reopen the Action menu after a confirm dialog on touch ([#117](https://github.com/mclgoerg/mailbroom/issues/117)) ([e65b0c1](https://github.com/mclgoerg/mailbroom/commit/e65b0c111d063f1b3905411d7b2f349cfee1d515))
+
+
+### Performance Improvements
+
+* AI group review asks for low reasoning effort ([#118](https://github.com/mclgoerg/mailbroom/issues/118)) ([3a7390f](https://github.com/mclgoerg/mailbroom/commit/3a7390f58e9128a8b1f3a61fc42665aaf59d56f8))
+
 ## [1.7.0](https://github.com/mclgoerg/mailbroom/compare/v1.6.0...v1.7.0) (2026-10-08)
 
 
