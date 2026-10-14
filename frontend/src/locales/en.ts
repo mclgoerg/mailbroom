@@ -919,7 +919,9 @@ export const EN: Record<string, string> = {
   "aisort.title": "Sort the senders left in Other with AI?",
   "aisort.nothing": "Nothing left to sort: the AI has seen every sender in Other.",
   "aisort.b_units":
-    "{senders} senders the rules could not place (the senders of one company are asked about together)",
+    "{n} senders the rules could not place (the senders of one company are asked about together)",
+  "aisort.b_units_one":
+    "1 sender the rules could not place",
   "aisort.b_cost": "About {tin} tokens in, {tout} out - roughly {cost}",
   "aisort.b_instructions": "Your own instructions from Settings are included",
   "aisort.b_only":
@@ -1014,7 +1016,8 @@ export const EN: Record<string, string> = {
   "know.filed_one": "Filed 1 sender under {kind}.",
   "know.undone": "Filing undone.",
   "know.kind_category": "Category “{name}”",
-  "know.keep_btn": "Keep these answers ({n})",
+  "know.keep_btn": "Keep these answers ({n} senders)",
+  "know.keep_btn_one": "Keep these answers (1 sender)",
   "know.keep_title": "Keep the AI’s answers for {n} senders?",
   "know.keep_title_one": "Keep the AI’s answer for 1 sender?",
   "know.keep_b_rules":
@@ -1029,9 +1032,9 @@ export const EN: Record<string, string> = {
   "know.kept": "Kept the AI’s answers for {n} senders.",
   "know.kept_one": "Kept the AI’s answer for 1 sender.",
   "know.kept_skipped":
-    "{n} senders were left as they are: they already have a filing of your own.",
+    "{n} senders were left as they are: they have a filing of your own, or their address cannot be filed.",
   "know.kept_skipped_one":
-    "1 sender was left as it is: it already has a filing of your own.",
+    "1 sender was left as it is: it has a filing of your own, or its address cannot be filed.",
   "know.kept_none": "No AI answer applies right now.",
   "know.box_title": "How Mailbroom files this sender",
   "know.box_now": "Now in “{row}”.",
@@ -1135,11 +1138,14 @@ export const EN: Record<string, string> = {
   "know.unused_done": "Removed {n} unused entries.",
   "know.unused_done_one": "Removed 1 unused entry.",
   "know.keep_all": "Keep all AI answers",
-  "know.forget_btn": "Forget kept AI answers ({n})",
+  "know.forget_btn": "Forget kept AI answers ({n} senders)",
+  "know.forget_btn_one": "Forget kept AI answers (1 sender)",
+  "know.forget_btn_unused": "Forget kept AI answers ({n} answers)",
+  "know.forget_btn_unused_one": "Forget kept AI answers (1 answer)",
   "know.forget_title": "Forget the kept AI answers for {n} senders?",
   "know.forget_title_one": "Forget the kept AI answer for 1 sender?",
-  "know.forget_title_unused": "Forget {n} kept AI answers that no sender uses any more?",
-  "know.forget_title_unused_one": "Forget 1 kept AI answer that no sender uses any more?",
+  "know.forget_title_unused": "Forget {n} kept AI answers that currently file no sender?",
+  "know.forget_title_unused_one": "Forget 1 kept AI answer that currently files no sender?",
   "know.forget_b_back": "The senders go back to where the rules put them.",
   "know.forget_b_own": "What you filed yourself stays.",
   "know.forget_go": "Forget for {n} senders",

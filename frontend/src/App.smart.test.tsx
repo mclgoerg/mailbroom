@@ -1118,7 +1118,7 @@ test("'Keep these answers' sits next to 'Remove AI sorting', confirms with "
   openRow("Orders & deliveries");
   await screen.findByRole("tab", { name: /^Senders/ });
   expect(screen.getByRole("button", { name: "Remove AI sorting" })).toBeTruthy();
-  fireEvent.click(screen.getByRole("button", { name: "Keep these answers (1)" }));
+  fireEvent.click(screen.getByRole("button", { name: "Keep these answers (1 sender)" }));
   const dlg = await findDialog();
   expect(within(dlg).getByText("Keep the AI’s answer for 1 sender?")).toBeTruthy();
   expect(within(dlg).getByText(
@@ -1135,7 +1135,7 @@ test("declining the confirmation keeps nothing", async () => {
   await openSmart();
   openRow("Orders & deliveries");
   await screen.findByRole("tab", { name: /^Senders/ });
-  fireEvent.click(screen.getByRole("button", { name: "Keep these answers (1)" }));
+  fireEvent.click(screen.getByRole("button", { name: "Keep these answers (1 sender)" }));
   await findDialog();
   await pressDialog("Cancel");
   await expectNoDialog();
@@ -1150,7 +1150,7 @@ test("a refused keep (an AI run is going) shows the reason in words", async () =
   await openSmart();
   openRow("Orders & deliveries");
   await screen.findByRole("tab", { name: /^Senders/ });
-  fireEvent.click(screen.getByRole("button", { name: "Keep these answers (1)" }));
+  fireEvent.click(screen.getByRole("button", { name: "Keep these answers (1 sender)" }));
   await findDialog();
   await pressDialog("Keep for 1 sender");
   expect(await screen.findByText(/An AI run is going/)).toBeTruthy();
@@ -1182,7 +1182,7 @@ test("keeping answers is German in the German UI", async () => {
   openRow("Bestellungen & Lieferungen");
   await screen.findByRole("tab", { name: /^Absender \(/ });
   fireEvent.click(screen.getByRole("button",
-    { name: "Diese Antworten behalten (1)" }));
+    { name: "Diese Antworten behalten (1 Absender)" }));
   const dlg = await findDialog();
   expect(within(dlg).getByText("Die KI-Antwort für 1 Absender behalten?"))
     .toBeTruthy();
@@ -1216,7 +1216,7 @@ test("a finished AI sorting run offers to keep its answers right in the notice",
     knowledgeKeepAi.mockResolvedValue({ ok: true, kept: 1, senders: 1, skipped: 0 });
     await mount();
     const keep = await screen.findByRole("button",
-      { name: "Keep these answers (1)" });
+      { name: "Keep these answers (1 sender)" });
     expect(within(keep.closest("[role=status]") as HTMLElement).getByText(
       /AI sorting done: 1 of 2 senders placed\./)).toBeTruthy();
     fireEvent.click(keep);
@@ -1243,10 +1243,78 @@ test("keeping says how many senders were kept and how many already had a "
   await openSmart();
   openRow("Orders & deliveries");
   await screen.findByRole("tab", { name: /^Senders/ });
-  fireEvent.click(screen.getByRole("button", { name: "Keep these answers (1)" }));
+  fireEvent.click(screen.getByRole("button", { name: "Keep these answers (1 sender)" }));
   await findDialog();
   await pressDialog("Keep for 1 sender");
   expect(await screen.findByText("Kept the AI’s answers for 3 senders. "
-    + "2 senders were left as they are: they already have a filing of your own."))
+    + "2 senders were left as they are: they have a filing of your own, or their address cannot be filed."))
     .toBeTruthy();
+});
+
+
+test("when every answer had to be left alone, the toast says so instead of "
+  + "'nothing applies'", async () => {
+  withSortedOrders();
+  noKnowledge();
+  knowledgeKeepAi.mockResolvedValue({ ok: true, kept: 0, senders: 0, skipped: 1 });
+  await openSmart();
+  openRow("Orders & deliveries");
+  await screen.findByRole("tab", { name: /^Senders/ });
+  fireEvent.click(screen.getByRole("button", { name: "Keep these answers (1 sender)" }));
+  await findDialog();
+  await pressDialog("Keep for 1 sender");
+  expect(await screen.findByText("1 sender was left as it is: it has a filing "
+    + "of your own, or its address cannot be filed.")).toBeTruthy();
+});
+
+test("the cost dialog and the post-run notices count senders, in German too",
+  async () => {
+    cfg.ai.available = true;
+    localStorage.setItem("pmc_ai_ack", "1");
+    aiSortEstimate.mockResolvedValue({ units: 3, senders: 5, tokens_in: 1000,
+      tokens_out: 200, cost: 0.01, sorted: 0, checked: 0, available: true,
+      blocked: "", has_instructions: false });
+    setLang("de");
+    withOther();
+    state = { ...state, notice: { key: "ai_sort_done",
+      params: { placed: 3, total: 5 } } };
+    noKnowledge();
+    render(<ToastProvider><DialogProvider><App /></DialogProvider></ToastProvider>);
+    expect(await screen.findByText(/KI-Sortierung fertig: 3 von 5 Absendern eingeordnet\./))
+      .toBeTruthy();
+    fireEvent.click(await screen.findByRole("tab", { name: "Smart" }));
+    await waitFor(() => expect(screen.getAllByText("Sonstige Absender").length)
+      .toBeGreaterThan(0));
+    openRow("Sonstige Absender");
+    fireEvent.click(await screen.findByRole("button", { name: "Mit KI sortieren" }));
+    const dlg = await findDialog();
+    expect(within(dlg).getByText("5 Absender, die die Regeln nicht einordnen "
+      + "konnten (die Absender einer Firma werden zusammen gefragt)")).toBeTruthy();
+    expect(within(dlg).queryByText(/Gruppen/)).toBeNull();
+  });
+
+test("the cancelled and budget notices count senders", async () => {
+  for (const [key, text] of [
+    ["ai_sort_cancelled", /AI sorting cancelled after 40 of 95 senders/],
+    ["ai_sort_budget", /Monthly AI budget reached after 40 of 95 senders/]] as const) {
+    state = { ...baseState, notice: { key, params: { done: 40, total: 95 } } };
+    await mount();
+    expect(await screen.findByText(text)).toBeTruthy();
+    cleanup();
+  }
+});
+
+test("one sender reads in the singular in the cost dialog", async () => {
+  cfg.ai.available = true;
+  localStorage.setItem("pmc_ai_ack", "1");
+  aiSortEstimate.mockResolvedValue({ units: 1, senders: 1, tokens_in: 100,
+    tokens_out: 40, cost: 0.001, sorted: 0, checked: 0, available: true,
+    blocked: "", has_instructions: false });
+  withOther();
+  noKnowledge();
+  await openSmart();
+  openRow("Other senders");
+  fireEvent.click(await screen.findByRole("button", { name: "Sort with AI" }));
+  const dlg = await findDialog();
+  expect(within(dlg).getByText("1 sender the rules could not place")).toBeTruthy();
 });

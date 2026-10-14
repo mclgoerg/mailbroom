@@ -396,10 +396,15 @@ def test_a_monthly_budget_stops_a_run_between_batches(monkeypatch):
     mailops.run_scan()
     calls = fake_model(monkeypatch, lambda u: ("orders", True),
                        tokens=(2_000_000, 100))               # $4 per batch at $2/M
+    acc = accountsmod.get()
+    with acc.lock:
+        asked = sum(len(u["addrs"]) for u in aisort.collect_units(acc))
     state = run_sort()
     assert len(calls) == 1                                    # the 2nd batch was refused
     assert state["notice"]["key"] == "ai_sort_budget"
-    assert state["notice"]["params"]["done"] == aisort.SORT_BATCH
+    # the notice counts SENDERS: those answered so far of those asked about
+    assert state["notice"]["params"] == {"done": aisort.SORT_BATCH, "total": asked}
+    assert asked > aisort.SORT_BATCH
     assert len(aisortstore.load_account("default")) == aisort.SORT_BATCH
     # what was learned still applies
     assert sum(1 for r in mailops.STATE["groups"]["sender"].values()
@@ -428,6 +433,8 @@ def test_cancel_keeps_what_was_sorted_so_far(monkeypatch):
     state = run_sort()
     assert state["notice"]["key"] == "ai_sort_cancelled"
     assert len(aisortstore.load_account("default")) == aisort.SORT_BATCH
+    assert state["notice"]["params"]["done"] == aisort.SORT_BATCH   # senders
+    assert state["notice"]["params"]["total"] > aisort.SORT_BATCH
 
 
 def test_a_provider_error_is_reported_and_keeps_earlier_answers(monkeypatch, mailbox):
@@ -781,3 +788,17 @@ def test_progress_is_counted_in_senders(mailbox, monkeypatch):
     assert len(seen) == 2 and seen[0] == ""            # 4 units, batches of 2
     done, total = seen[1].split(" ")[0].split("/")
     assert seen[1].endswith(" senders") and total == "5" and 0 < int(done) < 5
+
+
+def test_placed_falls_back_to_the_stored_answers_when_the_rows_cannot_be_rebuilt(
+        mailbox, monkeypatch):
+    answers = {"mystery@one.example": ("orders", True),
+               "a@duo.example": ("appointments", True)}
+    fake_model(monkeypatch, lambda u: answers.get(first_addr(u), ("other", False)))
+
+    def broken(*a, **k):
+        raise RuntimeError("rebuild failed")
+    monkeypatch.setattr(mailops, "rebuild_smart", broken)
+    state = run_sort()
+    # three senders hold a placing answer (one plus a company of two)
+    assert state["notice"]["params"] == {"placed": 3, "total": 5}

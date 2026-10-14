@@ -37,7 +37,7 @@ import type { KnowledgeEntry, KnowledgeList } from "./types";
 
 const entry = (over: Partial<KnowledgeEntry>): KnowledgeEntry => ({
   key: "a:amy@solo.example", kind: "orders", src: "user", ts: 100, note: "",
-  status: "active", reason: "", senders: 1, rows: ["k:orders"], ...over });
+  status: "active", reason: "", senders: 1, filed: 1, rows: ["k:orders"], ...over });
 const ENTRIES: KnowledgeEntry[] = [
   entry({ key: "a:amy@solo.example", kind: "orders", ts: 300, note: "my plumber" }),
   entry({ key: "co:acme.example", kind: "support", ts: 200, senders: 3,
@@ -357,7 +357,7 @@ describe("the confirmations say what they do", () => {
     let dlg = await findDialog();
     expect(within(dlg).getByText(/This cannot be undone\./)).toBeTruthy();
     await cancelDialog();
-    fireEvent.click(screen.getByRole("button", { name: "Forget kept AI answers (1)" }));
+    fireEvent.click(screen.getByRole("button", { name: "Forget kept AI answers (1 sender)" }));
     dlg = await findDialog();
     expect(within(dlg).getByText(/gone for good/)).toBeTruthy();
     await cancelDialog();
@@ -463,7 +463,7 @@ describe("AI answers", () => {
       mount();
       await screen.findByText("amy@solo.example");
       fireEvent.click(screen.getByRole("button",
-        { name: "Forget kept AI answers (1)" }));
+        { name: "Forget kept AI answers (1 sender)" }));
       const dlg = await findDialog();
       expect(within(dlg).getByText("Forget the kept AI answer for 1 sender?")).toBeTruthy();
       expect(within(dlg).getByText("What you filed yourself stays.")).toBeTruthy();
@@ -475,26 +475,28 @@ describe("AI answers", () => {
   it("counts the kept answers in senders - and, for answers no sender uses, "
     + "says so", async () => {
     list({ entries: [
-      entry({ key: "co:acme.example", kind: "support", src: "ai", senders: 3 }),
-      entry({ key: "a:amy@solo.example", kind: "jobs", src: "ai", senders: 1 }),
+      entry({ key: "co:acme.example", kind: "support", src: "ai", senders: 4,
+        filed: 3 }),                       // 4 match, 3 are decided by it
+      entry({ key: "a:amy@solo.example", kind: "jobs", src: "ai", senders: 1,
+        filed: 1 }),
       entry({ key: "a:ghost@nowhere.example", kind: "jobs", src: "ai",
-        senders: 0, status: "unused" })] });
+        senders: 0, filed: 0, status: "unused" })] });
     knowledgeForgetAi.mockResolvedValue({ ok: true, forgotten: 3 });
     mount();
     fireEvent.click(await screen.findByRole("button",
-      { name: "Forget kept AI answers (4)" }));     // 3 + 1 + 0 senders
+      { name: "Forget kept AI answers (4 senders)" }));   // 3 + 1 + 0 filed
     const dlg = await findDialog();
     expect(within(dlg).getByText("Forget the kept AI answers for 4 senders?"))
       .toBeTruthy();
     await cancelDialog();
     cleanup();
     list({ entries: [entry({ key: "a:ghost@nowhere.example", kind: "jobs",
-      src: "ai", senders: 0, status: "unused" })] });
+      src: "ai", senders: 0, filed: 0, status: "unused" })] });
     mount();
     fireEvent.click(await screen.findByRole("button",
-      { name: "Forget kept AI answers (1)" }));
+      { name: "Forget kept AI answers (1 answer)" }));
     expect(within(await findDialog()).getByText(
-      "Forget 1 kept AI answer that no sender uses any more?")).toBeTruthy();
+      "Forget 1 kept AI answer that currently files no sender?")).toBeTruthy();
     await cancelDialog();
   });
 

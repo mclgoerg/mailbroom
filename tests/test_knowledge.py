@@ -541,6 +541,24 @@ def test_the_listing_says_why_an_entry_has_no_effect(mailbox):
     assert body["max"] == ks.MAX_ENTRIES and body["ai_running"] is False
 
 
+def test_filed_counts_the_senders_an_entry_decides_not_every_match(mailbox):
+    # a company entry matches all its senders, but decides only the ones that
+    # are not a row of their own / replied / protected ...
+    put(entries=[{"key": "co:duo.example", "kind": "support"},
+                 {"key": "a:big@shop.example", "kind": "support"}])
+    got = listing()
+    assert (got["co:duo.example"]["senders"], got["co:duo.example"]["filed"]) == (2, 2)
+    # (an own row: it matches, it decides nothing)
+    assert (got["a:big@shop.example"]["senders"],
+            got["a:big@shop.example"]["filed"]) == (1, 0)
+    # a sender covered by an own entry AND its company's counts once, for the
+    # entry that wins
+    put(key="a:a@duo.example", kind="jobs")
+    got = listing()
+    assert got["a:a@duo.example"]["filed"] == 1
+    assert got["co:duo.example"]["filed"] == 1
+
+
 def test_rules_that_became_confident_and_decided_rows_are_explained(mailbox):
     # kept answers only apply where the rules are unsure
     ks.modify(lambda e: e.update({

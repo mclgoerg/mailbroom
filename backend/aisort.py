@@ -370,9 +370,10 @@ def _run_sort(acc, units: list[dict]) -> None:
             STATE["ai"]["error"] = f"{type(exc).__name__}: {exc}"
 
 
-def _rebuild_quietly(acc) -> None:
+def _rebuild_quietly(acc) -> bool:
     """Place what was learned; a failure here must never leave the job
-    'running' (the caller sets the final status either way)."""
+    'running' (the caller sets the final status either way). True when the
+    rows were re-derived."""
     try:
         with acc.lock:
             aisort_pruned = prune(acc)
@@ -380,8 +381,10 @@ def _rebuild_quietly(acc) -> None:
             log.info("AI sort: forgot %d answers about vanished senders",
                      aisort_pruned)
         mailops.rebuild_smart(acc, force=True)
+        return True
     except Exception:
         log.exception("AI sorting: could not re-derive the smart rows")
+        return False
 
 
 def _finish(acc, cancelled: bool, over_budget: bool, done: int,
@@ -391,15 +394,20 @@ def _finish(acc, cancelled: bool, over_budget: bool, done: int,
     run's units actually landed on after the rebuild - an answer that does
     not apply (the AI never gives a purpose to a free-mail sender) is not
     counted, so the number matches what "Keep these answers" offers."""
-    _rebuild_quietly(acc)
+    rebuilt = _rebuild_quietly(acc)
+    cached = aisortstore.load_account(acc.name)
     with acc.lock:
         state = acc.state
         senders = state["groups"]["sender"]
         placed = 0
         for u in units:
             for addr in u["addrs"]:
-                why = (senders.get(addr) or {}).get("smart_why") or {}
-                placed += why.get("r") == "ai" and why.get("k") != "other"
+                if rebuilt:
+                    why = (senders.get(addr) or {}).get("smart_why") or {}
+                    placed += why.get("r") == "ai" and why.get("k") != "other"
+                else:        # rows not re-derived: count the stored answers
+                    placed += (cached.get(u["key"]) or {}).get("kind", "other") \
+                        != "other"
         state["ai"]["status"] = "done"
         state["ai"]["progress"] = ""
         key = ("ai_sort_cancelled" if cancelled

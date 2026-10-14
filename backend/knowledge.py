@@ -207,7 +207,7 @@ def remove_unused() -> dict:
 # -------------------------------------------------------------- live info
 
 class _Live(NamedTuple):
-    rows: dict[str, dict]       # entry key -> {status, reason, senders, rows}
+    rows: dict[str, dict]       # entry key -> {status, reason, senders, filed, rows}
     complete: bool              # every configured account has a finished scan
     unscanned: list[str]
 
@@ -255,7 +255,8 @@ def _live(cfg: dict, entries: dict[str, dict]) -> _Live:
     for key, entry in entries.items():
         prefix, _, rest = key.partition(":")
         kind = entry["kind"]
-        row = {"status": "active", "reason": "", "senders": 0, "rows": []}
+        row = {"status": "active", "reason": "", "senders": 0, "filed": 0,
+               "rows": []}
         rows[key] = row
         valid = sk.valid_address_key(rest) if prefix == "a" \
             else sk.valid_company_key(rest)
@@ -277,8 +278,11 @@ def _live(cfg: dict, entries: dict[str, dict]) -> _Live:
             row.update(status="unused" if complete else "unknown")
             continue
         rank = "rule" if entry["src"] == ks.USER else "kept_ai"
-        if any(why.get("r") == rank and why.get("by") == prefix
-               for _, (_, why) in matches):
+        # `filed`: the senders this entry actually decides right now (a sender
+        # that merely matches, e.g. one with its own row, is not counted)
+        row["filed"] = len({a for a, (_, why) in matches
+                            if why.get("r") == rank and why.get("by") == prefix})
+        if row["filed"]:
             continue                                        # active
         reasons = [_reason(why, entry, sk.is_freemail(a.rpartition("@")[2]))
                    for a, (_, why) in matches]
