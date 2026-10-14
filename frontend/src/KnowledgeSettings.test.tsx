@@ -117,11 +117,11 @@ describe("the list", () => {
     expect(names()).toEqual(["acme.example", "amy@solo.example",
       "bob@solo.example", "cat@solo.example", "ghost@nowhere.example"]);
     const head = (name: string) => screen.getByRole("button", { name });
-    fireEvent.click(head("Senders"));                       // ascending
-    expect(names()[0]).toBe("ghost@nowhere.example");
-    expect(names().at(-1)).toBe("acme.example");
-    fireEvent.click(head("Senders"));                       // descending
+    fireEvent.click(head("Senders"));                       // most first
     expect(names()[0]).toBe("acme.example");
+    expect(names().at(-1)).toBe("ghost@nowhere.example");
+    fireEvent.click(head("Senders"));                       // fewest first
+    expect(names()[0]).toBe("ghost@nowhere.example");
     fireEvent.click(head("Status"));            // what needs a look comes first
     expect(names().slice(0, 3)).toEqual(["cat@solo.example",
       "ghost@nowhere.example", "acme.example"]);
@@ -273,6 +273,125 @@ describe("changing entries", () => {
       { name: "Delete" }));
     expect(await screen.findByText(/That kind is not available/)).toBeTruthy();
     expect(knowledge).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe("selection and undo", () => {
+  it("a bulk action only reaches what the search shows", async () => {
+    knowledgePut.mockResolvedValue({ ok: true, saved: 0, removed: 1,
+      previous: { "a:amy@solo.example": null } });
+    mount();
+    await screen.findByText("amy@solo.example");
+    fireEvent.click(screen.getByLabelText("Select amy@solo.example"));
+    fireEvent.click(screen.getByLabelText("Select acme.example"));
+    fireEvent.change(screen.getByPlaceholderText("Search filed senders…"),
+      { target: { value: "plumber" } });                 // only amy is shown
+    expect(screen.getByText("1 selected")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Delete selected (1)" }));
+    await pressDialog("Delete 1 entry");
+    await waitFor(() => expect(knowledgePut).toHaveBeenCalledTimes(1));
+    expect(knowledgePut).toHaveBeenCalledWith({ remove: ["a:amy@solo.example"] });
+  });
+
+  it("Undo after an inline edit puts the old kind and note back", async () => {
+    const before = { kind: "orders", src: "user", ts: 300, note: "my plumber" };
+    knowledgePut.mockResolvedValueOnce({ ok: true, saved: 1, removed: 0,
+      previous: { "a:amy@solo.example": before } });
+    mount();
+    await screen.findByText("amy@solo.example");
+    fireEvent.click(within(rowOf("amy@solo.example")).getByRole("button",
+      { name: "Edit" }));
+    fireEvent.change(screen.getByLabelText("Filed under"),
+      { target: { value: "jobs" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    await screen.findByText("Saved.");
+    knowledgePut.mockResolvedValueOnce({ ok: true, saved: 1, removed: 0, previous: {} });
+    fireEvent.click(screen.getByRole("button", { name: "Undo" }));
+    await waitFor(() => expect(knowledgePut).toHaveBeenLastCalledWith({
+      entries: [{ key: "a:amy@solo.example", ...before }], remove: undefined }));
+  });
+
+  it("a bulk Undo restores every deleted entry in one request", async () => {
+    const a = { kind: "orders", src: "user", ts: 300, note: "my plumber" };
+    const b = { kind: "support", src: "user", ts: 200, note: "" };
+    knowledgePut.mockResolvedValueOnce({ ok: true, saved: 0, removed: 2,
+      previous: { "a:amy@solo.example": a, "co:acme.example": b } });
+    mount();
+    await screen.findByText("amy@solo.example");
+    fireEvent.click(screen.getByLabelText("Select amy@solo.example"));
+    fireEvent.click(screen.getByLabelText("Select acme.example"));
+    fireEvent.click(screen.getByRole("button", { name: "Delete selected (2)" }));
+    await pressDialog("Delete 2 entries");
+    await screen.findByText("2 entries removed.");
+    knowledgePut.mockResolvedValueOnce({ ok: true, saved: 2, removed: 0, previous: {} });
+    fireEvent.click(screen.getByRole("button", { name: "Undo" }));
+    await waitFor(() => expect(knowledgePut).toHaveBeenCalledTimes(2));
+    expect(knowledgePut.mock.calls[1][0]).toEqual({ remove: undefined, entries: [
+      { key: "a:amy@solo.example", ...a }, { key: "co:acme.example", ...b }] });
+  });
+
+  it("sorts newest first by the time, and the phone's select starts there", async () => {
+    vi.stubGlobal("matchMedia", (q: string) => ({
+      matches: /max-width/.test(q), media: q,
+      addEventListener: () => {}, removeEventListener: () => {} }));
+    mount();
+    await screen.findByText("amy@solo.example");
+    const order = () => [...document.querySelectorAll("[aria-label^='Select ']")]
+      .map((el) => (el as HTMLElement).getAttribute("aria-label")!.slice(7));
+    fireEvent.change(screen.getByRole("combobox", { name: "Sort entries" }),
+      { target: { value: "ts" } });
+    expect(order()).toEqual(["amy@solo.example", "acme.example",
+      "bob@solo.example", "ghost@nowhere.example", "cat@solo.example"]);
+    fireEvent.change(screen.getByRole("combobox", { name: "Sort entries" }),
+      { target: { value: "senders" } });
+    expect(order()[0]).toBe("acme.example");               // most senders first
+  });
+});
+
+describe("the confirmations say what they do", () => {
+  it("Remove unused and Forget say they cannot be undone; Keep says whose "
+    + "answers", async () => {
+    mount(2);
+    await screen.findByText("amy@solo.example");
+    fireEvent.click(screen.getByRole("button", { name: "Remove unused (1)" }));
+    let dlg = await findDialog();
+    expect(within(dlg).getByText(/This cannot be undone\./)).toBeTruthy();
+    await cancelDialog();
+    fireEvent.click(screen.getByRole("button", { name: "Forget kept AI answers (1)" }));
+    dlg = await findDialog();
+    expect(within(dlg).getByText(/gone for good/)).toBeTruthy();
+    await cancelDialog();
+    fireEvent.click(screen.getByRole("button", { name: "Keep all AI answers" }));
+    dlg = await findDialog();
+    expect(within(dlg).getByText(/the account you are looking at/)).toBeTruthy();
+    await cancelDialog();
+  });
+
+  it("an upload says that the rest of a full backup is ignored; an entries "
+    + "list that is not an object is no knowledge", async () => {
+    mount();
+    await screen.findByText("amy@solo.example");
+    const input = screen.getByLabelText("Upload…") as HTMLInputElement;
+    const send = (content: string) => {
+      Object.defineProperty(input, "files", { configurable: true,
+        value: [new File([content], "k.json", { type: "application/json" })] });
+      fireEvent.change(input);
+    };
+    send(JSON.stringify({ entries: ["a:x@y.example"] }));
+    expect(await screen.findByText("That file has no filed senders.")).toBeTruthy();
+    send(JSON.stringify({ entries: { "a:x@y.example": { kind: "jobs" } } }));
+    const dlg = await findDialog();
+    expect(within(dlg).getByText(/Anything else in a full backup is ignored here/))
+      .toBeTruthy();
+    await cancelDialog();
+  });
+
+  it("the download button says the file lists addresses", async () => {
+    mount();
+    await screen.findByText("amy@solo.example");
+    expect(screen.getByRole("button", { name: "Download" }).getAttribute("title"))
+      .toBe("Download this list as a file. It lists sender addresses and notes "
+        + "- keep it private.");
   });
 });
 

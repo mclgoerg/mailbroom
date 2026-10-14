@@ -481,7 +481,8 @@ export function SettingsModal({ cfg, account, onClose, onSaved,
       if (!res.ok) throw new Error(await res.text());
       const r = await res.json();
       onSaved(await api.getConfig());
-      setMsg(t("import.done", { rules: r.rules, verdicts: r.verdicts }));
+      setMsg(t("import.done", { rules: r.rules, verdicts: r.verdicts,
+        knowledge: r.knowledge ?? 0 }));
     } catch (err: any) {
       setMsg(t("err.generic", { msg: err.message ?? err }));
     }
@@ -980,7 +981,7 @@ export function SettingsModal({ cfg, account, onClose, onSaved,
         </>)}
 
         {tab === "senders" && (
-          <div className="sm:col-span-2">
+          <div className="min-w-0 sm:col-span-2">
             <KnowledgeSettings aiAnswers={aiAnswers}
               onChanged={onKnowledgeChanged} />
           </div>

@@ -605,10 +605,10 @@ export const EN: Record<string, string> = {
   "import.title": "Import this backup",
   "import.settings": "Settings are overwritten.",
   "import.rules": "Rules are replaced (back in report mode).",
-  "import.merged": "AI verdicts and replied data are merged.",
+  "import.merged": "AI verdicts, replied data and filed senders are merged.",
   "import.secrets": "Passwords and API keys are never imported.",
   "import.confirm": "Import backup",
-  "import.done": "Imported: {rules} rules, {verdicts} verdicts.",
+  "import.done": "Imported: {rules} rules, {verdicts} verdicts, {knowledge} filed senders.",
   "view.all_mails": "All mails",
   "mails.sort_date": "Date",
   "mails.sort_size": "Size",
@@ -1125,7 +1125,7 @@ export const EN: Record<string, string> = {
   "know.unused_body":
     "No sender in any of your mailboxes matches them. Entries of senders "
     + "that merely sit in a row of their own or in a company row are not "
-    + "unused and stay.",
+    + "unused and stay. This cannot be undone.",
   "know.unused_go": "Remove {n} entries",
   "know.unused_go_one": "Remove 1 entry",
   "know.unused_done": "Removed {n} unused entries.",
@@ -1154,4 +1154,13 @@ export const EN: Record<string, string> = {
   "know.uploaded_one": "Merged: 1 entry added or updated.",
   "know.more": "Show more ({n} left)",
   "know.load_error": "Could not load the filed senders: {msg}",
+  "know.forget_b_gone":
+    "A forgotten answer is gone for good - run AI sorting again to get new ones. This cannot be undone.",
+  "know.keep_b_account":
+    "The answers of the account you are looking at are kept; other accounts keep theirs until you keep them there.",
+  "know.upload_b_rest":
+    "Anything else in a full backup is ignored here (Import in General restores that).",
+  "know.download_tip":
+    "Download this list as a file. It lists sender addresses and notes - keep it private.",
+  "know.col_actions": "Actions",
 };

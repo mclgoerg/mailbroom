@@ -474,10 +474,10 @@ export const DE: Record<string, string> = {
   "import.title": "Dieses Backup importieren",
   "import.settings": "Einstellungen werden überschrieben.",
   "import.rules": "Regeln werden ersetzt (wieder im Bericht-Modus).",
-  "import.merged": "Bewertungen und Antwortdaten werden zusammengeführt.",
+  "import.merged": "Bewertungen, Antwortdaten und eingeordnete Absender werden zusammengeführt.",
   "import.secrets": "Passwörter und API-Schlüssel werden nie importiert.",
   "import.confirm": "Backup importieren",
-  "import.done": "Importiert: {rules} Regeln, {verdicts} Bewertungen.",
+  "import.done": "Importiert: {rules} Regeln, {verdicts} Bewertungen, {knowledge} eingeordnete Absender.",
   "view.all_mails": "Alle Mails",
   "mails.sort_date": "Datum",
   "mails.sort_size": "Größe",
@@ -1302,7 +1302,7 @@ export const DE: Record<string, string> = {
   "know.unused_body":
     "Kein Absender in einem deiner Postfächer passt zu ihnen. Einträge von "
     + "Absendern, die nur eine eigene Zeile oder eine Firmenzeile haben, sind "
-    + "nicht unbenutzt und bleiben.",
+    + "nicht unbenutzt und bleiben. Das lässt sich nicht rückgängig machen.",
   "know.unused_go": "{n} Einträge entfernen",
   "know.unused_go_one": "1 Eintrag entfernen",
   "know.unused_done": "{n} unbenutzte Einträge entfernt.",
@@ -1331,4 +1331,13 @@ export const DE: Record<string, string> = {
   "know.uploaded_one": "Zusammengeführt: 1 Eintrag hinzugefügt oder aktualisiert.",
   "know.more": "Mehr anzeigen (noch {n})",
   "know.load_error": "Die eingeordneten Absender konnten nicht geladen werden: {msg}",
+  "know.forget_b_gone":
+    "Eine vergessene Antwort ist endgültig weg – sortiere erneut mit KI, um neue zu bekommen. Das lässt sich nicht rückgängig machen.",
+  "know.keep_b_account":
+    "Die Antworten des Kontos, das du gerade ansiehst, werden behalten; andere Konten behalten ihre, bis du sie dort behältst.",
+  "know.upload_b_rest":
+    "Alles andere in einem vollständigen Backup wird hier ignoriert (der Import unter Allgemein stellt das wieder her).",
+  "know.download_tip":
+    "Diese Liste als Datei herunterladen. Sie listet Absenderadressen und Notizen – halte sie privat.",
+  "know.col_actions": "Aktionen",
 };

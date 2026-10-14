@@ -16,6 +16,9 @@ import { Button, Checkbox, confirmDialog, EmptyState, Input, Loading,
 
 type SortBy = "key" | "kind" | "src" | "senders" | "status" | "ts";
 const PAGE = 50;
+// First click: biggest / newest first; the rest A-Z.
+const FIRST_DIR: Record<SortBy, 1 | -1> = { key: 1, kind: 1, src: 1,
+  senders: -1, status: 1, ts: -1 };
 const NOTE_MAX = 200;
 
 const isCompany = (e: KnowledgeEntry) => e.key.startsWith("co:");
@@ -132,7 +135,7 @@ export function KnowledgeSettings({ aiAnswers, onChanged }: {
       action: { label: t("Undo"), onClick: () => restore(r.previous) } });
   });
   const removeSelected = async () => {
-    const keys = [...sel];
+    const keys = selKeys;
     if (!await confirmDialog({
       title: t("know.delete_title", { n: keys.length }),
       body: t("know.delete_body"), confirmLabel: t("know.delete_go",
@@ -169,7 +172,7 @@ export function KnowledgeSettings({ aiAnswers, onChanged }: {
     if (!await confirmDialog({
       title: t("know.keep_title", { n: aiAnswers }),
       bullets: [t("know.keep_b_rules"), t("know.keep_b_clearer"),
-        t("know.keep_b_only")],
+        t("know.keep_b_only"), t("know.keep_b_account")],
       confirmLabel: t("know.keep_go", { n: aiAnswers }) })) return;
     act(async () => {
       const r = await api.knowledgeKeepAi();
@@ -180,7 +183,8 @@ export function KnowledgeSettings({ aiAnswers, onChanged }: {
   const forgetKept = async () => {
     if (!await confirmDialog({
       title: t("know.forget_title", { n: kept.length }),
-      bullets: [t("know.forget_b_back"), t("know.forget_b_own")],
+      bullets: [t("know.forget_b_back"), t("know.forget_b_own"),
+        t("know.forget_b_gone")],
       confirmLabel: t("know.forget_go", { n: kept.length }),
       tone: "danger" })) return;
     act(async () => {
@@ -205,11 +209,13 @@ export function KnowledgeSettings({ aiAnswers, onChanged }: {
       const body = JSON.parse(await file.text());
       section = body?.knowledge ?? body;      // this file, or a full backup
     } catch { section = null; }
-    const n = section && typeof section.entries === "object" && section.entries
+    const n = section && typeof section.entries === "object"
+      && section.entries && !Array.isArray(section.entries)
       ? Object.keys(section.entries).length : 0;
     if (!n) { toast.show(t("know.upload_bad"), { variant: "error" }); return; }
     if (!await confirmDialog({ title: t("know.upload_title"),
-      bullets: [t("know.upload_b_n", { n }), t("know.upload_b_merge")],
+      bullets: [t("know.upload_b_n", { n }), t("know.upload_b_merge"),
+        t("know.upload_b_rest")],
       confirmLabel: t("know.upload_go") })) return;
     act(async () => {
       const r = await api.knowledgeImport(section);
@@ -224,15 +230,20 @@ export function KnowledgeSettings({ aiAnswers, onChanged }: {
   });
   const sortBy_ = (by: SortBy) => {
     if (by === sortBy) setDir(dir === 1 ? -1 : 1);
-    else { setSortBy(by); setDir(1); }
+    else { setSortBy(by); setDir(FIRST_DIR[by]); }
   };
   const visible = list.slice(0, shown);
   const allShown = visible.length > 0 && visible.every((e) => sel.has(e.key));
+  // Only what the search currently shows counts as selected: a bulk action
+  // never reaches an entry the user cannot see.
+  const listKeys = useMemo(() => new Set(list.map((e) => e.key)), [list]);
+  const selKeys = [...sel].filter((k) => listKeys.has(k));
 
   // ---- cells shared by the table and the cards ----------------------------
   const editor = (e: KnowledgeEntry) => (
     <div className="flex flex-wrap items-center gap-2">
-      <Select value={draft.kind} className="min-w-0 flex-1 sm:flex-none"
+      <Select value={draft.kind}
+        className="min-w-0 basis-full sm:basis-auto sm:flex-none"
         aria-label={t("know.kind_label")}
         onChange={(ev) => setDraft({ ...draft, kind: ev.target.value })}>
         {FILE_KINDS.map((k) => (
@@ -246,7 +257,7 @@ export function KnowledgeSettings({ aiAnswers, onChanged }: {
           <option value={draft.kind}>{filedKindName(draft.kind)}</option>
         )}
       </Select>
-      <Input className="min-w-0 flex-1" maxLength={NOTE_MAX}
+      <Input className="min-w-0 basis-full sm:basis-0 sm:flex-1" maxLength={NOTE_MAX}
         value={draft.note} aria-label={t("know.note_label")}
         placeholder={t("know.note_placeholder")}
         onChange={(ev) => setDraft({ ...draft, note: ev.target.value })} />
@@ -319,9 +330,13 @@ export function KnowledgeSettings({ aiAnswers, onChanged }: {
               aria-label={t("know.search")}
               onChange={(ev) => setQuery(ev.target.value)} />
             {phone && (
-              <Select value={sortBy} className="w-full min-w-0"
+              <Select value={sortBy} className="w-full min-w-0 max-w-full"
                 aria-label={t("know.sort_label")}
-                onChange={(ev) => { setSortBy(ev.target.value as SortBy); setDir(1); }}>
+                onChange={(ev) => {
+                  const by = ev.target.value as SortBy;
+                  setSortBy(by);
+                  setDir(FIRST_DIR[by]);
+                }}>
                 <option value="key">{t("know.col_key")}</option>
                 <option value="kind">{t("know.col_kind")}</option>
                 <option value="src">{t("know.col_src")}</option>
@@ -347,6 +362,7 @@ export function KnowledgeSettings({ aiAnswers, onChanged }: {
             </Button>
             <span className="ml-auto flex items-center gap-2">
               <Button variant="secondary" size="sm" disabled={!entries.length}
+                title={t("know.download_tip")}
                 onClick={download}>{t("know.download")}</Button>
               <Button variant="secondary" size="sm" disabled={busy}
                 onClick={() => upload.current?.click()}>
@@ -363,13 +379,13 @@ export function KnowledgeSettings({ aiAnswers, onChanged }: {
             </p>
           )}
 
-          {sel.size > 0 && (
+          {selKeys.length > 0 && (
             <div className="flex flex-wrap items-center gap-2 rounded-card
               bg-panel2 px-3 py-2 type-meta">
-              <span>{t("know.selected", { n: sel.size })}</span>
+              <span>{t("know.selected", { n: selKeys.length })}</span>
               <Button variant="danger" size="sm" disabled={busy}
                 onClick={removeSelected}>
-                {t("know.delete_sel", { n: sel.size })}
+                {t("know.delete_sel", { n: selKeys.length })}
               </Button>
               <button type="button" className="cursor-pointer underline"
                 onClick={() => setSel(new Set())}>{t("Clear selection")}</button>
@@ -428,7 +444,9 @@ export function KnowledgeSettings({ aiAnswers, onChanged }: {
                   {sortHead("kind", t("know.col_kind"), false, "w-3/12")}
                   {sortHead("senders", t("know.col_senders"), true, "w-20")}
                   {sortHead("status", t("know.col_status"), false, "w-28")}
-                  <th scope="col" className="w-20 px-2 py-2" />
+                  <th scope="col" className="w-20 px-2 py-2">
+                    <span className="sr-only">{t("know.col_actions")}</span>
+                  </th>
                 </tr>
               </thead>
               <tbody>

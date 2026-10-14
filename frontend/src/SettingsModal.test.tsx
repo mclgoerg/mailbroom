@@ -284,7 +284,7 @@ test("Export and Import live in General > Backup & restore", async () => {
   await waitFor(() => expect(onSaved).toHaveBeenCalled());
   expect(fetch).toHaveBeenCalledWith("/api/import_config",
     expect.objectContaining({ method: "POST" }));
-  await screen.findByText("Imported: 2 rules, 3 verdicts.");
+  await screen.findByText("Imported: 2 rules, 3 verdicts, 0 filed senders.");
   vi.unstubAllGlobals();
 });
 
