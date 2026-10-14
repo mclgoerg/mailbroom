@@ -291,7 +291,10 @@ def _run_sort(acc, units: list[dict]) -> None:
     instructions = cfg["ai"].get("sort_instructions", "")
     cfg = {**cfg, "ai": ai_eff}
     STATE, STATE_LOCK = acc.state, acc.lock
-    usage_in = usage_out = done = placed = 0
+    usage_in = usage_out = done = 0
+    # Everything the user is told is counted in SENDERS (a unit - a small
+    # company asked about as one - can hold several).
+    total = sum(len(u["addrs"]) for u in units)
     cancelled = over_budget = False
     try:
         model = cfg["ai"]["model"] or "claude-sonnet-5"
@@ -346,19 +349,18 @@ def _run_sort(acc, units: list[dict]) -> None:
                         # (sure + other: it really belongs in Other)
                         entries[unit["key"]] = {"kind": kind, "fp": unit["fp"],
                                                 "sure": sure}
-                        placed += kind != "other"
                     if entries:
                         aisortstore.save(entries, acc.name)
-                    done += len(batch)
+                    done += sum(len(u["addrs"]) for u in batch)
                 with STATE_LOCK:
-                    STATE["ai"]["progress"] = f"{done}/{len(units)} units"
+                    STATE["ai"]["progress"] = f"{done}/{total} senders"
                     STATE["groups_rev"] += 1
                 if failure:
                     raise failure       # what the other batches learned is kept
         finally:
             spent = (cfgmod.record_usage(cfg["ai"], usage_in, usage_out)
                      if usage_in or usage_out else None)
-        _finish(acc, cancelled, over_budget, done, placed, len(units),
+        _finish(acc, cancelled, over_budget, done, units, total,
                 usage_in, usage_out, spent)
     except Exception as exc:
         log.exception("AI sorting failed")
@@ -382,11 +384,22 @@ def _rebuild_quietly(acc) -> None:
         log.exception("AI sorting: could not re-derive the smart rows")
 
 
-def _finish(acc, cancelled: bool, over_budget: bool, done: int, placed: int,
-            total: int, usage_in: int, usage_out: int, spent) -> None:
+def _finish(acc, cancelled: bool, over_budget: bool, done: int,
+            units: list[dict], total: int, usage_in: int, usage_out: int,
+            spent) -> None:
+    """`done` / `total` count senders. "Placed" is what the senders of THIS
+    run's units actually landed on after the rebuild - an answer that does
+    not apply (the AI never gives a purpose to a free-mail sender) is not
+    counted, so the number matches what "Keep these answers" offers."""
     _rebuild_quietly(acc)
     with acc.lock:
         state = acc.state
+        senders = state["groups"]["sender"]
+        placed = 0
+        for u in units:
+            for addr in u["addrs"]:
+                why = (senders.get(addr) or {}).get("smart_why") or {}
+                placed += why.get("r") == "ai" and why.get("k") != "other"
         state["ai"]["status"] = "done"
         state["ai"]["progress"] = ""
         key = ("ai_sort_cancelled" if cancelled

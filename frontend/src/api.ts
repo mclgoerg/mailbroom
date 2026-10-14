@@ -124,7 +124,8 @@ export const api = {
     req<KnowledgeSaved>("/api/knowledge", body, "PUT"),
   // Keep the AI's cached answers of the current account as your own rules.
   knowledgeKeepAi: () =>
-    req<{ ok: boolean; kept: number }>("/api/knowledge/keep_ai", { all: true }),
+    req<{ ok: boolean; kept: number; senders: number; skipped: number }>(
+      "/api/knowledge/keep_ai", { all: true }),
   knowledgeForgetAi: () =>
     req<{ ok: boolean; forgotten: number }>("/api/knowledge/forget_ai", {}),
   // Refused (code knowledge_unscanned) unless every account has a finished scan.

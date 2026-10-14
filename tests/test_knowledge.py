@@ -806,9 +806,27 @@ def test_keeping_an_answer_is_a_move_not_a_copy(sorted_box):
     assert where("a@duo.example") != "k:jobs"
 
 
+def test_keep_reports_answers_senders_and_what_it_could_not_keep(sorted_box):
+    # the same unit as everywhere else: SENDERS (a company answer covers two)
+    r = client.post("/api/knowledge/keep_ai",
+                    json={"keys": ["co:duo.example"]}).json()
+    assert (r["kept"], r["senders"], r["skipped"]) == (1, 2, 0)
+    # an own filing of the same key (inactive for now: its category is gone)
+    # is never overwritten by the AI's answer - reported as skipped senders
+    cfgmod.update_config({"categories": {"hobby": ["zzz"]}})
+    assert put(key="a:mystery@one.example", kind="cat:hobby").status_code == 200
+    cfgmod.update_config({"categories": {}})
+    mailops.rebuild_smart_all()
+    assert where("mystery@one.example") == "k:support"      # the cached answer
+    r = client.post("/api/knowledge/keep_ai", json={"all": True}).json()
+    assert (r["kept"], r["senders"], r["skipped"]) == (0, 0, 1)
+    assert ks.load()["a:mystery@one.example"]["src"] == "user"
+
+
 def test_keep_all_keeps_every_answer_that_applies_once(sorted_box):
     r = client.post("/api/knowledge/keep_ai", json={"all": True})
     assert r.json()["kept"] == 2                    # mystery + the duo company
+    assert r.json()["senders"] == 3 and r.json()["skipped"] == 0
     assert set(listing()) == {"a:mystery@one.example", "co:duo.example"}
     assert all(e["src"] == "ai" for e in listing().values())
     assert aisortstore.load_account(accountsmod.get().name) == {

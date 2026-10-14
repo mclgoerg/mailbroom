@@ -718,7 +718,7 @@ test("it names scope, cost and what is sent before anything is sent",
     fireEvent.click(await screen.findByRole("button", { name: "Sort with AI" }));
     const dlg = await findDialog();
     expect(within(dlg).getByText("Sort the senders left in Other with AI?")).toBeTruthy();
-    expect(within(dlg).getByText("5 senders (3 groups) the rules could not place"))
+    expect(within(dlg).getByText("5 senders the rules could not place (the senders of one company are asked about together)"))
       .toBeTruthy();
     expect(within(dlg).getByText("About 12,000 tokens in, 84 out - roughly $0.0368"))
       .toBeTruthy();
@@ -1113,7 +1113,7 @@ test("'Keep these answers' sits next to 'Remove AI sorting', confirms with "
   + "the count, and keeps them once", async () => {
   withSortedOrders();
   noKnowledge();
-  knowledgeKeepAi.mockResolvedValue({ ok: true, kept: 1 });
+  knowledgeKeepAi.mockResolvedValue({ ok: true, kept: 1, senders: 1, skipped: 0 });
   await openSmart();
   openRow("Orders & deliveries");
   await screen.findByRole("tab", { name: /^Senders/ });
@@ -1124,9 +1124,9 @@ test("'Keep these answers' sits next to 'Remove AI sorting', confirms with "
   expect(within(dlg).getByText(
     "“Remove AI sorting” does not touch kept answers. No mail is moved."))
     .toBeTruthy();
-  await pressDialog("Keep 1 answer");
+  await pressDialog("Keep for 1 sender");
   await waitFor(() => expect(knowledgeKeepAi).toHaveBeenCalledTimes(1));
-  expect(await screen.findByText("Kept 1 AI answer.")).toBeTruthy();
+  expect(await screen.findByText("Kept the AI’s answer for 1 sender.")).toBeTruthy();
 });
 
 test("declining the confirmation keeps nothing", async () => {
@@ -1152,7 +1152,7 @@ test("a refused keep (an AI run is going) shows the reason in words", async () =
   await screen.findByRole("tab", { name: /^Senders/ });
   fireEvent.click(screen.getByRole("button", { name: "Keep these answers (1)" }));
   await findDialog();
-  await pressDialog("Keep 1 answer");
+  await pressDialog("Keep for 1 sender");
   expect(await screen.findByText(/An AI run is going/)).toBeTruthy();
 });
 
@@ -1174,7 +1174,7 @@ test("keeping answers is German in the German UI", async () => {
   setLang("de");
   withSortedOrders();
   noKnowledge();
-  knowledgeKeepAi.mockResolvedValue({ ok: true, kept: 2 });
+  knowledgeKeepAi.mockResolvedValue({ ok: true, kept: 2, senders: 3, skipped: 0 });
   render(<ToastProvider><DialogProvider><App /></DialogProvider></ToastProvider>);
   fireEvent.click(await screen.findByRole("tab", { name: "Smart" }));
   await waitFor(() => expect(screen.getAllByText("Big Shop").length)
@@ -1186,8 +1186,8 @@ test("keeping answers is German in the German UI", async () => {
   const dlg = await findDialog();
   expect(within(dlg).getByText("Die KI-Antwort für 1 Absender behalten?"))
     .toBeTruthy();
-  await pressDialog("1 Antwort behalten");
-  expect(await screen.findByText("2 KI-Antworten behalten.")).toBeTruthy();
+  await pressDialog("Für 1 Absender behalten");
+  expect(await screen.findByText("KI-Antworten für 3 Absender behalten.")).toBeTruthy();
 });
 
 
@@ -1213,15 +1213,15 @@ test("a finished AI sorting run offers to keep its answers right in the notice",
     state = { ...state, notice: { key: "ai_sort_done",
       params: { placed: 1, total: 2 } } };
     noKnowledge();
-    knowledgeKeepAi.mockResolvedValue({ ok: true, kept: 1 });
+    knowledgeKeepAi.mockResolvedValue({ ok: true, kept: 1, senders: 1, skipped: 0 });
     await mount();
     const keep = await screen.findByRole("button",
       { name: "Keep these answers (1)" });
     expect(within(keep.closest("[role=status]") as HTMLElement).getByText(
-      /AI sorting done: 1 of 2 groups placed\./)).toBeTruthy();
+      /AI sorting done: 1 of 2 senders placed\./)).toBeTruthy();
     fireEvent.click(keep);
     await findDialog();
-    await pressDialog("Keep 1 answer");
+    await pressDialog("Keep for 1 sender");
     await waitFor(() => expect(knowledgeKeepAi).toHaveBeenCalledTimes(1));
   });
 
@@ -1229,6 +1229,24 @@ test("no keep link in the notice when the AI placed nobody", async () => {
   state = { ...baseState, notice: { key: "ai_sort_done",
     params: { placed: 0, total: 2 } } };
   await mount();
-  await screen.findByText(/AI sorting done: 0 of 2 groups placed\./);
+  await screen.findByText(/AI sorting done: 0 of 2 senders placed\./);
   expect(screen.queryByRole("button", { name: /Keep these answers/ })).toBeNull();
+});
+
+
+test("keeping says how many senders were kept and how many already had a "
+  + "filing of their own", async () => {
+  withSortedOrders();
+  noKnowledge();
+  knowledgeKeepAi.mockResolvedValue({ ok: true, kept: 1, senders: 3,
+    skipped: 2 });
+  await openSmart();
+  openRow("Orders & deliveries");
+  await screen.findByRole("tab", { name: /^Senders/ });
+  fireEvent.click(screen.getByRole("button", { name: "Keep these answers (1)" }));
+  await findDialog();
+  await pressDialog("Keep for 1 sender");
+  expect(await screen.findByText("Kept the AI’s answers for 3 senders. "
+    + "2 senders were left as they are: they already have a filing of your own."))
+    .toBeTruthy();
 });

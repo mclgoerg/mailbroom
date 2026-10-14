@@ -1089,7 +1089,7 @@ export const DE: Record<string, string> = {
   "aisort.title": "Die Absender in „Sonstige“ mit KI sortieren?",
   "aisort.nothing": "Nichts mehr zu sortieren: die KI hat jeden Absender in „Sonstige“ gesehen.",
   "aisort.b_units":
-    "{senders} Absender ({units} Gruppen), die die Regeln nicht einordnen konnten",
+    "{senders} Absender, die die Regeln nicht einordnen konnten (die Absender einer Firma werden zusammen gefragt)",
   "aisort.b_cost": "Etwa {tin} Tokens rein, {tout} raus – ungefähr {cost}",
   "aisort.b_instructions": "Deine eigenen Anweisungen aus den Einstellungen sind dabei",
   "aisort.b_only":
@@ -1104,9 +1104,9 @@ export const DE: Record<string, string> = {
   "aisort.clear_confirm":
     "Die KI-Sortierung von {n} Absendern entfernen? Behaltene Antworten bleiben eingeordnet.",
   "aisort.started": "KI-Sortierung gestartet.",
-  "notice.ai_sort_done": "KI-Sortierung fertig: {placed} von {total} Gruppen eingeordnet.",
-  "notice.ai_sort_cancelled": "KI-Sortierung nach {done}/{total} Gruppen abgebrochen; was sortiert ist, bleibt.",
-  "notice.ai_sort_budget": "Monatsbudget der KI nach {done}/{total} Gruppen erreicht; was sortiert ist, bleibt.",
+  "notice.ai_sort_done": "KI-Sortierung fertig: {placed} von {total} Absendern eingeordnet.",
+  "notice.ai_sort_cancelled": "KI-Sortierung nach {done} von {total} Absendern abgebrochen; was sortiert ist, bleibt.",
+  "notice.ai_sort_budget": "Monatsbudget der KI nach {done} von {total} Absendern erreicht; was sortiert ist, bleibt.",
   "ai.sort_instructions": "Deine Anweisungen für die KI-Sortierung (optional)",
   "ai.sort_instructions_help":
     "Wird den festen Anweisungen hinzugefügt, wenn die KI die Absender in "
@@ -1198,10 +1198,14 @@ export const DE: Record<string, string> = {
   "know.keep_b_only":
     "„KI-Sortierung entfernen“ rührt behaltene Antworten nicht an. "
     + "Es wird keine Mail verschoben.",
-  "know.keep_go": "{n} Antworten behalten",
-  "know.keep_go_one": "1 Antwort behalten",
-  "know.kept": "{n} KI-Antworten behalten.",
-  "know.kept_one": "1 KI-Antwort behalten.",
+  "know.keep_go": "Für {n} Absender behalten",
+  "know.keep_go_one": "Für 1 Absender behalten",
+  "know.kept": "KI-Antworten für {n} Absender behalten.",
+  "know.kept_one": "KI-Antwort für 1 Absender behalten.",
+  "know.kept_skipped":
+    "{n} Absender blieben, wie sie sind: sie haben schon eine eigene Einordnung von dir.",
+  "know.kept_skipped_one":
+    "1 Absender blieb, wie er ist: er hat schon eine eigene Einordnung von dir.",
   "know.kept_none": "Gerade gilt keine KI-Antwort.",
   "know.box_title": "So ordnet Mailbroom diesen Absender ein",
   "know.box_now": "Gerade in „{row}“.",
@@ -1309,14 +1313,20 @@ export const DE: Record<string, string> = {
   "know.unused_done_one": "1 unbenutzter Eintrag entfernt.",
   "know.keep_all": "Alle KI-Antworten behalten",
   "know.forget_btn": "Behaltene KI-Antworten vergessen ({n})",
-  "know.forget_title": "Die {n} behaltenen KI-Antworten vergessen?",
-  "know.forget_title_one": "Die 1 behaltene KI-Antwort vergessen?",
+  "know.forget_title": "Die behaltenen KI-Antworten für {n} Absender vergessen?",
+  "know.forget_title_one": "Die behaltene KI-Antwort für 1 Absender vergessen?",
+  "know.forget_title_unused": "{n} behaltene KI-Antworten vergessen, die kein Absender mehr nutzt?",
+  "know.forget_title_unused_one": "1 behaltene KI-Antwort vergessen, die kein Absender mehr nutzt?",
   "know.forget_b_back": "Die Absender sind wieder dort, wo die Regeln sie hingelegt haben.",
   "know.forget_b_own": "Was du selbst eingeordnet hast, bleibt.",
-  "know.forget_go": "{n} Antworten vergessen",
-  "know.forget_go_one": "1 Antwort vergessen",
-  "know.forgot": "{n} behaltene KI-Antworten vergessen.",
-  "know.forgot_one": "1 behaltene KI-Antwort vergessen.",
+  "know.forget_go": "Für {n} Absender vergessen",
+  "know.forget_go_one": "Für 1 Absender vergessen",
+  "know.forget_go_unused": "{n} Antworten vergessen",
+  "know.forget_go_unused_one": "1 Antwort vergessen",
+  "know.forgot": "Behaltene KI-Antworten für {n} Absender vergessen.",
+  "know.forgot_one": "Behaltene KI-Antwort für 1 Absender vergessen.",
+  "know.forgot_unused": "{n} behaltene KI-Antworten vergessen.",
+  "know.forgot_unused_one": "1 behaltene KI-Antwort vergessen.",
   "know.download": "Herunterladen",
   "know.upload": "Hochladen…",
   "know.upload_bad": "In dieser Datei stehen keine eingeordneten Absender.",
