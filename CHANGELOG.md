@@ -1,5 +1,52 @@
 # Changelog
 
+## [1.8.0](https://github.com/mclgoerg/mailbroom/compare/v1.7.0...v1.8.0) (2026-10-14)
+
+
+### Features
+
+* file senders in Smart and keep AI answers ([#121](https://github.com/mclgoerg/mailbroom/issues/121)) ([3301b04](https://github.com/mclgoerg/mailbroom/commit/3301b04055a10894748b26f5be9cbced5fb612e8))
+  <!-- release-notes:121 -->
+  - **File senders yourself**: in a Smart row, tick senders and choose "File in Smart as…" to put a sender - or its whole company - under any kind or one of your own categories. It never moves mail, is remembered on your server and can be undone.
+  - A sender's detail view now shows how Mailbroom files it and why, and lets you change or reset that.
+  - After an AI sorting run you can **keep its answers** as your own rules; clearer mail still wins over a kept answer.
+* manage what Mailbroom knows about your senders in Settings ([#122](https://github.com/mclgoerg/mailbroom/issues/122)) ([52b16d8](https://github.com/mclgoerg/mailbroom/commit/52b16d8366de239c8bdce7d7380228f462199282))
+  <!-- release-notes:122 -->
+  - **A new Settings tab "Filed senders"** shows everything you have filed in Smart and every kept AI answer: search and sort it, edit an entry in place, delete (and undo), remove entries that no longer match any sender, keep or forget AI answers in one go, and download or upload just this list.
+  - The list stays on your server and is never sent to an AI. Backups (Settings > General > Export) now include it and, like before, list sender addresses - keep the file private.
+* private sender knowledge (backend) ([#120](https://github.com/mclgoerg/mailbroom/issues/120)) ([320fb6c](https://github.com/mclgoerg/mailbroom/commit/320fb6c5561f7a60b06aa8ca16889fb80e98f259))
+* re-rate groups from the AI review entries ([#106](https://github.com/mclgoerg/mailbroom/issues/106)) ([ed73f8e](https://github.com/mclgoerg/mailbroom/commit/ed73f8eefc957df22484ac8f7500a27fb381c55f))
+  <!-- release-notes:106 -->
+  - **AI review can now re-rate**: when some of the groups you are reviewing already have an AI verdict, AI review asks whether to review only the new ones or to re-rate all of them (uses tokens again). Nothing changes if no group is rated yet.
+* smart grouping replaces the Domain tab ([#105](https://github.com/mclgoerg/mailbroom/issues/105)) ([891713e](https://github.com/mclgoerg/mailbroom/commit/891713e995db61f8f46939cfb3554299ace089ef))
+  <!-- release-notes:105 -->
+  - The **Domain tab is replaced by Smart**: big senders keep their own row, small senders are pooled by company and by what their mails are about (orders, appointments, applications, support, accounts & security, newsletters, ...), cutting hundreds of rows to about 50.
+  - Open a pooled row to see its senders and trash, archive, move, mark read or protect just the ones you tick. Company rows say what their mails are about.
+  - Categories you define or edit still decide first and now apply without a rescan; the built-in keyword categories no longer place rows.
+  - Optional: a button on the Other row lets your AI sort the senders the rules could not place (you see the scope and cost first; only sender names, addresses, counts and a few subject lines are sent; you can add your own instructions in Settings and remove the sorting again).
+  - Settings > "Own row from N mails" (default 10). Domain rules, domain blocks and `@domain` protect entries keep working. After the upgrade the Smart rows are re-derived from the saved scan (no rescan needed).
+
+
+### Bug Fixes
+
+* bump the python base image to pick up OpenSSL and PCRE2 security fixes ([#114](https://github.com/mclgoerg/mailbroom/issues/114)) ([a63dd52](https://github.com/mclgoerg/mailbroom/commit/a63dd5254f52332b8f5f768ae360b4becd57a519))
+  <!-- release-notes:114 -->
+  Container image rebuilt on an updated Debian base with OpenSSL and PCRE2 security fixes. No configuration changes; pull the new image to get them.
+* count AI sorting and kept answers in senders everywhere ([#123](https://github.com/mclgoerg/mailbroom/issues/123)) ([6c53989](https://github.com/mclgoerg/mailbroom/commit/6c53989dc34bf3519f5899a799b9a8eca470365d))
+  <!-- release-notes:123 -->
+  - **AI sorting counts in senders everywhere**: the cost dialog, progress, the "done" notice, the Keep button and its result now all use the same unit - senders - instead of mixing senders, groups and answers.
+  - The "placed" number no longer counts answers that cannot apply (a shop-type answer for a free-mail sender), so it matches what "Keep these answers" keeps.
+* don't reopen the Action menu after a confirm dialog on touch ([#117](https://github.com/mclgoerg/mailbroom/issues/117)) ([e65b0c1](https://github.com/mclgoerg/mailbroom/commit/e65b0c111d063f1b3905411d7b2f349cfee1d515))
+  <!-- release-notes:117 -->
+  - Fixed: on iPhone/iPad the Action menu no longer pops open again after you confirm an action from it.
+
+
+### Performance Improvements
+
+* AI group review asks for low reasoning effort ([#118](https://github.com/mclgoerg/mailbroom/issues/118)) ([3a7390f](https://github.com/mclgoerg/mailbroom/commit/3a7390f58e9128a8b1f3a61fc42665aaf59d56f8))
+  <!-- release-notes:118 -->
+  - **AI review is faster and cheaper**: it now asks the model for low reasoning effort, which roughly halves the time and cuts the cost by about a third; the verdicts come out about the same, slightly more cautious.
+
 ## [1.7.0](https://github.com/mclgoerg/mailbroom/compare/v1.6.0...v1.7.0) (2026-10-08)
 
 
