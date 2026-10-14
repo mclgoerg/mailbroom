@@ -593,20 +593,22 @@ export const EN: Record<string, string> = {
     "How many days a sender stays flagged \"New\" (is:new, the New badge) "
     + "after it's first seen in a scan.",
   "export.tip":
-    "Download settings, rules, AI verdicts and the replied cache "
-    + "(passwords and API keys are never exported)",
+    "Download settings, rules, AI verdicts, the replied cache and the senders "
+    + "you filed - the file lists sender addresses (passwords and API keys "
+    + "are never exported)",
   "backup.title": "Backup & restore",
   "backup.help":
-    "Export downloads your settings, rules, AI verdicts and the replied "
-    + "cache as a file; import restores such a file. Passwords and API keys "
+    "Export downloads your settings, rules, AI verdicts, the replied cache "
+    + "and the senders you filed as a file; import restores such a file. The "
+    + "file lists sender addresses - keep it private. Passwords and API keys "
     + "are never part of a backup.",
   "import.title": "Import this backup",
   "import.settings": "Settings are overwritten.",
   "import.rules": "Rules are replaced (back in report mode).",
-  "import.merged": "AI verdicts and replied data are merged.",
+  "import.merged": "AI verdicts, replied data and filed senders are merged.",
   "import.secrets": "Passwords and API keys are never imported.",
   "import.confirm": "Import backup",
-  "import.done": "Imported: {rules} rules, {verdicts} verdicts.",
+  "import.done": "Imported: {rules} rules, {verdicts} verdicts, {knowledge} filed senders.",
   "view.all_mails": "All mails",
   "mails.sort_date": "Date",
   "mails.sort_size": "Size",
@@ -1061,4 +1063,104 @@ export const EN: Record<string, string> = {
   "know.err.full": "The list of filed senders is full.",
   "know.err.ai_running": "An AI run is going - try again when it is done.",
   "know.err.unscanned": "Scan every account first.",
+  // Settings > Senders: what Mailbroom knows about your senders.
+  "tab.senders": "Filed senders",
+  "tab.senders_short": "Senders",
+  "know.table_title": "What Mailbroom knows about your senders",
+  "know.table_help":
+    "Where you filed senders and companies in Smart, and the AI answers you "
+    + "kept. It stays on this server and is never sent to an AI. Changes "
+    + "here apply at once - there is nothing to save.",
+  "know.empty_title": "Nothing filed yet",
+  "know.empty_hint":
+    "File a sender in Smart (tick it, then “File in Smart as…”) or keep an "
+    + "AI sorting answer, and it is listed here. It stays on this server.",
+  "know.search": "Search filed senders…",
+  "know.none": "No entries match.",
+  "know.sort_label": "Sort entries",
+  "know.col_key": "Sender or company",
+  "know.col_kind": "Filed under",
+  "know.col_src": "Source",
+  "know.col_senders": "Senders",
+  "know.col_status": "Status",
+  "know.col_ts": "Newest",
+  "know.company": "Company",
+  "know.kind_label": "Filed under",
+  "know.note_label": "Note",
+  "know.note_placeholder": "Optional note (200 characters at most)",
+  "know.edit": "Edit",
+  "know.delete": "Delete",
+  "know.saved": "Saved.",
+  "know.select": "Select {name}",
+  "know.select_all": "Select all shown",
+  "know.selected": "{n} selected",
+  "know.delete_sel": "Delete selected ({n})",
+  "know.delete_title": "Delete {n} entries?",
+  "know.delete_title_one": "Delete 1 entry?",
+  "know.delete_body":
+    "The senders go back to where the rules put them. You can undo this "
+    + "right after.",
+  "know.delete_go": "Delete {n} entries",
+  "know.delete_go_one": "Delete 1 entry",
+  "know.deleted": "{n} entries removed.",
+  "know.deleted_one": "Entry removed.",
+  "know.status.active": "In effect",
+  "know.status.no_effect": "No effect: {why}",
+  "know.status.inactive": "Inactive: {why}",
+  "know.status.inert": "Unusable: {why}",
+  "know.status.unused": "No sender in your mailboxes matches",
+  "know.status.unknown": "Not every mailbox is scanned yet",
+  "know.status_short.active": "In effect",
+  "know.status_short.no_effect": "No effect",
+  "know.status_short.inactive": "Inactive",
+  "know.status_short.inert": "Unusable",
+  "know.status_short.unused": "Unused",
+  "know.status_short.unknown": "Unknown",
+  "know.unused_btn": "Remove unused ({n})",
+  "know.unused_blocked":
+    "Scan every account first ({n} not scanned yet): until then an entry "
+    + "cannot be called unused.",
+  "know.unused_title": "Remove {n} unused entries?",
+  "know.unused_title_one": "Remove 1 unused entry?",
+  "know.unused_body":
+    "No sender in any of your mailboxes matches them. Entries of senders "
+    + "that merely sit in a row of their own or in a company row are not "
+    + "unused and stay. This cannot be undone.",
+  "know.unused_go": "Remove {n} entries",
+  "know.unused_go_one": "Remove 1 entry",
+  "know.unused_done": "Removed {n} unused entries.",
+  "know.unused_done_one": "Removed 1 unused entry.",
+  "know.keep_all": "Keep all AI answers",
+  "know.forget_btn": "Forget kept AI answers ({n})",
+  "know.forget_title": "Forget the {n} kept AI answers?",
+  "know.forget_title_one": "Forget the 1 kept AI answer?",
+  "know.forget_b_back": "The senders go back to where the rules put them.",
+  "know.forget_b_own": "What you filed yourself stays.",
+  "know.forget_go": "Forget {n} answers",
+  "know.forget_go_one": "Forget 1 answer",
+  "know.forgot": "Forgot {n} kept AI answers.",
+  "know.forgot_one": "Forgot 1 kept AI answer.",
+  "know.download": "Download",
+  "know.upload": "Upload…",
+  "know.upload_bad": "That file has no filed senders.",
+  "know.upload_title": "Merge this file into your filed senders?",
+  "know.upload_b_n": "The file holds {n} entries.",
+  "know.upload_b_n_one": "The file holds 1 entry.",
+  "know.upload_b_merge":
+    "Your existing entries stay; when both have the same sender or company "
+    + "the newer one wins.",
+  "know.upload_go": "Merge",
+  "know.uploaded": "Merged: {n} entries added or updated.",
+  "know.uploaded_one": "Merged: 1 entry added or updated.",
+  "know.more": "Show more ({n} left)",
+  "know.load_error": "Could not load the filed senders: {msg}",
+  "know.forget_b_gone":
+    "A forgotten answer is gone for good - run AI sorting again to get new ones. This cannot be undone.",
+  "know.keep_b_account":
+    "The answers of the account you are looking at are kept; other accounts keep theirs until you keep them there.",
+  "know.upload_b_rest":
+    "Anything else in a full backup is ignored here (Import in General restores that).",
+  "know.download_tip":
+    "Download this list as a file. It lists sender addresses and notes - keep it private.",
+  "know.col_actions": "Actions",
 };

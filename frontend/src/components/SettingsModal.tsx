@@ -8,6 +8,7 @@ import type { AdminTenantStats, AuthMode, AutoScanUnit, BodySearchMode, Config,
   DigestSchedule, FoldersResp, OauthProvider, Preset, Security,
   SmtpSecurity } from "../types";
 import { IndexPanel } from "./IndexPanel";
+import { KnowledgeSettings } from "./KnowledgeSettings";
 import { Button, Checkbox, confirmDialog, Field, Input, LINK_ACCENT, Loading,
   Modal, PanelHeader, promptDialog, SectionLabel, Segmented, Select, Spinner,
   Tag, tabPanelProps, TextArea, useMediaQuery } from "./ui";
@@ -56,11 +57,15 @@ const PRESET_LABELS: Record<Preset, string> = {
 };
 
 export function SettingsModal({ cfg, account, onClose, onSaved,
-  onAccountsChanged }: {
+  onAccountsChanged, aiAnswers = 0, onKnowledgeChanged = () => {} }: {
   cfg: Config;
   account: string;                       // the ACTIVE account
   onClose: () => void;
   onSaved: (c: Config) => void;
+  /** Senders tab: AI answers of the active account that apply now (what
+   *  "Keep all AI answers" would keep) and a refresh after a change. */
+  aiAnswers?: number;
+  onKnowledgeChanged?: () => void;
   /** Accounts were added/removed. `switchTo` names a new account to
    *  activate (or null to let App re-validate the current one). */
   onAccountsChanged: (c: Config, switchTo: string | null) => void;
@@ -476,7 +481,8 @@ export function SettingsModal({ cfg, account, onClose, onSaved,
       if (!res.ok) throw new Error(await res.text());
       const r = await res.json();
       onSaved(await api.getConfig());
-      setMsg(t("import.done", { rules: r.rules, verdicts: r.verdicts }));
+      setMsg(t("import.done", { rules: r.rules, verdicts: r.verdicts,
+        knowledge: r.knowledge ?? 0 }));
     } catch (err: any) {
       setMsg(t("err.generic", { msg: err.message ?? err }));
     }
@@ -488,7 +494,7 @@ export function SettingsModal({ cfg, account, onClose, onSaved,
   // Settings are split into tabs; the SERVER tab (login + shared AI)
   // exists for the admin only. All form state lives in this component,
   // so Save always persists every tab, not just the visible one.
-  type Tab = "account" | "general" | "ai" | "server";
+  type Tab = "account" | "general" | "senders" | "ai" | "server";
   const [tab, setTab] = useState<Tab>("account");
   useEffect(() => {
     if (tab !== "server" || !cfg.auth.is_admin || tenantStats) return;
@@ -502,6 +508,7 @@ export function SettingsModal({ cfg, account, onClose, onSaved,
   const tabs: { value: Tab; label: string }[] = [
     { value: "account", label: t(phone ? "tab.account_short" : "tab.account") },
     { value: "general", label: t(phone ? "tab.general_short" : "tab.general") },
+    { value: "senders", label: t(phone ? "tab.senders_short" : "tab.senders") },
     { value: "ai", label: t(phone ? "tab.ai_short" : "tab.ai") },
     ...(cfg.auth.is_admin ? [{ value: "server" as Tab,
       label: t(phone ? "tab.server_short" : "tab.server") }] : []),
@@ -972,6 +979,13 @@ export function SettingsModal({ cfg, account, onClose, onSaved,
           </div>
         </div>
         </>)}
+
+        {tab === "senders" && (
+          <div className="min-w-0 sm:col-span-2">
+            <KnowledgeSettings aiAnswers={aiAnswers}
+              onChanged={onKnowledgeChanged} />
+          </div>
+        )}
 
         {tab === "server" && cfg.auth.is_admin && (<>
           <SectionLabel className="sm:col-span-2 mt-2">

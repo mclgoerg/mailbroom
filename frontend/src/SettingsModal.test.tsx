@@ -27,6 +27,10 @@ vi.mock("./api", () => ({
       return Promise.resolve(testDigestResult);
     },
     getConfig: () => Promise.resolve(cfg),
+    knowledge: () => Promise.resolve({ entries: [{ key: "a:amy@solo.example",
+      kind: "orders", src: "user", ts: 1, note: "", status: "active",
+      reason: "", senders: 1, rows: ["k:orders"] }], complete: true,
+    unscanned: [], categories: [], max: 5000, ai_running: false }),
     oauthDisconnect: (a: string) => { oauthDisconnectCalls.push(a);
       return Promise.resolve({}); },
     adminStats: () => Promise.resolve({ tenants: [{
@@ -44,7 +48,7 @@ vi.mock("./api", () => ({
 }));
 
 import { SettingsModal } from "./components/SettingsModal";
-import { DialogProvider } from "./components/ui";
+import { DialogProvider, ToastProvider } from "./components/ui";
 import { cancelDialog, expectNoDialog, findDialog, pressDialog }
   from "./dialogTestUtils";
 import type { Config } from "./types";
@@ -227,8 +231,10 @@ test("tabs switch the visible section", () => {
 });
 
 test("the active tab controls one labelled tabpanel", () => {
-  renderWithDialogs();
-  for (const name of ["Mail account", "General", "AI"]) {
+  render(<ToastProvider><DialogProvider><SettingsModal cfg={cfg}
+    account="default" onClose={() => {}} onSaved={() => {}}
+    onAccountsChanged={() => {}} /></DialogProvider></ToastProvider>);
+  for (const name of ["Mail account", "General", "Filed senders", "AI"]) {
     const tab = screen.getByRole("tab", { name });
     fireEvent.click(tab);
     const panel = screen.getByRole("tabpanel");
@@ -278,7 +284,7 @@ test("Export and Import live in General > Backup & restore", async () => {
   await waitFor(() => expect(onSaved).toHaveBeenCalled());
   expect(fetch).toHaveBeenCalledWith("/api/import_config",
     expect.objectContaining({ method: "POST" }));
-  await screen.findByText("Imported: 2 rules, 3 verdicts.");
+  await screen.findByText("Imported: 2 rules, 3 verdicts, 0 filed senders.");
   vi.unstubAllGlobals();
 });
 
@@ -617,4 +623,27 @@ test("the AI tab has a box for the user's own AI-sorting instructions, "
   fireEvent.click(screen.getByRole("button", { name: "Save" }));
   expect(saveCalls.at(-1).ai.sort_instructions)
     .toBe("Mails from my landlord are support.");
+});
+
+
+test("the Filed senders tab lists what the user filed; nothing to save there",
+  async () => {
+    render(<ToastProvider><DialogProvider><SettingsModal cfg={cfg}
+      account="default" onClose={() => {}} onSaved={() => {}}
+      onAccountsChanged={() => {}} aiAnswers={2} /></DialogProvider></ToastProvider>);
+    fireEvent.click(screen.getByRole("tab", { name: "Filed senders" }));
+    expect(await screen.findByText("What Mailbroom knows about your senders"))
+      .toBeTruthy();
+    expect(await screen.findByText("amy@solo.example")).toBeTruthy();
+    expect(screen.getByText(/Changes here apply at once/)).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Keep all AI answers" }))
+      .toHaveProperty("disabled", false);
+    expect(screen.queryByLabelText("Host")).toBeNull();
+  });
+
+test("the backup text says the file lists sender addresses", () => {
+  renderWithDialogs();
+  fireEvent.click(screen.getByRole("tab", { name: "General" }));
+  expect(screen.getByText(/The file lists sender addresses - keep it private\./))
+    .toBeTruthy();
 });

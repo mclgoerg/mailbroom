@@ -461,20 +461,23 @@ export const DE: Record<string, string> = {
   "Export": "Exportieren",
   "Import…": "Importieren…",
   "export.tip":
-    "Einstellungen, Regeln, KI-Bewertungen und Antwort-Cache "
-    + "herunterladen (Passwörter und API-Schlüssel nie enthalten)",
+    "Einstellungen, Regeln, KI-Bewertungen, Antwort-Cache und die "
+    + "eingeordneten Absender herunterladen – die Datei listet "
+    + "Absenderadressen (Passwörter und API-Schlüssel nie enthalten)",
   "backup.title": "Sichern & Wiederherstellen",
   "backup.help":
-    "Der Export lädt Einstellungen, Regeln, KI-Bewertungen und den "
-    + "Antwort-Cache als Datei herunter; der Import spielt eine solche Datei "
-    + "wieder ein. Passwörter und API-Schlüssel sind nie Teil eines Backups.",
+    "Der Export lädt Einstellungen, Regeln, KI-Bewertungen, den "
+    + "Antwort-Cache und die eingeordneten Absender als Datei herunter; der "
+    + "Import spielt eine solche Datei wieder ein. Die Datei listet "
+    + "Absenderadressen – halte sie privat. Passwörter und API-Schlüssel sind "
+    + "nie Teil eines Backups.",
   "import.title": "Dieses Backup importieren",
   "import.settings": "Einstellungen werden überschrieben.",
   "import.rules": "Regeln werden ersetzt (wieder im Bericht-Modus).",
-  "import.merged": "Bewertungen und Antwortdaten werden zusammengeführt.",
+  "import.merged": "Bewertungen, Antwortdaten und eingeordnete Absender werden zusammengeführt.",
   "import.secrets": "Passwörter und API-Schlüssel werden nie importiert.",
   "import.confirm": "Backup importieren",
-  "import.done": "Importiert: {rules} Regeln, {verdicts} Bewertungen.",
+  "import.done": "Importiert: {rules} Regeln, {verdicts} Bewertungen, {knowledge} eingeordnete Absender.",
   "view.all_mails": "Alle Mails",
   "mails.sort_date": "Datum",
   "mails.sort_size": "Größe",
@@ -1235,4 +1238,106 @@ export const DE: Record<string, string> = {
   "know.err.full": "Die Liste der eingeordneten Absender ist voll.",
   "know.err.ai_running": "Ein KI-Lauf ist aktiv – versuche es nach dem Ende noch einmal.",
   "know.err.unscanned": "Scanne zuerst jedes Konto.",
+  // Einstellungen > Absender: was Mailbroom über deine Absender weiß.
+  "tab.senders": "Eingeordnete Absender",
+  "tab.senders_short": "Absender",
+  "know.table_title": "Was Mailbroom über deine Absender weiß",
+  "know.table_help":
+    "Wo du Absender und Firmen in Smart eingeordnet hast, und die "
+    + "KI-Antworten, die du behalten hast. Das bleibt auf diesem Server und "
+    + "wird nie an eine KI geschickt. Änderungen hier gelten sofort – es gibt "
+    + "nichts zu speichern.",
+  "know.empty_title": "Noch nichts eingeordnet",
+  "know.empty_hint":
+    "Ordne einen Absender in Smart ein (markieren, dann „In Smart einordnen "
+    + "als…“) oder behalte eine KI-Antwort, dann steht er hier. Das bleibt "
+    + "auf diesem Server.",
+  "know.search": "Eingeordnete Absender suchen…",
+  "know.none": "Keine Einträge gefunden.",
+  "know.sort_label": "Einträge sortieren",
+  "know.col_key": "Absender oder Firma",
+  "know.col_kind": "Eingeordnet unter",
+  "know.col_src": "Quelle",
+  "know.col_senders": "Absender",
+  "know.col_status": "Status",
+  "know.col_ts": "Neueste",
+  "know.company": "Firma",
+  "know.kind_label": "Eingeordnet unter",
+  "know.note_label": "Notiz",
+  "know.note_placeholder": "Optionale Notiz (höchstens 200 Zeichen)",
+  "know.edit": "Bearbeiten",
+  "know.delete": "Löschen",
+  "know.saved": "Gespeichert.",
+  "know.select": "{name} auswählen",
+  "know.select_all": "Alle angezeigten auswählen",
+  "know.selected": "{n} ausgewählt",
+  "know.delete_sel": "Auswahl löschen ({n})",
+  "know.delete_title": "{n} Einträge löschen?",
+  "know.delete_title_one": "1 Eintrag löschen?",
+  "know.delete_body":
+    "Die Absender sind danach wieder dort, wo die Regeln sie hingelegt "
+    + "haben. Du kannst das gleich danach rückgängig machen.",
+  "know.delete_go": "{n} Einträge löschen",
+  "know.delete_go_one": "1 Eintrag löschen",
+  "know.deleted": "{n} Einträge entfernt.",
+  "know.deleted_one": "Eintrag entfernt.",
+  "know.status.active": "Wirkt",
+  "know.status.no_effect": "Ohne Wirkung: {why}",
+  "know.status.inactive": "Inaktiv: {why}",
+  "know.status.inert": "Unbrauchbar: {why}",
+  "know.status.unused": "Kein Absender in deinen Postfächern passt",
+  "know.status.unknown": "Noch nicht jedes Postfach ist gescannt",
+  "know.status_short.active": "Wirkt",
+  "know.status_short.no_effect": "Ohne Wirkung",
+  "know.status_short.inactive": "Inaktiv",
+  "know.status_short.inert": "Unbrauchbar",
+  "know.status_short.unused": "Unbenutzt",
+  "know.status_short.unknown": "Unbekannt",
+  "know.unused_btn": "Unbenutzte entfernen ({n})",
+  "know.unused_blocked":
+    "Scanne zuerst jedes Konto ({n} noch nicht gescannt): bis dahin kann "
+    + "kein Eintrag als unbenutzt gelten.",
+  "know.unused_title": "{n} unbenutzte Einträge entfernen?",
+  "know.unused_title_one": "1 unbenutzten Eintrag entfernen?",
+  "know.unused_body":
+    "Kein Absender in einem deiner Postfächer passt zu ihnen. Einträge von "
+    + "Absendern, die nur eine eigene Zeile oder eine Firmenzeile haben, sind "
+    + "nicht unbenutzt und bleiben. Das lässt sich nicht rückgängig machen.",
+  "know.unused_go": "{n} Einträge entfernen",
+  "know.unused_go_one": "1 Eintrag entfernen",
+  "know.unused_done": "{n} unbenutzte Einträge entfernt.",
+  "know.unused_done_one": "1 unbenutzter Eintrag entfernt.",
+  "know.keep_all": "Alle KI-Antworten behalten",
+  "know.forget_btn": "Behaltene KI-Antworten vergessen ({n})",
+  "know.forget_title": "Die {n} behaltenen KI-Antworten vergessen?",
+  "know.forget_title_one": "Die 1 behaltene KI-Antwort vergessen?",
+  "know.forget_b_back": "Die Absender sind wieder dort, wo die Regeln sie hingelegt haben.",
+  "know.forget_b_own": "Was du selbst eingeordnet hast, bleibt.",
+  "know.forget_go": "{n} Antworten vergessen",
+  "know.forget_go_one": "1 Antwort vergessen",
+  "know.forgot": "{n} behaltene KI-Antworten vergessen.",
+  "know.forgot_one": "1 behaltene KI-Antwort vergessen.",
+  "know.download": "Herunterladen",
+  "know.upload": "Hochladen…",
+  "know.upload_bad": "In dieser Datei stehen keine eingeordneten Absender.",
+  "know.upload_title": "Diese Datei mit deinen eingeordneten Absendern zusammenführen?",
+  "know.upload_b_n": "Die Datei enthält {n} Einträge.",
+  "know.upload_b_n_one": "Die Datei enthält 1 Eintrag.",
+  "know.upload_b_merge":
+    "Deine bestehenden Einträge bleiben; gibt es denselben Absender oder "
+    + "dieselbe Firma in beiden, gewinnt der neuere.",
+  "know.upload_go": "Zusammenführen",
+  "know.uploaded": "Zusammengeführt: {n} Einträge hinzugefügt oder aktualisiert.",
+  "know.uploaded_one": "Zusammengeführt: 1 Eintrag hinzugefügt oder aktualisiert.",
+  "know.more": "Mehr anzeigen (noch {n})",
+  "know.load_error": "Die eingeordneten Absender konnten nicht geladen werden: {msg}",
+  "know.forget_b_gone":
+    "Eine vergessene Antwort ist endgültig weg – sortiere erneut mit KI, um neue zu bekommen. Das lässt sich nicht rückgängig machen.",
+  "know.keep_b_account":
+    "Die Antworten des Kontos, das du gerade ansiehst, werden behalten; andere Konten behalten ihre, bis du sie dort behältst.",
+  "know.upload_b_rest":
+    "Alles andere in einem vollständigen Backup wird hier ignoriert (der Import unter Allgemein stellt das wieder her).",
+  "know.download_tip":
+    "Diese Liste als Datei herunterladen. Sie listet Absenderadressen und Notizen – halte sie privat.",
+  "know.col_actions": "Aktionen",
 };

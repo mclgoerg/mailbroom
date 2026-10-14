@@ -2,7 +2,7 @@
 /* Account scoping: every API path is tagged with the active account. */
 
 import { afterEach, expect, test, vi } from "vitest";
-import { api, downloadFile, setAccount, withAccount } from "./api";
+import { api, downloadFile, saveBlob, setAccount, withAccount } from "./api";
 
 test("withAccount appends the active account to every path", () => {
   setAccount("");
@@ -133,4 +133,35 @@ test("the sender knowledge calls use PUT and POST, carry the account, and a "
       .rejects.toThrow(text);
   }
   setAccount("");
+});
+
+
+test("forget / remove unused / import are POSTs of just that, and saveBlob "
+  + "hands a blob: link to the browser", async () => {
+  const fetchMock = vi.fn().mockResolvedValue({ ok: true,
+    json: () => Promise.resolve({ ok: true }) });
+  vi.stubGlobal("fetch", fetchMock);
+  await api.knowledgeForgetAi();
+  await api.knowledgeRemoveUnused();
+  await api.knowledgeImport({ version: 1, entries: { "a:x@y.example": { kind: "jobs" } } });
+  expect(fetchMock.mock.calls.map(([url, init]) => [url, init?.method, init?.body]))
+    .toEqual([
+      ["/api/knowledge/forget_ai", "POST", JSON.stringify({})],
+      ["/api/knowledge/remove_unused", "POST", JSON.stringify({})],
+      ["/api/import_config", "POST", JSON.stringify({ knowledge: {
+        version: 1, entries: { "a:x@y.example": { kind: "jobs" } } } })]]);
+  vi.spyOn(URL, "createObjectURL").mockReturnValue("blob:x");
+  vi.spyOn(URL, "revokeObjectURL").mockImplementation(() => {});
+  const clicked: string[] = [];
+  const realCreateElement = document.createElement.bind(document);
+  vi.spyOn(document, "createElement")
+    .mockImplementation((tag: string): HTMLElement => {
+      const el = realCreateElement(tag);
+      if (el instanceof HTMLAnchorElement) {
+        el.addEventListener("click", () => clicked.push(`${el.href}|${el.download}`));
+      }
+      return el;
+    });
+  saveBlob("k.json", new Blob(["{}"]));
+  expect(clicked).toEqual(["blob:x|k.json"]);
 });

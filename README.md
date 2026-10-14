@@ -126,6 +126,9 @@ presets.
   only, never sent to an AI), undoable, and a sender's detail view shows
   how it is filed and why. After an AI sorting run you can keep its answers
   as your own rules too; clearer mail still wins over a kept answer.
+  Settings > Filed senders lists everything Mailbroom knows this way -
+  searchable and sortable, editable in place, with delete, "Remove unused",
+  and download / upload of just this list.
 - **Attachment explorer** - an on-demand BODYSTRUCTURE pass (structure
   only, no content downloaded) lists mails by attachment size with file
   names, adds a 📎 aggregate to groups, and enables the `att:>10m` filter.
