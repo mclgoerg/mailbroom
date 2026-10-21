@@ -70,7 +70,7 @@ Release would show. To give users the real story:
 ## Running everything locally
 
 ```bash
-# backend (Python 3.13)
+# backend (Python 3.14)
 pip install -r backend/requirements-dev.txt
 python -m pytest tests/ -q
 
@@ -79,7 +79,7 @@ cd frontend && npm ci
 npm test          # tsc --noEmit + vitest
 
 # or exactly like CI, via Docker:
-docker run --rm -v "$PWD":/app -w /app python:3.13-slim \
+docker run --rm -v "$PWD":/app -w /app python:3.14-slim \
   sh -c "pip install -q -r backend/requirements-dev.txt && python -m pytest tests/ -q"
 docker run --rm -v "$PWD/frontend":/app -w /app node:26-alpine \
   sh -c "npm ci --no-audit --no-fund && npm test"
