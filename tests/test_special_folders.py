@@ -8,9 +8,9 @@ import pytest
 from fastapi.testclient import TestClient
 
 from backend import config as cfgmod
-from backend import mailops
+from backend import auditlog, mailops
 from backend.main import app
-from conftest import FakeIMAP, make_msg
+from conftest import FakeIMAP, make_msg, wait_delete_done
 
 client = TestClient(app)
 
@@ -119,6 +119,34 @@ _PROVIDERS = {
         {"INBOX": 1, "Sent": 1, "Sent Messages": 3},
         {"Sent": "\\Sent", "Sent Messages": "\\Sent"}, "/",
         {"sent": "Sent Messages"}, {"Sent": "sent"}, {"sent"}),
+    # a user subfolder below INBOX/ never takes a role from the provider's
+    # own top-level folder, however much mail it holds
+    "gmx-top-level-beats-inbox-subfolders": (
+        {"INBOX": 1, "Gesendet": 1, "INBOX/Sent": 2, "Gel&APY-scht": 1,
+         "INBOX/Trash": 2, "Spamverdacht": 1, "INBOX/Junk": 2, "Archiv": 1,
+         "INBOX/Archive": 2}, {}, "/",
+        {"sent": "Gesendet", "trash": "Gel&APY-scht",
+         "junk": "Spamverdacht", "archive": "Archiv"},
+        {"INBOX/Sent": "sent", "INBOX/Trash": "trash",
+         "INBOX/Junk": "junk", "INBOX/Archive": "archive"}, set()),
+    "inbox-subfolder-next-to-flagged-trash": (
+        {"INBOX": 1, "Wastebasket": 0, "INBOX/Trash": 2},
+        {"Wastebasket": "\\Trash"}, "/",
+        {"trash": "Wastebasket"}, {"INBOX/Trash": "trash"}, set()),
+    "equal-mail-two-trash-names": (
+        {"INBOX": 1, "Trash": 1, "Deleted Items": 1}, {}, "/",
+        {"trash": "Deleted Items"}, {"Trash": "trash"}, {"trash"}),
+    "equal-mail-two-flagged-sent": (
+        {"INBOX": 1, "Sent": 1, "Sent Messages": 1},
+        {"Sent": "\\Sent", "Sent Messages": "\\Sent"}, "/",
+        {"sent": "Sent"}, {"Sent Messages": "sent"}, {"sent"}),
+    "archive-lookalike": (
+        {"INBOX": 1, "Archive": 1, "Archiv": 1},
+        {"Archive": "\\Archive"}, "/",
+        {"archive": "Archive"}, {"Archiv": "archive"}, set()),
+    "only-gmail-and-inbox-roots-count": (
+        {"INBOX": 1, "[Old]/Trash": 1, "[Gmail]/Trash": 0}, {}, "/",
+        {"trash": "[Gmail]/Trash"}, {}, set()),
     "two-trash-names": (
         {"INBOX": 1, "Trash": 1, "Deleted Items": 5}, {}, "/",
         {"trash": "Deleted Items"}, {"Trash": "trash"}, {"trash"}),
@@ -258,3 +286,84 @@ def test_inbox_prefix_needs_the_announced_delimiter():
     assert mailops.resolve_roles(slash)["roles"] == {}
     dot = FakeIMAP(_box({"INBOX": 0, "INBOX.Trash": 0}), delimiter=".")
     assert mailops.resolve_roles(dot)["roles"] == {"trash": "INBOX.Trash"}
+
+
+def test_archive_lookalike_is_still_scanned(monkeypatch):
+    """D11: Archive stays a scanned folder, look-alike or not."""
+    _use(monkeypatch, FakeIMAP(_box({"INBOX": 1, "Archive": 1, "Archiv": 1}),
+                               flags={"Archive": "\\Archive"}))
+    mailops.run_scan()
+    assert mailops.STATE["folders"] == ["INBOX", "Archive", "Archiv"]
+    by = {f["raw"]: f for f in client.get("/api/folders").json()["folders"]}
+    assert by["Archiv"]["looks_like"] == "archive"
+    assert by["Archiv"]["excluded"] is False
+
+
+def test_xlist_attributes_map_to_roles():
+    fake = FakeIMAP(_box({"Everything": 0, "Bulk": 0}),
+                    flags={"Everything": "\\AllMail", "Bulk": "\\Spam"})
+    found = mailops.resolve_roles(fake)
+    assert found["roles"] == {"all": "Everything", "junk": "Bulk"}
+    assert found["source"] == {"all": "flag", "junk": "flag"}
+
+
+def test_malformed_role_overrides_are_ignored():
+    # a folder literally named "None" must not be picked by a null value
+    fake = FakeIMAP(_box({"INBOX": 1, "Trash": 1, "Spam": 0, "None": 0}))
+    cfgmod.CONFIG_PATH.write_text(json.dumps({"accounts": {"default": {
+        "role_overrides": {"trash": 5, "junk": ["Spam"], "bogus": "Trash",
+                           "sent": None, "drafts": "None"}}}}))
+    found = mailops.resolve_roles(fake)
+    assert found["roles"] == {"trash": "Trash", "junk": "Spam",
+                              "drafts": "None"}   # only the valid one
+    assert found["source"]["drafts"] == "override"
+    cfgmod.CONFIG_PATH.write_text(json.dumps({"accounts": {"default": {
+        "role_overrides": ["trash"]}}}))
+    assert mailops.resolve_roles(fake)["roles"]["trash"] == "Trash"
+
+
+def test_folder_holding_two_roles_is_reported_stably(monkeypatch):
+    _use(monkeypatch, FakeIMAP(_box({"INBOX": 1, "Everything": 1}),
+                               flags={"Everything": "\\All \\Archive"}))
+    for _ in range(2):
+        by = {f["raw"]: f
+              for f in client.get("/api/folders").json()["folders"]}
+        assert by["Everything"]["role"] == "all"
+        assert by["Everything"]["excluded"] is True
+
+
+def _two_trashes(monkeypatch) -> FakeIMAP:
+    fake = _use(monkeypatch, FakeIMAP(
+        _box({"INBOX": 1, "Trash": 2, "Deleted Items": 2})))
+    return fake
+
+
+def test_empty_trash_refuses_while_trash_is_ambiguous(monkeypatch):
+    fake = _two_trashes(monkeypatch)
+    before = {f: list(m) for f, m in fake.mailbox.items()}
+    audit = lambda: auditlog.load(None, 0, 100)["entries"]   # noqa: E731
+    assert audit() == []
+    with pytest.raises(RuntimeError, match="ambiguous"):
+        mailops.empty_trash(uv=1, max_uid=99)
+    assert fake.mailbox == before                    # nothing deleted
+    assert audit() == []                             # nothing recorded
+    r = client.post("/api/empty_trash", json={"uv": 1, "max_uid": 99})
+    assert r.status_code == 409 and "ambiguous" in r.json()["detail"]
+
+
+def test_empty_trash_runs_with_a_confirmed_override(monkeypatch):
+    fake = _two_trashes(monkeypatch)
+    cfgmod.CONFIG_PATH.write_text(json.dumps({"accounts": {"default": {
+        "role_overrides": {"trash": "Trash"}}}}))
+    assert mailops.empty_trash(uv=1, max_uid=99)["deleted"] == 2
+    assert fake.mailbox["Trash"] == []
+    assert len(fake.mailbox["Deleted Items"]) == 2   # the other one is left
+
+
+def test_reversible_actions_use_the_pick_while_ambiguous(monkeypatch):
+    fake = _two_trashes(monkeypatch)
+    mailops.run_scan()
+    mailops.delete_groups("sender", list(mailops.STATE["groups"]["sender"]))
+    wait_delete_done()
+    assert fake.mailbox["INBOX"] == []
+    assert len(fake.mailbox["Deleted Items"]) == 3   # deterministic pick

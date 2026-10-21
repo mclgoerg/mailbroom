@@ -514,20 +514,19 @@ def virtual_views(conn=None, pairs=None) -> set[str]:
 _PREFIX_RE = {}
 
 
-def _name_keys(name: str, sep: str | None = None) -> set[str]:
-    """Lowercased strings a folder name is matched on: the decoded full
-    path, and the path below an `INBOX` prefix or a `[Gmail]`-style
-    namespace root (the hierarchy delimiter when LIST announced one, else
-    `/` or `.`). Deeper user folders ("Work/Archive") never match: only
-    folders directly under those roots are special."""
+def _name_keys(name: str, sep: str | None = None) -> tuple[str, str | None]:
+    """(full decoded lowercase path, the part below an `INBOX` prefix or a
+    `[Gmail]` / `[Google Mail]` root or None). The delimiter is the one LIST
+    announced, else `/` or `.`. Only folders directly under those roots can
+    match by their short name: "Work/Archive" or "[Old]/Trash" never do."""
     low = decode_mutf7(name).lower()
     seps = re.escape(sep) if sep else r"[/.]"
     rx = _PREFIX_RE.get(seps)
     if rx is None:
         rx = _PREFIX_RE[seps] = re.compile(
-            rf"^(?:inbox|\[[^\]]+\]){seps}(?P<rest>.+)$")
+            rf"^(?:inbox|\[gmail\]|\[google mail\]){seps}(?P<rest>.+)$")
     m = rx.match(low)
-    return {low, m.group("rest")} if m else {low}
+    return low, (m.group("rest") if m else None)
 
 
 def _role_overrides(acc) -> dict[str, str]:
@@ -549,7 +548,8 @@ def resolve_roles(conn, acc=None, pairs=None) -> dict:
       roles       {role: raw folder} - the deterministic pick
       source      {role: "flag" | "name" | "override"}
       ambiguous   {role: [raw, ...]} - several equally good candidates, pick
-                  first (flag > name, then most mail, then LIST order); a
+                  first (flag > whole-path name > name below INBOX/[Gmail],
+                  then most mail, then folder name - never LIST order); a
                   role the user confirmed via `role_overrides` is never here.
                   Permanent actions must refuse these roles.
       looks_like  {raw folder: role} - folders that look like a role another
@@ -560,7 +560,7 @@ def resolve_roles(conn, acc=None, pairs=None) -> dict:
     delims = getattr(pairs, "delims", {})
     views = virtual_views(pairs=pairs)
     flagged: dict[str, list[str]] = {}
-    named: dict[str, list[str]] = {}
+    named: dict[str, tuple[list[str], list[str]]] = {}  # whole, prefixed
     for name, flags in pairs:
         if name in views:
             continue
@@ -571,10 +571,13 @@ def resolve_roles(conn, acc=None, pairs=None) -> dict:
                 hit = True
         if hit:
             continue
-        keys = _name_keys(name, delims.get(name))
+        full, short = _name_keys(name, delims.get(name))
         for role, names in _ROLE_NAMES.items():
-            if keys & names:
-                named.setdefault(role, []).append(name)
+            if full in names:
+                named.setdefault(role, ([], []))[0].append(name)
+                break
+            if short in names:
+                named.setdefault(role, ([], []))[1].append(name)
                 break
     overrides = _role_overrides(acc)
     listed = {n for n, _ in pairs}
@@ -583,25 +586,31 @@ def resolve_roles(conn, acc=None, pairs=None) -> dict:
     ambiguous: dict[str, list[str]] = {}
     looks_like: dict[str, str] = {}
     for role in _ROLE_NAMES:
-        flag_c, name_c = flagged.get(role, []), named.get(role, [])
+        flag_c = flagged.get(role, [])
+        exact_c, prefixed_c = named.get(role, ([], []))
         ov = overrides.get(role)
         if ov not in listed or ov in views:
             ov = None
-        if not (flag_c or name_c or ov):
+        if not (flag_c or exact_c or prefixed_c or ov):
             continue
         if ov:
-            holder, src, tier = ov, "override", []
+            holder, src = ov, "override"
         else:
-            src, tier = ("flag", flag_c) if flag_c else ("name", name_c)
-            holder = tier[0]
+            # flag > a name matching the whole path > a name that only
+            # matches below INBOX / [Gmail]; within a tier most mail, then
+            # the folder name (never LIST order)
+            src, tier = next((s_, c) for s_, c in (
+                ("flag", flag_c), ("name", exact_c),
+                ("name", prefixed_c)) if c)
             if len(tier) > 1:
                 counts = {n: folder_message_count(conn, n) or 0
                           for n in tier}
-                tier = sorted(tier, key=lambda n: -counts[n])   # stable
-                holder = tier[0]
+                tier = sorted(tier, key=lambda n: (
+                    -counts[n], decode_mutf7(n).lower(), n))
                 ambiguous[role] = tier
+            holder = tier[0]
         roles[role], source[role] = holder, src
-        for n in flag_c + name_c:
+        for n in flag_c + exact_c + prefixed_c:
             if n != holder:
                 looks_like.setdefault(n, role)
     return {"roles": roles, "source": source, "ambiguous": ambiguous,
@@ -2025,10 +2034,10 @@ def _apply_removal(moved_uids: dict[str, set[int]], acc) -> dict:
     return meta
 
 
-def _resolve_dest(conn, action: str, dest: str) -> str:
+def _resolve_dest(conn, action: str, dest: str, acc=None) -> str:
     """Raw name of the folder an action moves mail into (via folder role)."""
     if action in ("trash", "archive"):
-        name = folder_roles(conn).get(action)
+        name = folder_roles(conn, acc).get(action)
         if not name:
             raise RuntimeError(
                 f"No {action.capitalize()} folder found on the server")
@@ -2051,7 +2060,7 @@ def _move_uids(by_folder: dict[str, set[int]], action: str, dest: str,
         moved_uids = {}
     conn = connect(cfgmod.account_imap(acc.name), acc.name)
     try:
-        trash = _resolve_dest(conn, action, dest)
+        trash = _resolve_dest(conn, action, dest, acc)
         for folder, uidset in by_folder.items():
             if folder == trash:
                 continue   # moving into itself is a no-op
@@ -3032,9 +3041,15 @@ def empty_trash(acc=None, uv: int = 0, max_uid: int = 0) -> dict:
     failure: Exception | None = None
     trash = ""
     try:
-        trash = folder_roles(conn, acc).get("trash")
+        found = resolve_roles(conn, acc)
+        acc.folder_roles.update(found["roles"])
+        trash = found["roles"].get("trash")
         if not trash:
             raise RuntimeError("No Trash folder found on the server")
+        if "trash" in found["ambiguous"]:
+            # permanent deletion needs a confirmed target (role_overrides)
+            raise RuntimeError("Trash is ambiguous - choose it in Settings "
+                               "first")
         status, _ = conn.select(quote_folder(trash), readonly=False)
         if status != "OK":
             raise RuntimeError("cannot open Trash")

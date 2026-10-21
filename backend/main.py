@@ -1201,7 +1201,14 @@ def get_folders(account: str | None = Query(None)):
     except Exception as exc:
         raise HTTPException(500, f"{type(exc).__name__}: {exc}")
     rules = cfgmod.account_imap(acc.name).get("excluded_folders") or []
-    role_of = {name: role for role, name in roles.items()}
+    # a folder can hold several roles (flagged \All and \Archive): report
+    # the first in a fixed order, excluded if any of them is excluded
+    role_of: dict[str, str] = {}
+    held: dict[str, set[str]] = {}
+    for role in (*mailops.EXCLUDED_ROLES, "archive"):
+        if role in roles:
+            role_of.setdefault(roles[role], role)
+            held.setdefault(roles[role], set()).add(role)
     looks_like = found["looks_like"]
     return {
         "folders": [
@@ -1214,7 +1221,8 @@ def get_folders(account: str | None = Query(None)):
              or looks_like.get(f) in found["ambiguous"],
              "looks_like": looks_like.get(f),
              "view": f in views,
-             "excluded": role_of.get(f) in mailops.EXCLUDED_ROLES
+             "excluded": bool(held.get(f, set())
+                              & set(mailops.EXCLUDED_ROLES))
              or looks_like.get(f) in mailops.EXCLUDED_ROLES
              or f in views
              or mailops.excluded(f, rules)
