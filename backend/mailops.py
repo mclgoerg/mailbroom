@@ -181,6 +181,9 @@ SNAPSHOT_DIR = Path(os.environ.get("SNAPSHOT_DIR", "/data"))
 # v2: index records carry `irt`/`refs` (thread grouping). A v1 snapshot is
 # ignored on load, so the first scan after an upgrade refetches every
 # header in full - otherwise old cached mails would silently never thread.
+# `label_copies` (Gmail label dedupe) is optional: a snapshot without it
+# loads as "no label copies cached", and records without `gmid` get it from
+# the next Gmail scan's flags refresh - no version bump, no refetch.
 _SNAP_VERSION = 2
 
 
@@ -205,6 +208,7 @@ def save_snapshot(acc) -> None:
             "folder_roles": acc.folder_roles,
             "trash_count": acc.state["trash_count"],
             "index": list(acc.index.values()),
+            "label_copies": list(acc.label_copies.values()),
             "groups": acc.state["groups"],
             # what the smart groups were built with (restore compares)
             "smart_sig": [acc.smart_sig[0], list(acc.smart_sig[1]),
@@ -238,6 +242,9 @@ def load_snapshot(acc) -> bool:
                 return False              # never clobber live state
             acc.index.update({ikey(m["folder"], m["uid"]): m
                               for m in data["index"]})
+            acc.label_copies.update({
+                ikey(m["folder"], m["uid"]): m
+                for m in data.get("label_copies") or []})
             acc.folder_uv.update(data.get("folder_uv") or {})
             acc.folder_roles.update(data.get("folder_roles") or {})
             acc.state["groups"] = data["groups"]
@@ -614,10 +621,18 @@ def header_text(value) -> str:
 _UID_RE = re.compile(rb"UID (\d+)")
 _SIZE_RE = re.compile(rb"RFC822\.SIZE (\d+)")
 _FLAGS_RE = re.compile(rb"FLAGS \(([^)]*)\)")
+_GMID_RE = re.compile(rb"X-GM-MSGID (\d+)")
+
+
+def has_gmail_ext(conn) -> bool:
+    """Gmail's IMAP extensions (X-GM-MSGID, labels as folders)."""
+    caps = getattr(conn, "capabilities", ()) or ()
+    return any(str(c if isinstance(c, str) else c.decode()).upper()
+               == "X-GM-EXT-1" for c in caps)
 
 
 def _fetch_full_chunk(conn, folder: str, chunk: list[bytes],
-                      messages: list, acc) -> int:
+                      messages: list, acc, gm: bool = False) -> int:
     """Full header+flags FETCH for one chunk of `chunk` (new UIDs, or a
     UIDVALIDITY-stale folder); appends to `messages`. Returns count of
     unparseable messages skipped."""
@@ -625,6 +640,7 @@ def _fetch_full_chunk(conn, folder: str, chunk: list[bytes],
     status, data = conn.uid(
         "FETCH", b",".join(chunk).decode(),
         "(UID FLAGS RFC822.SIZE INTERNALDATE "
+        + ("X-GM-MSGID " if gm else "") +
         "BODY.PEEK[HEADER.FIELDS (FROM SUBJECT MESSAGE-ID IN-REPLY-TO "
         "REFERENCES LIST-UNSUBSCRIBE LIST-UNSUBSCRIBE-POST)])")
     if status != "OK":
@@ -646,7 +662,9 @@ def _fetch_full_chunk(conn, folder: str, chunk: list[bytes],
             msg = email.message_from_bytes(item[1])
             name, addr = parseaddr(header_text(msg.get("From")))
             addr = addr.strip().lower() or "(unparseable sender)"
+            gmid = _GMID_RE.search(meta) if gm else None
             messages.append({
+                **({"gmid": gmid.group(1).decode()} if gmid else {}),
                 "uid": int(m.group(1)), "folder": folder, "addr": addr,
                 "name": decode_mime(name) if name else "",
                 "subject": decode_mime(msg.get("Subject", ""))[:150],
@@ -674,12 +692,13 @@ def _fetch_full_chunk(conn, folder: str, chunk: list[bytes],
 
 
 def _refresh_flags_chunk(conn, folder: str, chunk: list[bytes],
-                         cached: dict, messages: list) -> None:
+                         cached: dict, messages: list,
+                         gm: bool = False) -> None:
     """Cheap FLAGS-only FETCH for one chunk of UIDs already cached from a
     prior scan (same UIDVALIDITY generation) - picks up \\Seen changes
     made by another client without re-fetching headers/bodies."""
     status, data = conn.uid("FETCH", b",".join(chunk).decode(),
-                            "(UID FLAGS)")
+                            "(UID FLAGS X-GM-MSGID)" if gm else "(UID FLAGS)")
     if status != "OK":
         # Can't confirm flags right now - keep the cached copy as-is
         # rather than silently dropping these messages from `messages`.
@@ -689,6 +708,7 @@ def _refresh_flags_chunk(conn, folder: str, chunk: list[bytes],
                 messages.append(old)
         return
     seen_by_uid: dict[int, bool] = {}
+    gmid_by_uid: dict[int, str] = {}
     for item in data or []:
         if not isinstance(item, (bytes, bytearray)):
             continue
@@ -698,6 +718,9 @@ def _refresh_flags_chunk(conn, folder: str, chunk: list[bytes],
         fm = _FLAGS_RE.search(item)
         seen_by_uid[int(m.group(1))] = bool(
             fm and b"\\Seen" in fm.group(1))
+        gm_m = _GMID_RE.search(item) if gm else None
+        if gm_m:
+            gmid_by_uid[int(m.group(1))] = gm_m.group(1).decode()
     for u in chunk:
         uid_int = int(u)
         old = cached.get(uid_int)
@@ -705,11 +728,13 @@ def _refresh_flags_chunk(conn, folder: str, chunk: list[bytes],
             continue
         if uid_int in seen_by_uid:
             old = {**old, "seen": seen_by_uid[uid_int]}
+        if uid_int in gmid_by_uid:
+            old = {**old, "gmid": gmid_by_uid[uid_int]}
         messages.append(old)
 
 
 def scan_folder(conn, folder: str, messages: list, progress_cb,
-                acc=None) -> int:
+                acc=None, gm: bool = False) -> int:
     """Scan one folder into `messages`; returns how many messages had to
     be SKIPPED because their metadata could not be parsed (real-world
     mail contains arbitrarily broken headers - one bad message must
@@ -718,7 +743,10 @@ def scan_folder(conn, folder: str, messages: list, progress_cb,
     Incremental: UIDs already cached from a previous scan of this exact
     UIDVALIDITY generation only get a cheap flags-only refresh; only
     genuinely new UIDs get a full header fetch. A UIDVALIDITY change (or
-    no prior cache) falls back to fetching everything, same as before."""
+    no prior cache) falls back to fetching everything, same as before.
+
+    `gm` (server advertises X-GM-EXT-1): every record also carries Gmail's
+    message id, see dedupe_gmail_labels."""
     acc = acc or accounts.get()
     status, _ = conn.select(quote_folder(folder), readonly=True)
     if status != "OK":
@@ -737,7 +765,8 @@ def scan_folder(conn, folder: str, messages: list, progress_cb,
     else:
         cached = {}
         for u in uids:
-            rec = acc.index.get(ikey(folder, int(u)))
+            rec = (acc.index.get(ikey(folder, int(u)))
+                   or acc.label_copies.get(ikey(folder, int(u))))
             if rec is not None:
                 cached[int(u)] = rec
         new_uids = [u for u in uids if int(u) not in cached]
@@ -748,17 +777,44 @@ def scan_folder(conn, folder: str, messages: list, progress_cb,
         if cancel_requested("scan", acc):
             raise Cancelled()
         chunk = new_uids[start:start + FETCH_CHUNK]
-        skipped += _fetch_full_chunk(conn, folder, chunk, messages, acc)
+        skipped += _fetch_full_chunk(conn, folder, chunk, messages, acc,
+                                    gm)
         done += len(chunk)
         progress_cb(folder, done, total)
     for start in range(0, len(existing_uids), FETCH_CHUNK):
         if cancel_requested("scan", acc):
             raise Cancelled()
         chunk = existing_uids[start:start + FETCH_CHUNK]
-        _refresh_flags_chunk(conn, folder, chunk, cached, messages)
+        _refresh_flags_chunk(conn, folder, chunk, cached, messages, gm)
         done += len(chunk)
         progress_cb(folder, done, total)
     return skipped
+
+
+def _copy_rank(m: dict) -> tuple:
+    """Which copy of a Gmail message is the one we keep: INBOX first, then
+    the folder name (case-insensitive, decoded), then the lowest UID - a
+    fixed order, so the pick never flips between scans."""
+    return (m["folder"].upper() != "INBOX",
+            decode_mutf7(m["folder"]).casefold(), m["folder"], m["uid"])
+
+
+def dedupe_gmail_labels(messages: list) -> tuple[list, list]:
+    """Gmail shows one message under every label folder it carries. Keep
+    one record per X-GM-MSGID (see _copy_rank) and return (kept, copies);
+    kept keeps the scan order. Records without a Gmail id are never
+    dropped."""
+    best: dict[str, dict] = {}
+    for m in messages:
+        gid = m.get("gmid")
+        if gid and (gid not in best
+                    or _copy_rank(m) < _copy_rank(best[gid])):
+            best[gid] = m
+    kept, copies = [], []
+    for m in messages:
+        gid = m.get("gmid")
+        (kept if not gid or best[gid] is m else copies).append(m)
+    return kept, copies
 
 
 def scan_sent_recipients(conn, progress_cb=None,
@@ -1653,9 +1709,13 @@ def run_scan(acc=None) -> None:
                 acc.state["folders"] = [decode_mutf7(f) for f in folders]
             messages: list = []
             skipped = 0
+            gm = has_gmail_ext(conn)
             for folder in folders:
                 skipped += scan_folder(conn, folder, messages,
-                                       progress_cb, acc)
+                                       progress_cb, acc, gm)
+            copies: list = []
+            if gm:
+                messages, copies = dedupe_gmail_labels(messages)
             trash_count = folder_message_count(conn, roles.get("trash"))
             replied = load_replied(acc)
             new_replied = scan_sent_recipients(conn, progress_cb, roles, acc)
@@ -1674,6 +1734,9 @@ def run_scan(acc=None) -> None:
                 acc.index.clear()
                 for m in messages:
                     acc.index[ikey(m["folder"], m["uid"])] = m
+                acc.label_copies.clear()
+                for m in copies:
+                    acc.label_copies[ikey(m["folder"], m["uid"])] = m
                 acc.state["groups"] = groups
                 acc.smart_sig = smart_sig(sp)
                 acc.state["status"] = "done"

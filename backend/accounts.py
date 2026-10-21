@@ -63,6 +63,11 @@ class AccountState:
         self.lock = threading.Lock()
         self.state = _initial_state()
         self.index: dict[str, dict] = {}     # "folder\x00uid" -> metadata
+        # Gmail only: the label copies of a message whose kept copy is in
+        # `index` ("folder\x00uid" -> metadata). Never counted or acted on;
+        # cached so a rescan does not refetch them and can promote one when
+        # the kept copy leaves its folder.
+        self.label_copies: dict[str, dict] = {}
         self.folder_uv: dict[str, int] = {}  # folder -> UIDVALIDITY at scan
         self.folder_roles: dict[str, str] = {}   # role -> raw folder name
         self.undo_log: list[dict] = []
