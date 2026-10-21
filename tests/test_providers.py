@@ -191,3 +191,57 @@ def test_config_transport_fields_roundtrip():
     im = cfg["accounts"]["default"]
     assert im["security"] == "starttls"
     assert im["preset"] == "gmail"
+
+
+def _gmail_views(monkeypatch, prefix="[Gmail]") -> FakeIMAP:
+    """One mail visible in INBOX, Starred and Important (no flags needed
+    for the name-fallback variant)."""
+    m = make_msg(1, frm="a@x.example", subject="hello", msgid="<one@x.example>")
+    fake = FakeIMAP(
+        {"INBOX": [dict(m)], f"{prefix}/Starred": [dict(m)],
+         f"{prefix}/Important": [dict(m)],
+         f"{prefix}/Trash": []},
+        flags={f"{prefix}/Starred": "\\Flagged",
+               f"{prefix}/Important": "\\Important",
+               f"{prefix}/Trash": "\\Trash"})
+    monkeypatch.setattr(mailops, "connect", lambda cfg, name=None: fake)
+    return fake
+
+
+def test_gmail_starred_important_counted_once(monkeypatch):
+    _gmail_views(monkeypatch)
+    mailops.run_scan()
+    assert mailops.STATE["groups"]["sender"]["a@x.example"]["count"] == 1
+    dups = client.get("/api/duplicates").json()
+    assert not (dups.get("groups") if isinstance(dups, dict) else dups)
+
+
+def test_gmail_views_by_name_fallback(monkeypatch):
+    fake = _gmail_views(monkeypatch, "[Google Mail]")
+    fake.flags.clear()
+    assert mailops.virtual_views(fake) == {
+        "[Google Mail]/Starred", "[Google Mail]/Important"}
+    mailops.run_scan()
+    assert mailops.STATE["groups"]["sender"]["a@x.example"]["count"] == 1
+
+
+def test_folders_endpoint_marks_views(monkeypatch):
+    _gmail_views(monkeypatch)
+    by_name = {f["raw"]: f for f in client.get("/api/folders").json()["folders"]}
+    for n in ("[Gmail]/Starred", "[Gmail]/Important"):
+        assert by_name[n]["view"] is True and by_name[n]["excluded"] is True
+        assert by_name[n]["role"] is None
+    assert by_name["INBOX"]["view"] is False
+
+
+def test_views_detected_by_flag_with_non_gmail_names(monkeypatch):
+    """Proton-style "Starred" (\\Flagged) and an oddly named \\Important
+    folder are views by flag alone - no Gmail name involved."""
+    m = make_msg(1, frm="a@x.example", subject="hello")
+    fake = FakeIMAP(
+        {"INBOX": [dict(m)], "Starred": [dict(m)], "Priority Box": [dict(m)]},
+        flags={"Starred": "\\Flagged", "Priority Box": "\\Important"})
+    monkeypatch.setattr(mailops, "connect", lambda cfg, name=None: fake)
+    assert mailops.virtual_views(fake) == {"Starred", "Priority Box"}
+    mailops.run_scan()
+    assert mailops.STATE["groups"]["sender"]["a@x.example"]["count"] == 1

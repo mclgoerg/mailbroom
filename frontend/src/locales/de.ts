@@ -600,6 +600,10 @@ export const DE: Record<string, string> = {
     + "Code eingeben:",
   "folder.role_excluded":
     "Spezialordner (per Rolle erkannt) - wird nie mitgescannt",
+  "folder.view_excluded":
+    "Virtuelle Ansicht auf Mails, die woanders liegen - wird nie "
+    + "mitgescannt, damit nichts doppelt z\u00e4hlt",
+  "folder.view": "Ansicht",
   "account.label": "Zu bearbeitendes Konto",
   "account.add": "Konto hinzufügen",
   "account.hint":

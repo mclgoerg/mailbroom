@@ -276,6 +276,7 @@ export interface FolderInfo {
   raw: string;
   name: string;
   role: string | null;    // trash | sent | junk | drafts | archive | all
+  view?: boolean;         // virtual view (Gmail Starred / Important)
   excluded: boolean;
 }
 
