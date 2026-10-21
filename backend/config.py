@@ -379,6 +379,10 @@ def _load_accounts(saved: dict, env_first: bool = True) -> dict[str, dict]:
         out[name] = {**base, **block}
         if not isinstance(out[name].get("excluded_folders"), list):
             out[name]["excluded_folders"] = list(DEFAULT_EXCLUDED)
+        # confirmed special-folder choices ({role: raw folder}); older
+        # configs lack the key
+        if not isinstance(out[name].get("role_overrides"), dict):
+            out[name]["role_overrides"] = {}
         # tolerate a pre-digest config (missing key), a pre-hour/minute
         # one, or a partial saved block (e.g. an old backup import
         # missing "recipient")

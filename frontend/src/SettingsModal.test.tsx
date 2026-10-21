@@ -172,6 +172,27 @@ test("a virtual view folder is listed as a locked, tagged row", async () => {
   }
 });
 
+test("a look-alike of a special folder is locked and unticked", async () => {
+  foldersResult = { wildcards: [], folders: [
+    { raw: "Deleted Items", name: "Deleted Items", role: "trash",
+      role_source: "flag", ambiguous: false, looks_like: null,
+      excluded: true },
+    { raw: "Gelöschte Elemente", name: "Gelöschte Elemente", role: null,
+      role_source: null, ambiguous: false, looks_like: "trash",
+      excluded: true }] };
+  try {
+    render(<SettingsModal cfg={cfg} account="default" onClose={() => {}}
+      onSaved={() => {}} onAccountsChanged={() => {}} />);
+    const box = await screen.findByLabelText(/Gelöschte Elemente/);
+    expect((box as HTMLInputElement).disabled).toBe(true);
+    expect((box as HTMLInputElement).checked).toBe(false);
+    expect(box.closest("span[title]")?.getAttribute("title"))
+      .toMatch(/second special folder/);
+  } finally {
+    foldersResult = null;
+  }
+});
+
 const renderWithDialogs = (over: Partial<Parameters<typeof SettingsModal>[0]>
   = {}) => render(<DialogProvider><SettingsModal cfg={cfg} account="default"
   onClose={() => {}} onSaved={() => {}} onAccountsChanged={() => {}}

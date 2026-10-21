@@ -1189,7 +1189,9 @@ def get_folders(account: str | None = Query(None)):
         try:
             pairs = mailops.list_folders_ex(conn)
             names = [n for n, _ in pairs]
-            roles = mailops.folder_roles(conn, acc, pairs=pairs)
+            found = mailops.resolve_roles(conn, acc, pairs=pairs)
+            acc.folder_roles.update(found["roles"])
+            roles = found["roles"]
             views = mailops.virtual_views(pairs=pairs)
         finally:
             try:
@@ -1200,12 +1202,20 @@ def get_folders(account: str | None = Query(None)):
         raise HTTPException(500, f"{type(exc).__name__}: {exc}")
     rules = cfgmod.account_imap(acc.name).get("excluded_folders") or []
     role_of = {name: role for role, name in roles.items()}
+    looks_like = found["looks_like"]
     return {
         "folders": [
             {"raw": f, "name": mailops.decode_mutf7(f),
              "role": role_of.get(f),
+             # how the role was found ("flag" / "name" / "override"), and
+             # whether another folder is just as good a candidate
+             "role_source": found["source"].get(role_of.get(f)),
+             "ambiguous": role_of.get(f) in found["ambiguous"]
+             or looks_like.get(f) in found["ambiguous"],
+             "looks_like": looks_like.get(f),
              "view": f in views,
              "excluded": role_of.get(f) in mailops.EXCLUDED_ROLES
+             or looks_like.get(f) in mailops.EXCLUDED_ROLES
              or f in views
              or mailops.excluded(f, rules)
              or mailops.excluded(mailops.decode_mutf7(f), rules)}

@@ -728,6 +728,9 @@ export const EN: Record<string, string> = {
   "folder.view_excluded":
     "Virtual view of mail kept elsewhere - never scanned, so nothing is "
     + "counted twice",
+  "folder.lookalike_excluded":
+    "Looks like a second special folder (another folder already holds "
+    + "that role) - never scanned, so its mail is not offered for cleanup",
   "folder.view": "view",
   "audit.empty": "Nothing recorded yet",
   "audit.export": "Export audit log as CSV",

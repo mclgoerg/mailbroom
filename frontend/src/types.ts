@@ -278,6 +278,9 @@ export interface FolderInfo {
   name: string;
   role: string | null;    // trash | sent | junk | drafts | archive | all
   view?: boolean;         // virtual view (Gmail Starred / Important)
+  role_source?: "flag" | "name" | "override" | null;
+  ambiguous?: boolean;    // another folder is an equally good candidate
+  looks_like?: string | null;  // a role another folder already holds
   excluded: boolean;
 }
 

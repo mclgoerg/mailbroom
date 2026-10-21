@@ -422,13 +422,23 @@ def uidvalidity(conn: imaplib.IMAP4_SSL) -> int:
         return 0
 
 
-_LIST_RE = re.compile(rb'\((?P<flags>[^)]*)\) "(?P<delim>[^"]*)" (?P<name>.+)$')
+_LIST_RE = re.compile(
+    rb'\((?P<flags>[^)]*)\) (?:"(?P<delim>[^"]*)"|NIL) (?P<name>.+)$')
+
+
+class FolderList(list):
+    """list_folders_ex result: (name, flags) pairs; `.delims` maps a raw
+    name to its hierarchy delimiter (absent when LIST said NIL)."""
+
+    def __init__(self, *a):
+        super().__init__(*a)
+        self.delims: dict[str, str] = {}
 
 
 def list_folders_ex(conn) -> list[tuple[str, set[str]]]:
     """(name, lowercased-flags) per folder from LIST."""
     status, data = conn.list()
-    out: list[tuple[str, set[str]]] = []
+    out = FolderList()
     if status != "OK":
         return out
     for item in data or []:
@@ -444,7 +454,10 @@ def list_folders_ex(conn) -> list[tuple[str, set[str]]]:
             name = name[1:-1]
         flags = {f.lower() for f in
                  m.group("flags").decode("utf-8", "replace").split()}
-        out.append((name.decode("utf-8", "replace"), flags))
+        raw = name.decode("utf-8", "replace")
+        out.append((raw, flags))
+        if m.group("delim"):
+            out.delims[raw] = m.group("delim").decode("utf-8", "replace")
     return out
 
 
@@ -452,27 +465,28 @@ def list_folders(conn) -> list[str]:
     return [name for name, _ in list_folders_ex(conn)]
 
 
-# RFC 6154 SPECIAL-USE flags -> folder role.
+# RFC 6154 SPECIAL-USE flags -> folder role, plus the legacy XLIST
+# attributes Gmail used (\\AllMail, \\Spam).
 _ROLE_FLAGS = {"\\trash": "trash", "\\sent": "sent", "\\junk": "junk",
-               "\\drafts": "drafts", "\\archive": "archive", "\\all": "all"}
+               "\\drafts": "drafts", "\\archive": "archive",
+               "\\all": "all", "\\allmail": "all", "\\spam": "junk"}
 
-# Fallback for servers without SPECIAL-USE: common provider/localized names
-# (compared against the decoded, lowercased folder name).
+# Fallback for servers without SPECIAL-USE: common provider/localized names,
+# compared against the decoded, lowercased path (see _name_keys: the part
+# below an INBOX. / INBOX/ prefix or a "[Gmail]/"-style namespace root is
+# matched too, so those need no entries of their own).
 _ROLE_NAMES: dict[str, set[str]] = {
     "trash": {"trash", "bin", "deleted", "deleted messages", "deleted items",
-              "papierkorb", "gelöschte elemente", "gelöschte objekte",
-              "corbeille", "[gmail]/trash", "[gmail]/bin",
-              "[gmail]/papierkorb"},
+              "papierkorb", "gelöscht", "gelöschte elemente",
+              "gelöschte objekte", "gelöschte nachrichten", "corbeille"},
     "sent": {"sent", "sent mail", "sent items", "sent messages", "gesendet",
-             "gesendete elemente", "gesendete objekte", "[gmail]/sent mail",
-             "[gmail]/gesendet"},
-    "junk": {"spam", "junk", "junk mail", "junk e-mail", "bulk mail",
-             "[gmail]/spam"},
-    "drafts": {"drafts", "draft", "entwürfe", "[gmail]/drafts",
-               "[gmail]/entwürfe"},
-    "archive": {"archive", "archiv", "[gmail]/archive"},
-    "all": {"all mail", "[gmail]/all mail", "[gmail]/alle nachrichten",
-            "[gmail]/tous les messages"},
+             "gesendete elemente", "gesendete objekte",
+             "gesendete nachrichten"},
+    "junk": {"spam", "junk", "junk mail", "junk email", "junk e-mail",
+             "junk-e-mail", "bulk mail", "spamverdacht"},
+    "drafts": {"drafts", "draft", "entwürfe"},
+    "archive": {"archive", "archiv"},
+    "all": {"all mail", "alle nachrichten", "tous les messages"},
 }
 
 # Roles that never belong in cleanup scans: trash/junk hold deleted mail,
@@ -483,7 +497,7 @@ EXCLUDED_ROLES = ("trash", "junk", "sent", "drafts", "all")
 # Gmail's Starred / Important are saved searches shown as folders: every
 # mail in them also lives in INBOX or a label, so scanning them counts it
 # again (and "deleting the extra copy" would trash the one real message).
-_VIEW_FLAGS = {"\\flagged", "\\important"}
+_VIEW_FLAGS = {"\\flagged", "\\important", "\\starred"}
 _VIEW_NAMES = {f"{prefix}/{leaf}" for prefix in ("[gmail]", "[google mail]")
                for leaf in ("starred", "important", "markiert", "wichtig")}
 
@@ -497,21 +511,109 @@ def virtual_views(conn=None, pairs=None) -> set[str]:
             or decode_mutf7(name).lower() in _VIEW_NAMES}
 
 
-def folder_roles(conn, acc=None, pairs=None) -> dict[str, str]:
-    """{role: raw folder name} via SPECIAL-USE flags, name fallback second.
-    Also refreshes the account's role cache (used by fetch_message)."""
+_PREFIX_RE = {}
+
+
+def _name_keys(name: str, sep: str | None = None) -> set[str]:
+    """Lowercased strings a folder name is matched on: the decoded full
+    path, and the path below an `INBOX` prefix or a `[Gmail]`-style
+    namespace root (the hierarchy delimiter when LIST announced one, else
+    `/` or `.`). Deeper user folders ("Work/Archive") never match: only
+    folders directly under those roots are special."""
+    low = decode_mutf7(name).lower()
+    seps = re.escape(sep) if sep else r"[/.]"
+    rx = _PREFIX_RE.get(seps)
+    if rx is None:
+        rx = _PREFIX_RE[seps] = re.compile(
+            rf"^(?:inbox|\[[^\]]+\]){seps}(?P<rest>.+)$")
+    m = rx.match(low)
+    return {low, m.group("rest")} if m else {low}
+
+
+def _role_overrides(acc) -> dict[str, str]:
+    """The account's confirmed {role: raw folder} choices (config key
+    `role_overrides`; absent/empty by default). Read-only here: the
+    Settings UI that writes it comes later."""
+    try:
+        ov = cfgmod.account_imap(acc.name).get("role_overrides")
+    except Exception:
+        return {}
+    if not isinstance(ov, dict):
+        return {}
+    return {str(r): str(n) for r, n in ov.items()
+            if r in _ROLE_FLAGS.values() and isinstance(n, str)}
+
+
+def resolve_roles(conn, acc=None, pairs=None) -> dict:
+    """Role detection with its evidence. Returns
+      roles       {role: raw folder} - the deterministic pick
+      source      {role: "flag" | "name" | "override"}
+      ambiguous   {role: [raw, ...]} - several equally good candidates, pick
+                  first (flag > name, then most mail, then LIST order); a
+                  role the user confirmed via `role_overrides` is never here.
+                  Permanent actions must refuse these roles.
+      looks_like  {raw folder: role} - folders that look like a role another
+                  folder holds (a client's second Trash, a second \\Sent)
+    A flag always beats a name; Gmail's virtual views are never a role."""
     acc = acc or accounts.get()
-    roles: dict[str, str] = {}
     pairs = list_folders_ex(conn) if pairs is None else pairs
+    delims = getattr(pairs, "delims", {})
+    views = virtual_views(pairs=pairs)
+    flagged: dict[str, list[str]] = {}
+    named: dict[str, list[str]] = {}
     for name, flags in pairs:
+        if name in views:
+            continue
+        hit = False
         for flag, role in _ROLE_FLAGS.items():
-            if flag in flags and role not in roles:
-                roles[role] = name
-    for name, _ in pairs:
-        low = decode_mutf7(name).lower()
+            if flag in flags and name not in flagged.setdefault(role, []):
+                flagged[role].append(name)
+                hit = True
+        if hit:
+            continue
+        keys = _name_keys(name, delims.get(name))
         for role, names in _ROLE_NAMES.items():
-            if role not in roles and low in names:
-                roles[role] = name
+            if keys & names:
+                named.setdefault(role, []).append(name)
+                break
+    overrides = _role_overrides(acc)
+    listed = {n for n, _ in pairs}
+    roles: dict[str, str] = {}
+    source: dict[str, str] = {}
+    ambiguous: dict[str, list[str]] = {}
+    looks_like: dict[str, str] = {}
+    for role in _ROLE_NAMES:
+        flag_c, name_c = flagged.get(role, []), named.get(role, [])
+        ov = overrides.get(role)
+        if ov not in listed or ov in views:
+            ov = None
+        if not (flag_c or name_c or ov):
+            continue
+        if ov:
+            holder, src, tier = ov, "override", []
+        else:
+            src, tier = ("flag", flag_c) if flag_c else ("name", name_c)
+            holder = tier[0]
+            if len(tier) > 1:
+                counts = {n: folder_message_count(conn, n) or 0
+                          for n in tier}
+                tier = sorted(tier, key=lambda n: -counts[n])   # stable
+                holder = tier[0]
+                ambiguous[role] = tier
+        roles[role], source[role] = holder, src
+        for n in flag_c + name_c:
+            if n != holder:
+                looks_like.setdefault(n, role)
+    return {"roles": roles, "source": source, "ambiguous": ambiguous,
+            "looks_like": looks_like}
+
+
+def folder_roles(conn, acc=None, pairs=None) -> dict[str, str]:
+    """{role: raw folder name} via SPECIAL-USE flags, name fallback second
+    (see resolve_roles for ambiguity and look-alikes). Also refreshes the
+    account's role cache (used by fetch_message)."""
+    acc = acc or accounts.get()
+    roles = resolve_roles(conn, acc, pairs)["roles"]
     acc.folder_roles.update(roles)
     return roles
 
@@ -1696,10 +1798,16 @@ def run_scan(acc=None) -> None:
         try:
             rules = im.get("excluded_folders") or []
             pairs = list_folders_ex(conn)
-            roles = folder_roles(conn, acc, pairs=pairs)
+            found = resolve_roles(conn, acc, pairs=pairs)
+            roles = found["roles"]
+            acc.folder_roles.update(roles)
             # Special folders are excluded by ROLE (works for any provider's
             # names); the user's name/wildcard rules still apply on top.
+            # So is a look-alike of one (a client's second Trash): it is
+            # never scanned as ordinary mail, ticked or not.
             role_excluded = {roles[r] for r in EXCLUDED_ROLES if r in roles}
+            role_excluded |= {n for n, r in found["looks_like"].items()
+                              if r in EXCLUDED_ROLES}
             role_excluded |= virtual_views(pairs=pairs)
             folders = [f for f, _ in pairs
                        if f not in role_excluded

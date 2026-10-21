@@ -761,10 +761,12 @@ export function SettingsModal({ cfg, account, onClose, onSaved,
                   // Starred / Important) are excluded on the backend - their
                   // checkboxes are informational only.
                   const locked = x.view
+                    || (!!x.looks_like && x.looks_like !== "archive")
                     || (!!x.role && x.role !== "archive");
                   return (
                   <span key={x.raw} className="min-w-0"
                     title={locked ? t(x.view ? "folder.view_excluded"
+                      : x.looks_like ? "folder.lookalike_excluded"
                       : "folder.role_excluded") : undefined}>
                     <Checkbox className="max-w-full"
                       checked={included.has(x.raw)}

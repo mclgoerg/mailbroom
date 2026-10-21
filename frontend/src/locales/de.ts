@@ -603,6 +603,10 @@ export const DE: Record<string, string> = {
   "folder.view_excluded":
     "Virtuelle Ansicht auf Mails, die woanders liegen - wird nie "
     + "mitgescannt, damit nichts doppelt z\u00e4hlt",
+  "folder.lookalike_excluded":
+    "Sieht aus wie ein zweiter Spezialordner (die Rolle hat schon ein "
+    + "anderer Ordner) - wird nie mitgescannt, seine Mails werden nicht "
+    + "zum Aufr\u00e4umen angeboten",
   "folder.view": "Ansicht",
   "account.label": "Zu bearbeitendes Konto",
   "account.add": "Konto hinzufügen",

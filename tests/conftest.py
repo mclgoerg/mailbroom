@@ -103,6 +103,9 @@ class FakeIMAP:
     `move=False` simulates a server without the MOVE capability (deletes
     must then go through COPY + \\Deleted + UID EXPUNGE); `uidplus=False`
     one without UIDPLUS (UID EXPUNGE is then a BAD command).
+    `delimiter` is the hierarchy delimiter LIST announces (None = NIL);
+    `list_order` names folders LIST returns first, in that order (the rest
+    follow in mailbox order) - role detection must not depend on it.
 
     STORE applies the flags to exactly the given set and EXPUNGE removes
     only \\Deleted mail, like a real server.
@@ -115,7 +118,10 @@ class FakeIMAP:
     def __init__(self, mailbox: dict[str, list[dict]],
                  flags: dict[str, str] | None = None, move: bool = True,
                  uidplus: bool = True, gmail: bool = False,
-                 trash: str = "[Gmail]/Trash"):
+                 trash: str = "[Gmail]/Trash", delimiter: str | None = "/",
+                 list_order: list[str] | None = None):
+        self.delimiter = delimiter
+        self.list_order = list_order or []
         self.mailbox = mailbox            # folder -> list of make_msg dicts
         self.flags = flags or {}
         self.move = move
@@ -157,11 +163,13 @@ class FakeIMAP:
     # -- mailbox metadata -----------------------------------------------
     def list(self):
         out = []
-        for f in list(self.mailbox):
+        first = [f for f in self.list_order if f in self.mailbox]
+        delim = f'"{self.delimiter}"' if self.delimiter else "NIL"
+        for f in first + [f for f in self.mailbox if f not in first]:
             fl = "\\HasNoChildren"
             if f in self.flags:
                 fl += f" {self.flags[f]}"
-            out.append(f'({fl}) "/" "{f}"'.encode())
+            out.append(f'({fl}) {delim} "{f}"'.encode())
         return "OK", out
 
     def select(self, qname, readonly=False):
