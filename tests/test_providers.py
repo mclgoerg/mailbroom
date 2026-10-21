@@ -232,3 +232,16 @@ def test_folders_endpoint_marks_views(monkeypatch):
         assert by_name[n]["view"] is True and by_name[n]["excluded"] is True
         assert by_name[n]["role"] is None
     assert by_name["INBOX"]["view"] is False
+
+
+def test_views_detected_by_flag_with_non_gmail_names(monkeypatch):
+    """Proton-style "Starred" (\\Flagged) and an oddly named \\Important
+    folder are views by flag alone - no Gmail name involved."""
+    m = make_msg(1, frm="a@x.example", subject="hello")
+    fake = FakeIMAP(
+        {"INBOX": [dict(m)], "Starred": [dict(m)], "Priority Box": [dict(m)]},
+        flags={"Starred": "\\Flagged", "Priority Box": "\\Important"})
+    monkeypatch.setattr(mailops, "connect", lambda cfg, name=None: fake)
+    assert mailops.virtual_views(fake) == {"Starred", "Priority Box"}
+    mailops.run_scan()
+    assert mailops.STATE["groups"]["sender"]["a@x.example"]["count"] == 1

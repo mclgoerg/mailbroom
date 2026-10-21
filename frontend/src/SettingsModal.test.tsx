@@ -10,13 +10,16 @@ const foldersCalls: (string | undefined)[] = [];
 const saveCalls: any[] = [];
 const testDigestCalls: string[] = [];
 const oauthDisconnectCalls: string[] = [];
+let foldersResult: unknown = null;   // null: picker stays loading
 let testDigestResult: { sent: boolean; demo: boolean } =
   { sent: true, demo: false };
 vi.mock("./api", () => ({
   api: {
     folders: (account?: string) => {
       foldersCalls.push(account);
-      return new Promise(() => {});              // picker stays loading
+      return foldersResult
+        ? Promise.resolve(foldersResult)
+        : new Promise(() => {});                 // picker stays loading
     },
     saveConfig: (body: any) => {
       saveCalls.push(body);
@@ -146,6 +149,27 @@ test("folder discovery follows the account being edited", () => {
   // manual re-discover button
   fireEvent.click(screen.getByText(/Discover/));
   expect(foldersCalls).toEqual(["default", "icloud", "icloud"]);
+});
+
+test("a virtual view folder is listed as a locked, tagged row", async () => {
+  foldersResult = { wildcards: [], folders: [
+    { raw: "INBOX", name: "INBOX", role: null, view: false, excluded: false },
+    { raw: "[Gmail]/Starred", name: "[Gmail]/Starred", role: null,
+      view: true, excluded: true }] };
+  try {
+    render(<SettingsModal cfg={cfg} account="default" onClose={() => {}}
+      onSaved={() => {}} onAccountsChanged={() => {}} />);
+    const box = await screen.findByLabelText(/\[Gmail\]\/Starred/);
+    expect((box as HTMLInputElement).disabled).toBe(true);
+    expect((box as HTMLInputElement).checked).toBe(false);
+    expect(screen.getByText("view")).toBeTruthy();
+    expect(box.closest("span[title]")?.getAttribute("title"))
+      .toMatch(/Virtual view/);
+    expect((screen.getByLabelText("INBOX") as HTMLInputElement).disabled)
+      .toBe(false);
+  } finally {
+    foldersResult = null;
+  }
 });
 
 const renderWithDialogs = (over: Partial<Parameters<typeof SettingsModal>[0]>

@@ -757,8 +757,9 @@ export function SettingsModal({ cfg, account, onClose, onSaved,
                     || x.name.toLowerCase().startsWith(
                       w.trim().toLowerCase().slice(0, -1))))
                   .map((x) => {
-                  // trash/junk/sent/drafts/all are excluded by ROLE on the
-                  // backend - their checkboxes are informational only.
+                  // trash/junk/sent/drafts/all roles and virtual views (Gmail
+                  // Starred / Important) are excluded on the backend - their
+                  // checkboxes are informational only.
                   const locked = x.view
                     || (!!x.role && x.role !== "archive");
                   return (

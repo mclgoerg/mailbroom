@@ -490,12 +490,12 @@ def virtual_views(conn=None, pairs=None) -> set[str]:
             or decode_mutf7(name).lower() in _VIEW_NAMES}
 
 
-def folder_roles(conn, acc=None) -> dict[str, str]:
+def folder_roles(conn, acc=None, pairs=None) -> dict[str, str]:
     """{role: raw folder name} via SPECIAL-USE flags, name fallback second.
     Also refreshes the account's role cache (used by fetch_message)."""
     acc = acc or accounts.get()
     roles: dict[str, str] = {}
-    pairs = list_folders_ex(conn)
+    pairs = list_folders_ex(conn) if pairs is None else pairs
     for name, flags in pairs:
         for flag, role in _ROLE_FLAGS.items():
             if flag in flags and role not in roles:
@@ -1639,12 +1639,13 @@ def run_scan(acc=None) -> None:
         conn = connect(im, acc.name)
         try:
             rules = im.get("excluded_folders") or []
-            roles = folder_roles(conn, acc)
+            pairs = list_folders_ex(conn)
+            roles = folder_roles(conn, acc, pairs=pairs)
             # Special folders are excluded by ROLE (works for any provider's
             # names); the user's name/wildcard rules still apply on top.
             role_excluded = {roles[r] for r in EXCLUDED_ROLES if r in roles}
-            role_excluded |= virtual_views(conn)
-            folders = [f for f in list_folders(conn)
+            role_excluded |= virtual_views(pairs=pairs)
+            folders = [f for f, _ in pairs
                        if f not in role_excluded
                        and not (excluded(f, rules)
                                 or excluded(decode_mutf7(f), rules))]

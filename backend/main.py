@@ -1181,9 +1181,10 @@ def get_folders(account: str | None = Query(None)):
     try:
         conn = mailops.connect(cfgmod.account_imap(acc.name), acc.name)
         try:
-            names = mailops.list_folders(conn)
-            roles = mailops.folder_roles(conn, acc)
-            views = mailops.virtual_views(conn)
+            pairs = mailops.list_folders_ex(conn)
+            names = [n for n, _ in pairs]
+            roles = mailops.folder_roles(conn, acc, pairs=pairs)
+            views = mailops.virtual_views(pairs=pairs)
         finally:
             try:
                 conn.logout()
