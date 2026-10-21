@@ -232,7 +232,7 @@ def test_pre_thread_snapshot_is_ignored_so_headers_are_refetched(threaded):
     acc = accountsmod.get()
     path = mailops._snap_path(acc.name)
     data = json.loads(path.read_text())
-    assert data["version"] == 2
+    assert data["version"] == mailops._SNAP_VERSION
     for m in data["index"]:
         m.pop("irt"), m.pop("refs")
     data["groups"].pop("thread")

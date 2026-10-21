@@ -70,6 +70,12 @@ class AccountState:
         self.label_copies: dict[str, dict] = {}
         self.folder_uv: dict[str, int] = {}  # folder -> UIDVALIDITY at scan
         self.folder_roles: dict[str, str] = {}   # role -> raw folder name
+        # Role folders (Trash, later Junk ...) never enter `index`; each
+        # gets its own small incremental cache instead: role -> {"folder\x00uid":
+        # metadata} and role -> {folder: UIDVALIDITY at refresh}. Guarded by
+        # `lock` like `index`.
+        self.role_index: dict[str, dict[str, dict]] = {}
+        self.role_uv: dict[str, dict[str, int]] = {}
         self.undo_log: list[dict] = []
         self.replied: set[str] = set()
         self.replied_loaded = False
