@@ -1121,14 +1121,13 @@ def post_trash_restore(body: TrashRestoreBody,
 
 class EmptyTrashBody(BaseModel):
     uv: int = 0           # UIDVALIDITY of the Trash the count was read from
-    max_uid: int = 0      # highest UID the confirm counted (0 = all present)
+    max_uid: int = 0      # highest UID the confirm counted (0 = count was 0)
 
 
 @app.post("/api/empty_trash")
-def post_empty_trash(body: EmptyTrashBody | None = None,
+def post_empty_trash(body: EmptyTrashBody,
                      account: str | None = Query(None)):
     acc = _acc(account)
-    body = body or EmptyTrashBody()
     try:
         return mailops.empty_trash(acc, body.uv, body.max_uid)
     except RuntimeError as exc:

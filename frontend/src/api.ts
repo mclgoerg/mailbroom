@@ -168,8 +168,8 @@ export const api = {
   undo: (index = -1) =>
     req<{ restored: number; of: number; rescan: boolean }>(
       "/api/undo", { index }),
-  emptyTrash: (counted?: { uv: number; max_uid: number }) =>
-    req<{ deleted: number }>("/api/empty_trash", counted ?? {}),
+  emptyTrash: (counted: { uv: number; max_uid: number }) =>
+    req<{ deleted: number }>("/api/empty_trash", counted),
   cancel: (target: "scan" | "ai" | "delete" | "atts" | "unsub" | "index") =>
     req<{ ok: boolean }>("/api/cancel", { target }),
   clearNotice: () => req<{ ok: boolean }>("/api/notice/clear", {}),

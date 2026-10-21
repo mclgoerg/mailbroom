@@ -764,30 +764,29 @@ export default function App() {
   // `known` = a listing the caller just read (the Trash panel's own). The
   // server deletes only the mails up to the highest UID that listing saw.
   const emptyTrash = async (known?: TrashResp): Promise<boolean> => {
-    let listing: TrashResp | null = known ?? null;
-    if (listing === null) {
+    let listing: TrashResp;
+    if (known) listing = known;
+    else {
       // On real IMAP the live count can take seconds: say so.
       setPending(t("trash.counting"));
-      try { listing = await api.trash(); } catch { listing = null; }
+      try { listing = await api.trash(); }
+      catch (e: any) { setPending(""); fail(e); return false; }
       setPending("");
     }
-    const n: number | null = listing ? listing.total : null;
+    const n = listing.total;
     if (n === 0) {
       toast.show(t("trash.already_empty"));
       refresh();      // the cached count behind the menu entry was stale
       return false;
     }
     if (!await confirmDialog({ title: t("confirm.empty_trash_title"),
-      body: n === null ? t("confirm.empty_trash_body_nocount")
-        : t("confirm.empty_trash_body", { n }),
+      body: t("confirm.empty_trash_body", { n }),
       tone: "danger",
-      confirmLabel: n === null ? t("confirm.empty_trash_btn_nocount")
-        : t("confirm.empty_trash_btn", { n }) })) return false;
+      confirmLabel: t("confirm.empty_trash_btn", { n }) })) return false;
     setPending(t("Emptying Trash…"));
     let ok = true;
     try {
-      await api.emptyTrash(listing
-        ? { uv: listing.uv, max_uid: listing.max_uid } : undefined);
+      await api.emptyTrash({ uv: listing.uv, max_uid: listing.max_uid });
       refresh();
     }
     catch (e: any) { fail(e); ok = false; }

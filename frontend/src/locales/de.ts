@@ -948,11 +948,7 @@ export const DE: Record<string, string> = {
   "confirm.empty_trash_body_one":
     "Die 1 Mail im Papierkorb wird endgültig gelöscht. Das lässt sich nicht "
     + "rückgängig machen.",
-  "confirm.empty_trash_body_nocount":
-    "Alle Mails im Papierkorb werden endgültig gelöscht. Das lässt sich "
-    + "nicht rückgängig machen.",
   "confirm.empty_trash_btn": "Endgültig löschen ({n})",
-  "confirm.empty_trash_btn_nocount": "Endgültig löschen",
   "confirm.btn_anyway": "Trotzdem: {verb}",
   "confirm.b_mails_groups": "{n} Mails aus {k} Gruppen sind betroffen",
   "confirm.b_mails_groups_one": "1 Mail aus {k} Gruppen ist betroffen",

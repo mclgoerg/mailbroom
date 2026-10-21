@@ -14,7 +14,7 @@ const trashRestore = vi.fn();
 vi.mock("./api", () => ({
   api: {
     trash: () => Promise.resolve({
-      folder: "Trash", uv: 1, total,
+      folder: "Trash", uv: 1, total, max_uid: 77,
       mails: emptyList ? [] : [{ uid: 30, folder: "Trash", date: "2026-01-02", ts: 1,
         subject: "Deleted elsewhere", addr: "old@gone.example", size: 700,
         seen: false, ai: null }],
@@ -73,7 +73,7 @@ test("the footer's Empty Trash runs the shared handler and reloads the list",
     // the panel's own listing total, not the (possibly stale) state count
     fireEvent.click(screen.getByRole("button", { name: "Empty Trash (7)…" }));
     await waitFor(() => expect(onEmptyTrash).toHaveBeenCalledWith(
-      expect.objectContaining({ total: 7 })));
+      expect.objectContaining({ total: 7, uv: 1, max_uid: 77 })));
   });
 
 test("no Empty Trash footer when Trash is empty", async () => {
