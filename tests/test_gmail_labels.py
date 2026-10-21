@@ -207,3 +207,48 @@ def test_non_gmail_server_is_unchanged(monkeypatch):
     assert not any("gmid" in m for m in mailops.INDEX.values())
     assert not accountsmod.get().label_copies
     assert len(client.get("/api/duplicates").json()) == 1
+
+
+def test_inbox_beats_a_label_that_sorts_first(monkeypatch):
+    m = make_msg(1, frm=SENDER, subject="hello", msgid="<one@x.example>")
+    fake = FakeIMAP({"INBOX": [gmail_copy(m, 5)],
+                     "Accounts": [gmail_copy(m, 6)], TRASH: []},
+                    flags=FLAGS, gmail=True)
+    monkeypatch.setattr(mailops, "connect", lambda cfg, name=None: fake)
+    _scan()
+    assert [m["folder"] for m in _kept().values()] == ["INBOX"]
+    assert {m["folder"] for m in accountsmod.get().label_copies.values()} \
+        == {"Accounts"}
+
+
+def test_mails_without_a_gmail_id_are_never_merged(monkeypatch):
+    """On a Gmail server, a record the server gave no X-GM-MSGID for is
+    never dropped and never treated as another mail's copy."""
+    m = make_msg(1, frm=SENDER, subject="hello", msgid="<one@x.example>")
+    fake = FakeIMAP({"INBOX": [{**m, "uid": 1}],
+                     "Receipts": [{**m, "uid": 11}], TRASH: []},
+                    flags=FLAGS, gmail=True)
+    monkeypatch.setattr(mailops, "connect", lambda cfg, name=None: fake)
+    _scan()
+    assert mailops.STATE["groups"]["sender"][SENDER]["count"] == 2
+    assert not accountsmod.get().label_copies
+    assert not any("gmid" in m for m in mailops.INDEX.values())
+
+
+def test_label_copy_cache_follows_uidvalidity_and_trash(monkeypatch):
+    fake = _gmail(monkeypatch)
+    _scan()
+    acc = accountsmod.get()
+    old = {k for k, v in acc.label_copies.items() if v["folder"] == "Receipts"}
+    assert old == {"Receipts\x0011"}
+    # Receipts is renumbered (new UIDVALIDITY, new UID): no stale entry
+    fake.uv["Receipts"] = 2
+    fake.mailbox["Receipts"] = [gmail_copy(fake.mailbox["Receipts"][0], 12)]
+    _scan()
+    assert {k for k, v in acc.label_copies.items()
+            if v["folder"] == "Receipts"} == {"Receipts\x0012"}
+    # trashing the message removes it everywhere; nothing stays cached
+    mailops.delete_groups("sender", [SENDER])
+    wait_delete_done()
+    _scan()
+    assert not acc.label_copies
