@@ -759,10 +759,12 @@ export function SettingsModal({ cfg, account, onClose, onSaved,
                   .map((x) => {
                   // trash/junk/sent/drafts/all are excluded by ROLE on the
                   // backend - their checkboxes are informational only.
-                  const locked = !!x.role && x.role !== "archive";
+                  const locked = x.view
+                    || (!!x.role && x.role !== "archive");
                   return (
                   <span key={x.raw} className="min-w-0"
-                    title={locked ? t("folder.role_excluded") : undefined}>
+                    title={locked ? t(x.view ? "folder.view_excluded"
+                      : "folder.role_excluded") : undefined}>
                     <Checkbox className="max-w-full"
                       checked={included.has(x.raw)}
                       disabled={locked}
@@ -774,7 +776,8 @@ export function SettingsModal({ cfg, account, onClose, onSaved,
                       }}
                       label={<span className="flex min-w-0 items-center gap-2">
                         <span className="truncate">{x.name}</span>
-                        {x.role && <Tag>{x.role}</Tag>}
+                        {x.view ? <Tag>{t("folder.view")}</Tag>
+                          : x.role && <Tag>{x.role}</Tag>}
                       </span>} />
                   </span>
                   );

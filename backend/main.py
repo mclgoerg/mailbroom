@@ -1183,6 +1183,7 @@ def get_folders(account: str | None = Query(None)):
         try:
             names = mailops.list_folders(conn)
             roles = mailops.folder_roles(conn, acc)
+            views = mailops.virtual_views(conn)
         finally:
             try:
                 conn.logout()
@@ -1196,7 +1197,9 @@ def get_folders(account: str | None = Query(None)):
         "folders": [
             {"raw": f, "name": mailops.decode_mutf7(f),
              "role": role_of.get(f),
+             "view": f in views,
              "excluded": role_of.get(f) in mailops.EXCLUDED_ROLES
+             or f in views
              or mailops.excluded(f, rules)
              or mailops.excluded(mailops.decode_mutf7(f), rules)}
             for f in names],

@@ -725,6 +725,10 @@ export const EN: Record<string, string> = {
     "Open the link below on any device and enter this code:",
   "folder.role_excluded":
     "Special folder (detected by role) - always excluded from scans",
+  "folder.view_excluded":
+    "Virtual view of mail kept elsewhere - never scanned, so nothing is "
+    + "counted twice",
+  "folder.view": "view",
   "audit.empty": "Nothing recorded yet",
   "audit.export": "Export audit log as CSV",
   "audit.by": "by {actor}",

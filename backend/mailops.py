@@ -473,6 +473,23 @@ _ROLE_NAMES: dict[str, set[str]] = {
 EXCLUDED_ROLES = ("trash", "junk", "sent", "drafts", "all")
 
 
+# Gmail's Starred / Important are saved searches shown as folders: every
+# mail in them also lives in INBOX or a label, so scanning them counts it
+# again (and "deleting the extra copy" would trash the one real message).
+_VIEW_FLAGS = {"\\flagged", "\\important"}
+_VIEW_NAMES = {f"{prefix}/{leaf}" for prefix in ("[gmail]", "[google mail]")
+               for leaf in ("starred", "important", "markiert", "wichtig")}
+
+
+def virtual_views(conn=None, pairs=None) -> set[str]:
+    """Raw names of virtual-view folders (flag first, Gmail names as
+    fallback). Never scanned, never a role."""
+    pairs = list_folders_ex(conn) if pairs is None else pairs
+    return {name for name, flags in pairs
+            if flags & _VIEW_FLAGS
+            or decode_mutf7(name).lower() in _VIEW_NAMES}
+
+
 def folder_roles(conn, acc=None) -> dict[str, str]:
     """{role: raw folder name} via SPECIAL-USE flags, name fallback second.
     Also refreshes the account's role cache (used by fetch_message)."""
@@ -1626,6 +1643,7 @@ def run_scan(acc=None) -> None:
             # Special folders are excluded by ROLE (works for any provider's
             # names); the user's name/wildcard rules still apply on top.
             role_excluded = {roles[r] for r in EXCLUDED_ROLES if r in roles}
+            role_excluded |= virtual_views(conn)
             folders = [f for f in list_folders(conn)
                        if f not in role_excluded
                        and not (excluded(f, rules)
