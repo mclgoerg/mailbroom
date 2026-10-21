@@ -160,7 +160,7 @@ def test_empty_trash(bridge):
     assert r["deleted"] == 1
     assert bridge.mailbox["Trash"] == []
     assert mailops.STATE["trash_count"] == 0
-    assert mailops.UNDO_LOG == []                  # undo cleared: gone forever
+    assert mailops.UNDO_LOG == []        # the purged mail's undo entry is gone
 
 
 def test_search_mails(bridge):

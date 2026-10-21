@@ -101,14 +101,21 @@ class FakeIMAP:
 
     `flags` adds SPECIAL-USE flags per folder (e.g. {"Bin": "\\Trash"});
     `move=False` simulates a server without the MOVE capability (deletes
-    must then go through COPY + \\Deleted + UID EXPUNGE)."""
+    must then go through COPY + \\Deleted + UID EXPUNGE); `uidplus=False`
+    one without UIDPLUS (UID EXPUNGE is then a BAD command).
+
+    STORE applies the flags to exactly the given set and EXPUNGE removes
+    only \\Deleted mail, like a real server."""
 
     def __init__(self, mailbox: dict[str, list[dict]],
-                 flags: dict[str, str] | None = None, move: bool = True):
+                 flags: dict[str, str] | None = None, move: bool = True,
+                 uidplus: bool = True):
         self.mailbox = mailbox            # folder -> list of make_msg dicts
         self.flags = flags or {}
         self.move = move
-        self.capabilities = ("IMAP4REV1", "UIDPLUS") \
+        self.uidplus = uidplus
+        self.capabilities = ("IMAP4REV1",) \
+            + (("UIDPLUS",) if uidplus else ()) \
             + (("MOVE",) if move else ())
         self.uv = {f: 1 for f in mailbox}
         self.selected: str | None = None
@@ -284,13 +291,7 @@ class FakeIMAP:
             return "OK", data
 
         if cmd == "STORE":
-            wanted = {int(u) for u in args[0].split(",")}
-            for m in msgs:
-                if m["uid"] in wanted:
-                    if "Seen" in args[2]:
-                        m["seen"] = True
-                    if "Deleted" in args[2]:
-                        m["deleted"] = True
+            self._store(msgs, self._uid_set(msgs, args[0]), args[1], args[2])
             return "OK", [b""]
 
         if cmd == "MOVE":
@@ -311,7 +312,9 @@ class FakeIMAP:
             return "OK", [b""]
 
         if cmd == "EXPUNGE":     # UIDPLUS: expunge only the given UIDs
-            wanted = {int(u) for u in args[0].split(",")}
+            if not self.uidplus:
+                raise imaplib.IMAP4.error("UID EXPUNGE BAD (no UIDPLUS)")
+            wanted = self._uid_set(msgs, args[0])
             self.mailbox[self.selected] = [
                 m for m in msgs
                 if not (m["uid"] in wanted and m.get("deleted"))]
@@ -319,11 +322,47 @@ class FakeIMAP:
 
         raise AssertionError(f"unexpected UID {cmd}")
 
+    @staticmethod
+    def _span(text: str, top: int) -> set[int]:
+        """Resolve an IMAP set ("1,3:5", "1:*"); `top` is what `*` means."""
+        out: set[int] = set()
+        for part in str(text).split(","):
+            lo, _, hi = part.partition(":")
+            lo_n = top if lo == "*" else int(lo)
+            hi_n = (top if hi == "*" else int(hi)) if hi else lo_n
+            lo_n, hi_n = min(lo_n, hi_n), max(lo_n, hi_n)
+            out |= set(range(lo_n, hi_n + 1))
+        return out
+
+    def _uid_set(self, msgs, text) -> set[int]:
+        return self._span(text, max((m["uid"] for m in msgs),
+                                          default=0))
+
+    @staticmethod
+    def _store(msgs, wanted: set[int], op: str, flags: str) -> None:
+        names = {f.lstrip("\\").lower()
+                 for f in flags.strip("()").split() if f}
+        for m in msgs:
+            if m["uid"] not in wanted:
+                continue
+            for key in ("seen", "deleted"):
+                if key in names:
+                    m[key] = not op.startswith("-")
+            if op.upper() == "FLAGS":        # replace: unnamed flags clear
+                for key in ("seen", "deleted"):
+                    m[key] = key in names
+
     def store(self, span, op, flags):
+        """Sequence-number STORE (`1:*` = every message in the folder)."""
+        msgs = self.mailbox[self.selected]
+        seqs = self._span(span, len(msgs))
+        self._store(msgs, {m["uid"] for i, m in enumerate(msgs, 1)
+                           if i in seqs}, op, flags)
         return "OK", [b""]
 
     def expunge(self):
-        self.mailbox[self.selected] = []
+        self.mailbox[self.selected] = [
+            m for m in self.mailbox[self.selected] if not m.get("deleted")]
         return "OK", [b""]
 
 

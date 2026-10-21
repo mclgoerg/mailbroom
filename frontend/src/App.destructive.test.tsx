@@ -28,7 +28,7 @@ vi.mock("./api", () => ({
     trash: async () => {
       if (trashGate) await trashGate;
       if (trashFails) throw new Error("imap down");
-      return { folder: "Trash", uv: 1, total: trashTotal, mails: [] };
+      return { folder: "Trash", uv: 1, total: trashTotal, max_uid: 40, mails: [] };
     },
     logout: () => Promise.resolve(),
     exportUrl: (mode: string, keys?: string[]) =>
@@ -165,6 +165,8 @@ test("Empty Trash from the profile menu states N + irreversibility, then " +
   expect(emptyTrash).not.toHaveBeenCalled();
   await pressDialog("Delete permanently (5)");
   await waitFor(() => expect(emptyTrash).toHaveBeenCalledOnce());
+  // the delete is bound to what the confirm counted
+  expect(emptyTrash).toHaveBeenCalledWith({ uv: 1, max_uid: 40 });
 });
 
 test("Empty Trash uses the LIVE Trash total, not the stale state count",
@@ -200,6 +202,7 @@ test("if the live count can't be fetched the button carries no number",
   expect(dlg.textContent).toContain("All mails in Trash");
   await pressDialog("Delete permanently");
   await waitFor(() => expect(emptyTrash).toHaveBeenCalledOnce());
+  expect(emptyTrash).toHaveBeenCalledWith(undefined);   // nothing was counted
 });
 
 test("cancelling Empty Trash from the profile menu deletes nothing",

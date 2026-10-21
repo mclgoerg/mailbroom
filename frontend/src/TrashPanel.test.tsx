@@ -72,7 +72,8 @@ test("the footer's Empty Trash runs the shared handler and reloads the list",
     await screen.findByText("Deleted elsewhere");
     // the panel's own listing total, not the (possibly stale) state count
     fireEvent.click(screen.getByRole("button", { name: "Empty Trash (7)…" }));
-    await waitFor(() => expect(onEmptyTrash).toHaveBeenCalledWith(7));
+    await waitFor(() => expect(onEmptyTrash).toHaveBeenCalledWith(
+      expect.objectContaining({ total: 7 })));
   });
 
 test("no Empty Trash footer when Trash is empty", async () => {

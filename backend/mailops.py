@@ -2743,6 +2743,7 @@ def trash_list(limit: int = 1000, acc=None) -> dict:
         acc.state["trash_count"] = len(messages)
     return {"folder": trash, "uv": acc.folder_uv.get(trash, 0),
             "total": len(messages),
+            "max_uid": max((m["uid"] for m in messages), default=0),
             "mails": [{"uid": m["uid"], "folder": trash, "date": m["date"],
                        "ts": m["ts"], "subject": m["subject"],
                        "addr": m["addr"], "size": m["size"],
@@ -2793,36 +2794,114 @@ def trash_restore(uids: list[int], dest: str, uv: int = 0,
     return {"restored": restored, "rescan": rescan}
 
 
-def empty_trash(acc=None) -> dict:
-    """Permanently delete everything in Trash."""
+def _supports_uidplus(conn) -> bool:
+    caps = getattr(conn, "capabilities", ()) or ()
+    return any(str(c if isinstance(c, str) else c.decode()).upper() == "UIDPLUS"
+               for c in caps)
+
+
+def _fetch_msgids(conn, uids: list[int]) -> set[str]:
+    """Message-IDs of `uids` in the selected folder (for undo pruning)."""
+    out: set[str] = set()
+    status, data = conn.uid(
+        "FETCH", ",".join(str(u) for u in uids),
+        "(UID BODY.PEEK[HEADER.FIELDS (MESSAGE-ID)])")
+    if status != "OK":
+        return out
+    for item in data or []:
+        if isinstance(item, tuple) and len(item) >= 2:
+            mid = header_text(email.message_from_bytes(item[1]).get(
+                "Message-ID")).strip()[:300]
+            if mid:
+                out.add(mid)
+    return out
+
+
+def _prune_undo(acc, trash: str, purged: set[str]) -> None:
+    """Drop purged Message-IDs from the undo entries that restore out of
+    Trash; an entry left without items disappears."""
+    with acc.lock:
+        kept = []
+        for e in acc.undo_log:
+            if (e.get("in") or trash) != trash:
+                kept.append(e)
+                continue
+            items = [it for it in e["items"] if it[1] not in purged]
+            if items:
+                kept.append({**e, "items": items, "count": len(items)})
+        acc.undo_log[:] = kept
+        acc.state["undo"] = _undo_summaries(acc)
+
+
+def empty_trash(acc=None, uv: int = 0, max_uid: int = 0) -> dict:
+    """Permanently delete the mails in Trash that the confirm counted:
+    exactly the UIDs <= `max_uid` (the highest UID listed when the user
+    confirmed; 0 = everything present right now), after a UIDVALIDITY
+    check against `uv` (0 = not given). Mail that arrived in Trash later
+    survives. Uses UID STORE + UID EXPUNGE on those UIDs only; without
+    UIDPLUS a plain EXPUNGE would also remove other clients' \\Deleted mail,
+    so that is only done when the selection is the whole folder."""
     acc = acc or accounts.get()
     with acc.lock:
         if acc.state["delete"]["status"] == "running":
             raise RuntimeError("busy: a deletion is running")
-        acc.undo_log.clear()
-        acc.state["undo"] = []
 
     conn = connect(cfgmod.account_imap(acc.name), acc.name)
+    purged: set[str] = set()
     try:
         trash = folder_roles(conn, acc).get("trash")
         if not trash:
             raise RuntimeError("No Trash folder found on the server")
-        status, data = conn.select(quote_folder(trash), readonly=False)
+        status, _ = conn.select(quote_folder(trash), readonly=False)
         if status != "OK":
             raise RuntimeError("cannot open Trash")
-        count = int(data[0]) if data and data[0] else 0
-        if count:
-            conn.store("1:*", "+FLAGS", r"(\Deleted)")
-            conn.expunge()
+        if uv and uidvalidity(conn) not in (0, uv):
+            raise RuntimeError("Trash changed on the server - reload it "
+                               "before emptying")
+        status, data = conn.uid("SEARCH", None, "ALL")
+        if status != "OK":
+            raise RuntimeError("cannot list Trash")
+        present = sorted(int(u) for u in (data[0].split() if data and data[0]
+                                          else []))
+        chosen = [u for u in present if not max_uid or u <= max_uid]
+        uidplus = _supports_uidplus(conn)
+        if chosen and not uidplus and len(chosen) != len(present):
+            raise RuntimeError("this server cannot delete part of a folder "
+                               "safely - Trash changed since it was counted")
+        if chosen and not uidplus:       # whole-folder Empty: re-check
+            status, data = conn.uid("SEARCH", None, "ALL")
+            again = sorted(int(u) for u in (data[0].split()
+                                            if data and data[0] else []))
+            if status != "OK" or again != chosen:
+                raise RuntimeError("Trash changed since it was counted - "
+                                   "reload it before emptying")
+        want_ids = bool(acc.undo_log)
+        for start in range(0, len(chosen), MOVE_CHUNK):
+            chunk = chosen[start:start + MOVE_CHUNK]
+            uidstr = ",".join(str(u) for u in chunk)
+            if want_ids:
+                purged |= _fetch_msgids(conn, chunk)
+            status, _ = conn.uid("STORE", uidstr, "+FLAGS", r"(\Deleted)")
+            if status != "OK":
+                raise RuntimeError("cannot flag mails in Trash")
+            if uidplus:
+                status, _ = conn.uid("EXPUNGE", uidstr)
+            else:
+                status, _ = conn.expunge()
+            if status != "OK":
+                raise RuntimeError("cannot expunge Trash")
+        count = len(chosen)
     finally:
         try:
             conn.logout()
         except Exception:
             pass
 
+    if purged:
+        _prune_undo(acc, trash, purged)
     log.info("emptied Trash: %d mails permanently deleted", count)
     with acc.lock:
-        acc.state["trash_count"] = 0
+        acc.state["trash_count"] = len(present) - count
         acc.state["notice"] = {"key": "emptied_trash", "params": {"count": count}}
     auditlog.record("empty_trash", account=acc.name, count=count)
     return {"deleted": count}
