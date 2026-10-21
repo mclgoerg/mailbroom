@@ -191,9 +191,8 @@ def test_lookalike_not_scanned_even_when_ticked(monkeypatch):
     _use(monkeypatch, FakeIMAP(
         _box({"INBOX": 1, "Gel&APY-scht": 0, "Gel&APY-schte Elemente": 3}),
         flags={"Gel&APY-scht": "\\Trash"}))
-    cfg = cfgmod.load_config()
-    cfg["accounts"]["default"]["excluded_folders"] = []     # all ticked
-    cfgmod.CONFIG_PATH.write_text(json.dumps(cfg))
+    cfgmod.CONFIG_PATH.write_text(json.dumps({"accounts": {"default": {
+        "excluded_folders": []}}}))                          # all ticked
     mailops.run_scan()
     assert mailops.STATE["folders"] == ["INBOX"]
     assert sum(g["count"] for g in
@@ -221,10 +220,9 @@ def test_role_overrides_read_hook(monkeypatch):
     fake = _use(monkeypatch, FakeIMAP(
         _box({"INBOX": 1, "Trash": 9, "Deleted Items": 1})))
     assert mailops.resolve_roles(fake)["roles"]["trash"] == "Trash"
-    cfg = cfgmod.load_config()
-    cfg["accounts"]["default"]["role_overrides"] = {
-        "trash": "Deleted Items", "junk": "No Such Folder"}
-    cfgmod.CONFIG_PATH.write_text(json.dumps(cfg))
+    cfgmod.CONFIG_PATH.write_text(json.dumps({"accounts": {"default": {
+        "role_overrides": {"trash": "Deleted Items",
+                           "junk": "No Such Folder"}}}}))
     found = mailops.resolve_roles(fake)
     assert found["roles"] == {"trash": "Deleted Items"}
     assert found["source"] == {"trash": "override"}
