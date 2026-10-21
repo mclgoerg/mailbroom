@@ -28,7 +28,7 @@ vi.mock("./api", () => ({
     trash: async () => {
       if (trashGate) await trashGate;
       if (trashFails) throw new Error("imap down");
-      return { folder: "Trash", uv: 1, total: trashTotal, mails: [] };
+      return { folder: "Trash", uv: 1, total: trashTotal, max_uid: 40, mails: [] };
     },
     logout: () => Promise.resolve(),
     exportUrl: (mode: string, keys?: string[]) =>
@@ -165,6 +165,8 @@ test("Empty Trash from the profile menu states N + irreversibility, then " +
   expect(emptyTrash).not.toHaveBeenCalled();
   await pressDialog("Delete permanently (5)");
   await waitFor(() => expect(emptyTrash).toHaveBeenCalledOnce());
+  // the delete is bound to what the confirm counted
+  expect(emptyTrash).toHaveBeenCalledWith({ uv: 1, max_uid: 40 });
 });
 
 test("Empty Trash uses the LIVE Trash total, not the stale state count",
@@ -189,17 +191,15 @@ test("a single mail reads 'The 1 mail', not '1 mails'", async () => {
   await cancelDialog();
 });
 
-test("if the live count can't be fetched the button carries no number",
+test("if the live count can't be fetched there is no confirm and no delete",
   async () => {
   trashFails = true;
   await mount();
   openProfile();
   fireEvent.click(await screen.findByRole("menuitem", { name: /Empty Trash/ }));
-  const dlg = await findDialog();
-  expect(dlg.textContent).not.toMatch(/\d+ mails/);
-  expect(dlg.textContent).toContain("All mails in Trash");
-  await pressDialog("Delete permanently");
-  await waitFor(() => expect(emptyTrash).toHaveBeenCalledOnce());
+  await screen.findByText(/imap down/);
+  await expectNoDialog();
+  expect(emptyTrash).not.toHaveBeenCalled();
 });
 
 test("cancelling Empty Trash from the profile menu deletes nothing",
@@ -226,6 +226,7 @@ test("the Trash panel footer offers the same Empty Trash confirm",
   expect(dlg.textContent).toContain("cannot be undone");
   await pressDialog("Delete permanently (5)");
   await waitFor(() => expect(emptyTrash).toHaveBeenCalledOnce());
+  expect(emptyTrash).toHaveBeenCalledWith({ uv: 1, max_uid: 40 });
 });
 
 test("cancelling Empty Trash in the Trash panel deletes nothing",

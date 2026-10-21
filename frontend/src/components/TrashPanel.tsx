@@ -15,7 +15,7 @@ export function TrashPanel({ state, onClose, onChanged, onEmptyTrash }: {
   onChanged: () => void;
   /** The shared "Empty Trash" flow (confirm + permanent delete), given the
    *  live total this panel just listed; resolves true once emptied. */
-  onEmptyTrash: (total: number) => Promise<boolean>;
+  onEmptyTrash: (listing: TrashResp) => Promise<boolean>;
 }) {
   const [trash, setTrash] = useState<TrashResp | null>(null);
   const [error, setError] = useState("");
@@ -133,7 +133,7 @@ export function TrashPanel({ state, onClose, onChanged, onEmptyTrash }: {
               max-sm:pb-[calc(0.5rem+env(safe-area-inset-bottom))]">
               <Button variant="danger-quiet" disabled={busy}
                 onClick={async () => {
-                  if (await onEmptyTrash(trash.total)) load();
+                  if (await onEmptyTrash(trash)) load();
                 }}>
                 {t("Empty Trash")} ({trash.total})…
               </Button>

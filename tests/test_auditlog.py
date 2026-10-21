@@ -108,7 +108,7 @@ def test_undo_and_empty_trash_are_logged(bridge):
 
     mailops.delete_messages([["INBOX", 4]])
     wait_delete_done()
-    mailops.empty_trash()
+    mailops.empty_trash(uv=1, max_uid=99)
     e = next(e for e in entries() if e["action"] == "empty_trash")
     assert e["count"] == 1
 

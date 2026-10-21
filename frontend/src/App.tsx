@@ -36,7 +36,7 @@ import { SenderFiling } from "./components/SenderFiling";
 import type { FileEntry, SenderAction } from "./components/SenderList";
 import type { AppState, AuthProbe, Config, FilterPreset, Group, Grouping,
   KnowledgeStored,
-  StatusMsg } from "./types";
+  StatusMsg, TrashResp } from "./types";
 
 const GROUPING_LABEL: Record<Grouping, string> = {
   sender: "Sender", smart: "Smart", domain: "Domain", subject: "Subject",
@@ -761,29 +761,34 @@ export default function App() {
   // Trash was actually emptied (false = declined or failed). The count on
   // the irreversible button must be live: state.trash_count is only
   // refreshed by scans/listings, so it can lag behind mails trashed since.
-  // `known` = a total the caller just read (the Trash panel's own list).
-  const emptyTrash = async (known?: number): Promise<boolean> => {
-    let n: number | null = known ?? null;
-    if (n === null) {
+  // `known` = a listing the caller just read (the Trash panel's own). The
+  // server deletes only the mails up to the highest UID that listing saw.
+  const emptyTrash = async (known?: TrashResp): Promise<boolean> => {
+    let listing: TrashResp;
+    if (known) listing = known;
+    else {
       // On real IMAP the live count can take seconds: say so.
       setPending(t("trash.counting"));
-      try { n = (await api.trash()).total; } catch { n = null; }
+      try { listing = await api.trash(); }
+      catch (e: any) { setPending(""); fail(e); return false; }
       setPending("");
     }
+    const n = listing.total;
     if (n === 0) {
       toast.show(t("trash.already_empty"));
       refresh();      // the cached count behind the menu entry was stale
       return false;
     }
     if (!await confirmDialog({ title: t("confirm.empty_trash_title"),
-      body: n === null ? t("confirm.empty_trash_body_nocount")
-        : t("confirm.empty_trash_body", { n }),
+      body: t("confirm.empty_trash_body", { n }),
       tone: "danger",
-      confirmLabel: n === null ? t("confirm.empty_trash_btn_nocount")
-        : t("confirm.empty_trash_btn", { n }) })) return false;
+      confirmLabel: t("confirm.empty_trash_btn", { n }) })) return false;
     setPending(t("Emptying Trash…"));
     let ok = true;
-    try { await api.emptyTrash(); refresh(); }
+    try {
+      await api.emptyTrash({ uv: listing.uv, max_uid: listing.max_uid });
+      refresh();
+    }
     catch (e: any) { fail(e); ok = false; }
     setPending("");
     return ok;

@@ -167,6 +167,7 @@ export interface TrashResp {
   folder: string;
   uv: number;
   total: number;
+  max_uid: number;
   mails: Mail[];
 }
 

@@ -783,10 +783,7 @@ export const EN: Record<string, string> = {
     "{n} mails in Trash will be permanently deleted. This cannot be undone.",
   "confirm.empty_trash_body_one":
     "The 1 mail in Trash will be permanently deleted. This cannot be undone.",
-  "confirm.empty_trash_body_nocount":
-    "All mails in Trash will be permanently deleted. This cannot be undone.",
   "confirm.empty_trash_btn": "Delete permanently ({n})",
-  "confirm.empty_trash_btn_nocount": "Delete permanently",
   "confirm.btn_anyway": "{verb} anyway",
   "confirm.b_mails_groups": "{n} mails from {k} groups will be affected",
   "confirm.b_mails_groups_one": "1 mail from {k} groups will be affected",
