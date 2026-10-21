@@ -15,8 +15,8 @@ COPY backend/requirements.txt ./
 # and keeps image CVE scanners quiet about libraries the app never runs.
 RUN pip install --no-cache-dir -r requirements.txt \
     && pip uninstall -y pip \
-    && rm -rf /usr/local/lib/python3.13/site-packages/setuptools* \
-              /usr/local/lib/python3.13/ensurepip \
+    && rm -rf /usr/local/lib/python3.*/site-packages/setuptools* \
+              /usr/local/lib/python3.*/ensurepip \
     && useradd --uid 1000 --create-home app \
     && mkdir -p /data && chown app:app /data
 COPY backend/ ./backend/
