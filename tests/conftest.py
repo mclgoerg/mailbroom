@@ -105,18 +105,28 @@ class FakeIMAP:
     one without UIDPLUS (UID EXPUNGE is then a BAD command).
 
     STORE applies the flags to exactly the given set and EXPUNGE removes
-    only \\Deleted mail, like a real server."""
+    only \\Deleted mail, like a real server.
+
+    `gmail=True` gives Gmail label semantics: the server advertises
+    X-GM-EXT-1 and answers X-GM-MSGID. A message under several labels is
+    one dict per folder (own UID each) sharing the same `gmid` key (see
+    `gmail_copy`); a MOVE into `trash` removes it from EVERY folder."""
 
     def __init__(self, mailbox: dict[str, list[dict]],
                  flags: dict[str, str] | None = None, move: bool = True,
-                 uidplus: bool = True):
+                 uidplus: bool = True, gmail: bool = False,
+                 trash: str = "[Gmail]/Trash"):
         self.mailbox = mailbox            # folder -> list of make_msg dicts
         self.flags = flags or {}
         self.move = move
         self.uidplus = uidplus
+        self.gmail = gmail
+        self.trash = trash
         self.capabilities = ("IMAP4REV1",) \
             + (("UIDPLUS",) if uidplus else ()) \
-            + (("MOVE",) if move else ())
+            + (("MOVE",) if move else ()) \
+            + (("X-GM-EXT-1",) if gmail else ())
+        self.gm_fetches: list[str] = []      # FETCH specs asking X-GM-MSGID
         self.uv = {f: 1 for f in mailbox}
         self.selected: str | None = None
         self.logged_out = False
@@ -204,6 +214,12 @@ class FakeIMAP:
                 f'("attachment" ("filename" "{name}")) NIL)')
         return "(" + "".join(parts) + ' "mixed" ("boundary" "b1") NIL NIL)'
 
+    def _gm(self, m) -> str:
+        """` X-GM-MSGID <n>` for a Gmail fake's message (empty otherwise)."""
+        if not self.gmail or not m.get("gmid"):
+            return ""
+        return f" X-GM-MSGID {m['gmid']}"
+
     def uid(self, cmd, *args):
         msgs = self.mailbox[self.selected]
         if cmd == "SEARCH" and args[-1] == "BODY":
@@ -263,7 +279,9 @@ class FakeIMAP:
                         data += [(f"{i+1} (UID {m['uid']} BODY[] "
                                   f"{{{len(body)}}}".encode(), body), b")"]
                 return "OK", data or [None]
-            if args[1] == "(UID FLAGS)":
+            if "X-GM-MSGID" in args[1]:
+                self.gm_fetches.append(args[1])
+            if args[1] in ("(UID FLAGS)", "(UID FLAGS X-GM-MSGID)"):
                 # No literal attached (flags-only) - imaplib hands back a
                 # plain bytes line per message, not a (meta, literal) tuple.
                 data = []
@@ -271,7 +289,8 @@ class FakeIMAP:
                     if m["uid"] not in wanted:
                         continue
                     flags = "\\Seen" if m["seen"] else ""
-                    data.append(f"{i+1} (UID {m['uid']} "
+                    data.append(f"{i+1} (UID {m['uid']}"
+                                f"{self._gm(m) if 'GM' in args[1] else ''} "
                                 f"FLAGS ({flags}))".encode())
                 return "OK", data
             data = []
@@ -280,7 +299,8 @@ class FakeIMAP:
                     continue
                 hdr = self._header_blob(m)
                 flags = "\\Seen" if m["seen"] else ""
-                meta = (f"{i+1} (UID {m['uid']} FLAGS ({flags}) "
+                gm = self._gm(m) if "X-GM-MSGID" in args[1] else ""
+                meta = (f"{i+1} (UID {m['uid']}{gm} FLAGS ({flags}) "
                         f"RFC822.SIZE {m['size']} "
                         f"INTERNALDATE \"{m['date']}\" "
                         f"BODY[HEADER.FIELDS (FROM SUBJECT MESSAGE-ID "
@@ -302,6 +322,13 @@ class FakeIMAP:
             self.mailbox[self.selected] = [m for m in msgs
                                            if m["uid"] not in wanted]
             self.mailbox.setdefault(dest, []).extend(moving)
+            if self.gmail and dest == self.trash:
+                # trashing a Gmail message drops it from every label
+                gone = {m["gmid"] for m in moving if m.get("gmid")}
+                for f in self.mailbox:
+                    if f != dest:
+                        self.mailbox[f] = [m for m in self.mailbox[f]
+                                           if m.get("gmid") not in gone]
             return "OK", [b""]
 
         if cmd == "COPY":
@@ -364,6 +391,12 @@ class FakeIMAP:
         self.mailbox[self.selected] = [
             m for m in self.mailbox[self.selected] if not m.get("deleted")]
         return "OK", [b""]
+
+
+def gmail_copy(m: dict, uid: int, gmid: str = "1001") -> dict:
+    """The same Gmail message seen in another label folder: own UID, same
+    X-GM-MSGID. (Use gmail_copy on every copy, the first one included.)"""
+    return {**m, "uid": uid, "gmid": gmid}
 
 
 @pytest.fixture
