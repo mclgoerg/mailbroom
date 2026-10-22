@@ -1,29 +1,49 @@
 import { ClipboardList, Pin, Shield, TriangleAlert } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { api } from "../api";
 import { t } from "../i18n";
 import { matchGroup, parseFilter } from "../lib";
-import type { AppState, Grouping, Rule } from "../types";
+import type { AppState, Grouping, Rule, RuleScope } from "../types";
 import { QueryBuilder } from "./QueryBuilder";
-import { Button, confirmDialog, EmptyState, Field, Input, Modal, PanelHeader, SectionLabel,
-  Select, Spinner, Tag } from "./ui";
+import { Button, confirmDialog, EmptyState, Field, Input, Modal, Notice, PanelHeader,
+  SectionLabel, Select, Spinner, Tag } from "./ui";
 
 const EMPTY = {
-  name: "", grouping: "sender" as Grouping, query: "", action: "trash",
+  name: "", scope: "mail" as RuleScope, grouping: "sender" as Grouping,
+  query: "", action: "trash",
   dest: "", schedule: "manual" as Rule["schedule"],
   retention: "none" as "none" | "keep_latest" | "older_than_days",
   retentionN: "",
 };
 
+/** What a new Junk / Trash purge rule starts with (D8): older than 30 days,
+ *  weekly. The server always creates it in report mode. */
+const PURGE_DEFAULTS = {
+  action: "purge", grouping: "sender" as Grouping, dest: "",
+  schedule: "weekly" as Rule["schedule"],
+  retention: "older_than_days" as const, retentionN: "30",
+};
+
+const isPurge = (scope: RuleScope | undefined) =>
+  scope === "junk" || scope === "trash";
+
 function RunSummary({ rule }: { rule: Rule }) {
   const r = rule.last_run;
   if (!r) return <span className="text-muted">{t("rule.never_ran")}</span>;
   if (r.error) return <span className="text-danger-fg">{r.error}</span>;
+  const purge = isPurge(rule.scope);
   return (
     <>
       {new Date(r.ts * 1000).toLocaleString()} -{" "}
-      {t(r.mode === "execute" ? "rule.run_executed" : "rule.run_report", {
-        groups: r.groups, mails: r.mails, acted: r.acted })}
+      {purge
+        ? r.mode === "execute"
+          ? t("rule.purge_run_exec", { n: r.acted, matched: r.mails })
+          : t("rule.purge_run_report", { n: r.mails, groups: r.groups })
+        : t(r.mode === "execute" ? "rule.run_executed" : "rule.run_report", {
+          groups: r.groups, mails: r.mails, acted: r.acted })}
+      {purge && !rule.query.trim() && <> · {t("rule.purge_all_short")}</>}
+      {(r.unverified ?? 0) > 0 &&
+        <> · {t("rule.purge_unverified", { n: r.unverified ?? 0 })}</>}
       {r.capped > 0 && <> · {t("rule.capped", { n: r.capped })}</>}
       {r.skipped_protected > 0 &&
         <span className="inline-flex items-center gap-1">
@@ -53,12 +73,21 @@ export function RulesModal({ state, onClose, onChanged }: {
   const [editId, setEditId] = useState<string | null>(null);
   const [busyId, setBusyId] = useState("");
   const [msg, setMsg] = useState("");
-
   const rules = state.rules ?? [];
+
+  // The effective per-run cap, from the server (purge confirms name it).
+  const capRef = useRef<number | null>(null);
+  const getCap = async (): Promise<number> => {
+    if (capRef.current == null) capRef.current = (await api.rules()).cap;
+    return capRef.current;
+  };
+  useEffect(() => { getCap().catch(() => {}); }, []);
 
   // Live match count against the current scan, using the SAME filter code
   // the group list uses (the backend port mirrors it).
+  const purge = isPurge(form.scope);
   const matchCount = useMemo(() => {
+    if (purge) return null;           // the folder is read live on a run
     const groups = Object.values(state.groups?.[form.grouping] ?? {});
     if (!groups.length) return null;
     const f = parseFilter(form.query);
@@ -68,16 +97,31 @@ export function RulesModal({ state, onClose, onChanged }: {
       form.action === "mark_read" ? 0 : g.pinned ?? 0;
     return { groups: hits.length,
              mails: hits.reduce((n, g) => n + g.count - pinned(g), 0) };
-  }, [state, form.grouping, form.query, form.action]);
+  }, [state, purge, form.grouping, form.query, form.action]);
 
   const set = (k: keyof typeof form) =>
     (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
       setForm({ ...form, [k]: e.target.value });
 
+  const setScope = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const scope = e.target.value as RuleScope;
+    if (isPurge(scope) === purge) { setForm({ ...form, scope }); return; }
+    // Crossing between the two kinds of rule: everything that differs
+    // (action, grouping, age, schedule) switches together.
+    setForm(isPurge(scope)
+      ? { ...form, scope, ...PURGE_DEFAULTS }
+      : { ...form, scope, action: EMPTY.action, retention: "none",
+          retentionN: "", schedule: EMPTY.schedule });
+  };
+
   const save = async () => {
     setMsg("");
     const { retention, retentionN, ...rest } = form;
     const n = Number(retentionN);
+    if (purge && !(Number.isInteger(n) && n >= 1 && n <= 36500)) {
+      setMsg(t("fp.older_invalid"));
+      return;
+    }
     const body = {
       ...rest,
       keep_latest: retention === "keep_latest" && n > 0 ? n : null,
@@ -94,12 +138,36 @@ export function RulesModal({ state, onClose, onChanged }: {
     }
   };
 
+  /** The danger confirm of a purge rule (execute switch / run): says what
+   *  is deleted, how much per run, and - for an empty filter - that it
+   *  means ALL senders of the folder. */
+  const purgeConfirm = async (rule: Rule, title: string,
+                              bodyKey: string): Promise<boolean> => {
+    const cap = await getCap();
+    return confirmDialog({
+      title, tone: "danger", confirmLabel: t("rule.purge_confirm_btn", { cap }),
+      body: <>
+        <p>{t(bodyKey, { cap, n: cap })}</p>
+        {!rule.query.trim() && <p className="mt-2 font-medium">
+          {t("rule.purge_all_senders",
+            { folder: t(rule.scope === "junk" ? "Junk" : "Trash") })}</p>}
+      </> });
+  };
+
   const run = async (rule: Rule) => {
-    if (rule.mode === "execute" && !await confirmDialog({
-      title: t("rule.confirm_execute", { name: rule.name }), tone: "danger",
-      confirmLabel: t("rule.run_now") })) return;
-    setBusyId(rule.id);
     setMsg("");
+    try {
+      if (rule.mode === "execute" && !(isPurge(rule.scope)
+        ? await purgeConfirm(rule,
+          t("rule.confirm_execute", { name: rule.name }), "rule.purge_run_body")
+        : await confirmDialog({
+          title: t("rule.confirm_execute", { name: rule.name }),
+          tone: "danger", confirmLabel: t("rule.run_now") }))) return;
+    } catch (e: any) {
+      setMsg(t("err.generic", { msg: e.message ?? e }));
+      return;
+    }
+    setBusyId(rule.id);
     try {
       await api.runRule(rule.id);
       onChanged();
@@ -111,12 +179,15 @@ export function RulesModal({ state, onClose, onChanged }: {
 
   const toggleMode = async (rule: Rule) => {
     const mode = rule.mode === "report" ? "execute" : "report";
-    if (mode === "execute" && !await confirmDialog({
-      title: t("rule.enable_title", { name: rule.name }),
-      body: t("rule.enable_body"), tone: "danger",
-      confirmLabel: t("rule.enable_execute") })) return;
     setMsg("");
     try {
+      if (mode === "execute" && !(isPurge(rule.scope)
+        ? await purgeConfirm(rule,
+          t("rule.enable_title", { name: rule.name }), "rule.purge_enable_body")
+        : await confirmDialog({
+          title: t("rule.enable_title", { name: rule.name }),
+          body: t("rule.enable_body"), tone: "danger",
+          confirmLabel: t("rule.enable_execute") }))) return;
       await api.updateRule(rule.id, { mode });
       onChanged();
     } catch (e: any) {
@@ -139,7 +210,8 @@ export function RulesModal({ state, onClose, onChanged }: {
 
   const edit = (rule: Rule) => {
     setEditId(rule.id);
-    setForm({ name: rule.name, grouping: rule.grouping, query: rule.query,
+    setForm({ name: rule.name, scope: rule.scope ?? "mail",
+      grouping: rule.grouping, query: rule.query,
       action: rule.action, dest: rule.dest, schedule: rule.schedule,
       retention: rule.keep_latest != null ? "keep_latest"
         : rule.older_than_days != null ? "older_than_days" : "none",
@@ -159,10 +231,13 @@ export function RulesModal({ state, onClose, onChanged }: {
             className="rounded-card border border-line bg-panel2 p-3">
             <div className="flex flex-wrap items-center gap-2">
               <span className="type-body font-medium">{rule.name}</span>
+              {isPurge(rule.scope) &&
+                <Tag tone="review">{t(rule.scope === "junk" ? "Junk" : "Trash")}</Tag>}
               <Tag>{t(rule.grouping === "sender" ? "Sender"
                 : rule.grouping === "domain" ? "Domain"
                 : rule.grouping === "thread" ? "Thread" : "Subject")}</Tag>
-              <Tag>{t(`action.${rule.action}`)}
+              <Tag tone={isPurge(rule.scope) ? "review" : "neutral"}>
+                {t(`action.${rule.action}`)}
                 {rule.dest ? ` → ${rule.dest}` : ""}</Tag>
               <Tag>{t(`sched.${rule.schedule}`)}</Tag>
               {rule.keep_latest != null && (
@@ -176,18 +251,33 @@ export function RulesModal({ state, onClose, onChanged }: {
                 {t(`mode.${rule.mode}`)}
               </Tag>
             </div>
-            {rule.query && (
+            {rule.query ? (
               <code className="mt-1 block type-meta text-chiptext">
                 {rule.query}
               </code>
+            ) : isPurge(rule.scope) && (
+              <span className="mt-1 block type-meta text-chiptext">
+                {t("rule.purge_all_short")}
+              </span>
+            )}
+            {isPurge(rule.scope) && rule.mode === "report"
+              && rule.reset_reason && (
+              <div className="mt-1 flex items-start gap-1 type-meta text-review-fg">
+                <TriangleAlert size={14} className="mt-0.5 shrink-0" />
+                {t(`rule.reset_${rule.reset_reason}`)}
+              </div>
             )}
             <div className="mt-1 type-meta text-muted">
               <RunSummary rule={rule} />
             </div>
             <div className="mt-2 flex flex-wrap items-center gap-2">
-              <Button variant="secondary" size="sm"
+              <Button size="sm"
+                variant={isPurge(rule.scope) && rule.mode === "report"
+                  ? "primary" : "secondary"}
                 onClick={() => run(rule)} disabled={busyId === rule.id}>
-                {busyId === rule.id ? <Spinner /> : t("rule.run_now")}
+                {busyId === rule.id ? <Spinner />
+                  : t(isPurge(rule.scope) && rule.mode === "report"
+                    ? "rule.run_report_btn" : "rule.run_now")}
               </Button>
               <Button variant="quiet" size="sm"
                 onClick={() => edit(rule)}>{t("Edit")}</Button>
@@ -219,15 +309,32 @@ export function RulesModal({ state, onClose, onChanged }: {
               <Input className="w-full" placeholder={t("rule.name")}
                 value={form.name} onChange={set("name")} />
             </Field>
-            <Field label={t("rule.f_grouping")}>
-              <Select className="w-full" value={form.grouping}
-                onChange={set("grouping")}>
-                <option value="sender">{t("Sender")}</option>
-                <option value="domain">{t("Domain")}</option>
-                <option value="subject">{t("Subject")}</option>
-                <option value="thread">{t("Thread")}</option>
+            <Field label={t("rule.f_scope")}>
+              <Select className="w-full" value={form.scope}
+                onChange={setScope}>
+                <option value="mail">{t("rule.scope_mail")}</option>
+                <option value="junk">{t("Junk")}</option>
+                <option value="trash">{t("Trash")}</option>
               </Select>
             </Field>
+            {purge && (
+              <div className="sm:col-span-2">
+                <Notice icon={<TriangleAlert size={16} />}>
+                  {t("rule.purge_warning")}
+                </Notice>
+              </div>
+            )}
+            {!purge && (
+              <Field label={t("rule.f_grouping")}>
+                <Select className="w-full" value={form.grouping}
+                  onChange={set("grouping")}>
+                  <option value="sender">{t("Sender")}</option>
+                  <option value="domain">{t("Domain")}</option>
+                  <option value="subject">{t("Subject")}</option>
+                  <option value="thread">{t("Thread")}</option>
+                </Select>
+              </Field>
+            )}
             <div className="sm:col-span-2">
               {/* The builder stays outside the <label>: its popover holds
                   controls of its own. */}
@@ -239,23 +346,31 @@ export function RulesModal({ state, onClose, onChanged }: {
                       value={form.query} onChange={set("query")} />
                   </Field>
                 </div>
-                <QueryBuilder value={form.query}
+                <QueryBuilder value={form.query} senderOnly={purge}
                   onChange={(q) => setForm({ ...form, query: q })} />
               </div>
               <div className="mt-1 type-meta text-muted">
-                {matchCount
-                  ? t("rule.match_count", matchCount)
-                  : t("rule.match_unknown")}
+                {purge
+                  ? t("rule.purge_filter_help")
+                  : matchCount
+                    ? t("rule.match_count", matchCount)
+                    : t("rule.match_unknown")}
               </div>
             </div>
             <Field label={t("rule.f_action")}>
-              <Select className="w-full" value={form.action}
-                onChange={set("action")}>
-                <option value="trash">{t("action.trash")}</option>
-                <option value="archive">{t("action.archive")}</option>
-                <option value="move">{t("action.move")}</option>
-                <option value="mark_read">{t("action.mark_read")}</option>
-              </Select>
+              {purge ? (
+                <Select className="w-full" value="purge" disabled>
+                  <option value="purge">{t("action.purge")}</option>
+                </Select>
+              ) : (
+                <Select className="w-full" value={form.action}
+                  onChange={set("action")}>
+                  <option value="trash">{t("action.trash")}</option>
+                  <option value="archive">{t("action.archive")}</option>
+                  <option value="move">{t("action.move")}</option>
+                  <option value="mark_read">{t("action.mark_read")}</option>
+                </Select>
+              )}
             </Field>
             <Field label={t("rule.f_schedule")}>
               <Select className="w-full" value={form.schedule}
@@ -265,24 +380,32 @@ export function RulesModal({ state, onClose, onChanged }: {
                 <option value="weekly">{t("sched.weekly")}</option>
               </Select>
             </Field>
-            <Field label={t("rule.f_apply")}>
-              <Select className="w-full" value={form.retention}
-                onChange={set("retention")}>
-                <option value="none">{t("retention.none")}</option>
-                <option value="keep_latest">{t("retention.keep_latest")}</option>
-                <option value="older_than_days">
-                  {t("retention.older_than_days")}
-                </option>
-              </Select>
-            </Field>
-            {form.retention !== "none" && (
+            {purge ? (
+              <Field label={t("fp.older_label")}>
+                <Input className="w-full" type="number" min={1}
+                  max={36500} placeholder={t("retention.n_placeholder")}
+                  value={form.retentionN} onChange={set("retentionN")} />
+              </Field>
+            ) : (
+              <Field label={t("rule.f_apply")}>
+                <Select className="w-full" value={form.retention}
+                  onChange={set("retention")}>
+                  <option value="none">{t("retention.none")}</option>
+                  <option value="keep_latest">{t("retention.keep_latest")}</option>
+                  <option value="older_than_days">
+                    {t("retention.older_than_days")}
+                  </option>
+                </Select>
+              </Field>
+            )}
+            {!purge && form.retention !== "none" && (
               <Field label={t("rule.f_retention_n")}>
                 <Input className="w-full" type="number" min={1}
                   placeholder={t("retention.n_placeholder")}
                   value={form.retentionN} onChange={set("retentionN")} />
               </Field>
             )}
-            {form.action === "move" && (
+            {!purge && form.action === "move" && (
               <div className="sm:col-span-2">
                 <Field label={t("rule.f_dest")}>
                   <Select className="w-full" value={form.dest}
@@ -296,6 +419,11 @@ export function RulesModal({ state, onClose, onChanged }: {
               </div>
             )}
           </div>
+          {purge && rules.find((r) => r.id === editId)?.mode === "execute" && (
+            <div className="mt-2 type-meta text-muted">
+              {t("rule.purge_edit_reset")}
+            </div>
+          )}
           <div className="mt-3 flex items-center gap-3">
             <Button onClick={save}>
               {editId ? t("Save") : t("rule.create")}

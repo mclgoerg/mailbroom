@@ -1343,8 +1343,9 @@ def test_no_default_config_or_demo_triggers_a_purge():
         if path.exists():
             assert "purge_mails" not in path.read_text()
     called_from = []
-    for p in (root / "backend").glob("*.py"):
+    for p in sorted((root / "backend").glob("*.py")):
         text = p.read_text()
         if "purge_mails(" in text and p.name != "mailops.py":
             called_from.append(p.name)
-    assert called_from == ["main.py"]             # only the endpoint
+    # the endpoint and the purge-rule engine, nothing else
+    assert called_from == ["main.py", "rules.py"]

@@ -14,10 +14,14 @@ import { Button, Chip, Input, Modal, SectionLabel, Select, useMediaQuery }
 const TAGS = ["newsletter", "shipping", "finance", "shopping", "social",
   "travel", "dev/cloud", "automated"];
 
-export function QueryBuilder({ value, onChange, className = "" }: {
+export function QueryBuilder({ value, onChange, className = "",
+  senderOnly = false }: {
   value: string;
   onChange: (q: string) => void;
   className?: string;                    // extra classes for the trigger
+  /** Only the conditions a Junk / Trash purge rule can answer (sender text,
+   *  age, unread share); no tags, AI, attachment or flag conditions. */
+  senderOnly?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const phone = useMediaQuery("(max-width: 639px)");
@@ -104,19 +108,19 @@ export function QueryBuilder({ value, onChange, className = "" }: {
       {/* 6.5rem (not a token): "Attachments ≥" must not wrap on phones. */}
       <div className="mt-3 grid grid-cols-[6.5rem_1fr_auto] sm:grid-cols-[7rem_1fr_auto] items-center
         gap-x-2 gap-y-2">
-        {row(t("qb.tag"),
+        {!senderOnly && row(t("qb.tag"),
           <Select className="min-w-0 flex-1" value={tag}
             onChange={(e) => setTag(e.target.value)}>
             {TAGS.map((x) => <option key={x}>{x}</option>)}
           </Select>, `tag:${tag}`)}
-        {row(t("qb.ai"),
+        {!senderOnly && row(t("qb.ai"),
           <Select className="min-w-0 flex-1" value={ai}
             onChange={(e) => setAi(e.target.value)}>
             <option value="safe">{t("qb.ai_safe")}</option>
             <option value="review">{t("qb.ai_review")}</option>
             <option value="keep">{t("qb.ai_keep")}</option>
           </Select>, `ai:${ai}`)}
-        {row(t("qb.age"), <>
+        {row(t(senderOnly ? "qb.age_sender" : "qb.age"), <>
           <Input className="w-16 shrink-0 sm:w-20" type="number" min="1"
             value={age} onChange={(e) => setAge(e.target.value)} />
           <Select className="min-w-0 flex-1" value={ageUnit}
@@ -131,12 +135,13 @@ export function QueryBuilder({ value, onChange, className = "" }: {
             onChange={(e) => setUnread(e.target.value)} />
           <span className="type-meta text-muted">%</span>
         </>, `unread:>${+unread || 1}`)}
-        {row(t("qb.att"), <>
+        {!senderOnly && row(t("qb.att"), <>
           <Input className="w-16 shrink-0 sm:w-20" type="number" min="1"
             value={att} onChange={(e) => setAtt(e.target.value)} />
           <span className="type-meta text-muted">MB</span>
         </>, `att:>${+att || 1}m`)}
       </div>
+      {!senderOnly && <>
       <SectionLabel className="mb-1.5 mt-4">{t("qb.flags")}</SectionLabel>
       <div className="flex flex-wrap items-center gap-1.5">
         {flag("is:unsub", t("qb.is_unsub"))}
@@ -151,6 +156,7 @@ export function QueryBuilder({ value, onChange, className = "" }: {
         {flag("eng:medium", t("qb.eng_medium"))}
         {flag("eng:high", t("qb.eng_high"))}
       </div>
+      </>}
     </>
   );
 

@@ -3121,6 +3121,36 @@ def role_senders(mails: list[dict]) -> list[dict]:
     return sorted(groups.values(), key=lambda g: (-g["count"], g["addr"]))
 
 
+def role_sender_groups(mails: list[dict]) -> list[dict]:
+    """Sender groups of a role listing shaped like the main index's sender
+    groups (`key` / `label` / `sub` / `count` / `unread` / `last`), so the
+    rule filter (`rules.match_group`) can run on them unchanged. Fields the
+    role index has no data for (tags, AI, engagement, replied ...) stay
+    empty: purge rules refuse the qualifiers that need them."""
+    groups: dict[str, dict] = {}
+    for m in mails:
+        g = groups.setdefault(m["addr"], {
+            "key": m["addr"], "label": m["addr"], "sub": "", "count": 0,
+            "unread": 0, "ts": 0, "names": {}, "tags": [], "ai": None,
+            "unsub": False, "protected": False, "pinned": 0, "new": False,
+            "replied": False, "unsubscribed": None, "att_size": 0,
+            "engagement": 0})
+        g["count"] += 1
+        g["unread"] += 0 if m["seen"] else 1
+        g["ts"] = max(g["ts"], m["ts"] or 0)
+        name = m.get("name") or ""
+        if name and name.lower() != m["addr"]:
+            g["names"][name] = g["names"].get(name, 0) + 1
+    for g in groups.values():
+        names = g.pop("names")
+        if names:                    # the most frequent display name
+            g["label"] = max(names, key=names.get)
+            g["sub"] = g["key"]
+        ts = g.pop("ts")
+        g["last"] = time.strftime("%Y-%m-%d", time.localtime(ts)) if ts else ""
+    return list(groups.values())
+
+
 def role_list(role: str, limit: int = 1000, acc=None) -> dict:
     """Live listing of a role folder through its incremental index. The
     returned uv (and, for Empty, max_uid / total) describe the listing just
@@ -3650,9 +3680,18 @@ def _empty_trash(acc, uv: int, max_uid: int) -> dict:
 # missing role folder refused before any destructive command. Junk goes via
 # Trash (one path on every provider): MOVE exactly those UIDs, identify the
 # copies exactly, delete exactly those. `purge_mails` is the single code
-# path; the purge rules (later) call it with a rule-selected UID list.
+# path; the purge rules call it with a rule-selected UID list.
 
 PURGE_ROLES = ("trash", "junk")
+
+
+class PurgeError(RuntimeError):
+    """A permanent deletion stopped part-way: `deleted` mails are gone for
+    good, `unverified` were moved to Trash and not deleted."""
+
+    def __init__(self, msg: str, deleted: int = 0, unverified: int = 0):
+        super().__init__(msg)
+        self.deleted, self.unverified = deleted, unverified
 
 
 class _Unverified(Exception):
@@ -3718,7 +3757,7 @@ def _purge_split(mails: list[dict], wanted, acc):
 
 def purge_preview(role: str, *, uids=None, senders=None,
                   older_than_days: int | None = None,
-                  everything: bool = False, acc=None) -> dict:
+                  everything: bool = False, match=None, acc=None) -> dict:
     """The live count a permanent deletion of `role` would act on - read
     from a fresh listing of the server (never the cache), selected by
     exactly one of: `uids` (a selection), `senders` (every mail of those
@@ -3727,8 +3766,9 @@ def purge_preview(role: str, *, uids=None, senders=None,
     would be deleted plus what is skipped (protected / pinned) and the
     `folder` (for Junk also the `trash_folder` it goes through) the count
     was read from; the confirm sends all of it back to `purge_mails`, which
-    refuses when the role resolves to another folder now. Deletes
-    nothing."""
+    refuses when the role resolves to another folder now. `match` (purge
+    rules) narrows the selection further: it gets the whole fresh listing
+    and returns the UIDs it accepts. Deletes nothing."""
     acc = acc or accounts.get()
     if role not in PURGE_ROLES:
         raise ValueError("bad role")
@@ -3759,6 +3799,8 @@ def purge_preview(role: str, *, uids=None, senders=None,
         wanted = {m["uid"] for m in mails if 0 < m["ts"] < cutoff}
     else:
         wanted = {m["uid"] for m in mails}
+    if match is not None:
+        wanted &= {int(u) for u in match(mails)}
     keep, protected, pinned, _ = _purge_split(mails, wanted, acc)
     key = ROLE_COUNTED[role]
     with acc.lock:
@@ -4037,7 +4079,7 @@ def purge_mails(role: str, uids, uv: int, acc=None, *, folder: str = "",
                 trash_folder: str | None = None, actor: str = "user",
                 cap: int = 0) -> dict:
     """Permanently delete mails of `role` (trash | junk) - the single code
-    path for the manual action and (later) purge rules.
+    path for the manual action and the purge rules.
 
     `uids` + `uv` + `folder` (+ `trash_folder` for Junk) are the counted
     listing (see purge_preview): exactly these UIDs, nothing else, in
@@ -4188,8 +4230,8 @@ def _purge_run(role: str, wanted: list[int], uv: int, folder: str,
             parts.append(f"{len(stranded)} mails were moved to Trash and "
                          "not deleted")
         if parts:
-            raise RuntimeError(f"{failure} ({'; '.join(parts)})") \
-                from failure
+            raise PurgeError(f"{failure} ({'; '.join(parts)})",
+                             led.deleted, len(stranded)) from failure
         raise failure
     return res
 

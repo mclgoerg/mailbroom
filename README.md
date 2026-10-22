@@ -230,6 +230,22 @@ presets.
   server, irreversibly. Junk mails go through Trash first. Refused while
   Trash/Junk is ambiguous and not confirmed in Settings. Nothing is ever
   deleted without your click and the confirm.
+- **Purge rules (Trash and Junk)** - an opt-in kind of rule (Rules ->
+  "Applies to": Junk or Trash) that deletes mail older than N days (default 30,
+  weekly) **permanently, on the server**. Nothing creates one for you; a
+  new one starts in report mode (counts and a sender-level preview, nothing
+  is deleted), may only be switched to execute after a report run of its
+  current definition behind a confirm, and goes back to report mode when
+  its folder, filter or age is edited - or when its account is renamed,
+  its server / login changes, or the Junk / Trash folder it resolves to
+  changes (also a folder deleted and re-created). Deleting an account
+  deletes its purge rules (its ordinary rules stay and stop running). Every run is
+  capped per run (oldest first; the confirm names the cap), skips protected
+  senders and protected mails with no override, and deletes through the
+  same exact-UID path as the manual delete above (refused when the role is
+  ambiguous, UIDVALIDITY changed or the server lacks UIDPLUS). An empty
+  filter means all senders in that folder. Audited as `rule:<id>`, counted as permanent
+  deletes in the digest and statistics.
 - **Persistent audit log** - every mailbox action (trash/archive/move/
   mark-read, incl. rule-triggered ones, rule runs, unsubscribes, undo,
   empty-trash) is recorded with a timestamp, actor, outcome and bytes

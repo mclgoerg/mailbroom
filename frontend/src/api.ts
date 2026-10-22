@@ -217,7 +217,8 @@ export const api = {
       + (keys?.length
         ? keys.map((k) => `&keys=${encodeURIComponent(k)}`).join("")
         : "")),
-  rules: () => req<{ rules: Rule[] }>("/api/rules"),
+  // `cap`: the effective per-run cap every rule run obeys
+  rules: () => req<{ rules: Rule[]; cap: number }>("/api/rules"),
   createRule: (body: Partial<Rule>) => req<Rule>("/api/rules", body),
   updateRule: (id: string, body: Partial<Rule>) =>
     req<Rule>(`/api/rules/${id}`, body),

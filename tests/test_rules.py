@@ -158,7 +158,7 @@ def test_crud_and_execute_guard():
 
     assert client.delete(f"/api/rules/{rule['id']}").json() == {"ok": True}
     assert client.delete(f"/api/rules/{rule['id']}").status_code == 404
-    assert client.get("/api/rules").json() == {"rules": []}
+    assert client.get("/api/rules").json()["rules"] == []
 
 
 # ----------------------------------------------------------------- engine

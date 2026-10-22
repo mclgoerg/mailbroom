@@ -61,7 +61,8 @@ export const EN: Record<string, string> = {
     + "local search index, saved filters, pins, unsubscribe records, known "
     + "senders, digest and auto-scan settings.",
   "account.delete_rules":
-    "Its rules keep the account name but stop running.",
+    "Its mail rules keep the account name but stop running; its Junk and "
+    + "Trash purge rules are deleted.",
   "account.delete_mails": "Mails on the server are untouched.",
   "account.delete_confirm": "Delete account",
   "menu.accounts": "Accounts",
@@ -981,6 +982,69 @@ export const EN: Record<string, string> = {
   "rule.f_retention_n": "Number",
   "rule.f_dest": "Folder",
   "rule.f_name": "Name",
+  "rule.f_scope": "Applies to",
+  "rule.scope_mail": "Inbox & folders",
+  "action.purge": "Delete permanently",
+  "rule.purge_warning":
+    "Deletes mail on the server, permanently - this cannot be undone. "
+    + "Protected senders and protected mails are never touched. A new rule "
+    + "only reports what it would delete until you switch it to execute.",
+  "rule.purge_filter_help":
+    "Matches the senders in this folder: free text, from:, age: (the "
+    + "sender's newest mail) and unread:. An empty filter means ALL senders. "
+    + "Not available here: tag:, ai:, eng:, att:, is:, has: and domain: filters. "
+    + "\"Received more than N days ago\" applies to each mail. Run it in "
+    + "report mode to preview what it would delete.",
+  "rule.purge_edit_reset":
+    "Changing the folder, filter or age switches this rule back to report "
+    + "mode, so what you previewed is what runs.",
+  "rule.run_report_btn": "Run report",
+  "rule.purge_run_report":
+    "report: {n} mails would be deleted permanently · senders: {groups}",
+  "rule.purge_run_report_one":
+    "report: 1 mail would be deleted permanently · senders: {groups}",
+  "rule.purge_run_exec":
+    "executed: {n} mails deleted permanently ({matched} matched)",
+  "rule.purge_run_exec_one":
+    "executed: 1 mail deleted permanently ({matched} matched)",
+  "rule.purge_unverified":
+    "{n} mails moved to Trash but not deleted (could not be verified)",
+  "rule.purge_unverified_one":
+    "1 mail moved to Trash but not deleted (could not be verified)",
+  "rule.purge_run_body":
+    "This deletes matching mail permanently, on the server, up to {cap} "
+    + "mails per run. Protected senders and protected mails are never "
+    + "touched. It cannot be undone. Afterwards you can switch the rule "
+    + "back to report mode.",
+  "rule.purge_run_body_one":
+    "This deletes matching mail permanently, on the server, up to {cap} "
+    + "mail per run. Protected senders and protected mails are never "
+    + "touched. It cannot be undone. Afterwards you can switch the rule "
+    + "back to report mode.",
+  "rule.purge_enable_body":
+    "From now on this rule deletes mail permanently, on the server, up to "
+    + "{cap} mails per run (also on its schedule). Protected senders and "
+    + "protected mails are never touched. You can switch back to report "
+    + "mode at any time.",
+  "rule.purge_enable_body_one":
+    "From now on this rule deletes mail permanently, on the server, up to "
+    + "{cap} mail per run (also on its schedule). Protected senders and "
+    + "protected mails are never touched. You can switch back to report "
+    + "mode at any time.",
+  "rule.purge_confirm_btn": "Delete permanently (up to {cap})",
+  "rule.purge_all_senders":
+    "The filter is empty: this applies to ALL senders in the {folder} folder.",
+  "rule.purge_all_short": "all senders",
+  "rule.reset_edited":
+    "Back in report mode: the folder, filter or age was changed. Run a "
+    + "report again before switching to execute.",
+  "rule.reset_account":
+    "Back in report mode: the account was renamed, or its server or login "
+    + "changed. Run a report again before switching to execute.",
+  "rule.reset_folder":
+    "Back in report mode: the Junk / Trash folder changed since the last "
+    + "report. Nothing was deleted. Run a report again.",
+  "qb.age_sender": "Sender's newest mail older than",
 
   "ai.review_body":
     "Already rated: {rated} of {total}. Re-rating sends them to the AI again, "

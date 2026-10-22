@@ -282,11 +282,18 @@ export interface RuleRun {
   skipped_pinned: number;
   preview: { key: string; label: string; count: number }[];
   error: string;
+  /** Purge rules: mails moved to Trash but not verified for deletion. */
+  unverified?: number;
 }
+
+/** Where a rule looks: the main cleanup index, or the Junk / Trash folder
+ *  (those rules delete permanently, on the server). */
+export type RuleScope = "mail" | "junk" | "trash";
 
 export interface Rule {
   id: string;
   name: string;
+  scope: RuleScope;
   grouping: Grouping;
   query: string;
   action: string;
@@ -297,6 +304,9 @@ export interface Rule {
   older_than_days: number | null;
   origin: "manual" | "block";
   report_runs: number;
+  /** Purge rules: why an armed rule went back to report mode (shown on the
+   *  card). */
+  reset_reason?: "" | "edited" | "account" | "folder";
   created: number;
   last_run: RuleRun | null;
 }

@@ -317,7 +317,7 @@ test("declining the block confirmation never calls api.block", async () => {
 });
 
 const blockRuleFixture = {
-  id: "rule1", name: "DHL Paket", grouping: "sender" as const,
+  id: "rule1", name: "DHL Paket", scope: "mail" as const, grouping: "sender" as const,
   query: "from:noreply@dhl.example", action: "trash", dest: "",
   schedule: "daily" as const, mode: "execute" as const, keep_latest: null,
   older_than_days: null, origin: "block" as const, report_runs: 1,
