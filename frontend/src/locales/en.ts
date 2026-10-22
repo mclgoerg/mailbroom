@@ -981,6 +981,42 @@ export const EN: Record<string, string> = {
   "rule.f_retention_n": "Number",
   "rule.f_dest": "Folder",
   "rule.f_name": "Name",
+  "rule.f_scope": "Folder",
+  "rule.scope_mail": "Inbox & folders",
+  "action.purge": "Delete permanently",
+  "rule.purge_warning":
+    "Deletes mail on the server, permanently - this cannot be undone. "
+    + "Protected senders and protected mails are never touched. A new rule "
+    + "only reports what it would delete until you switch it to execute.",
+  "rule.purge_filter_help":
+    "Matches the senders in this folder: free text, from:, age: and "
+    + "unread:. Tag, AI and engagement filters are not available here. "
+    + "Run it in report mode to preview what it would delete.",
+  "rule.purge_edit_reset":
+    "Changing the folder, filter or age switches this rule back to report "
+    + "mode, so what you previewed is what runs.",
+  "rule.run_report_btn": "Run report",
+  "rule.purge_run_report":
+    "report: {n} mails would be deleted permanently ({groups} senders)",
+  "rule.purge_run_report_one":
+    "report: 1 mail would be deleted permanently ({groups} senders)",
+  "rule.purge_run_exec":
+    "executed: {n} mails deleted permanently ({matched} matched)",
+  "rule.purge_run_exec_one":
+    "executed: 1 mail deleted permanently ({matched} matched)",
+  "rule.purge_unverified":
+    "{n} mails moved to Trash but not deleted (could not be verified)",
+  "rule.purge_unverified_one":
+    "1 mail moved to Trash but not deleted (could not be verified)",
+  "rule.purge_run_body":
+    "This deletes matching mail permanently, on the server, up to 500 mails "
+    + "per run. Protected senders and protected mails are never touched. It "
+    + "cannot be undone.",
+  "rule.purge_enable_body":
+    "From now on this rule deletes mail permanently, on the server, up to "
+    + "500 mails per run (also on its schedule). Protected senders and "
+    + "protected mails are never touched. You can switch back to report "
+    + "mode at any time.",
 
   "ai.review_body":
     "Already rated: {rated} of {total}. Re-rating sends them to the AI again, "

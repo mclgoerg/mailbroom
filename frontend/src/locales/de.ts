@@ -1162,6 +1162,45 @@ export const DE: Record<string, string> = {
   "rule.f_retention_n": "Anzahl",
   "rule.f_dest": "Ordner",
   "rule.f_name": "Name",
+  "rule.f_scope": "Ordner",
+  "rule.scope_mail": "Posteingang & Ordner",
+  "action.purge": "Endgültig löschen",
+  "rule.purge_warning":
+    "Löscht Mails auf dem Server, endgültig - das lässt sich nicht "
+    + "rückgängig machen. Geschützte Absender und geschützte Mails werden "
+    + "nie angefasst. Eine neue Regel meldet nur, was sie löschen würde, "
+    + "bis sie auf Ausführen umgeschaltet wird.",
+  "rule.purge_filter_help":
+    "Trifft die Absender in diesem Ordner: Freitext, from:, age: und "
+    + "unread:. Tag-, KI- und Engagement-Filter sind hier nicht verfügbar. "
+    + "Im Berichtsmodus ausführen, um die Vorschau zu sehen.",
+  "rule.purge_edit_reset":
+    "Wird Ordner, Filter oder Alter geändert, wechselt die Regel zurück in "
+    + "den Berichtsmodus - so läuft nur, was zuvor geprüft wurde.",
+  "rule.run_report_btn": "Bericht erstellen",
+  "rule.purge_run_report":
+    "Bericht: {n} Mails würden endgültig gelöscht ({groups} Absender)",
+  "rule.purge_run_report_one":
+    "Bericht: 1 Mail würde endgültig gelöscht ({groups} Absender)",
+  "rule.purge_run_exec":
+    "ausgeführt: {n} Mails endgültig gelöscht ({matched} gefunden)",
+  "rule.purge_run_exec_one":
+    "ausgeführt: 1 Mail endgültig gelöscht ({matched} gefunden)",
+  "rule.purge_unverified":
+    "{n} Mails in den Papierkorb verschoben, aber nicht gelöscht (nicht "
+    + "überprüfbar)",
+  "rule.purge_unverified_one":
+    "1 Mail in den Papierkorb verschoben, aber nicht gelöscht (nicht "
+    + "überprüfbar)",
+  "rule.purge_run_body":
+    "Das löscht passende Mails endgültig auf dem Server, bis zu 500 Mails "
+    + "pro Lauf. Geschützte Absender und geschützte Mails werden nie "
+    + "angefasst. Das lässt sich nicht rückgängig machen.",
+  "rule.purge_enable_body":
+    "Ab jetzt löscht diese Regel Mails endgültig auf dem Server, bis zu 500 "
+    + "Mails pro Lauf (auch nach Zeitplan). Geschützte Absender und "
+    + "geschützte Mails werden nie angefasst. Der Wechsel zurück in den "
+    + "Berichtsmodus ist jederzeit möglich.",
 
   "ai.review_body":
     "Schon bewertet: {rated} von {total}. Beim Neubewerten gehen sie erneut "

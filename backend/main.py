@@ -915,9 +915,10 @@ def post_digest_test(account: str | None = Query(None)):
 
 class RuleBody(BaseModel):
     name: str = ""
+    scope: str = "mail"            # mail | junk | trash (junk / trash purge)
     grouping: str = "sender"
     query: str = ""
-    action: str = "trash"
+    action: str | None = None      # None: "trash" (mail) / "purge" (junk, trash)
     dest: str = ""
     account: str | None = None     # None = default account
     schedule: str = "manual"
@@ -932,9 +933,15 @@ def get_rules():
 
 
 @app.post("/api/rules")
-def post_rules(body: RuleBody):
+def post_rules(body: RuleBody, account: str | None = Query(None)):
+    """The rule belongs to the account in the body, else to the one in
+    `?account=` (the account the UI is showing) - never silently to the
+    default account."""
+    data = body.model_dump(exclude_none=True)
+    if not data.get("account") and account:
+        data["account"] = _acc(account).name
     try:
-        return rulesmod.create_rule(body.model_dump(exclude_none=True))
+        return rulesmod.create_rule(data)
     except ValueError as exc:
         raise HTTPException(400, str(exc))
 
