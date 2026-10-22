@@ -477,20 +477,20 @@ test("an empty filter says ALL senders in the editor help, the card, the " +
   expect(screen.getAllByText(/all senders/).length).toBeGreaterThanOrEqual(2);
   fireEvent.click(screen.getByText("Enable execute"));
   expect((await findDialog()).textContent)
-    .toContain("The filter is empty: this applies to ALL senders in Junk.");
+    .toContain("The filter is empty: this applies to ALL senders in the Junk folder.");
   await cancelDialog();
   unmount();
   renderCards([{ ...ran, mode: "execute" }]);
   fireEvent.click(screen.getByText("Run now"));
   expect((await findDialog()).textContent)
-    .toContain("applies to ALL senders in Junk");
+    .toContain("applies to ALL senders in the Junk folder");
   await cancelDialog();
   cleanup();
   render(<RulesModal state={baseState} onClose={() => {}}
     onChanged={() => {}} />);
   pickScope("trash");
   expect(screen.getByText(/An empty filter means ALL senders/)).toBeTruthy();
-  for (const fam of ["tag:", "ai:", "eng:", "att:", "is:", "has:"]) {
+  for (const fam of ["tag:", "ai:", "eng:", "att:", "is:", "has:", "domain:"]) {
     expect(screen.getByText(new RegExp(fam)), fam).toBeTruthy();
   }
 });
@@ -509,7 +509,7 @@ test("German: empty filter says alle Absender in both confirms", async () => {
   expect(screen.getByText("alle Absender")).toBeTruthy();
   fireEvent.click(screen.getByText("Ausführen aktivieren"));
   expect((await findDialog()).textContent)
-    .toContain("gilt für ALLE Absender in Spam");
+    .toContain("gilt für ALLE Absender im Ordner Spam");
   await pressDialog("Abbrechen");
 });
 
@@ -608,4 +608,17 @@ test("German: the run confirm of an execute-mode rule has the full " +
   expect(screen.getByRole("button", { name: "Endgültig löschen (bis zu 37)" }))
     .toBeTruthy();
   await pressDialog("Abbrechen");
+});
+
+test("German: the editor help says an empty filter means ALL senders and " +
+  "lists the refused filters", () => {
+  setLang("de");
+  render(<RulesModal state={baseState} onClose={() => {}}
+    onChanged={() => {}} />);
+  fireEvent.change(screen.getByLabelText("Gilt für"),
+    { target: { value: "junk" } });
+  const help = screen.getByText(/Ein leerer Filter bedeutet ALLE Absender/);
+  for (const fam of ["tag:", "ai:", "eng:", "att:", "is:", "has:", "domain:"]) {
+    expect(help.textContent, fam).toContain(fam);
+  }
 });

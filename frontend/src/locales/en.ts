@@ -61,7 +61,8 @@ export const EN: Record<string, string> = {
     + "local search index, saved filters, pins, unsubscribe records, known "
     + "senders, digest and auto-scan settings.",
   "account.delete_rules":
-    "Its rules keep the account name but stop running.",
+    "Its mail rules keep the account name but stop running; its Junk and "
+    + "Trash purge rules are deleted.",
   "account.delete_mails": "Mails on the server are untouched.",
   "account.delete_confirm": "Delete account",
   "menu.accounts": "Accounts",
@@ -991,7 +992,7 @@ export const EN: Record<string, string> = {
   "rule.purge_filter_help":
     "Matches the senders in this folder: free text, from:, age: (the "
     + "sender's newest mail) and unread:. An empty filter means ALL senders. "
-    + "Not available here: tag:, ai:, eng:, att:, is: and has: filters. "
+    + "Not available here: tag:, ai:, eng:, att:, is:, has: and domain: filters. "
     + "\"Received more than N days ago\" applies to each mail. Run it in "
     + "report mode to preview what it would delete.",
   "rule.purge_edit_reset":
@@ -1032,7 +1033,7 @@ export const EN: Record<string, string> = {
     + "mode at any time.",
   "rule.purge_confirm_btn": "Delete permanently (up to {cap})",
   "rule.purge_all_senders":
-    "The filter is empty: this applies to ALL senders in {folder}.",
+    "The filter is empty: this applies to ALL senders in the {folder} folder.",
   "rule.purge_all_short": "all senders",
   "rule.reset_edited":
     "Back in report mode: the folder, filter or age was changed. Run a "

@@ -1154,17 +1154,24 @@ def test_an_account_rename_disarms_its_purge_rules_with_a_reason(monkeypatch):
     assert _stored(other["id"])["mode"] == "execute"      # others untouched
 
 
-def test_deleting_an_account_removes_its_rules_so_a_new_one_starts_clean(
+def test_deleting_an_account_removes_its_purge_rules_but_not_its_mail_rules(
         monkeypatch):
+    """A purge rule must never outlive its mailbox; ordinary rules keep the
+    account name and stop running (what the delete confirm says)."""
     _two_accounts(monkeypatch)
     gone = _rule("trash", account="two")
+    gone2 = _rule("junk", account="two")
     keep = _rule("trash", account="one")
-    mail = rulesmod.create_rule({"name": "m", "account": "two"})
+    mail = rulesmod.create_rule({"name": "m", "account": "two",
+                                 "query": "tag:x", "action": "archive",
+                                 "schedule": "daily"})
+    before = _stored(mail["id"])
     r = client.post("/api/config", json={"delete_account": "two"})
     assert r.status_code == 200
     ids = [r_["id"] for r_ in rulesmod.load_rules()]
-    assert ids == [keep["id"]] and gone["id"] not in ids \
-        and mail["id"] not in ids
+    assert sorted(ids) == sorted([keep["id"], mail["id"]])
+    assert gone["id"] not in ids and gone2["id"] not in ids
+    assert _stored(mail["id"]) == before and before["account"] == "two"
 
 
 def test_a_report_for_another_mailbox_does_not_arm_a_rewritten_account(
@@ -1344,3 +1351,72 @@ def test_the_account_name_is_part_of_the_fingerprint_even_for_one_mailbox(
     raw["rules"][0].update(mode="execute", report_runs=1)
     rulesmod._path().write_text(json.dumps(raw))
     assert _stored(rule["id"])["mode"] == "report"
+
+
+# ============================================== re-review: small gaps
+
+def test_a_rule_without_an_account_follows_the_default_accounts_mailbox(
+        monkeypatch):
+    """Legacy / hand-edited rule with account=None: the fingerprint is the
+    DEFAULT account's, so changing its host or login disarms the rule."""
+    _two_accounts(monkeypatch)
+    assert accountsmod.default_name() == "one"
+    rule = _armed(_rule("trash"))
+    raw = json.loads(rulesmod._path().read_text())
+    raw["rules"][0]["account"] = None
+    raw["rules"][0]["report_box"] = rulesmod.box_sig(
+        {"account": None})                       # armed as a legacy rule
+    rulesmod._path().write_text(json.dumps(raw))
+    assert _stored(rule["id"])["mode"] == "execute"
+    _login(user="someone-else")                   # default account's login
+    stored = _stored(rule["id"])
+    assert stored["mode"] == "report" and stored["reset_reason"] == "account"
+    assert rulesmod.box_sig({"account": None}) \
+        == rulesmod.box_sig({"account": "one"})
+
+
+@pytest.mark.parametrize("scope,folder,kw", [
+    ("trash", "Trash", {}),
+    ("junk", "Spam", dict(renumber=True, copyuid=True))])
+def test_a_folder_recreated_under_the_same_name_is_not_purged_unseen(
+        monkeypatch, scope, folder, kw):
+    fake = _env(monkeypatch, trash=_mails([3, 4], date=OLD),
+                junk=_mails([13, 14], date=OLD), **kw)
+    rule = _armed(_rule(scope))
+    assert _stored(rule["id"])["report_at"]["uv"] == 1
+    fake.uv[folder] = 7                      # deleted and re-created
+    _refused_back_to_report(rule, fake, "Trash", "Spam")
+    assert _run(rule)["mails"] == 2          # a new report sees the new one
+    assert _stored(rule["id"])["report_at"]["uv"] == 7
+
+
+def test_the_mailbox_fingerprint_is_taken_at_the_start_of_a_report(
+        monkeypatch):
+    boxes, _ = _two_accounts(monkeypatch)
+    rule = _rule("trash", account="one")
+    orig = mailops.purge_preview
+
+    def login_changes_meanwhile(*a, **k):
+        out = orig(*a, **k)
+        _login(user="someone-else")
+        return out
+    monkeypatch.setattr(mailops, "purge_preview", login_changes_meanwhile)
+    _run(rule)
+    monkeypatch.setattr(mailops, "purge_preview", orig)
+    stored = _stored(rule["id"])
+    assert stored["report_runs"] == 0 and not rulesmod.purge_armed(stored)
+    with pytest.raises(ValueError, match="report mode first"):
+        rulesmod.update_rule(rule["id"], {"mode": "execute"})
+
+
+def test_older_than_zero_days_is_rejected_at_save_for_purge_rules():
+    for bad in (0, -5):
+        with pytest.raises(ValueError, match=">= 1"):
+            _rule("trash", days=bad)
+    rule = _rule("trash")
+    with pytest.raises(ValueError, match=">= 1"):
+        rulesmod.update_rule(rule["id"], {"older_than_days": 0})
+    assert client.post("/api/rules", json={
+        "name": "z", "scope": "junk",
+        "older_than_days": 0}).status_code == 400
+    assert _stored(rule["id"])["older_than_days"] == 30

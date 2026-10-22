@@ -218,7 +218,7 @@ def mailbox_id(account) -> str:
 
 def box_sig(rule: dict) -> str:
     """The account the rule runs on: its name AND the mailbox behind it."""
-    acct = rule.get("account")
+    acct = rule.get("account") or accounts.default_name()  # None = default
     return hashlib.sha256(json.dumps(
         [acct, mailbox_id(acct)]).encode()).hexdigest()[:16]
 
@@ -453,15 +453,17 @@ def rename_account(old: str, new: str) -> None:
 
 
 def drop_account(name: str) -> None:
-    """A deleted account takes its rules with it (a purge rule must never
-    outlive its mailbox: a re-created account of the same name is another
-    mailbox)."""
+    """A deleted account takes its PURGE rules (Junk / Trash) with it: one
+    must never outlive its mailbox (a re-created account of the same name
+    is another mailbox). Ordinary mail rules stay, as before - they keep
+    the account name but stop running."""
     with _LOCK:
         rules = load_rules()
-        mine = [r for r in rules if r.get("account") == name]
+        mine = [r for r in rules if r.get("account") == name
+                and r.get("scope", "mail") in PURGE_SCOPES]
         if mine:
-            _save([r for r in rules if r.get("account") != name])
-            log.info("account %r deleted: %d rule(s) removed", name,
+            _save([r for r in rules if r not in mine])
+            log.info("account %r deleted: %d purge rule(s) removed", name,
                      len(mine))
 
 
@@ -719,7 +721,10 @@ def _run_purge(rule: dict, acc, result: dict) -> None:
 
         pv = mailops.purge_preview(role, older_than_days=rule["older_than_days"],
                                    match=match, acc=acc)
-        at = {"folder": pv["folder"], "trash_folder": pv["trash_folder"]}
+        # the folder(s) and the UIDVALIDITY of the role folder as counted: a
+        # folder deleted and re-created under the same name is another one
+        at = {"folder": pv["folder"], "trash_folder": pv["trash_folder"],
+              "uv": pv["uv"]}
         result["at"] = at
         if rule["mode"] == "execute" and at != rule["report_at"]:
             # The folder(s) the role resolves to now are not the ones the

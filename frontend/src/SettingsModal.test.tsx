@@ -316,6 +316,11 @@ test("deleting an account names it in a danger dialog; Cancel keeps it",
     const dlg = await findDialog();
     expect(dlg.textContent).toContain('Delete account "default"');
     expect(dlg.textContent).toContain("Mails on the server are untouched.");
+    // ties the text to the backend: mail rules stay (and stop running), only
+    // the account's Junk / Trash purge rules are deleted with it
+    expect(dlg.textContent).toContain(
+      "Its mail rules keep the account name but stop running; its Junk and "
+      + "Trash purge rules are deleted.");
     await cancelDialog();
     await expectNoDialog();
     expect(saveCalls).toEqual([]);

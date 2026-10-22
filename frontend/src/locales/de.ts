@@ -777,7 +777,8 @@ export const DE: Record<string, string> = {
     + "Abbestell-Einträge, bekannte Absender sowie Digest- und "
     + "Auto-Scan-Einstellungen.",
   "account.delete_rules":
-    "Seine Regeln behalten den Kontonamen, laufen aber nicht mehr.",
+    "Seine Mail-Regeln behalten den Kontonamen, laufen aber nicht mehr; "
+    + "seine Lösch-Regeln für Spam und Papierkorb werden gelöscht.",
   "account.delete_mails": "Mails auf dem Server bleiben unangetastet.",
   "account.delete_confirm": "Konto löschen",
   "menu.accounts": "Konten",
@@ -1173,7 +1174,7 @@ export const DE: Record<string, string> = {
   "rule.purge_filter_help":
     "Trifft die Absender in diesem Ordner: Freitext, from:, age: (neueste "
     + "Mail des Absenders) und unread:. Ein leerer Filter bedeutet ALLE "
-    + "Absender. Hier nicht verfügbar: tag:, ai:, eng:, att:, is: und has:. "
+    + "Absender. Hier nicht verfügbar: tag:, ai:, eng:, att:, is:, has: und domain:. "
     + "„Vor mehr als N Tagen empfangen“ gilt für jede einzelne Mail. Im "
     + "Berichtsmodus ausführen, um die Vorschau zu sehen.",
   "rule.purge_edit_reset":
@@ -1216,7 +1217,7 @@ export const DE: Record<string, string> = {
     + "Berichtsmodus ist jederzeit möglich.",
   "rule.purge_confirm_btn": "Endgültig löschen (bis zu {cap})",
   "rule.purge_all_senders":
-    "Der Filter ist leer: Die Regel gilt für ALLE Absender in {folder}.",
+    "Der Filter ist leer: Die Regel gilt für ALLE Absender im Ordner {folder}.",
   "rule.purge_all_short": "alle Absender",
   "rule.reset_edited":
     "Zurück im Berichtsmodus: Ordner, Filter oder Alter wurden geändert. "
