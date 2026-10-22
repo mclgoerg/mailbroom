@@ -781,7 +781,7 @@ export const EN: Record<string, string> = {
     "More than one folder could be your {role} folder. Until you choose, "
     + "Mailbroom uses \u201c{pick}\u201d for moves to {role} and refuses to "
     + "delete permanently or empty it.",
-  "folder.choose": "Choose\u2026",
+  "folder.choose": "Not confirmed yet - choose\u2026",
   "folder.choose_label": "Which folder is your {role} folder?",
   "folder.confirmed":
     "You chose this folder. Permanent actions on {role} (such as Empty "
@@ -810,6 +810,11 @@ export const EN: Record<string, string> = {
   "folder.err.not_lookalike":
     "This folder no longer looks like a second special folder - reload the "
     + "list.",
+  "folder.err.move_unsafe":
+    "This server can neither MOVE nor safely delete single mails, so the "
+    + "move is refused - nothing was changed.",
+  "folder.undone": "Moved {n} mails back.",
+  "folder.undone_one": "Moved 1 mail back.",
   "audit.act.move_contents": "Folder contents moved",
   "audit.empty": "Nothing recorded yet",
   "audit.export": "Export audit log as CSV",

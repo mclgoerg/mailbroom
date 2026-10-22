@@ -10,6 +10,7 @@ import { afterEach, expect, test, vi } from "vitest";
 const foldersCalls: (string | undefined)[] = [];
 const saveCalls: any[] = [];
 const testDigestCalls: string[] = [];
+const roleCalls: unknown[][] = [];
 const oauthDisconnectCalls: string[] = [];
 let foldersResult: unknown = null;   // null: picker stays loading
 let testDigestResult: { sent: boolean; demo: boolean } =
@@ -21,6 +22,11 @@ vi.mock("./api", () => ({
       return foldersResult
         ? Promise.resolve(foldersResult)
         : new Promise(() => {});                 // picker stays loading
+    },
+    setFolderRole: (...a: unknown[]) => {
+      roleCalls.push(a);
+      return Promise.resolve({ role: "trash", folder: "Trash",
+        source: "override" });
     },
     saveConfig: (body: any) => {
       saveCalls.push(body);
@@ -192,6 +198,63 @@ test("a look-alike of a special folder is locked and unticked", async () => {
     expect((box as HTMLInputElement).checked).toBe(false);
     expect(box.closest("span[title]")?.getAttribute("title"))
       .toMatch(/second special folder/);
+  } finally {
+    foldersResult = null;
+  }
+});
+
+const tiedTrash = () => ({ wildcards: [], special: [{
+  role: "trash", raw: "Deleted Items", name: "Deleted Items",
+  source: "name", ambiguous: true, choices: [
+    { raw: "Deleted Items", name: "Deleted Items", count: 3 },
+    { raw: "Trash", name: "Trash", count: 1 }] }],
+folders: [
+  { raw: "INBOX", name: "INBOX", role: null, excluded: false },
+  { raw: "Projects", name: "Projects", role: null, excluded: false },
+  { raw: "Deleted Items", name: "Deleted Items", role: "trash",
+    excluded: true },
+  { raw: "Trash", name: "Trash", looks_like: "trash", role: null,
+    excluded: true }] });
+
+test("choosing a role folder acts on the edited account, not the active one",
+  async () => {
+    roleCalls.length = 0;
+    foldersResult = tiedTrash();
+    try {
+      render(<SettingsModal cfg={cfg} account="default" onClose={() => {}}
+        onSaved={() => {}} onAccountsChanged={() => {}} />);
+      fireEvent.change(
+        screen.getByLabelText(/Account to edit/) as HTMLSelectElement,
+        { target: { value: "icloud" } });
+      fireEvent.change(await screen.findByLabelText(
+        "Which folder is your Trash folder?"),
+      { target: { value: "Trash" } });
+      await waitFor(() => expect(roleCalls).toEqual(
+        [["trash", "Trash", "icloud"]]));
+    } finally {
+      foldersResult = null;
+    }
+  });
+
+test("unsaved ticks survive the reload after a role choice", async () => {
+  foldersResult = tiedTrash();
+  try {
+    render(<SettingsModal cfg={cfg} account="default" onClose={() => {}}
+      onSaved={() => {}} onAccountsChanged={() => {}} />);
+    const box = await screen.findByLabelText("Projects") as HTMLInputElement;
+    expect(box.checked).toBe(true);
+    fireEvent.click(box);                       // untick, not saved yet
+    expect(box.checked).toBe(false);
+    const before = foldersCalls.length;
+    fireEvent.change(screen.getByLabelText(
+      "Which folder is your Trash folder?"), { target: { value: "Trash" } });
+    await waitFor(() => expect(foldersCalls.length).toBeGreaterThan(before));
+    // the reload answers "Projects is scanned" again - the user's untick stays
+    await waitFor(() => expect(
+      (screen.getByLabelText("Projects") as HTMLInputElement).checked)
+      .toBe(false));
+    expect((screen.getByLabelText("INBOX") as HTMLInputElement).checked)
+      .toBe(true);
   } finally {
     foldersResult = null;
   }

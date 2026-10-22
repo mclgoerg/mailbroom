@@ -45,8 +45,11 @@ function nest(items: FolderInfo[]):
   });
 }
 
-export function FolderSettings({ data, included, setIncluded, wildcards,
-  setWildcards, reload }: {
+export function FolderSettings({ account, data, included, setIncluded,
+  wildcards, setWildcards, reload }: {
+  /** The account being edited (not necessarily the active one): every
+   *  call below is pinned to it. */
+  account: string;
   data: FoldersResp;
   included: Set<string>;
   setIncluded: (next: Set<string>) => void;
@@ -63,13 +66,19 @@ export function FolderSettings({ data, included, setIncluded, wildcards,
     .map((x) => ({ role: x.role!, raw: x.raw, name: x.name,
       source: x.role_source ?? "name", ambiguous: !!x.ambiguous,
       choices: [] }));
-  const roles = ROLE_ORDER.map((r) => special.find((s) => s.role === r))
+  // All mail is a view of everything else (never scanned): listed with the
+  // views below, not as a role row.
+  const roles = ROLE_ORDER.filter((r) => r !== "all")
+    .map((r) => special.find((s) => s.role === r))
     .filter((s): s is SpecialRole => !!s);
-  const holders = new Set(roles.filter((r) => UNSCANNED.has(r.role))
+  const holders = new Set(special.filter((r) => UNSCANNED.has(r.role))
     .map((r) => r.raw));
-  const views = data.folders.filter((x) => x.view);
-  const lookalikes = (role: string) => data.folders.filter(
-    (x) => x.looks_like === role && !x.view);
+  const views = data.folders.filter((x) => x.view
+    || x.role === "all" || x.looks_like === "all");
+  // Archive look-alikes are scanned and tickable in the list above (D11):
+  // only the other roles list theirs under the role row.
+  const lookalikes = (role: string) => role === "archive" ? []
+    : data.folders.filter((x) => x.looks_like === role && !x.view);
   const hidden = (x: FolderInfo) => wildcards.some((w) => {
     const p = w.trim().toLowerCase().slice(0, -1);
     return x.raw.toLowerCase().startsWith(p)
@@ -85,7 +94,7 @@ export function FolderSettings({ data, included, setIncluded, wildcards,
   const choose = async (r: SpecialRole, folder: string) => {
     setBusy(true);
     try {
-      await api.setFolderRole(r.role, folder);
+      await api.setFolderRole(r.role, folder, account);
       toast.show(folder
         ? t("folder.choice_saved", { role: roleName(r.role),
           name: data.folders.find((x) => x.raw === folder)?.name ?? folder })
@@ -99,7 +108,7 @@ export function FolderSettings({ data, included, setIncluded, wildcards,
   const moveContents = async (x: FolderInfo, role: string) => {
     setBusy(true);
     try {
-      const c = await api.lookalike(x.raw);
+      const c = await api.lookalike(x.raw, account);
       if (c.count === 0) {
         toast.show(t("folder.move_empty", { folder: x.name }));
         return;
@@ -109,12 +118,16 @@ export function FolderSettings({ data, included, setIncluded, wildcards,
         body: t("folder.move_body", { folder: x.name, target: c.target_name }),
         confirmLabel: t("folder.move_confirm", { n: c.count }),
         tone: "primary" })) return;
-      const r = await api.moveLookalike(x.raw, c.uv, c.max_uid);
+      const r = await api.moveLookalike(x.raw, c.uv, c.max_uid, account);
       const ident = r.undo;
       toast.show(t("folder.moved", { n: r.moved, role: roleName(role) }), {
         variant: "success",
         action: ident ? { label: t("Undo"), onClick: () => {
-          api.undo(-1, ident).then(reload).catch(fail);
+          api.undo(-1, ident, account).then((u) => {
+            toast.show(t("folder.undone", { n: u.restored }),
+              { variant: "success" });
+            reload();
+          }).catch(fail);
         } } : undefined });
       reload();
     } catch (e) { fail(e); }
@@ -199,8 +212,9 @@ export function FolderSettings({ data, included, setIncluded, wildcards,
                       <Select value={r.ambiguous ? "" : r.raw} disabled={busy}
                         aria-label={t("folder.choose_label",
                           { role: roleName(r.role) })}
+                        // any pick is saved - also the folder Mailbroom
+                        // already uses by default: that is how it is confirmed
                         onChange={(e) => e.target.value
-                          && e.target.value !== r.raw
                           && choose(r, e.target.value)}>
                         {r.ambiguous && (
                           <option value="" disabled>{t("folder.choose")}</option>
@@ -235,7 +249,7 @@ export function FolderSettings({ data, included, setIncluded, wildcards,
                     </span>
                     <Tag tone="review">{t("folder.lookalike_tag",
                       { role: roleName(r.role) })}</Tag>
-                    {r.role !== "archive" && r.role !== "all" && (
+                    {(
                       <Button variant="secondary" size="sm"
                         disabled={busy || r.ambiguous}
                         title={r.ambiguous ? t("folder.move_needs_choice",

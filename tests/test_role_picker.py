@@ -312,3 +312,142 @@ def test_refuses_while_a_job_runs(monkeypatch):
     r = client.post("/api/folders/move_contents", json={
         "folder": "Deleted Items", "uv": 1, "max_uid": 3})
     assert r.status_code == 409 and len(fake.mailbox["Deleted Items"]) == 3
+
+
+# -- account scoping ------------------------------------------------------
+
+def _two_accounts(monkeypatch) -> dict[str, FakeIMAP]:
+    """'one' is the first (default, active) account, 'two' the other. Both
+    have a flagged Trash plus a look-alike and a tied Junk pair."""
+    cfgmod.CONFIG_PATH.write_text(json.dumps({"accounts": {
+        "one": {"host": "host-one", "user": "u1", "password": "pw"},
+        "two": {"host": "host-two", "user": "u2", "password": "pw"}}}))
+
+    def box():
+        return FakeIMAP({
+            "INBOX": _mails("in", 1), "Trash": _mails("tr", 1, first=100),
+            "Deleted Items": _mails("de", 2),
+            "Spam": _mails("sp", 1, first=200),
+            "Junk Email": _mails("ju", 2)},
+            flags={"Trash": "\\Trash"})
+    fakes = {"host-one": box(), "host-two": box()}
+    monkeypatch.setattr(mailops, "connect",
+                        lambda im, name=None: fakes[im["host"]])
+    return {"one": fakes["host-one"], "two": fakes["host-two"]}
+
+
+def _overrides(account: str) -> dict:
+    return cfgmod.load_config()["accounts"][account]["role_overrides"]
+
+
+def test_set_role_acts_on_the_named_account_only(monkeypatch):
+    _two_accounts(monkeypatch)
+    r = client.post("/api/folders/role", params={"account": "two"},
+                    json={"role": "junk", "folder": "Spam"})
+    assert r.status_code == 200 and r.json()["folder"] == "Spam"
+    assert _overrides("two") == {"junk": "Spam"}
+    assert _overrides("one") == {}                     # the active one
+    # a folder that is only a candidate on the active account is not
+    # accepted for the named one - validation uses the named account's list
+    r = client.post("/api/folders/role", params={"account": "two"},
+                    json={"role": "junk", "folder": "Nope"})
+    assert r.status_code == 400 and _overrides("one") == {}
+
+
+def test_lookalike_count_and_move_use_the_named_account(monkeypatch):
+    fakes = _two_accounts(monkeypatch)
+    fakes["one"].mailbox["Deleted Items"] = _mails("de", 5)  # differs
+    r = client.get("/api/folders/lookalike", params={
+        "folder": "Deleted Items", "account": "two"})
+    assert r.status_code == 200 and r.json()["count"] == 2
+    r = client.post("/api/folders/move_contents", params={"account": "two"},
+                    json={"folder": "Deleted Items", "uv": 1, "max_uid": 2})
+    assert r.status_code == 200 and r.json()["moved"] == 2
+    assert fakes["two"].mailbox["Deleted Items"] == []
+    assert len(fakes["one"].mailbox["Deleted Items"]) == 5   # untouched
+    assert len(fakes["one"].mailbox["Trash"]) == 1
+    assert [u["count"] for u in mailops.accounts.get("two").undo_log] == [2]
+    assert mailops.accounts.get("one").undo_log == []
+    # and the undo of that entry also runs on the named account
+    r = client.post("/api/undo", params={"account": "two"},
+                    json={"ident": r.json()["undo"]})
+    assert r.status_code == 200 and r.json()["restored"] == 2
+    assert len(fakes["two"].mailbox["Deleted Items"]) == 2
+
+
+def test_folders_endpoint_reports_the_delimiter(monkeypatch):
+    _use(monkeypatch, FakeIMAP({"INBOX": _mails("in", 1),
+                                "INBOX.Work": _mails("wo", 1)}, delimiter="."))
+    by = {f["raw"]: f for f in client.get("/api/folders").json()["folders"]}
+    assert by["INBOX.Work"]["delim"] == "."
+    _use(monkeypatch, FakeIMAP({"INBOX": _mails("in", 1)}, delimiter=None))
+    by = {f["raw"]: f for f in client.get("/api/folders").json()["folders"]}
+    assert by["INBOX"]["delim"] is None
+
+
+# -- safety: no MOVE and no UIDPLUS ---------------------------------------
+
+def test_refuses_without_move_and_uidplus(monkeypatch):
+    fake = _client_made_trash(monkeypatch, n=2, move=False, uidplus=False)
+    before = {f: list(m) for f, m in fake.mailbox.items()}
+    for call in (
+        lambda: client.get("/api/folders/lookalike", params={
+            "folder": "Deleted Items"}),
+        lambda: client.post("/api/folders/move_contents", json={
+            "folder": "Deleted Items", "uv": 1, "max_uid": 2})):
+        r = call()
+        assert r.status_code == 409 and r.json()["detail"] == "move_unsafe"
+    assert fake.mailbox == before and not _audit()
+
+
+def test_move_without_move_capability_but_with_uidplus_is_allowed(monkeypatch):
+    fake = _client_made_trash(monkeypatch, n=2, move=False, uidplus=True)
+    r = client.post("/api/folders/move_contents", json={
+        "folder": "Deleted Items", "uv": 1, "max_uid": 2})
+    assert r.json()["moved"] == 2 and fake.mailbox["Deleted Items"] == []
+
+
+# -- undo by identity -----------------------------------------------------
+
+def _two_moves(monkeypatch):
+    fake = _use(monkeypatch, FakeIMAP({
+        "INBOX": _mails("in", 1), "Trash": _mails("tr", 1, first=100),
+        "Deleted Items": _mails("de", 2), "Spam": _mails("sp", 1, first=200),
+        "Junk Email": _mails("ju", 3)},
+        flags={"Trash": "\\Trash", "Spam": "\\Junk"}))
+    first = client.post("/api/folders/move_contents", json={
+        "folder": "Deleted Items", "uv": 1, "max_uid": 2}).json()["undo"]
+    second = client.post("/api/folders/move_contents", json={
+        "folder": "Junk Email", "uv": 1, "max_uid": 3}).json()["undo"]
+    return fake, first, second
+
+
+def test_undo_by_ident_picks_a_non_last_entry(monkeypatch):
+    fake, first, second = _two_moves(monkeypatch)
+    r = client.post("/api/undo", json={"ident": first})
+    assert r.status_code == 200 and r.json()["restored"] == 2
+    assert len(fake.mailbox["Deleted Items"]) == 2          # back
+    assert fake.mailbox["Junk Email"] == []                  # the last stays
+    assert [u["label"] for u in client.get("/api/state").json()["undo"]] \
+        == ["Junk Email"]
+
+
+def test_unknown_ident_is_refused_and_undoes_nothing(monkeypatch):
+    fake, first, second = _two_moves(monkeypatch)
+    before = {f: list(m) for f, m in fake.mailbox.items()}
+    r = client.post("/api/undo", json={"ident": {
+        "ts": 1, "label": "Gone", "count": 9}})
+    assert r.status_code == 409
+    assert fake.mailbox == before
+    assert len(client.get("/api/state").json()["undo"]) == 2
+
+
+def test_undoing_a_lookalike_move_starts_no_rescan(monkeypatch):
+    fake, first, second = _two_moves(monkeypatch)
+    started = []
+    monkeypatch.setattr(mailops, "start_scan",
+                        lambda *a, **k: started.append(1))
+    r = client.post("/api/undo", json={"ident": second})
+    assert r.json() == {"restored": 3, "of": 3, "rescan": False}
+    assert not started
+    assert mailops.accounts.get().state["notice"] is None

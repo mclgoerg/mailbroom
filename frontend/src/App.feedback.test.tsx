@@ -222,6 +222,21 @@ test("two new entries toast their total without an Undo action", async () => {
     .toBeNull();
 });
 
+test("a look-alike folder move is not announced by the generic toast",
+  async () => {
+    await mount({ ...baseState });
+    // Settings shows its own toast (with Undo) for these entries
+    tick({ undo: [{ ts: 3, label: "Deleted Items", count: 3,
+      action: "move_contents" }] });
+    await new Promise((r) => setTimeout(r, 50));
+    expect(screen.queryByText(/Moved|processed/)).toBeNull();
+    // other entries still toast
+    tick({ delete: job("done", { moved: 2 }) as any,
+      undo: [{ ts: 3, label: "Deleted Items", count: 3,
+        action: "move_contents" }, entry(4, 2)] });
+    expect(await screen.findByText("Moved 2 mails to Trash")).toBeTruthy();
+  });
+
 test("undoing the last entry does not toast", async () => {
   await mount({ ...baseState, undo: [entry(1, 5)] });
   tick({ undo: [] });

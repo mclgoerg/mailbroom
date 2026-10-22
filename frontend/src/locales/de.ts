@@ -661,7 +661,7 @@ export const DE: Record<string, string> = {
     + "Bis du w\u00e4hlst, verwendet Mailbroom \u201e{pick}\u201c f\u00fcr "
     + "Verschiebungen dorthin und l\u00f6scht nicht endg\u00fcltig und leert ihn "
     + "nicht.",
-  "folder.choose": "Ausw\u00e4hlen\u2026",
+  "folder.choose": "Noch nicht best\u00e4tigt - ausw\u00e4hlen\u2026",
   "folder.choose_label": "Welcher Ordner ist dein Ordner \u201e{role}\u201c?",
   "folder.confirmed":
     "Du hast diesen Ordner gew\u00e4hlt. Dauerhafte Aktionen f\u00fcr "
@@ -698,6 +698,12 @@ export const DE: Record<string, string> = {
   "folder.err.not_lookalike":
     "Dieser Ordner sieht nicht mehr wie ein zweiter Spezialordner aus - "
     + "Liste neu laden.",
+  "folder.err.move_unsafe":
+    "Dieser Server kann weder verschieben noch einzelne Mails sicher "
+    + "entfernen, deshalb wird das Verschieben abgelehnt - nichts wurde "
+    + "ge\u00e4ndert.",
+  "folder.undone": "{n} Mails zur\u00fcck verschoben.",
+  "folder.undone_one": "1 Mail zur\u00fcck verschoben.",
   "audit.act.move_contents": "Ordnerinhalt verschoben",
   "account.label": "Zu bearbeitendes Konto",
   "account.add": "Konto hinzufügen",

@@ -18,6 +18,12 @@ export function setAccount(name: string) {
   ACCOUNT = name;
 }
 
+/** Pin a call to one account (the one being edited in Settings, which is
+ *  not necessarily the active one). */
+const forAccount = (path: string, account?: string): string =>
+  account ? `${path}${path.includes("?") ? "&" : "?"}account=`
+    + encodeURIComponent(account) : path;
+
 export function withAccount(path: string): string {
   if (!ACCOUNT || path.includes("account=")) return path;
   const sep = path.includes("?") ? "&" : "?";
@@ -71,6 +77,7 @@ const ERROR_CODES: Record<string, string> = {
   // special-folder choices (backend/mailops.py)
   role_not_candidate: "folder.err.not_candidate",
   role_ambiguous: "folder.err.ambiguous",
+  move_unsafe: "folder.err.move_unsafe",
   not_lookalike: "folder.err.not_lookalike",
 };
 
@@ -174,9 +181,9 @@ export const api = {
   unsubscribeAck: (addr: string, done = true) =>
     req<{ status?: string; ok?: boolean }>("/api/unsubscribe/ack",
       { addr, done }),
-  undo: (index = -1, ident?: UndoIdent) =>
+  undo: (index = -1, ident?: UndoIdent, account?: string) =>
     req<{ restored: number; of: number; rescan: boolean }>(
-      "/api/undo", ident ? { index, ident } : { index }),
+      forAccount("/api/undo", account), ident ? { index, ident } : { index }),
   emptyTrash: (counted: { uv: number; max_uid: number }) =>
     req<{ deleted: number }>("/api/empty_trash", counted),
   cancel: (target: "scan" | "ai" | "delete" | "atts" | "unsub" | "index") =>
@@ -193,15 +200,18 @@ export const api = {
     req<FoldersResp>(account
       ? `/api/folders?account=${encodeURIComponent(account)}`
       : "/api/folders"),
-  setFolderRole: (role: string, folder: string) =>
+  setFolderRole: (role: string, folder: string, account?: string) =>
     req<{ role: string; folder: string | null; source: string | null }>(
-      "/api/folders/role", { role, folder }),
-  lookalike: (folder: string) =>
-    req<LookalikeCount>(`/api/folders/lookalike?folder=${encodeURIComponent(folder)}`),
-  moveLookalike: (folder: string, uv: number, max_uid: number) =>
+      forAccount("/api/folders/role", account), { role, folder }),
+  lookalike: (folder: string, account?: string) =>
+    req<LookalikeCount>(forAccount(
+      `/api/folders/lookalike?folder=${encodeURIComponent(folder)}`, account)),
+  moveLookalike: (folder: string, uv: number, max_uid: number,
+                  account?: string) =>
     req<{ moved: number; target?: string; role?: string;
           undo: UndoIdent | null }>(
-      "/api/folders/move_contents", { folder, uv, max_uid }),
+      forAccount("/api/folders/move_contents", account),
+      { folder, uv, max_uid }),
   exportUrl: (grouping: Grouping, keys?: string[]) =>
     withAccount(`/api/export?grouping=${grouping}`
       + (keys?.length

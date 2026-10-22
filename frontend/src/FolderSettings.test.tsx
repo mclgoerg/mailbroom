@@ -35,9 +35,10 @@ const special = (role: string, raw: string,
     ...over });
 
 const reload = vi.fn();
-const mount = (data: FoldersResp, included = new Set<string>(["INBOX"])) =>
+const mount = (data: FoldersResp, included = new Set<string>(["INBOX"]),
+  account = "default") =>
   render(<ToastProvider><DialogProvider>
-    <FolderSettings data={data} included={included} setIncluded={() => {}}
+    <FolderSettings account={account} data={data} included={included} setIncluded={() => {}}
       wildcards={[]} setWildcards={() => {}} reload={reload} />
   </DialogProvider></ToastProvider>);
 
@@ -120,7 +121,7 @@ test("folders are nested by the LIST delimiter, decoded", () => {
 test("ticking a scanned folder reports the change", () => {
   const setIncluded = vi.fn();
   render(<ToastProvider><DialogProvider>
-    <FolderSettings data={provider()} included={new Set(["INBOX"])}
+    <FolderSettings account="default" data={provider()} included={new Set(["INBOX"])}
       setIncluded={setIncluded} wildcards={[]} setWildcards={() => {}}
       reload={reload} /></DialogProvider></ToastProvider>);
   fireEvent.click(screen.getByLabelText("Projects"));
@@ -148,7 +149,7 @@ test("an ambiguous role shows the candidates with counts and a Select", () => {
   const select = screen.getByLabelText("Which folder is your Trash folder?");
   expect((select as HTMLSelectElement).value).toBe("");     // unconfirmed
   const opts = within(select).getAllByRole("option").map((o) => o.textContent);
-  expect(opts).toEqual(["Choose…", "Deleted Items (3 mails)",
+  expect(opts).toEqual(["Not confirmed yet - choose…", "Deleted Items (3 mails)",
     "Trash (1 mail)"]);
   expect(screen.getByText(/the one permanent actions will use/)).toBeTruthy();
 });
@@ -159,7 +160,7 @@ test("choosing a candidate saves it and reloads the list", async () => {
   mount(ambiguous());
   fireEvent.change(screen.getByLabelText("Which folder is your Trash folder?"),
     { target: { value: "Trash" } });
-  await waitFor(() => expect(setRole).toHaveBeenCalledWith("trash", "Trash"));
+  await waitFor(() => expect(setRole).toHaveBeenCalledWith("trash", "Trash", "default"));
   await waitFor(() => expect(reload).toHaveBeenCalled());
   expect(await screen.findByText(/Trash folder set to/)).toBeTruthy();
 });
@@ -183,7 +184,7 @@ test("a confirmed role says permanent actions use it and can be reset",
     expect((screen.getByLabelText("Which folder is your Trash folder?") as
       HTMLSelectElement).value).toBe("Trash");
     fireEvent.click(screen.getByRole("button", { name: "Use automatic choice" }));
-    await waitFor(() => expect(setRole).toHaveBeenCalledWith("trash", ""));
+    await waitFor(() => expect(setRole).toHaveBeenCalledWith("trash", "", "default"));
   });
 
 const withLookalike = (over: Partial<SpecialRole> = {}): FoldersResp => ({
@@ -220,11 +221,12 @@ test("moving a look-alike: confirm with the count, then a toast with Undo",
     expect(moveLookalike).not.toHaveBeenCalled();
     await pressDialog("Move 3 mails");
     await waitFor(() => expect(moveLookalike)
-      .toHaveBeenCalledWith("Deleted Items", 7, 12));   // exactly what was counted
+      .toHaveBeenCalledWith("Deleted Items", 7, 12, "default"));   // exactly what was counted
     expect(await screen.findByText("Moved 3 mails to Trash.")).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Undo" }));
     await waitFor(() => expect(undo).toHaveBeenCalledWith(-1,
-      { ts: 5, label: "Deleted Items", count: 3 }));    // that entry, by identity
+      { ts: 5, label: "Deleted Items", count: 3 }, "default"));   // that entry, by identity
+    expect(await screen.findByText("Moved 3 mails back.")).toBeTruthy();
   });
 
 test("cancelling the confirm moves nothing", async () => {
@@ -274,4 +276,88 @@ test("German: tag and action use the translated role name", () => {
   expect(screen.getByText("sieht auch aus wie „Papierkorb“")).toBeTruthy();
   expect(screen.getByRole("button",
     { name: "Inhalt nach „Papierkorb“ verschieben" })).toBeTruthy();
+});
+
+test("every call is pinned to the account being edited", async () => {
+  setRole.mockResolvedValue({});
+  lookalike.mockResolvedValue({ role: "trash", target: "Trash",
+    target_name: "Trash", count: 2, uv: 3, max_uid: 4 });
+  moveLookalike.mockResolvedValue({ moved: 2, undo:
+    { ts: 9, label: "Deleted Items", count: 2 } });
+  undo.mockResolvedValue({ restored: 2, of: 2, rescan: false });
+  mount({ ...withLookalike(), special: [special("trash", "Trash", {
+    source: "name", ambiguous: true, choices: [
+      { raw: "Trash", name: "Trash", count: 1 },
+      { raw: "Bin", name: "Bin", count: 1 }] })] },
+  new Set(), "icloud");
+  fireEvent.change(screen.getByLabelText("Which folder is your Trash folder?"),
+    { target: { value: "Bin" } });
+  await waitFor(() => expect(setRole)
+    .toHaveBeenCalledWith("trash", "Bin", "icloud"));
+  cleanup();
+  mount(withLookalike(), new Set(), "icloud");
+  fireEvent.click(screen.getByRole("button",
+    { name: "Move contents to Trash" }));
+  await pressDialog("Move 2 mails");
+  await waitFor(() => expect(moveLookalike)
+    .toHaveBeenCalledWith("Deleted Items", 3, 4, "icloud"));
+  expect(lookalike).toHaveBeenCalledWith("Deleted Items", "icloud");
+  fireEvent.click(await screen.findByRole("button", { name: "Undo" }));
+  await waitFor(() => expect(undo).toHaveBeenCalledWith(-1,
+    { ts: 9, label: "Deleted Items", count: 2 }, "icloud"));
+});
+
+test("confirming the folder Mailbroom already picked saves it", async () => {
+  setRole.mockResolvedValue({});
+  mount(ambiguous());          // pick = "Deleted Items", not confirmed yet
+  const select = screen.getByLabelText(
+    "Which folder is your Trash folder?") as HTMLSelectElement;
+  expect(select.value).toBe("");
+  expect(within(select).getByText(/Not confirmed yet/)).toBeTruthy();
+  fireEvent.change(select, { target: { value: "Deleted Items" } });
+  await waitFor(() => expect(setRole)
+    .toHaveBeenCalledWith("trash", "Deleted Items", "default"));
+});
+
+test("an Archive look-alike is listed once, tickable", () => {
+  mount({ wildcards: [], special: [special("archive", "Archive"),
+    special("trash", "Trash")], folders: [folder("INBOX"),
+    folder("Archive", { role: "archive" }),
+    folder("Archives 2020", { looks_like: "archive" }),
+    folder("Trash", { role: "trash" })] });
+  const boxes = screen.getAllByLabelText(/Archives 2020/);
+  expect(boxes).toHaveLength(1);
+  expect((boxes[0] as HTMLInputElement).disabled).toBe(false);
+  expect(screen.queryByText(/also looks like Archive/)).toBeNull();
+});
+
+test("All mail is listed as a view, not as a role row", () => {
+  mount({ wildcards: [], special: [special("all", "[Gmail]/All Mail"),
+    special("trash", "Trash")], folders: [folder("INBOX"),
+    folder("[Gmail]/All Mail", { role: "all", excluded: true }),
+    folder("Trash", { role: "trash" })] });
+  expect(document.querySelector('[data-role="all"]')).toBeNull();
+  expect(screen.getByText("[Gmail]/All Mail")).toBeTruthy();
+  expect(screen.getByText(/Views of other folders - never scanned/))
+    .toBeTruthy();
+  expect(screen.queryByLabelText(/All Mail/)).toBeNull();
+});
+
+const pad = (label: string) => screen.getByLabelText(label)
+  .closest<HTMLElement>("span[style]")!.style.paddingInlineStart;
+
+test("nesting follows a '.' delimiter (Dovecot INBOX.)", () => {
+  mount({ wildcards: [], folders: [folder("INBOX", { delim: "." }),
+    folder("INBOX.Work", { delim: "." }),
+    folder("INBOX.Work.Reports", { delim: "." })] });
+  expect(pad("INBOX")).toBe("0rem");
+  expect(pad("Work")).toBe("1.25rem");
+  expect(pad("Reports")).toBe("2.5rem");
+});
+
+test("folders without a delimiter (NIL) stay flat", () => {
+  mount({ wildcards: [], folders: [folder("INBOX", { delim: null }),
+    folder("Work.Reports", { delim: null }), folder("Work", { delim: null })] });
+  expect(pad("Work")).toBe("0rem");
+  expect(pad("Work.Reports")).toBe("0rem");
 });

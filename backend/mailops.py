@@ -90,6 +90,7 @@ ALL_PINNED = "all_pinned"            # delete_groups: nothing but pinned mails
 ROLE_NOT_CANDIDATE = "role_not_candidate"  # set_role_override: not that role's
 ROLE_AMBIGUOUS = "role_ambiguous"    # lookalike_*: choose the role folder first
 NOT_LOOKALIKE = "not_lookalike"      # lookalike_*: no look-alike of a role
+MOVE_UNSAFE = "move_unsafe"          # lookalike_*: server has no MOVE/UIDPLUS
 UNDO_MAX = 10
 
 # All mutable mail state lives in per-account AccountState objects (see
@@ -2998,6 +2999,10 @@ def undo_last(index: int = -1, acc=None, ident: dict | None = None) -> dict:
     auditlog.record(
         "undo", account=acc.name, count=restored, label=entry["label"],
         outcome="ok" if restored == entry["count"] else "partial")
+    if entry.get("action") == "move_contents":
+        # the mails went back to a folder that is never scanned: nothing
+        # in the index changes, so no rescan and no "rescan" notice
+        return {"restored": restored, "of": entry["count"], "rescan": False}
     rescan = _rescan_after_restore(acc, restored, "restored", {
         "restored": restored, "of": entry["count"], "label": entry["label"]})
     return {"restored": restored, "of": entry["count"], "rescan": rescan}
@@ -3359,6 +3364,11 @@ def _lookalike_target(conn, folder: str, acc) -> tuple[str, str]:
         raise ValueError(NOT_LOOKALIKE)
     if role in found["ambiguous"]:
         raise ValueError(ROLE_AMBIGUOUS)
+    if not (_supports_move(conn) or _supports_uidplus(conn)):
+        # the COPY + plain EXPUNGE fallback of _uid_move would also remove
+        # other clients' \\Deleted mail from the folder (e.g. mail that
+        # arrived after the count): refuse rather than risk it
+        raise ValueError(MOVE_UNSAFE)
     return role, target
 
 

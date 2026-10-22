@@ -183,17 +183,28 @@ export function SettingsModal({ cfg, account, onClose, onSaved,
 
   // Folder discovery is PER ACCOUNT (each provider names folders
   // differently) and needs that account's SAVED credentials.
-  const discoverFolders = (name: string) => {
+  // `merge` (a reload after a role choice or a move) keeps the ticks and
+  // wildcard chips the user already changed instead of resetting them.
+  const touched = useRef(new Set<string>());
+  const discoverFolders = (name: string, merge = false) => {
+    if (!merge) touched.current.clear();
     setFolders(null);
     setFoldersErr("");
     api.folders(name)
       .then((r) => {
         setFolders(r);
-        setWildcards(r.wildcards);
-        setIncluded(new Set(
-          r.folders.filter((x) => !x.excluded).map((x) => x.raw)));
+        if (!merge) setWildcards(r.wildcards);
+        setIncluded((prev) => new Set(r.folders
+          .filter((x) => merge && touched.current.has(x.raw)
+            ? prev.has(x.raw) : !x.excluded)
+          .map((x) => x.raw)));
       })
       .catch((e) => setFoldersErr(String(e.message ?? e)));
+  };
+  const tick = (next: Set<string>) => {
+    for (const raw of new Set([...included, ...next]))
+      if (included.has(raw) !== next.has(raw)) touched.current.add(raw);
+    setIncluded(next);
   };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { discoverFolders(editAcct); }, [editAcct]);
@@ -749,10 +760,10 @@ export function SettingsModal({ cfg, account, onClose, onSaved,
             </div>
           )}
           {folders && (
-            <FolderSettings data={folders} included={included}
-              setIncluded={setIncluded} wildcards={wildcards}
+            <FolderSettings account={editAcct} data={folders}
+              included={included} setIncluded={tick} wildcards={wildcards}
               setWildcards={setWildcards}
-              reload={() => discoverFolders(editAcct)} />
+              reload={() => discoverFolders(editAcct, true)} />
           )}
         </div>
 
