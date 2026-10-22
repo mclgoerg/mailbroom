@@ -491,8 +491,7 @@ test("an empty filter says ALL senders in the editor help, the card, the " +
   pickScope("trash");
   expect(screen.getByText(/An empty filter means ALL senders/)).toBeTruthy();
   for (const fam of ["tag:", "ai:", "eng:", "att:", "is:", "has:"]) {
-    expect(screen.getByText(new RegExp(`${fam.replace(":", ":")}`)), fam)
-      .toBeTruthy();
+    expect(screen.getByText(new RegExp(fam)), fam).toBeTruthy();
   }
 });
 
