@@ -264,6 +264,20 @@ test("Notice shows its text and icon and can be dismissed", () => {
   expect(onClose).toHaveBeenCalledOnce();
 });
 
+test("Notice has a neutral default and a danger tone for irreversible warnings", () => {
+  const { rerender } = render(<Notice icon={<i data-testid="ic" />}>Plain</Notice>);
+  let box = screen.getByText("Plain").closest<HTMLElement>('[role="status"]')!;
+  expect(box.className).toContain("bg-panel2");
+  expect(box.className).not.toContain("bg-keep-bg");
+  expect(screen.getByTestId("ic").parentElement!.className).toContain("text-muted");
+  rerender(<Notice tone="danger" icon={<i data-testid="ic" />}>Careful</Notice>);
+  box = screen.getByText("Careful").closest<HTMLElement>('[role="status"]')!;
+  expect(box.className).toContain("bg-keep-bg");
+  expect(box.className).toContain("text-keep-fg");
+  expect(box.className).not.toContain("bg-panel2");
+  expect(screen.getByTestId("ic").parentElement!.className).toContain("text-keep-fg");
+});
+
 function ToastHarness({ opts }: { opts?: Parameters<ReturnType<typeof useToast>["show"]>[1] }) {
   const toast = useToast();
   return <button onClick={() => toast.show("Saved", opts)}>fire</button>;
