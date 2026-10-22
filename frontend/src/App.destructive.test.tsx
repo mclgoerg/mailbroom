@@ -30,6 +30,13 @@ vi.mock("./api", () => ({
       if (trashFails) throw new Error("imap down");
       return { folder: "Trash", uv: 1, total: trashTotal, max_uid: 40, mails: [] };
     },
+    // the Folders panel's listing (same Trash)
+    foldersPanel: async () => {
+      if (trashGate) await trashGate;
+      if (trashFails) throw new Error("imap down");
+      return { folder: "Trash", uv: 1, total: trashTotal, max_uid: 40,
+        mails: [], senders: [] };
+    },
     logout: () => Promise.resolve(),
     exportUrl: (mode: string, keys?: string[]) =>
       `/api/export?grouping=${mode}`

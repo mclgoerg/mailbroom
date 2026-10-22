@@ -5,6 +5,7 @@ import type {
   Config, ConversationResp, DupSet, FilterPreset, FoldersResp, Grouping, IndexInfo,
   Mail, MessageDetail,
   MailsResp, Rule, RuleRun, SearchResp, SortEstimate, StatsResp, TrashResp,
+  FolderMoveResp, FolderRole,
   UnsubBulkResult, UnsubResult,
 } from "./types";
 
@@ -57,6 +58,7 @@ export function saveBlob(name: string, blob: Blob): void {
 const ERROR_CODES: Record<string, string> = {
   no_message_id: "pin.no_message_id",
   pinned_mails: "pin.refused",
+  protected_mails: "fp.protected_refused",
   all_pinned: "toast.all_pinned",
   // private sender knowledge (backend/knowledgestore.py)
   knowledge_bad_request: "know.err.bad_request",
@@ -83,7 +85,10 @@ async function req<T>(path: string, body?: unknown,
       /* plain text */
     }
     const code = ERROR_CODES[detail];
-    throw new Error(code ? t(code) : detail || `HTTP ${res.status}`);
+    const err: Error & { code?: string } =
+      new Error(code ? t(code) : detail || `HTTP ${res.status}`);
+    if (code) err.code = detail;
+    throw err;
   }
   return res.json() as Promise<T>;
 }
@@ -219,6 +224,12 @@ export const api = {
     req<AuditResp>(`/api/audit?offset=${offset}&limit=${limit}`),
   auditExportUrl: () => withAccount("/api/audit/export"),
   trash: () => req<TrashResp>("/api/trash"),
+  foldersPanel: (role: FolderRole) =>
+    req<TrashResp>(`/api/folders_panel?role=${role}`),
+  folderMove: (role: FolderRole, action: "not_junk" | "trash",
+               uids: number[], uv: number, force = false) =>
+    req<FolderMoveResp>("/api/folders_panel/move",
+      { role, action, uids, uv, force }),
   trashRestore: (uids: number[], dest: string, uv: number) =>
     req<{ restored: number; rescan: boolean }>("/api/trash/restore", { uids, dest, uv }),
   testConnection: () =>

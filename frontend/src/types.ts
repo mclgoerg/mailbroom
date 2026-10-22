@@ -163,12 +163,33 @@ export interface DupSet {
   mails: Mail[];    // newest first
 }
 
+export interface SenderGroup {
+  addr: string;
+  count: number;
+  size: number;
+  unread: number;
+  ts: number;
+  date: string;
+  uids: number[];
+}
+
 export interface TrashResp {
   folder: string;
   uv: number;
   total: number;
   max_uid: number;
   mails: Mail[];
+  /** whole folder grouped by sender (folders panel listing) */
+  senders?: SenderGroup[];
+}
+
+export type FolderRole = "junk" | "trash";
+
+export interface FolderMoveResp {
+  moved: number;
+  rescan: boolean;
+  senders: string[];
+  undo: { ts: number; label: string; count: number } | null;
 }
 
 export interface StatsResp {
@@ -257,8 +278,10 @@ export interface AppState {
   atts: AttsState;
   unsub: UnsubState;
   trash_count: number | null;
+  junk_count?: number | null;
   notice: { key: string; params: Record<string, string | number> } | null;
-  undo: { ts: number; label: string; count: number; action: string }[];
+  undo: { ts: number; label: string; count: number; action: string;
+    quiet?: boolean }[];
   folders_raw: string[];
   rules: Rule[];
   presets: FilterPreset[];

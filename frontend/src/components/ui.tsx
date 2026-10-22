@@ -900,12 +900,14 @@ export function ChipSegment({ on = false, children, className = "", ...rest }:
  *  the solid accent that belongs to the one primary Button. `fill` makes
  *  the row full-width, segments sized to their content (`flex-auto`). */
 export function Segmented<T extends string>({ value, onChange, options,
-  label, fill = false, className = "", idPrefix }: {
+  label, fill = false, tall = false, className = "", idPrefix }: {
   value: T | null;
   onChange: (v: T) => void;
   options: { value: T; label: ReactNode }[];
   label: string;
   fill?: boolean;
+  /** 44 px tall segments (phone sheets with big touch targets). */
+  tall?: boolean;
   className?: string;
   /** Wires the tabs to a panel: tab ids `${idPrefix}-tab-${value}`, and the
    *  selected one gets `aria-controls="${idPrefix}-panel"` (render the panel
@@ -939,7 +941,8 @@ export function Segmented<T extends string>({ value, onChange, options,
             aria-controls={idPrefix && on ? `${idPrefix}-panel` : undefined}
             tabIndex={o.value === tabStop ? 0 : -1}
             onClick={() => onChange(o.value)}
-            className={`min-h-9 coarse:min-h-10 min-w-0 whitespace-nowrap
+            className={`${tall ? "min-h-11 coarse:min-h-11"
+              : "min-h-9 coarse:min-h-10"} min-w-0 whitespace-nowrap
               px-1.5 transition-colors type-meta md:type-body md:px-2 lg:px-3
               focus-visible:-outline-offset-2 enabled:active:translate-y-px
               first:rounded-l-control last:rounded-r-control
@@ -1003,6 +1006,8 @@ export type ToastVariant = "info" | "success" | "error";
 export type ToastOptions = {
   variant?: ToastVariant;
   action?: { label: string; onClick: () => void };
+  /** A second button next to `action` (e.g. Undo + Protect sender). */
+  action2?: { label: string; onClick: () => void };
   /** ms before auto-dismiss; 0 = stay until closed. Default 8000, and
    *  errors stay by default. */
   duration?: number;
@@ -1035,7 +1040,7 @@ const TOAST_ICON = { info: Info, success: CheckCircle2, error: AlertCircle };
 function ToastView({ toast, dismiss }: {
   toast: ToastItem; dismiss: (id: number) => void;
 }) {
-  const { variant = "info", action, duration, id } = toast;
+  const { variant = "info", action, action2, duration, id } = toast;
   const ms = duration ?? (variant === "error" ? 0 : TOAST_MS);
   const box = useRef<HTMLDivElement>(null);
   // The toast is about to unmount: if the user had focused one of its
@@ -1062,12 +1067,13 @@ function ToastView({ toast, dismiss }: {
       <Icon size={16} aria-hidden className={`shrink-0 ${variant === "error"
         ? "text-danger-fg" : ""}`} />
       <div className="min-w-0 flex-1 py-1">{toast.message}</div>
-      {action && (
-        <Button variant="quiet" size="sm" className="shrink-0 !text-inherit"
-          onClick={() => { action.onClick(); onDismiss(); }}>
-          {action.label}
+      {[action, action2].map((a) => a && (
+        <Button key={a.label} variant="quiet" size="sm"
+          className="shrink-0 !text-inherit"
+          onClick={() => { a.onClick(); onDismiss(); }}>
+          {a.label}
         </Button>
-      )}
+      ))}
       <Button variant="quiet" size="icon" label={t("Dismiss")}
         className="shrink-0 !text-inherit" onClick={onDismiss}>
         <X size={18} />

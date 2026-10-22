@@ -85,6 +85,7 @@ ACTIONS = ("trash", "archive", "move", "mark_read")
 # texts (frontend/src/api.ts ERROR_CODES) instead of showing raw English.
 NO_MESSAGE_ID = "no_message_id"      # set_pin: nothing stable to key a pin on
 PINNED_MAILS = "pinned_mails"        # delete_messages: needs force
+PROTECTED_MAILS = "protected_mails"  # role_move trash: needs force
 ALL_PINNED = "all_pinned"            # delete_groups: nothing but pinned mails
 UNDO_MAX = 10
 
@@ -212,6 +213,7 @@ def save_snapshot(acc) -> None:
             "folder_uv": acc.folder_uv,
             "folder_roles": acc.folder_roles,
             "trash_count": acc.state["trash_count"],
+            "junk_count": acc.state["junk_count"],
             "index": list(acc.index.values()),
             "label_copies": list(acc.label_copies.values()),
             "role_index": {r: list(ix.values())
@@ -287,6 +289,7 @@ def load_snapshot(acc) -> bool:
             acc.state["folders"] = data.get("folders") or []
             acc.state["folders_raw"] = data.get("folders_raw") or []
             acc.state["trash_count"] = data.get("trash_count")
+            acc.state["junk_count"] = data.get("junk_count")
             acc.state["scanned_ts"] = data.get("ts")
             acc.state["status"] = "done"
             acc.state["groups_rev"] += 1
@@ -357,7 +360,9 @@ def cancel_requested(target: str, acc=None) -> bool:
 
 def _undo_summaries(acc) -> list[dict]:
     return [{"ts": u["ts"], "label": u["label"], "count": u["count"],
-             "action": u.get("action", "trash")}
+             "action": u.get("action", "trash"),
+             # the Folders panel toasts these itself; absent = ordinary
+             **({"quiet": True} if u.get("quiet") else {})}
             for u in acc.undo_log]
 
 
@@ -1883,6 +1888,7 @@ def run_scan(acc=None) -> None:
             if gm:
                 messages, copies = dedupe_gmail_labels(messages)
             trash_count = folder_message_count(conn, roles.get("trash"))
+            junk_count = folder_message_count(conn, roles.get("junk"))
             replied = load_replied(acc)
             new_replied = scan_sent_recipients(conn, progress_cb, roles, acc)
             if new_replied - replied:
@@ -1908,6 +1914,7 @@ def run_scan(acc=None) -> None:
                 acc.state["status"] = "done"
                 acc.state["progress"] = ""
                 acc.state["trash_count"] = trash_count
+                acc.state["junk_count"] = junk_count
                 acc.state["folders_raw"] = folders
                 if cached and not acc.state["notice"]:
                     acc.state["notice"] = {"key": "cached_verdicts",
@@ -2119,8 +2126,11 @@ def _move_uids(by_folder: dict[str, set[int]], action: str, dest: str,
             # UIDVALIDITY changed since the scan -> our UIDs may point at
             # different messages now. Refuse rather than trash blindly.
             uv = uidvalidity(conn)
-            if acc.folder_uv.get(folder) not in (None, 0) and uv \
-                    and uv != acc.folder_uv[folder]:
+            expected = acc.folder_uv.get(folder)
+            if not expected:       # a role folder: its index remembers it
+                role = role_of_folder(folder, acc)
+                expected = role_uvalidity(role, folder, acc) if role else 0
+            if expected and uv and uv != expected:
                 raise RuntimeError(
                     f"mailbox {decode_mutf7(folder)!r} changed on the server "
                     "(UIDVALIDITY mismatch) - rescan before deleting")
@@ -2201,8 +2211,10 @@ def _apply_seen(folder: str, uids: list[int], acc) -> None:
 
 
 def _record_undo(label: str, meta: dict, action: str, dest: str,
-                 acc) -> None:
-    """Append a move job to the undo log (acc.lock held)."""
+                 acc, quiet: bool = False) -> None:
+    """Append a move job to the undo log (acc.lock held). `quiet` = the
+    caller shows its own toast (Folders panel), so the UI's generic "moved
+    N" toast for new undo entries stays silent."""
     items = [(folder, m["msgid"])
              for folder, by_uid in meta.items()
              for m in by_uid.values() if m.get("msgid")]
@@ -2210,7 +2222,7 @@ def _record_undo(label: str, meta: dict, action: str, dest: str,
         return
     acc.undo_log.append({"ts": int(time.time()), "label": label,
                          "action": action, "count": len(items),
-                         "items": items, "in": dest})
+                         "items": items, "in": dest, "quiet": quiet})
     del acc.undo_log[:-UNDO_MAX]
     acc.state["undo"] = _undo_summaries(acc)
 
@@ -2946,9 +2958,18 @@ def undo_last(index: int = -1, acc=None) -> dict:
 
     log.info("undo: restored %d/%d mails (%s)", restored, entry["count"],
              entry["label"])
+    # The mails went back to where they came from: when that is a role
+    # folder (Undo of "Not junk"), its count grows again and its index
+    # (refreshed incrementally the next time the view opens) is stale.
+    back_roles = {role_of_folder(f, acc) for f, _ in entry["items"]
+                  if f != trash} & ROLE_COUNTED.keys()
     with acc.lock:
         if acc.state["trash_count"] is not None:
             acc.state["trash_count"] = max(0, acc.state["trash_count"] - restored)
+        for role in back_roles:
+            key = ROLE_COUNTED[role]
+            if acc.state[key] is not None:
+                acc.state[key] += restored
     auditlog.record(
         "undo", account=acc.name, count=restored, label=entry["label"],
         outcome="ok" if restored == entry["count"] else "partial")
@@ -2964,6 +2985,8 @@ def undo_last(index: int = -1, acc=None) -> dict:
 # refreshes it incrementally; moves out of the folder keep it consistent.
 
 ROLE_LABELS = {"trash": "Trash", "junk": "Junk"}
+# state key of each role's header count (post-scan STATUS, like trash_count)
+ROLE_COUNTED = {"trash": "trash_count", "junk": "junk_count"}
 
 
 def refresh_role_index(conn, role: str, folder: str,
@@ -3049,11 +3072,30 @@ def role_drop(role: str, folder: str, uids, acc=None) -> None:
                 index.pop(ikey(folder, int(u)), None)
 
 
+def role_senders(mails: list[dict]) -> list[dict]:
+    """Sender grouping of a role listing (light: sender address only - no
+    Smart rows, no AI, no known senders). Biggest groups first."""
+    groups: dict[str, dict] = {}
+    for m in mails:
+        g = groups.setdefault(m["addr"], {
+            "addr": m["addr"], "count": 0, "size": 0, "unread": 0,
+            "ts": 0, "date": "", "uids": []})
+        g["count"] += 1
+        g["size"] += m["size"]
+        g["unread"] += 0 if m["seen"] else 1
+        g["uids"].append(m["uid"])
+        if m["ts"] >= g["ts"]:
+            g["ts"], g["date"] = m["ts"], m["date"]
+    for g in groups.values():
+        g["uids"].sort()
+    return sorted(groups.values(), key=lambda g: (-g["count"], g["addr"]))
+
+
 def role_list(role: str, limit: int = 1000, acc=None) -> dict:
     """Live listing of a role folder through its incremental index. The
     returned uv (and, for Empty, max_uid / total) describe the listing just
     read from the server and must be sent back on restore / empty so we never
-    act on stale UIDs."""
+    act on stale UIDs. `senders` groups the WHOLE folder by sender."""
     acc = acc or accounts.get()
     label = ROLE_LABELS.get(role, role)
     conn = connect(cfgmod.account_imap(acc.name), acc.name)
@@ -3068,9 +3110,14 @@ def role_list(role: str, limit: int = 1000, acc=None) -> dict:
         except Exception:
             pass
     messages.sort(key=lambda m: -m["ts"])
+    key = ROLE_COUNTED.get(role)
+    if key:
+        with acc.lock:
+            acc.state[key] = len(messages)
     return {"folder": folder, "uv": uv,
             "total": len(messages),
             "max_uid": max((m["uid"] for m in messages), default=0),
+            "senders": role_senders(messages),
             "mails": [{"uid": m["uid"], "folder": folder, "date": m["date"],
                        "ts": m["ts"], "subject": m["subject"],
                        "addr": m["addr"], "size": m["size"],
@@ -3081,11 +3128,109 @@ def role_list(role: str, limit: int = 1000, acc=None) -> dict:
 def trash_list(limit: int = 1000, acc=None) -> dict:
     """Live Trash contents (Trash stays out of the cleanup index; it has its
     own incremental role index)."""
+    return role_list("trash", limit, acc)
+
+
+# Role move actions: (source role, action) -> what it does. Both are plain
+# reversible MOVEs through `_move_uids`; permanent deletion is not here.
+ROLE_MOVES = {("junk", "not_junk"), ("junk", "trash")}
+
+
+def role_move(role: str, action: str, uids: list[int], uv: int = 0,
+              force: bool = False, acc=None) -> dict:
+    """Move exact UIDs out of a role folder: `not_junk` -> INBOX (a rescue:
+    protected senders are not blocked, that is the point), `trash` -> the
+    Trash role (protected senders / pinned mails need `force`, like every
+    other Trash move). UIDVALIDITY is checked against the listing the UI
+    saw and the live folder; the move is undoable (the undo log entry is
+    quiet: the panel shows its own toast) and audited. An ambiguous role
+    uses the deterministic pick (reversible moves only)."""
     acc = acc or accounts.get()
-    out = role_list("trash", limit, acc)
+    if (role, action) not in ROLE_MOVES:
+        raise ValueError("bad action")
+    label = ROLE_LABELS.get(role, role)
     with acc.lock:
-        acc.state["trash_count"] = out["total"]
-    return out
+        if acc.state["delete"]["status"] == "running":
+            raise RuntimeError("busy: an action is running")
+    clean = sorted({int(u) for u in uids})
+    conn = connect(cfgmod.account_imap(acc.name), acc.name)
+    try:
+        roles = folder_roles(conn, acc)
+        src = roles.get(role)
+        if not src:
+            raise RuntimeError(f"No {label} folder found on the server")
+        if action == "not_junk":
+            inbox = next((f for f in list_folders(conn)
+                          if f.upper() == "INBOX"), None)
+            if not inbox:
+                raise RuntimeError("No Inbox found on the server")
+            dest, move_action = inbox, "move"
+        else:
+            dest, move_action = _resolve_dest(conn, "trash", "", acc), "trash"
+    finally:
+        try:
+            conn.logout()
+        except Exception:
+            pass
+    cached_uv, mails = role_state(role, src, acc)
+    if uv and cached_uv and uv != cached_uv:
+        raise RuntimeError(f"{label} changed on the server - reload it "
+                           "before moving")
+    known = {m["uid"]: m for m in mails if m["folder"] == src}
+    clean = [u for u in clean if u in known]     # exact, known UIDs only
+    if not clean:
+        raise RuntimeError("no known messages selected")
+    if action == "trash" and not force:
+        pinned = pinstore.load_account(acc.name)
+        if any(known[u]["msgid"] in pinned for u in clean
+               if known[u].get("msgid")):
+            raise ValueError(PINNED_MAILS)
+        plist = cfgmod.normalize_protected(
+            cfgmod.load_config().get("protected"))
+        if plist and any(cfgmod.is_protected(known[u]["addr"], plist)
+                         for u in clean):
+            raise ValueError(PROTECTED_MAILS)
+    moved_uids: dict[str, set[int]] = {}
+    error: Exception | None = None
+    try:
+        _move_uids({src: set(clean)}, move_action, dest, acc,
+                   moved_uids=moved_uids)
+    except Exception as exc:            # fold in what DID move, then raise
+        error = exc
+    moved = moved_uids.get(src, set())
+    meta = {src: {u: known[u] for u in moved}} if moved else {}
+    size = sum(m["size"] for m in meta.get(src, {}).values())
+    if moved:
+        role_drop(role, src, moved, acc)
+        with acc.lock:
+            _record_undo(f"{len(moved)} mails from {label}", meta,
+                         move_action, dest, acc, quiet=True)
+            key = ROLE_COUNTED.get(role)
+            if key and acc.state[key] is not None:
+                acc.state[key] = max(0, acc.state[key] - len(moved))
+            if action == "trash" and acc.state["trash_count"] is not None:
+                acc.state["trash_count"] += len(moved)
+        statsmod.record_action(move_action, len(moved), size, acc.name)
+        save_snapshot(acc)
+    auditlog.record(
+        move_action, account=acc.name, count=len(moved), size=size,
+        label=f"{len(moved)} mails from {label}",
+        outcome="error" if error else "ok",
+        error=f"{type(error).__name__}: {error}" if error else "")
+    if error:
+        raise error
+    rescan = False
+    if action == "not_junk":
+        # They come back as NEW inbox UIDs: an incremental scan shows them.
+        rescan = _rescan_after_restore(acc, len(moved), "junk_rescued", {
+            "n": len(moved)})
+    log.info("%s: %d mails -> %r", action, len(moved), decode_mutf7(dest))
+    with acc.lock:
+        last = acc.undo_log[-1] if moved and acc.undo_log else None
+        undo = ({"ts": last["ts"], "label": last["label"],
+                 "count": last["count"]} if last else None)
+    return {"moved": len(moved), "rescan": rescan, "undo": undo,
+            "senders": sorted({known[u]["addr"] for u in moved})}
 
 
 def trash_restore(uids: list[int], dest: str, uv: int = 0,
