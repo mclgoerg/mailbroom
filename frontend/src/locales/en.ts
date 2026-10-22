@@ -760,6 +760,57 @@ export const EN: Record<string, string> = {
     "Looks like a second special folder (another folder already holds "
     + "that role) - never scanned, so its mail is not offered for cleanup",
   "folder.view": "view",
+  "role.trash": "Trash",
+  "role.junk": "Junk",
+  "role.sent": "Sent",
+  "role.drafts": "Drafts",
+  "role.archive": "Archive",
+  "role.all": "All mail",
+  "folders.scan": "Folders to scan",
+  "folders.special": "Special folders",
+  "folders.special_hint":
+    "Not part of the cleanup scan. The folder shown for each role is the one "
+    + "Mailbroom moves mail into - and the one permanent actions use.",
+  "folders.none": "No folders found.",
+  "folder.src.flag": "server flag",
+  "folder.src.name": "by name",
+  "folder.src.override": "you chose",
+  "folder.view_row": "Views of other folders - never scanned",
+  "folder.archive_scanned": "Archive is still scanned - tick it below.",
+  "folder.ambiguous":
+    "More than one folder could be your {role} folder. Until you choose, "
+    + "Mailbroom uses \u201c{pick}\u201d for moves to {role} and refuses to "
+    + "delete permanently or empty it.",
+  "folder.choose": "Choose\u2026",
+  "folder.choose_label": "Which folder is your {role} folder?",
+  "folder.confirmed":
+    "You chose this folder. Permanent actions on {role} (such as Empty "
+    + "Trash) use exactly this one.",
+  "folder.choice_note":
+    "The folder you pick here is the one permanent actions will use.",
+  "folder.auto": "Use automatic choice",
+  "folder.choice_saved": "{role} folder set to \u201c{name}\u201d.",
+  "folder.choice_reset": "{role} folder is chosen automatically again.",
+  "folder.lookalike_tag": "also looks like {role}",
+  "folder.move_contents": "Move contents to {role}",
+  "folder.move_needs_choice": "Choose the {role} folder above first.",
+  "folder.move_title": "Move {n} mails to {role}?",
+  "folder.move_title_one": "Move 1 mail to {role}?",
+  "folder.move_body":
+    "The mails in \u201c{folder}\u201d are moved into \u201c{target}\u201d "
+    + "- not deleted. You can undo this right after.",
+  "folder.move_confirm": "Move {n} mails",
+  "folder.move_confirm_one": "Move 1 mail",
+  "folder.move_empty": "\u201c{folder}\u201d is empty - nothing to move.",
+  "folder.moved": "Moved {n} mails to {role}.",
+  "folder.moved_one": "Moved 1 mail to {role}.",
+  "folder.err.not_candidate": "That folder cannot be chosen for this role.",
+  "folder.err.ambiguous":
+    "Choose the right folder for this role first, then try again.",
+  "folder.err.not_lookalike":
+    "This folder no longer looks like a second special folder - reload the "
+    + "list.",
+  "audit.act.move_contents": "Folder contents moved",
   "audit.empty": "Nothing recorded yet",
   "audit.export": "Export audit log as CSV",
   "audit.by": "by {actor}",

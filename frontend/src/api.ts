@@ -4,9 +4,9 @@ import type {
   KnowledgeList, KnowledgeSaved, KnowledgeSrc,
   Config, ConversationResp, DupSet, FilterPreset, FoldersResp, Grouping, IndexInfo,
   Mail, MessageDetail,
-  MailsResp, Rule, RuleRun, SearchResp, SortEstimate, StatsResp, TrashResp,
+  LookalikeCount, MailsResp, Rule, RuleRun, SearchResp, SortEstimate, StatsResp, TrashResp,
   FolderMoveResp, FolderRole,
-  UnsubBulkResult, UnsubResult,
+  UndoIdent, UnsubBulkResult, UnsubResult,
 } from "./types";
 
 /* Active account: every API call is scoped to exactly one account (strict
@@ -68,6 +68,10 @@ const ERROR_CODES: Record<string, string> = {
   knowledge_full: "know.err.full",
   knowledge_ai_running: "know.err.ai_running",
   knowledge_unscanned: "know.err.unscanned",
+  // special-folder choices (backend/mailops.py)
+  role_not_candidate: "folder.err.not_candidate",
+  role_ambiguous: "folder.err.ambiguous",
+  not_lookalike: "folder.err.not_lookalike",
 };
 
 async function req<T>(path: string, body?: unknown,
@@ -170,9 +174,9 @@ export const api = {
   unsubscribeAck: (addr: string, done = true) =>
     req<{ status?: string; ok?: boolean }>("/api/unsubscribe/ack",
       { addr, done }),
-  undo: (index = -1) =>
+  undo: (index = -1, ident?: UndoIdent) =>
     req<{ restored: number; of: number; rescan: boolean }>(
-      "/api/undo", { index }),
+      "/api/undo", ident ? { index, ident } : { index }),
   emptyTrash: (counted: { uv: number; max_uid: number }) =>
     req<{ deleted: number }>("/api/empty_trash", counted),
   cancel: (target: "scan" | "ai" | "delete" | "atts" | "unsub" | "index") =>
@@ -189,6 +193,15 @@ export const api = {
     req<FoldersResp>(account
       ? `/api/folders?account=${encodeURIComponent(account)}`
       : "/api/folders"),
+  setFolderRole: (role: string, folder: string) =>
+    req<{ role: string; folder: string | null; source: string | null }>(
+      "/api/folders/role", { role, folder }),
+  lookalike: (folder: string) =>
+    req<LookalikeCount>(`/api/folders/lookalike?folder=${encodeURIComponent(folder)}`),
+  moveLookalike: (folder: string, uv: number, max_uid: number) =>
+    req<{ moved: number; target?: string; role?: string;
+          undo: UndoIdent | null }>(
+      "/api/folders/move_contents", { folder, uv, max_uid }),
   exportUrl: (grouping: Grouping, keys?: string[]) =>
     withAccount(`/api/export?grouping=${grouping}`
       + (keys?.length

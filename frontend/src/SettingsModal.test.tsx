@@ -2,8 +2,9 @@
 /* Provider presets: selecting one prefills the connection fields but
  * keeps everything editable; "custom" changes nothing. */
 
-import { cleanup, fireEvent, render, screen, waitFor, within }
+import { cleanup, fireEvent, render as rtlRender, screen, waitFor, within }
   from "@testing-library/react";
+import type { ReactElement } from "react";
 import { afterEach, expect, test, vi } from "vitest";
 
 const foldersCalls: (string | undefined)[] = [];
@@ -52,6 +53,9 @@ vi.mock("./api", () => ({
 
 import { SettingsModal } from "./components/SettingsModal";
 import { DialogProvider, ToastProvider } from "./components/ui";
+// The folder picker toasts its outcomes, so every render has a provider.
+const render = (ui: ReactElement) =>
+  rtlRender(<ToastProvider>{ui}</ToastProvider>);
 import { cancelDialog, expectNoDialog, findDialog, pressDialog }
   from "./dialogTestUtils";
 import type { Config } from "./types";
@@ -151,26 +155,26 @@ test("folder discovery follows the account being edited", () => {
   expect(foldersCalls).toEqual(["default", "icloud", "icloud"]);
 });
 
-test("a virtual view folder is listed as a locked, tagged row", async () => {
-  foldersResult = { wildcards: [], folders: [
-    { raw: "INBOX", name: "INBOX", role: null, view: false, excluded: false },
-    { raw: "[Gmail]/Starred", name: "[Gmail]/Starred", role: null,
-      view: true, excluded: true }] };
-  try {
-    render(<SettingsModal cfg={cfg} account="default" onClose={() => {}}
-      onSaved={() => {}} onAccountsChanged={() => {}} />);
-    const box = await screen.findByLabelText(/\[Gmail\]\/Starred/);
-    expect((box as HTMLInputElement).disabled).toBe(true);
-    expect((box as HTMLInputElement).checked).toBe(false);
-    expect(screen.getByText("view")).toBeTruthy();
-    expect(box.closest("span[title]")?.getAttribute("title"))
-      .toMatch(/Virtual view/);
-    expect((screen.getByLabelText("INBOX") as HTMLInputElement).disabled)
-      .toBe(false);
-  } finally {
-    foldersResult = null;
-  }
-});
+test("a virtual view folder is listed under special folders, no checkbox",
+  async () => {
+    foldersResult = { wildcards: [], folders: [
+      { raw: "INBOX", name: "INBOX", role: null, view: false,
+        excluded: false },
+      { raw: "[Gmail]/Starred", name: "[Gmail]/Starred", role: null,
+        view: true, excluded: true }] };
+    try {
+      render(<SettingsModal cfg={cfg} account="default" onClose={() => {}}
+        onSaved={() => {}} onAccountsChanged={() => {}} />);
+      expect(await screen.findByText("[Gmail]/Starred")).toBeTruthy();
+      expect(screen.getByText(/Views of other folders - never scanned/))
+        .toBeTruthy();
+      expect(screen.queryByLabelText(/\[Gmail\]\/Starred/)).toBeNull();
+      expect((screen.getByLabelText("INBOX") as HTMLInputElement).disabled)
+        .toBe(false);
+    } finally {
+      foldersResult = null;
+    }
+  });
 
 test("a look-alike of a special folder is locked and unticked", async () => {
   foldersResult = { wildcards: [], folders: [

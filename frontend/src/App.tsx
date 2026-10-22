@@ -84,7 +84,7 @@ const undoId = (u: { ts: number; count: number; label: string }) =>
 
 const actionVerb = (a: string): string =>
   ({ trash: t("Move to Trash"), archive: t("Archive"), move: t("Move"),
-     mark_read: t("Mark as read") } as Record<string, string>)[a] ?? a;
+     mark_read: t("Mark as read"), move_contents: t("Move") } as Record<string, string>)[a] ?? a;
 
 export default function App() {
   const [state, setState] = useState<AppState | null>(null);
@@ -343,8 +343,11 @@ export default function App() {
     if (state.status === "error" && prev?.scan !== "error")
       notify(t("err.generic", { msg: state.error }), "error");
     if (!prev) return;
+    // A look-alike folder's move is toasted by Settings itself (with its own
+    // Undo), so it is not announced a second time here.
     const fresh = staleDel ? []
-      : state.undo.filter((u) => !u.quiet && !prev.undo.includes(undoId(u)));
+      : state.undo.filter((u) => !u.quiet && u.action !== "move_contents"
+        && !prev.undo.includes(undoId(u)));
     const newJob = del.seq != null && prev.seq != null && del.seq > prev.seq;
     if (!staleDel && del.status !== "running" && (fresh.length || newJob
         || (del.seq == null && del.status !== prev.d))) {

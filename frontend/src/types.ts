@@ -299,6 +299,7 @@ export interface FilterPreset {
 export interface FolderInfo {
   raw: string;
   name: string;
+  delim?: string | null;  // hierarchy delimiter LIST announced
   role: string | null;    // trash | sent | junk | drafts | archive | all
   view?: boolean;         // virtual view (Gmail Starred / Important)
   role_source?: "flag" | "name" | "override" | null;
@@ -307,10 +308,33 @@ export interface FolderInfo {
   excluded: boolean;
 }
 
+/** One detected special-folder role: where it points and how it was found. */
+export interface SpecialRole {
+  role: string;
+  raw: string;
+  name: string;
+  source: "flag" | "name" | "override";
+  ambiguous: boolean;      // tied candidates and no confirmed choice yet
+  /** The tied folders to pick from (empty when nothing ties). */
+  choices: { raw: string; name: string; count: number | null }[];
+}
+
 export interface FoldersResp {
+  special?: SpecialRole[];
   folders: FolderInfo[];
   wildcards: string[];
 }
+
+export interface LookalikeCount {
+  role: string;
+  target: string;
+  target_name: string;
+  count: number;
+  uv: number;
+  max_uid: number;
+}
+
+export interface UndoIdent { ts: number; label: string; count: number }
 
 export interface Mail {
   uid: number;
