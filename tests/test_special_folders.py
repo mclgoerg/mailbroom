@@ -8,6 +8,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from backend import config as cfgmod
+from backend import accounts as accountsmod
 from backend import auditlog, mailops
 from backend.main import app
 from conftest import FakeIMAP, make_msg, wait_delete_done
@@ -308,15 +309,16 @@ def test_xlist_attributes_map_to_roles():
 
 
 def test_malformed_role_overrides_are_ignored():
-    # a folder literally named "None" must not be picked by a null value
-    fake = FakeIMAP(_box({"INBOX": 1, "Trash": 1, "Spam": 0, "None": 0}))
+    fake = FakeIMAP(_box({"INBOX": 1, "Trash": 1, "Spam": 0, "Drafts": 0,
+                          "Entw&APw-rfe": 0}))
     cfgmod.CONFIG_PATH.write_text(json.dumps({"accounts": {"default": {
         "role_overrides": {"trash": 5, "junk": ["Spam"], "bogus": "Trash",
-                           "sent": None, "drafts": "None"}}}}))
+                           "sent": None, "drafts": "Entw&APw-rfe"}}}}))
     found = mailops.resolve_roles(fake)
     assert found["roles"] == {"trash": "Trash", "junk": "Spam",
-                              "drafts": "None"}   # only the valid one
+                              "drafts": "Entw&APw-rfe"}   # only the valid one
     assert found["source"]["drafts"] == "override"
+    assert found["source"]["trash"] == "name"
     cfgmod.CONFIG_PATH.write_text(json.dumps({"accounts": {"default": {
         "role_overrides": ["trash"]}}}))
     assert mailops.resolve_roles(fake)["roles"]["trash"] == "Trash"
@@ -367,3 +369,73 @@ def test_reversible_actions_use_the_pick_while_ambiguous(monkeypatch):
     wait_delete_done()
     assert fake.mailbox["INBOX"] == []
     assert len(fake.mailbox["Deleted Items"]) == 3   # deterministic pick
+
+
+@pytest.mark.parametrize("target", [
+    "INBOX", "inbox", "Starred", "Sent", "Projects", "Entw&APw-rfe",
+    "No Such Folder"],
+    ids=["inbox", "inbox-lowercase", "virtual-view", "other-roles-folder",
+         "unrelated-folder", "other-roles-name-match", "not-listed"])
+def test_invalid_override_never_confirms_or_unlocks_empty_trash(
+        monkeypatch, target):
+    fake = _use(monkeypatch, FakeIMAP(
+        _box({"INBOX": 2, "Trash": 2, "Deleted Items": 2, "Starred": 1,
+              "Sent": 1, "Projects": 3, "Entw&APw-rfe": 1}),
+        flags={"Starred": "\\Flagged", "Sent": "\\Sent"}))
+    cfgmod.CONFIG_PATH.write_text(json.dumps({"accounts": {"default": {
+        "role_overrides": {"trash": target}}}}))
+    found = mailops.resolve_roles(fake)
+    assert found["source"]["trash"] == "name"        # override ignored
+    assert set(found["ambiguous"]) == {"trash"}      # still unconfirmed
+    assert found["roles"]["trash"] == "Deleted Items"
+    before = {f: list(m) for f, m in fake.mailbox.items()}
+    with pytest.raises(RuntimeError, match="ambiguous"):
+        mailops.empty_trash(uv=1, max_uid=99)
+    assert fake.mailbox == before
+    mailops.run_scan()          # and nothing stopped being scanned for it
+    assert "INBOX" in mailops.STATE["folders"]
+    assert "Projects" in mailops.STATE["folders"]
+
+
+def test_invalid_override_on_an_unambiguous_role_keeps_the_pick(monkeypatch):
+    fake = _use(monkeypatch, FakeIMAP(_box({"INBOX": 2, "Trash": 1})))
+    cfgmod.CONFIG_PATH.write_text(json.dumps({"accounts": {"default": {
+        "role_overrides": {"trash": "INBOX"}}}}))
+    assert mailops.resolve_roles(fake)["roles"] == {"trash": "Trash"}
+    assert mailops.empty_trash(uv=1, max_uid=99)["deleted"] == 1
+    assert len(fake.mailbox["INBOX"]) == 2
+
+
+def test_override_may_pick_a_lookalike_candidate(monkeypatch):
+    """Look-alikes of the role count as candidates (P7 lets the user choose
+    between them); the flagged holder then becomes the look-alike."""
+    fake = _use(monkeypatch, FakeIMAP(
+        _box({"INBOX": 1, "Wastebasket": 0, "Trash": 1}),
+        flags={"Wastebasket": "\\Trash"}))
+    cfgmod.CONFIG_PATH.write_text(json.dumps({"accounts": {"default": {
+        "role_overrides": {"trash": "Trash"}}}}))
+    found = mailops.resolve_roles(fake)
+    assert found["roles"]["trash"] == "Trash"
+    assert found["source"]["trash"] == "override"
+    assert found["looks_like"] == {"Wastebasket": "trash"}
+    assert mailops.empty_trash(uv=1, max_uid=99)["deleted"] == 1
+
+
+def test_resolve_dest_uses_its_own_accounts_overrides(monkeypatch):
+    """Two accounts with the same two Trash look-alikes but different
+    confirmed choices: each resolves (and caches) its own."""
+    cfgmod.CONFIG_PATH.write_text(json.dumps({"accounts": {
+        "one": {"host": "host-one", "user": "u1", "password": "pw",
+                "role_overrides": {"trash": "Trash"}},
+        "two": {"host": "host-two", "user": "u2", "password": "pw",
+                "role_overrides": {"trash": "Deleted Items"}}}}))
+    fakes = {h: FakeIMAP(_box({"INBOX": 1, "Trash": 1, "Deleted Items": 1}))
+             for h in ("host-one", "host-two")}
+    monkeypatch.setattr(mailops, "connect",
+                        lambda im, name=None: fakes[im["host"]])
+    one, two = accountsmod.get("one"), accountsmod.get("two")
+    assert mailops._resolve_dest(fakes["host-one"], "trash", "", one) == "Trash"
+    assert mailops._resolve_dest(
+        fakes["host-two"], "trash", "", two) == "Deleted Items"
+    assert one.folder_roles["trash"] == "Trash"
+    assert two.folder_roles["trash"] == "Deleted Items"

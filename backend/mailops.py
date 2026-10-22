@@ -554,7 +554,8 @@ def resolve_roles(conn, acc=None, pairs=None) -> dict:
                   Permanent actions must refuse these roles.
       looks_like  {raw folder: role} - folders that look like a role another
                   folder holds (a client's second Trash, a second \\Sent)
-    A flag always beats a name; Gmail's virtual views are never a role."""
+    A flag always beats a name; Gmail's virtual views are never a role.
+    An override naming anything but a candidate of its role is ignored."""
     acc = acc or accounts.get()
     pairs = list_folders_ex(conn) if pairs is None else pairs
     delims = getattr(pairs, "delims", {})
@@ -580,7 +581,6 @@ def resolve_roles(conn, acc=None, pairs=None) -> dict:
                 named.setdefault(role, ([], []))[1].append(name)
                 break
     overrides = _role_overrides(acc)
-    listed = {n for n, _ in pairs}
     roles: dict[str, str] = {}
     source: dict[str, str] = {}
     ambiguous: dict[str, list[str]] = {}
@@ -588,11 +588,16 @@ def resolve_roles(conn, acc=None, pairs=None) -> dict:
     for role in _ROLE_NAMES:
         flag_c = flagged.get(role, [])
         exact_c, prefixed_c = named.get(role, ([], []))
-        ov = overrides.get(role)
-        if ov not in listed or ov in views:
-            ov = None
-        if not (flag_c or exact_c or prefixed_c or ov):
+        if not (flag_c or exact_c or prefixed_c):
             continue
+        # An override only counts for a folder this role could be (flagged
+        # for it, or named like it - look-alikes included, so the user can
+        # pick between them), never INBOX; a view or another role's folder
+        # is not a candidate. Anything else is ignored, as if absent.
+        ov = overrides.get(role)
+        if ov not in (*flag_c, *exact_c, *prefixed_c) \
+                or ov.upper() == "INBOX":
+            ov = None
         if ov:
             holder, src = ov, "override"
         else:
