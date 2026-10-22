@@ -311,26 +311,27 @@ def test_role_accessors_are_generic(env):
 
 # ------------------------------------------------ safety / failure paths
 
-def test_returned_uv_belongs_to_its_own_listing(env):
+def test_returned_uv_belongs_to_its_own_listing(env, monkeypatch):
     """Two concurrent opens: the uv sent back with a listing must be the one
-    that very refresh read, not whatever the cache holds by then."""
+    that very refresh read. The second open starts right after the first
+    one's swap (its snapshot save), the window where reading the uv back
+    from the cache would pick up the other open's generation."""
     fake, _ = env
-    orig = fake.uid
+    orig_save = mailops.save_snapshot
     inner = {}
 
-    def uid(cmd, *args):
-        if cmd == "FETCH" and "done" not in inner:
+    def save(acc):
+        orig_save(acc)
+        if "done" not in inner:
             inner["done"] = True
             fake.uv["Trash"] = 2                   # a second tab, new generation
             fake.mailbox["Trash"] = _trash(60, 61)
             inner["b"] = mailops.trash_list()
-            fake.uv["Trash"] = 1
-        return orig(cmd, *args)
-    fake.uid = uid
+    monkeypatch.setattr(mailops, "save_snapshot", save)
     a = mailops.trash_list()
     assert inner["b"]["uv"] == 2 and inner["b"]["max_uid"] == 61
-    assert a["uv"] == 1                            # A read uv 1 itself
-    assert accountsmod.get().role_uv["trash"] == {"Trash": 1}
+    assert a["uv"] == 1 and a["max_uid"] == 5 and a["total"] == 3
+    assert accountsmod.get().role_uv["trash"] == {"Trash": 2}
 
 
 def test_role_state_is_one_consistent_pair(env):
@@ -344,8 +345,8 @@ def test_role_state_is_one_consistent_pair(env):
 def test_role_of_folder_is_generic(env):
     acc = accountsmod.get()
     mailops.trash_list()
-    assert mailops.role_of_folder(acc, "Trash") == "trash"
-    assert mailops.role_of_folder(acc, "INBOX") is None
+    assert mailops.role_of_folder("Trash", acc) == "trash"
+    assert mailops.role_of_folder("INBOX", acc) is None
 
 
 def test_aborted_refresh_leaves_cache_and_uv_untouched(env):
@@ -441,3 +442,16 @@ def test_role_index_reads_the_resolved_folder_never_a_look_alike(monkeypatch):
     r = mailops.trash_list()
     assert r["folder"] == "Bin" and [m["uid"] for m in r["mails"]] == [4, 3]
     assert {m["folder"] for m in mailops.role_mails("trash")} == {"Bin"}
+
+
+def test_role_cache_never_consults_label_copies(env):
+    fake, spy = env
+    acc = accountsmod.get()
+    acc.role_uv["trash"] = {"Trash": 1}            # not stale: cache is read
+    acc.label_copies[mailops.ikey("Trash", 3)] = {
+        "uid": 3, "folder": "Trash", "addr": "x@copy.example",
+        "subject": "from label copies", "size": 1, "seen": False,
+        "ts": 1, "date": ""}
+    r = mailops.trash_list()
+    assert 3 in spy.header_uids                    # fetched, not taken
+    assert {m["uid"]: m["subject"] for m in r["mails"]}[3] == "Old 3"

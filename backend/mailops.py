@@ -2936,7 +2936,7 @@ def undo_last(index: int = -1, acc=None) -> dict:
                     restored += len(chunk)
                     moved.extend(int(u) for u in chunk)
     finally:
-        role = role_of_folder(acc, trash) if trash else None
+        role = role_of_folder(trash, acc) if trash else None
         if role:
             role_drop(role, trash, moved, acc)
         try:
@@ -3009,8 +3009,9 @@ def role_state(role: str, folder: str, acc=None) -> tuple[int, list[dict]]:
                 list(acc.role_index.get(role, {}).values()))
 
 
-def role_of_folder(acc, folder: str) -> str | None:
+def role_of_folder(folder: str, acc=None) -> str | None:
     """The indexed role a raw folder name currently stands for, if any."""
+    acc = acc or accounts.get()
     with acc.lock:
         for role, per in acc.role_uv.items():
             if folder in per:
