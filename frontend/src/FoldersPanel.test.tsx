@@ -270,6 +270,16 @@ test("German labels", async () => {
   expect(screen.getByLabelText("Aktion…")).toBeTruthy();
 });
 
+test("both toggles (Junk | Trash and By sender | Mails) have equal-width segments",
+  async () => {
+    panel({ initialRole: "junk" });
+    await screen.findByText("win@lottery.example");
+    expect(screen.getByRole("tablist", { name: "Folder" }).className)
+      .toContain("auto-cols-fr");
+    expect(screen.getByRole("tablist", { name: "Group by" }).className)
+      .toContain("auto-cols-fr");
+  });
+
 test("phone layout: the role switch has its own full-width row, buttons >= 44px",
   async () => {
     panel({ initialRole: "junk" });
