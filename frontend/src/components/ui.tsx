@@ -898,9 +898,12 @@ export function ChipSegment({ on = false, children, className = "", ...rest }:
 /** Segmented control for mutually exclusive views (tablist). The selected
  *  segment is the quiet "current" style (chiph + accent inset ring), never
  *  the solid accent that belongs to the one primary Button. `fill` makes
- *  the row full-width, segments sized to their content (`flex-auto`). */
+ *  the row full-width, segments sized to their content (`flex-auto`).
+ *  `equal` gives every segment the width of the widest one (a short label
+ *  next to a long one no longer looks small). */
 export function Segmented<T extends string>({ value, onChange, options,
-  label, fill = false, tall = false, className = "", idPrefix }: {
+  label, fill = false, tall = false, equal = false, className = "",
+  idPrefix }: {
   value: T | null;
   onChange: (v: T) => void;
   options: { value: T; label: ReactNode }[];
@@ -908,6 +911,8 @@ export function Segmented<T extends string>({ value, onChange, options,
   fill?: boolean;
   /** 44 px tall segments (phone sheets with big touch targets). */
   tall?: boolean;
+  /** Equal-width segments (grid columns of 1fr). */
+  equal?: boolean;
   className?: string;
   /** Wires the tabs to a panel: tab ids `${idPrefix}-tab-${value}`, and the
    *  selected one gets `aria-controls="${idPrefix}-panel"` (render the panel
@@ -931,7 +936,8 @@ export function Segmented<T extends string>({ value, onChange, options,
     : options[0]?.value;
   return (
     <div role="tablist" aria-label={label} onKeyDown={onKey}
-      className={`inline-flex items-stretch overflow-hidden rounded-control
+      className={`${equal ? "inline-grid grid-flow-col auto-cols-fr"
+        : "inline-flex items-stretch"} overflow-hidden rounded-control
         border border-line bg-panel2 ${fill ? "w-full" : ""} ${className}`}>
       {options.map((o, i) => {
         const on = o.value === value;
@@ -946,7 +952,7 @@ export function Segmented<T extends string>({ value, onChange, options,
               px-1.5 transition-colors type-meta md:type-body md:px-2 lg:px-3
               focus-visible:-outline-offset-2 enabled:active:translate-y-px
               first:rounded-l-control last:rounded-r-control
-              ${fill ? "flex-auto" : ""} ${i > 0 ? "border-l border-line" : ""}
+              ${fill && !equal ? "flex-auto" : ""} ${i > 0 ? "border-l border-line" : ""}
               ${on ? "bg-chiph font-medium text-body ring-1 ring-inset ring-accent"
                 : "text-muted hover:bg-chip"}`}>
             {o.label}

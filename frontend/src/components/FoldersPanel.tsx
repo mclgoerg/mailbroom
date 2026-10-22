@@ -280,7 +280,7 @@ export function FoldersPanel({ state, initialRole = "trash", onClose,
         <>
           {/* Own full-width row (phones) / left-aligned segments (desktop) */}
           <div className="border-b border-line px-4 py-2">
-            <Segmented value={role} label={t("fp.which")} fill={!wide} tall={!wide}
+            <Segmented value={role} label={t("fp.which")} fill={!wide} tall={!wide} equal
               onChange={(r) => {
                 setRole(r); setQ(""); setNote("");
                 setGrouping(r === "junk" ? "sender" : "mails");
@@ -295,7 +295,7 @@ export function FoldersPanel({ state, initialRole = "trash", onClose,
               <Input className="w-full sm:w-auto sm:min-w-32 sm:flex-1"
                 placeholder={t("search.placeholder")}
                 value={q} onChange={(e) => setQ(e.target.value)} />
-              <Segmented value={grouping} label={t("fp.grouping")} tall={!wide}
+              <Segmented value={grouping} label={t("fp.grouping")} tall={!wide} equal
                 onChange={setGrouping}
                 options={[
                   { value: "sender", label: t("fp.by_sender") },

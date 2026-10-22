@@ -795,6 +795,31 @@ test("ProgressBar: determinate carries its value, indeterminate none", () => {
     .toBeNull();
 });
 
+test("Segmented `equal` gives every segment the same column width", () => {
+  const opts = [{ value: "a", label: "Short" }, { value: "b", label: "A much longer label" }];
+  const { rerender } = render(
+    <Segmented label="View" value="a" onChange={() => {}} options={opts} />);
+  // default: content-sized flex row
+  let list = screen.getByRole("tablist", { name: "View" });
+  expect(list.className).toContain("inline-flex");
+  expect(list.className).not.toContain("auto-cols-fr");
+  rerender(<Segmented label="View" value="a" onChange={() => {}} options={opts}
+    equal />);
+  // equal: one grid of 1fr columns, so the short label is as wide as the long one
+  list = screen.getByRole("tablist", { name: "View" });
+  expect(list.className).toContain("inline-grid");
+  expect(list.className).toContain("auto-cols-fr");
+  expect(list.className).not.toContain("inline-flex");
+  // with `fill` too: full width, still equal, and no content-sized flex-auto
+  rerender(<Segmented label="View" value="a" onChange={() => {}} options={opts}
+    equal fill />);
+  list = screen.getByRole("tablist", { name: "View" });
+  expect(list.className).toContain("w-full");
+  expect(list.className).toContain("auto-cols-fr");
+  for (const tab of screen.getAllByRole("tab"))
+    expect(tab.className).not.toContain("flex-auto");
+});
+
 test("Segmented marks the current segment and reports a change", () => {
   const onChange = vi.fn();
   render(
