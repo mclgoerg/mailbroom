@@ -28,6 +28,7 @@ from . import auth as authmod
 from . import bodyindex
 from . import autoscan as autoscanmod
 from . import config as cfgmod
+from . import csvsafe
 from . import digest as digestmod
 from . import errortext
 from . import knowledge as knowledgemod
@@ -894,11 +895,12 @@ def get_audit_export(account: str | None = Query(None)):
     w.writerow(["ts", "account", "actor", "action", "count", "bytes",
                 "label", "outcome", "error"])
     for e in entries:
-        w.writerow([e["ts"], e["account"], e["actor"], e["action"],
-                    e["count"], e["bytes"], e["label"], e["outcome"],
-                    # a coded error as English text (the UI's tooltip words
-                    # it in its language); older plain text as written
-                    errortext.describe(e["error"])])
+        w.writerow(csvsafe.row([
+            e["ts"], e["account"], e["actor"], e["action"],
+            e["count"], e["bytes"], e["label"], e["outcome"],
+            # a coded error as English text (the UI's tooltip words it in
+            # its language); older plain text as written
+            errortext.describe(e["error"])]))
     return StreamingResponse(
         iter([buf.getvalue()]), media_type="text/csv",
         headers={"Content-Disposition":
@@ -1462,11 +1464,12 @@ def get_export(grouping: str = Query("sender"),
             else (all_recs[k] for k in keys if k in all_recs)
         recs = sorted(wanted, key=lambda r: -r["count"])
         for r in recs:
-            w.writerow([r["key"], r["label"], r["count"], r["size"],
-                        r["unread"], r["first"], r["last"],
-                        " ".join(r["tags"]),
-                        r["ai"]["verdict"] if r["ai"] else "",
-                        r["ai"]["reason"] if r["ai"] else ""])
+            w.writerow(csvsafe.row([
+                r["key"], r["label"], r["count"], r["size"],
+                r["unread"], r["first"], r["last"],
+                " ".join(r["tags"]),
+                r["ai"]["verdict"] if r["ai"] else "",
+                r["ai"]["reason"] if r["ai"] else ""]))
     return StreamingResponse(
         iter([buf.getvalue()]), media_type="text/csv",
         headers={"Content-Disposition":
