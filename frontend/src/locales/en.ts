@@ -1378,4 +1378,80 @@ export const EN: Record<string, string> = {
   "know.download_tip":
     "Download this list as a file. It lists sender addresses and notes - keep it private.",
   "know.col_actions": "Actions",
+  // -- errors of the folder features (backend codes, see api.ts ERROR_CODES)
+  "ferr.folder_named": "“{name}”",
+  "ferr.role_archive": "Archive",
+  "ferr.busy_action":
+    "Another action is still running - try again when it has finished.",
+  "ferr.busy_purge":
+    "A permanent deletion is already running - try again when it has "
+    + "finished.",
+  "ferr.busy_scan": "A scan is running - try again when it has finished.",
+  "ferr.busy_rule":
+    "Another rule is running - try again when it has finished.",
+  "ferr.count_required":
+    "The folder was not counted yet - reload it and confirm again.",
+  "ferr.role_missing": "No {folder} folder found on the server.",
+  "ferr.inbox_missing": "No Inbox found on the server.",
+  "ferr.junk_needs_trash":
+    "No Trash folder found on the server - deleting Junk permanently goes "
+    + "through Trash.",
+  "ferr.role_unconfirmed":
+    "{folder} is ambiguous - choose the right folder in Settings first.",
+  "ferr.junk_is_trash": "Junk and Trash are the same folder.",
+  "ferr.folder_changed":
+    "{folder} changed on the server - reload the list and try again.",
+  "ferr.partial_unsafe":
+    "This server cannot safely delete only some of a folder's mails, so "
+    + "nothing was deleted.",
+  "ferr.partial_unsafe_changed":
+    "This server cannot safely delete only some of a folder's mails, and "
+    + "the folder changed since it was counted - reload it and try again. "
+    + "Nothing was deleted.",
+  "ferr.cannot_open": "Could not open {folder} on the server.",
+  "ferr.cannot_list": "Could not read the folder's mail list.",
+  "ferr.cannot_flag":
+    "The server did not accept marking the mails for deletion.",
+  "ferr.cannot_expunge": "The server did not remove the marked mails.",
+  "ferr.cannot_move": "The server refused the move.",
+  "ferr.cannot_remove_copies":
+    "The server did not remove the copied mails from Junk.",
+  "ferr.cannot_read_moved": "Could not read the moved mails in Trash.",
+  "ferr.uv_unreadable":
+    "Could not read the state of {folder} - nothing is deleted.",
+  "ferr.no_known_selected":
+    "None of the selected mails are in the folder any more - reload it.",
+  "ferr.unknown_target": "The target folder {folder} does not exist.",
+  "ferr.target_is_trash": "The target is the Trash folder itself.",
+  "ferr.nothing_to_undo": "There is nothing to undo any more.",
+  "ferr.deleted_then_failed":
+    "{cause} ({n} mails were permanently deleted before the failure)",
+  "ferr.deleted_then_failed_one":
+    "{cause} (1 mail was permanently deleted before the failure)",
+  "ferr.stranded_then_failed":
+    "{cause} ({n} mails were moved to Trash and not deleted)",
+  "ferr.stranded_then_failed_one":
+    "{cause} (1 mail was moved to Trash and not deleted)",
+  "ferr.moved_then_failed":
+    "{cause} ({n} mails were moved before the failure)",
+  "ferr.moved_then_failed_one":
+    "{cause} (1 mail was moved before the failure)",
+  "ferr.rule_report_first": "Run this rule in report mode first.",
+  "ferr.rule_folder_changed":
+    "The Junk or Trash folder changed since the last report - the rule is "
+    + "back in report mode and nothing was deleted.",
+  "ferr.rule_purge_grouping": "Junk and Trash rules match senders.",
+  "ferr.rule_purge_keep_latest":
+    "“Keep newest N” is not available for Junk and Trash rules.",
+  "ferr.rule_purge_needs_age":
+    "A Junk or Trash rule needs an age (mails older than N days).",
+  "ferr.rule_purge_filter":
+    "This filter is not available for Junk and Trash rules: {names}",
+  "ferr.rule_purge_filter_domain":
+    "This filter is not available for Junk and Trash rules: {names} (it "
+    + "never matches senders - use plain text such as the domain name).",
+  "undo.from_junk": "{n} mails from Junk",
+  "undo.from_junk_one": "1 mail from Junk",
+  "undo.from_trash": "{n} mails from Trash",
+  "undo.from_trash_one": "1 mail from Trash",
 };

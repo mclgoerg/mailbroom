@@ -4,6 +4,7 @@ fake in-memory IMAP server that speaks imaplib's response format."""
 from __future__ import annotations
 
 import imaplib
+import re
 import sys
 from pathlib import Path
 
@@ -82,6 +83,14 @@ def isolate(tmp_path, monkeypatch):
     unsubstore._cache.clear()
     pinstore._cache.clear()
     accountsmod.reset()
+
+
+def code_re(code: str, **params) -> str:
+    """A `pytest.raises(match=...)` pattern for the coded refusal
+    `mailops.coded(code, **params)` (the text of the folder features' errors
+    is the code the UI translates, see mailops.coded)."""
+    from backend import mailops
+    return re.escape(mailops.coded(code, **params))
 
 
 def make_msg(uid, frm='"Shop News" <news@shop.example>',

@@ -11,7 +11,7 @@ from backend import config as cfgmod
 from backend import accounts as accountsmod
 from backend import auditlog, mailops
 from backend.main import app
-from conftest import FakeIMAP, make_msg, wait_delete_done
+from conftest import FakeIMAP, code_re, make_msg, wait_delete_done
 
 client = TestClient(app)
 
@@ -345,12 +345,13 @@ def test_empty_trash_refuses_while_trash_is_ambiguous(monkeypatch):
     before = {f: list(m) for f, m in fake.mailbox.items()}
     audit = lambda: auditlog.load(None, 0, 100)["entries"]   # noqa: E731
     assert audit() == []
-    with pytest.raises(RuntimeError, match="ambiguous"):
+    with pytest.raises(RuntimeError, match=code_re(mailops.ROLE_UNCONFIRMED, role="trash")):
         mailops.empty_trash(uv=1, max_uid=99)
     assert fake.mailbox == before                    # nothing deleted
     assert audit() == []                             # nothing recorded
     r = client.post("/api/empty_trash", json={"uv": 1, "max_uid": 99})
-    assert r.status_code == 409 and "ambiguous" in r.json()["detail"]
+    assert r.status_code == 409 and r.json()["detail"] == mailops.coded(
+        mailops.ROLE_UNCONFIRMED, role="trash")
 
 
 def test_empty_trash_runs_with_a_confirmed_override(monkeypatch):
@@ -389,7 +390,7 @@ def test_invalid_override_never_confirms_or_unlocks_empty_trash(
     assert set(found["ambiguous"]) == {"trash"}      # still unconfirmed
     assert found["roles"]["trash"] == "Deleted Items"
     before = {f: list(m) for f, m in fake.mailbox.items()}
-    with pytest.raises(RuntimeError, match="ambiguous"):
+    with pytest.raises(RuntimeError, match=code_re(mailops.ROLE_UNCONFIRMED, role="trash")):
         mailops.empty_trash(uv=1, max_uid=99)
     assert fake.mailbox == before
     mailops.run_scan()          # and nothing stopped being scanned for it

@@ -11,6 +11,7 @@ after the reversible MOVE when the copies cannot be identified), account
 scoping, busy handling and inertness."""
 
 import json
+import re
 import threading
 import time
 
@@ -25,7 +26,7 @@ from backend import mailops
 from backend import pinstore
 from backend import stats as statsmod
 from backend.main import app
-from conftest import FakeIMAP, make_msg
+from conftest import FakeIMAP, code_re, make_msg
 
 client = TestClient(app)
 
@@ -160,7 +161,7 @@ def test_uids_that_vanished_are_reported_not_an_error(monkeypatch):
 def test_request_without_counted_uv_and_uids_is_refused(monkeypatch, uids, uv):
     fake = _env(monkeypatch, trash=_mails([3, 4]))
     spy = Spy(fake)
-    with pytest.raises(ValueError, match="counted listing"):
+    with pytest.raises(ValueError, match=code_re(mailops.COUNT_REQUIRED)):
         mailops.purge_mails("trash", uids, uv, **_W["trash"])
     assert spy.calls == [] and _uids(fake, "Trash") == [3, 4]
     r = client.post("/api/folders_panel/purge",
@@ -203,7 +204,8 @@ def test_uidvalidity_mismatch_refuses_and_deletes_nothing(monkeypatch, role):
     c = _count(role, everything=True)
     fake.uv["Trash" if role == "trash" else "Spam"] = 9
     spy = Spy(fake)
-    with pytest.raises(RuntimeError, match="changed on the server"):
+    with pytest.raises(RuntimeError, match=code_re(mailops.FOLDER_CHANGED,
+                                                   role=role)):
         mailops.purge_mails(role, c["uids"], c["uv"], **_at(c))
     assert spy.destructive() == []
     assert _uids(fake, "Trash" if role == "trash" else "Spam") == [3, 4]
@@ -225,7 +227,8 @@ def test_uidvalidity_changing_between_listing_and_delete_refuses(monkeypatch):
             fake.uv["Trash"] = 77
         return r
     fake.select = select
-    with pytest.raises(RuntimeError, match="changed on the server"):
+    with pytest.raises(RuntimeError, match=code_re(mailops.FOLDER_CHANGED,
+                                                   role="trash")):
         mailops.purge_mails("trash", c["uids"], c["uv"], **_at(c))
     assert _uids(fake, "Trash") == [3, 4] and n
 
@@ -252,7 +255,8 @@ def test_the_listing_read_alone_refuses_a_changed_uidvalidity(
     c = _count(role, everything=True)
     _uv_flips(fake, folder, readonly_uv=9, rw_uv=1)
     spy = Spy(fake)
-    with pytest.raises(RuntimeError, match="changed on the server"):
+    with pytest.raises(RuntimeError, match=code_re(mailops.FOLDER_CHANGED,
+                                                   role=role)):
         mailops.purge_mails(role, c["uids"], c["uv"], **_at(c))
     assert spy.destructive() == [] and _uids(fake, folder) == [3, 4]
 
@@ -267,7 +271,8 @@ def test_the_destructive_select_alone_refuses_a_changed_uidvalidity(
     c = _count(role, everything=True)
     _uv_flips(fake, folder, readonly_uv=1, rw_uv=9)
     spy = Spy(fake)
-    with pytest.raises(RuntimeError, match="changed on the server"):
+    with pytest.raises(RuntimeError, match=code_re(mailops.FOLDER_CHANGED,
+                                                   role=role)):
         mailops.purge_mails(role, c["uids"], c["uv"], **_at(c))
     assert spy.destructive() == [] and _uids(fake, folder) == [3, 4]
 
@@ -282,7 +287,8 @@ def test_unreadable_uidvalidity_refuses(monkeypatch, role):
     with pytest.raises(RuntimeError):
         mailops.purge_mails(role, c["uids"], c["uv"], **_at(c))
     assert spy.destructive() == []
-    with pytest.raises(RuntimeError, match="UIDVALIDITY"):
+    with pytest.raises(RuntimeError, match=code_re(mailops.UV_UNREADABLE,
+                                                   role=role)):
         _count(role, everything=True)               # the count refuses too
 
 
@@ -292,7 +298,8 @@ def test_no_uidplus_refuses_a_partial_trash_purge(monkeypatch):
     fake = _env(monkeypatch, trash=_mails([3, 4, 5]), uidplus=False)
     c = _count("trash", uids=[3])
     spy = Spy(fake)
-    with pytest.raises(RuntimeError, match="cannot delete part of a folder"):
+    with pytest.raises(RuntimeError, match=code_re(
+            mailops.PARTIAL_UNSAFE_CHANGED)):
         mailops.purge_mails("trash", c["uids"], c["uv"], **_at(c))
     assert spy.destructive() == [] and _uids(fake, "Trash") == [3, 4, 5]
 
@@ -318,7 +325,8 @@ def test_no_uidplus_refuses_when_trash_changes_during_the_recheck(monkeypatch):
         return r
     fake.uid = uid
     spy = Spy(fake)
-    with pytest.raises(RuntimeError, match="changed since it was counted"):
+    with pytest.raises(RuntimeError, match=code_re(mailops.FOLDER_CHANGED,
+                                                   role="trash")):
         mailops.purge_mails("trash", c["uids"], c["uv"], **_at(c))
     assert [c_ for c_ in spy.destructive() if c_[0] == "expunge"
             or c_[:2] == ("uid", "STORE")] == []
@@ -330,7 +338,8 @@ def test_junk_without_uidplus_is_refused_before_any_move(monkeypatch):
                 uidplus=False)
     c = _count("junk", everything=True)
     spy = Spy(fake)
-    with pytest.raises(RuntimeError, match="cannot delete part of a folder"):
+    with pytest.raises(RuntimeError, match=code_re(
+            mailops.PARTIAL_UNSAFE)):
         mailops.purge_mails("junk", c["uids"], c["uv"], **_at(c))
     assert spy.destructive() == []
     assert _uids(fake, "Spam") == [3, 4] and _uids(fake, "Trash") == [8]
@@ -455,16 +464,18 @@ def test_ambiguous_unconfirmed_role_refuses_before_any_command(monkeypatch,
         role = "junk"
     before = {f: list(m) for f, m in fake.mailbox.items()}
     spy = Spy(fake)
-    with pytest.raises(RuntimeError, match="ambiguous"):
+    ambiguous = mailops.coded(mailops.ROLE_UNCONFIRMED,
+                              role="junk" if which == "junk-own" else "trash")
+    with pytest.raises(RuntimeError, match=re.escape(ambiguous)):
         mailops.purge_mails(role, [3], 1, **_W[role])
-    with pytest.raises(RuntimeError, match="ambiguous"):
+    with pytest.raises(RuntimeError, match=re.escape(ambiguous)):
         _count(role, everything=True)
     assert spy.destructive() == [] and fake.mailbox == before
     assert _entries() == []
     r = client.post("/api/folders_panel/purge",
                     json={"role": role, "uids": [3], "uv": 1,
                           **_W[role]})
-    assert r.status_code == 409 and "ambiguous" in r.json()["detail"]
+    assert r.status_code == 409 and r.json()["detail"] == ambiguous
     assert fake.mailbox == before
 
 
@@ -499,7 +510,8 @@ def test_an_invalid_override_never_unlocks_a_purge(monkeypatch, target):
     fake.uv["Deleted Items"] = 1
     _confirm("trash", target)
     spy = Spy(fake)
-    with pytest.raises(RuntimeError, match="ambiguous"):
+    with pytest.raises(RuntimeError, match=code_re(mailops.ROLE_UNCONFIRMED,
+                                                   role="trash")):
         mailops.purge_mails("trash", [3], 1, **_W["trash"])
     assert spy.destructive() == [] and _uids(fake, "Trash") == [3]
 
@@ -508,16 +520,19 @@ def test_missing_role_folders_refuse(monkeypatch):
     fake = FakeIMAP({"INBOX": [make_msg(1)], "Spam": _mails([3]), "Sent": []})
     monkeypatch.setattr(mailops, "connect", lambda cfg, name=None: fake)
     spy = Spy(fake)
-    with pytest.raises(RuntimeError, match="No Trash folder"):
+    with pytest.raises(RuntimeError, match=code_re(mailops.ROLE_MISSING,
+                                                   role="trash")):
         mailops.purge_mails("trash", [3], 1, **_W["trash"])
-    with pytest.raises(RuntimeError, match="No Trash folder"):
+    with pytest.raises(RuntimeError, match=code_re(
+            mailops.JUNK_NEEDS_TRASH)):
         mailops.purge_mails("junk", [3], 1, **_W["junk"])         # Junk goes via Trash
-    with pytest.raises(RuntimeError, match="No Trash folder"):
+    with pytest.raises(RuntimeError, match=code_re(
+            mailops.JUNK_NEEDS_TRASH)):
         _count("junk", everything=True)
     assert spy.destructive() == [] and _uids(fake, "Spam") == [3]
     fake2 = FakeIMAP({"INBOX": [make_msg(1)], "Trash": _mails([3])})
     monkeypatch.setattr(mailops, "connect", lambda cfg, name=None: fake2)
-    with pytest.raises(RuntimeError, match="No Junk folder"):
+    with pytest.raises(RuntimeError, match=code_re(mailops.ROLE_MISSING, role="junk")):
         mailops.purge_mails("junk", [3], 1, **_W["junk"])
     assert _uids(fake2, "Trash") == [3]
 
@@ -526,7 +541,7 @@ def test_junk_and_trash_being_the_same_folder_refuses(monkeypatch):
     fake = FakeIMAP({"INBOX": [make_msg(1)], "Bin": _mails([3])},
                     flags={"Bin": "\\Trash \\Junk"})
     monkeypatch.setattr(mailops, "connect", lambda cfg, name=None: fake)
-    with pytest.raises(RuntimeError, match="same folder"):
+    with pytest.raises(RuntimeError, match=code_re(mailops.JUNK_IS_TRASH)):
         mailops.purge_mails("junk", [3], 1, **_W["junk"])
     assert _uids(fake, "Bin") == [3]
 
@@ -567,8 +582,8 @@ def test_partial_failure_books_what_was_really_deleted(monkeypatch):
                 return "NO", [b"denied"]
         return orig(cmd, *a)
     fake.uid = uid
-    with pytest.raises(RuntimeError, match="500 mails were permanently "
-                                           "deleted before the failure"):
+    with pytest.raises(RuntimeError, match=code_re(
+            mailops.DELETED_THEN_FAILED, n=500, cause=mailops.CANNOT_FLAG)):
         mailops.purge_mails("trash", c["uids"], c["uv"], **_at(c))
     assert _uids(fake, "Trash") == list(range(501, 1202))
     e = _entries("purge")
@@ -590,7 +605,7 @@ def test_expunge_failure_unflags_the_chunk_and_books_nothing(monkeypatch):
             return "NO", [b"denied"]
         return orig(cmd, *a)
     fake.uid = uid
-    with pytest.raises(RuntimeError, match="cannot expunge"):
+    with pytest.raises(RuntimeError, match=code_re(mailops.CANNOT_EXPUNGE)):
         mailops.purge_mails("trash", c["uids"], c["uv"], **_at(c))
     assert _uids(fake, "Trash") == [3, 4]
     assert not any(m.get("deleted") for m in fake.mailbox["Trash"])
@@ -709,11 +724,13 @@ def test_busy_while_a_delete_job_or_a_scan_runs(monkeypatch):
     fake = _env(monkeypatch, trash=_mails([3]))
     spy = Spy(fake)
     acc = accountsmod.get()
-    for key, val in (("delete", {**acc.state["delete"], "status": "running"}),
-                     ("status", "scanning")):
+    for key, val, busy in (
+            ("delete", {**acc.state["delete"], "status": "running"},
+             mailops.BUSY_ACTION),
+            ("status", "scanning", mailops.BUSY_SCAN)):
         old = acc.state[key]
         acc.state[key] = val
-        with pytest.raises(RuntimeError, match="busy"):
+        with pytest.raises(RuntimeError, match=code_re(busy)):
             mailops.purge_mails("trash", [3], 1, **_W["trash"])
         acc.state[key] = old
     assert spy.calls == []
@@ -728,9 +745,9 @@ def test_two_permanent_deletions_never_run_side_by_side(monkeypatch):
     acc = accountsmod.get()
     assert acc.purge_lock.acquire(blocking=False)
     try:
-        with pytest.raises(RuntimeError, match="busy"):
+        with pytest.raises(RuntimeError, match=code_re(mailops.BUSY_PURGE)):
             mailops.purge_mails("trash", [3], 1, **_W["trash"])
-        with pytest.raises(RuntimeError, match="busy"):
+        with pytest.raises(RuntimeError, match=code_re(mailops.BUSY_PURGE)):
             mailops.empty_trash(uv=1, max_uid=3)
     finally:
         acc.purge_lock.release()
@@ -1037,7 +1054,7 @@ def test_unreadable_trash_uidvalidity_refuses_before_the_move(monkeypatch):
     fake.response = lambda key: ((key, [None]) if key == "UIDVALIDITY"
                                  and fake.selected == "Trash" else orig(key))
     spy = Spy(fake)
-    with pytest.raises(RuntimeError, match="Trash changed"):
+    with pytest.raises(RuntimeError, match=code_re(mailops.FOLDER_CHANGED, role="trash")):
         mailops.purge_mails("junk", c["uids"], c["uv"], **_at(c))
     assert spy.destructive() == [] and _uids(fake, "Spam") == [3, 4, 5]
 
@@ -1052,7 +1069,7 @@ def test_failed_move_deletes_nothing(monkeypatch):
             return "NO", [b"denied"]
         return orig(cmd, *a)
     fake.uid = uid
-    with pytest.raises(RuntimeError, match="cannot move"):
+    with pytest.raises(RuntimeError, match=code_re(mailops.CANNOT_MOVE)):
         mailops.purge_mails("junk", c["uids"], c["uv"], **_at(c))
     assert _uids(fake, "Spam") == [3, 4, 5] and _entries() == []
 
@@ -1074,8 +1091,8 @@ def test_junk_partial_failure_books_the_completed_chunks_only(monkeypatch):
                 return "NO", [b"denied"]
         return orig(cmd, *a)
     fake.uid = uid
-    with pytest.raises(RuntimeError, match="500 mails were permanently "
-                                           "deleted before the failure"):
+    with pytest.raises(RuntimeError, match=code_re(
+            mailops.DELETED_THEN_FAILED, n=500, cause=mailops.CANNOT_MOVE)):
         mailops.purge_mails("junk", c["uids"], c["uv"], **_at(c))
     assert _uids(fake, "Spam") == list(range(501, 1202))
     assert _uids(fake, "Trash") == [2000]
@@ -1095,14 +1112,15 @@ def test_a_count_of_junk_cannot_delete_trash_with_the_same_uv(monkeypatch):
     fake = _env(monkeypatch, junk=_mails([3, 4]), trash=_mails([3, 4, 5]))
     c = _count("junk", everything=True)
     spy = Spy(fake)
-    with pytest.raises(RuntimeError, match="folder changed since it was "
-                                           "counted"):
+    with pytest.raises(RuntimeError, match=code_re(mailops.FOLDER_CHANGED,
+                                                   role="trash")):
         mailops.purge_mails("trash", c["uids"], c["uv"], folder=c["folder"])
     assert spy.destructive() == [] and _uids(fake, "Trash") == [3, 4, 5]
     r = client.post("/api/folders_panel/purge", json={
         "role": "trash", "uids": c["uids"], "uv": c["uv"],
         "folder": c["folder"]})
-    assert r.status_code == 409 and "folder changed" in r.json()["detail"]
+    assert r.status_code == 409 and r.json()["detail"] == mailops.coded(
+        mailops.FOLDER_CHANGED, role="trash")
     assert _uids(fake, "Trash") == [3, 4, 5] and _uids(fake, "Spam") == [3, 4]
     assert _entries() == []
 
@@ -1112,7 +1130,8 @@ def test_and_a_count_of_trash_cannot_delete_junk(monkeypatch):
                 renumber=True, copyuid=True)
     c = _count("trash", everything=True)
     spy = Spy(fake)
-    with pytest.raises(RuntimeError, match="folder changed"):
+    with pytest.raises(RuntimeError, match=code_re(mailops.FOLDER_CHANGED,
+                                                   role="junk")):
         mailops.purge_mails("junk", c["uids"], c["uv"], folder=c["folder"],
                             trash_folder="Trash")
     assert spy.destructive() == [] and _uids(fake, "Spam") == [3, 4]
@@ -1129,7 +1148,8 @@ def test_the_folder_the_role_resolves_to_changing_refuses(monkeypatch):
     assert c["folder"] == "Trash"
     _confirm("trash", "Deleted Items")
     spy = Spy(fake)
-    with pytest.raises(RuntimeError, match="folder changed"):
+    with pytest.raises(RuntimeError, match=code_re(mailops.FOLDER_CHANGED,
+                                                   role="trash")):
         mailops.purge_mails("trash", c["uids"], c["uv"], **_at(c))
     assert spy.destructive() == []
     assert _uids(fake, "Trash") == [3, 4]
@@ -1146,7 +1166,8 @@ def test_the_trash_a_junk_purge_goes_through_changing_refuses(monkeypatch):
     assert c["trash_folder"] == "Trash"
     _confirm("trash", "Deleted Items")
     spy = Spy(fake)
-    with pytest.raises(RuntimeError, match="folder changed"):
+    with pytest.raises(RuntimeError, match=code_re(mailops.FOLDER_CHANGED,
+                                                   role="junk")):
         mailops.purge_mails("junk", c["uids"], c["uv"], **_at(c))
     assert spy.destructive() == [] and _uids(fake, "Spam") == [3]
 
@@ -1156,7 +1177,7 @@ def test_the_trash_a_junk_purge_goes_through_changing_refuses(monkeypatch):
 def test_a_missing_folder_refuses_before_connecting(monkeypatch, kw):
     fake = _env(monkeypatch, trash=_mails([3, 4]))
     spy = Spy(fake)
-    with pytest.raises(ValueError, match="counted listing"):
+    with pytest.raises(ValueError, match=code_re(mailops.COUNT_REQUIRED)):
         mailops.purge_mails("trash", [3], 1, **kw)
     assert spy.calls == [] and _uids(fake, "Trash") == [3, 4]
     r = client.post("/api/folders_panel/purge",
@@ -1167,12 +1188,13 @@ def test_a_missing_folder_refuses_before_connecting(monkeypatch, kw):
 def test_junk_needs_the_trash_folder_too_and_a_wrong_one_refuses(monkeypatch):
     fake = _env(monkeypatch, junk=_mails([3]), trash=_mails([8]))
     spy = Spy(fake)
-    with pytest.raises(ValueError, match="counted listing"):
+    with pytest.raises(ValueError, match=code_re(mailops.COUNT_REQUIRED)):
         mailops.purge_mails("junk", [3], 1, folder="Spam")
     for wrong in ({"folder": "INBOX", "trash_folder": "Trash"},
                   {"folder": "Spam", "trash_folder": "INBOX"},
                   {"folder": "Spam", "trash_folder": "Spam"}):
-        with pytest.raises(RuntimeError, match="folder changed"):
+        with pytest.raises(RuntimeError, match=code_re(mailops.FOLDER_CHANGED,
+                                                       role="junk")):
             mailops.purge_mails("junk", [3], 1, **wrong)
     assert spy.destructive() == [] and _uids(fake, "Spam") == [3]
 
@@ -1313,7 +1335,8 @@ def test_api_refusals_map_to_409(monkeypatch):
     r = client.post("/api/folders_panel/purge",
                     json={"role": "trash", "uids": [3], "uv": 1,
                           "folder": "Trash"})
-    assert r.status_code == 409 and "changed" in r.json()["detail"]
+    assert r.status_code == 409 and r.json()["detail"] == mailops.coded(
+        mailops.FOLDER_CHANGED, role="trash")
     r = client.post("/api/folders_panel/purge_preview",
                     json={"role": "trash", "older_than_days": 0})
     assert r.status_code == 422

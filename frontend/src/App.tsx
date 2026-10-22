@@ -5,8 +5,8 @@ import { BarChart3, BookmarkPlus, ChevronDown, ClipboardList,
   Trash2, User, Wand2, Wrench, X }
   from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { api, downloadFile, setAccount as apiSetAccount, withAccount }
-  from "./api";
+import { api, downloadFile, errorText, noticeParams,
+  setAccount as apiSetAccount, undoLabel, withAccount } from "./api";
 import { AuditLogPanel } from "./components/AuditLogPanel";
 import { DetailPanel } from "./components/DetailPanel";
 import { Login } from "./components/Login";
@@ -352,7 +352,7 @@ export default function App() {
     if (!staleDel && del.status !== "running" && (fresh.length || newJob
         || (del.seq == null && del.status !== prev.d))) {
       if (del.status === "error") {
-        notify(t("err.generic", { msg: del.error }), "error");
+        notify(t("err.generic", { msg: errorText(del.error) }), "error");
       } else if (fresh.length || del.moved > 0) {
         const n = fresh.length
           ? fresh.reduce((a, u) => a + u.count, 0) : del.moved;
@@ -368,7 +368,7 @@ export default function App() {
             if (i >= 0) undo(i);
           } } : undefined,
         });
-        if (del.error) notify(t("err.generic", { msg: del.error }), "error");
+        if (del.error) notify(t("err.generic", { msg: errorText(del.error) }), "error");
       }
     }
     if (unsub && unsub.status !== "running" && unsub.status !== prev.u) {
@@ -753,7 +753,7 @@ export default function App() {
     setUndoOpen(false);
     if (!await confirmDialog({
       title: t("confirm.restore",
-        { count: entry.count, label: entry.label }),
+        { count: entry.count, label: undoLabel(entry) }),
       confirmLabel: t("confirm.restore_btn") })) return;
     setPending(t("Restoring…"));
     try { await api.undo(index); refresh(); }
@@ -1895,7 +1895,7 @@ export default function App() {
                       hover:bg-panel2"
                     onClick={() => undo(i)}>
                     {actionVerb(u.action)}: {t("n.mails", { n: u.count })}
-                    {" "}- <span className="text-muted">{u.label}</span>
+                    {" "}- <span className="text-muted">{undoLabel(u)}</span>
                   </button>
                 ))}
               </span>
@@ -1906,7 +1906,7 @@ export default function App() {
       {state?.notice && (
         <Notice className="mb-2" icon={<Info size={14} />}
           onClose={dismissNotice}>
-          {t(`notice.${state.notice.key}`, state.notice.params)}
+          {t(`notice.${state.notice.key}`, noticeParams(state.notice.params))}
           {/* a finished AI sorting run: the answers can be kept right here */}
           {state.notice.key === "ai_sort_done" && aiSortedCount > 0 && (
             <>{" "}

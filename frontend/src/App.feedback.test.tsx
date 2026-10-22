@@ -40,6 +40,7 @@ const undoApi = api.undo as ReturnType<typeof vi.fn>;
 import App from "./App";
 import { DialogProvider, ToastProvider } from "./components/ui";
 import { cancelDialog, findDialog, pressDialog } from "./dialogTestUtils";
+import { setLang } from "./i18n";
 import type { AppState, Config, Group } from "./types";
 
 const acctCfg = {
@@ -100,6 +101,7 @@ afterEach(() => {
   localStorage.clear();
   FakeEventSource.instances.length = 0;
   undoApi.mockClear();
+  setLang("en");
 });
 
 Element.prototype.scrollIntoView = () => {};
@@ -338,3 +340,62 @@ test("lower seq after a higher one: no toast now and no duplicate later", async 
   expect(screen.queryByText(/Done: /)).toBeNull();
 });
 
+
+// ---------------------------------------- errors / labels in the user's language
+
+const fromJunk = (ts: number, n: number) => ({
+  ts, label: `${n} mail${n === 1 ? "" : "s"} from Junk`, count: n,
+  action: "trash", quiet: true, label_key: "undo.from_junk",
+  label_params: { n } });
+
+test("the Undo list and the restore confirm word a role label in the " +
+  "user's language", async () => {
+  await mount({ ...baseState, undo: [
+    { ts: 7, label: "old@sender.example", count: 5, action: "trash" },
+    fromJunk(8, 1), fromJunk(9, 2)] });
+  setLang("de");
+  tick({});
+  fireEvent.click(await screen.findByRole("button", { name: /Rückgängig/ }));
+  expect(screen.getByText("2 Mails aus Spam")).toBeTruthy();
+  expect(screen.getByText("1 Mail aus Spam")).toBeTruthy();
+  expect(screen.getByText("old@sender.example")).toBeTruthy();  // plain stays
+  expect(screen.queryByText(/mails? from Junk/)).toBeNull();
+  fireEvent.click(screen.getByText("2 Mails aus Spam"));
+  const dlg = await findDialog();
+  expect(dlg.textContent)
+    .toContain("2 Mails wiederherstellen (2 Mails aus Spam)?");
+  await pressDialog("Abbrechen");
+});
+
+test("the Undo list keeps the English label for English, one mail singular",
+  async () => {
+    await mount({ ...baseState, undo: [fromJunk(8, 1)] });
+    fireEvent.click(screen.getByRole("button", { name: /Undo/ }));
+    expect(screen.getByText("1 mail from Junk")).toBeTruthy();
+    fireEvent.click(screen.getByText("1 mail from Junk"));
+    expect((await findDialog()).textContent)
+      .toContain("Restore 1 mail (1 mail from Junk)?");
+    await cancelDialog();
+  });
+
+test("the restore notice words the label of a role entry itself", async () => {
+  await mount({ ...baseState });
+  setLang("de");
+  tick({ notice: { key: "restored", params: { restored: 2, of: 2,
+    label: "2 mails from Junk", label_key: "undo.from_junk", label_n: 2 } } });
+  expect(await screen.findByText(
+    "2 von 2 Mails wiederhergestellt (2 Mails aus Spam)."))
+    .toBeTruthy();
+});
+
+test("a failed move job shows its coded error in the user's language",
+  async () => {
+    await mount({ ...baseState });
+    setLang("de");
+    tick({ delete: job("running", { progress: "1/2" }) as any });
+    tick({ delete: job("error", { error: "unknown_target:folder=Elsewhere",
+      moved: 0 }) as any });
+    expect(await screen.findByText(
+      "Fehler: Der Zielordner „Elsewhere“ existiert nicht."))
+      .toBeTruthy();
+  });

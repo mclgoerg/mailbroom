@@ -115,7 +115,7 @@ def test_move_action_validates_folder(bridge):
     mailops.delete_groups("sender", ["news@shop.example"],
                           action="move", dest="Nope")
     d = wait_delete_done()
-    assert "unknown target folder" in d["error"]
+    assert d["error"] == mailops.coded(mailops.UNKNOWN_TARGET, folder="Nope")
 
 
 def test_mark_read(bridge):

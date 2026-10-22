@@ -15,7 +15,8 @@ const entries: AuditEntry[] = Array.from({ length: 3 }, (_, i) => ({
 const audit = vi.fn().mockResolvedValue({ total: 3, entries });
 const downloadFile = vi.fn().mockResolvedValue(undefined);
 
-vi.mock("./api", () => ({
+vi.mock("./api", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("./api")>()),
   api: { audit: (...args: unknown[]) => audit(...args),
     auditExportUrl: () => "/api/audit/export" },
   downloadFile: (...args: unknown[]) => downloadFile(...args),
@@ -92,3 +93,20 @@ test("with entries the pager sits below the list as small buttons",
       & Node.DOCUMENT_POSITION_PRECEDING).toBeTruthy();
     expect(screen.getByText("CSV")).toBeTruthy();
   });
+
+test("the tooltip of a failed entry words a coded error in the interface " +
+  "language and keeps older plain text", async () => {
+  audit.mockResolvedValueOnce({ total: 2, entries: [
+    { ts: 5, action: "empty_trash", actor: "user", account: "a", count: 3,
+      bytes: 0, label: "", outcome: "partial",
+      error: "deleted_then_failed:n=3,cause=cannot_expunge" },
+    { ts: 4, action: "purge", actor: "user", account: "a", count: 0,
+      bytes: 0, label: "", outcome: "error",
+      error: "moved to Trash, could not verify for permanent deletion" }] });
+  render(<AuditLogPanel rules={[]} onClose={() => {}} />);
+  await waitFor(() => screen.getByTitle(/3 mails were permanently deleted/));
+  expect(screen.getByTitle("The server did not remove the marked mails. "
+    + "(3 mails were permanently deleted before the failure)")).toBeTruthy();
+  expect(screen.getByTitle(/could not verify for permanent deletion/))
+    .toBeTruthy();
+});

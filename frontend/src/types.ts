@@ -185,6 +185,19 @@ export interface TrashResp {
 
 export type FolderRole = "junk" | "trash";
 
+/** One entry of the Undo list. `label` is its English text and (with ts and
+ *  count) its identity; `label_key` + `label_params` (when present) let the
+ *  UI word the label itself in the user's language - see `undoLabel`. */
+export interface UndoEntry {
+  ts: number;
+  label: string;
+  count: number;
+  action: string;
+  quiet?: boolean;
+  label_key?: string;
+  label_params?: Record<string, string | number>;
+}
+
 export interface FolderMoveResp {
   moved: number;
   rescan: boolean;
@@ -330,8 +343,7 @@ export interface AppState {
   trash_count: number | null;
   junk_count?: number | null;
   notice: { key: string; params: Record<string, string | number> } | null;
-  undo: { ts: number; label: string; count: number; action: string;
-    quiet?: boolean }[];
+  undo: UndoEntry[];
   folders_raw: string[];
   rules: Rule[];
   presets: FilterPreset[];

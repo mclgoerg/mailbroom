@@ -10,7 +10,7 @@ from fastapi.testclient import TestClient
 from backend import auditlog, mailops
 from backend import config as cfgmod
 from backend.main import app
-from conftest import FakeIMAP, make_msg
+from conftest import FakeIMAP, code_re, make_msg
 
 client = TestClient(app)
 
@@ -119,7 +119,7 @@ def test_clearing_the_choice_makes_the_role_ambiguous_again(monkeypatch):
     assert client.post("/api/folders/role",
                        json={"role": "trash", "folder": ""}).status_code == 200
     assert _saved()["accounts"]["default"]["role_overrides"] == {}
-    with pytest.raises(RuntimeError, match="ambiguous"):
+    with pytest.raises(RuntimeError, match=code_re(mailops.ROLE_UNCONFIRMED, role="trash")):
         mailops.empty_trash(uv=1, max_uid=99)
 
 
@@ -202,7 +202,8 @@ def test_uidvalidity_change_refuses(monkeypatch):
     before = {f: list(m) for f, m in fake.mailbox.items()}
     r = client.post("/api/folders/move_contents", json={
         "folder": "Deleted Items", "uv": 1, "max_uid": 3})
-    assert r.status_code == 409 and "UIDVALIDITY" in r.json()["detail"]
+    assert r.status_code == 409 and r.json()["detail"] == mailops.coded(
+        mailops.FOLDER_CHANGED, folder="Deleted Items")
     assert fake.mailbox == before and not _audit()
 
 
@@ -291,7 +292,8 @@ def test_a_failing_chunk_books_what_moved_and_raises(monkeypatch):
     monkeypatch.setattr(mailops, "_uid_move", flaky)
     r = client.post("/api/folders/move_contents", json={
         "folder": "Deleted Items", "uv": 1, "max_uid": 5})
-    assert r.status_code == 409 and "2 mails were moved" in r.json()["detail"]
+    assert r.status_code == 409 and r.json()["detail"] == mailops.coded(
+        mailops.MOVED_THEN_FAILED, n=2, cause=mailops.CANNOT_MOVE)
     assert len(fake.mailbox["Deleted Items"]) == 3
     entry = next(e for e in _audit() if e["action"] == "move_contents")
     assert entry["count"] == 2 and entry["outcome"] == "partial"

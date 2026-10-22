@@ -6,7 +6,7 @@ import type {
   Mail, MessageDetail,
   LookalikeCount, MailsResp, Rule, RuleRun, SearchResp, SortEstimate, StatsResp, TrashResp,
   FolderMoveResp, FolderRole, PurgePreview, PurgeResult, PurgeSelect,
-  UndoIdent, UnsubBulkResult, UnsubResult,
+  UndoEntry, UndoIdent, UnsubBulkResult, UnsubResult,
 } from "./types";
 
 /* Active account: every API call is scoped to exactly one account (strict
@@ -59,8 +59,8 @@ export function saveBlob(name: string, blob: Blob): void {
   setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
 }
 
-/* Stable error codes the backend's pin feature answers with
- * (mailops.NO_MESSAGE_ID / PINNED_MAILS / ALL_PINNED) -> translated text. */
+/* Stable error codes the backend answers with (the HTTP `detail`; see
+ * mailops.py / knowledgestore.py) -> the `t()` key of the translated text. */
 const ERROR_CODES: Record<string, string> = {
   no_message_id: "pin.no_message_id",
   pinned_mails: "pin.refused",
@@ -79,7 +79,113 @@ const ERROR_CODES: Record<string, string> = {
   role_ambiguous: "folder.err.ambiguous",
   move_unsafe: "folder.err.move_unsafe",
   not_lookalike: "folder.err.not_lookalike",
+  // Empty Trash, permanent deletion, Folders panel moves, undo (mailops.py)
+  busy_action: "ferr.busy_action",
+  busy_purge: "ferr.busy_purge",
+  busy_scan: "ferr.busy_scan",
+  busy_rule: "ferr.busy_rule",
+  count_required: "ferr.count_required",
+  role_missing: "ferr.role_missing",
+  inbox_missing: "ferr.inbox_missing",
+  junk_needs_trash: "ferr.junk_needs_trash",
+  role_unconfirmed: "ferr.role_unconfirmed",
+  junk_is_trash: "ferr.junk_is_trash",
+  folder_changed: "ferr.folder_changed",
+  partial_unsafe: "ferr.partial_unsafe",
+  partial_unsafe_changed: "ferr.partial_unsafe_changed",
+  cannot_open: "ferr.cannot_open",
+  cannot_list: "ferr.cannot_list",
+  cannot_flag: "ferr.cannot_flag",
+  cannot_expunge: "ferr.cannot_expunge",
+  cannot_move: "ferr.cannot_move",
+  cannot_remove_copies: "ferr.cannot_remove_copies",
+  cannot_read_moved: "ferr.cannot_read_moved",
+  uv_unreadable: "ferr.uv_unreadable",
+  no_known_selected: "ferr.no_known_selected",
+  unknown_target: "ferr.unknown_target",
+  target_is_trash: "ferr.target_is_trash",
+  nothing_to_undo: "ferr.nothing_to_undo",
+  deleted_then_failed: "ferr.deleted_then_failed",
+  stranded_then_failed: "ferr.stranded_then_failed",
+  moved_then_failed: "ferr.moved_then_failed",
+  // purge rules (backend/rules.py)
+  rule_report_first: "ferr.rule_report_first",
+  rule_folder_changed: "ferr.rule_folder_changed",
+  rule_purge_grouping: "ferr.rule_purge_grouping",
+  rule_purge_keep_latest: "ferr.rule_purge_keep_latest",
+  rule_purge_needs_age: "ferr.rule_purge_needs_age",
+  rule_purge_filter: "ferr.rule_purge_filter",
+  rule_purge_filter_domain: "ferr.rule_purge_filter_domain",
 };
+
+/** The role names a `role=` param stands for (translated). */
+const ROLE_NAMES: Record<string, string> = {
+  trash: "Trash", junk: "Junk", archive: "ferr.role_archive",
+};
+
+/** A coded error detail: `code` or `code:key=value,...` (mailops.coded; the
+ *  values are percent-encoded, so a folder name or a nested `cause=` can hold
+ *  any character). Counts are `n`. `null` unless it is one of our codes with
+ *  well-formed params - the caller then shows the raw text. */
+export function parseErrorDetail(detail: string):
+    { code: string; params: Record<string, string | number> } | null {
+  if (typeof detail !== "string") return null;   // e.g. a 422's error list
+  const i = detail.indexOf(":");
+  const code = i < 0 ? detail : detail.slice(0, i);
+  if (!Object.hasOwn(ERROR_CODES, code)) return null;
+  const params: Record<string, string | number> = {};
+  if (i >= 0) {
+    try {
+      for (const pair of detail.slice(i + 1).split(",")) {
+        const eq = pair.indexOf("=");
+        if (eq < 1) return null;
+        const key = pair.slice(0, eq);
+        const value = decodeURIComponent(pair.slice(eq + 1));
+        params[key] = key === "n" && /^\d+$/.test(value) ? Number(value) : value;
+      }
+    } catch {
+      return null;                     // a broken % escape: show it raw
+    }
+  }
+  return { code, params };
+}
+
+/** The user-language text of a backend error `detail`: a known code with
+ *  its params, a nested `cause` translated the same way; anything else (an
+ *  unknown code, plain English from an older server, a raw IMAP error) as it
+ *  is. */
+export function errorText(detail: string): string {
+  const parsed = parseErrorDetail(detail);
+  if (!parsed) return detail;
+  const { code, params } = parsed;
+  const text: Record<string, string | number> = { ...params };
+  if (typeof params.cause === "string") text.cause = errorText(params.cause);
+  if (typeof params.role === "string")
+    text.folder = t(ROLE_NAMES[params.role] ?? params.role);
+  else if (typeof params.folder === "string")
+    text.folder = t("ferr.folder_named", { name: params.folder });
+  return t(ERROR_CODES[code], text);
+}
+
+/** The label of an Undo entry in the user's language: the structured label
+ *  (key + params) the backend recorded for it, else the label as sent - a
+ *  sender, a folder name, or an entry from before labels were structured. */
+export const undoLabel = (u: UndoLabelled): string =>
+  u.label_key ? t(u.label_key, u.label_params) : u.label;
+
+type UndoLabelled = Pick<UndoEntry, "label" | "label_key" | "label_params">;
+
+/** Notice params with a structured `label` (`label_key` + `label_<param>`,
+ *  see mailops.undo_last) worded in the user's language. */
+export function noticeParams(
+    params: Record<string, string | number>): Record<string, string | number> {
+  const key = params.label_key;
+  if (typeof key !== "string") return params;
+  const sub: Record<string, string | number> = {};
+  for (const [k, v] of Object.entries(params))
+    if (k.startsWith("label_") && k !== "label_key") sub[k.slice(6)] = v;
+  return { ...params, label: t(key, sub) };
+}
 
 async function req<T>(path: string, body?: unknown,
                       method?: "PUT" | "DELETE"): Promise<T> {
@@ -95,10 +201,10 @@ async function req<T>(path: string, body?: unknown,
     } catch {
       /* plain text */
     }
-    const code = ERROR_CODES[detail];
+    const parsed = parseErrorDetail(detail);
     const err: Error & { code?: string } =
-      new Error(code ? t(code) : detail || `HTTP ${res.status}`);
-    if (code) err.code = detail;
+      new Error(detail ? errorText(detail) : `HTTP ${res.status}`);
+    if (parsed) err.code = parsed.code;
     throw err;
   }
   return res.json() as Promise<T>;

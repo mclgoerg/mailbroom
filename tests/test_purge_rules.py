@@ -11,6 +11,7 @@ a changed UIDVALIDITY refuses, Junk goes via Trash, everything is audited and
 booked, accounts stay separate, concurrent runs are refused."""
 
 import json
+import re
 import time
 
 import pytest
@@ -25,7 +26,7 @@ from backend import pinstore
 from backend import rules as rulesmod
 from backend import stats as statsmod
 from backend.main import app
-from conftest import FakeIMAP, make_msg
+from conftest import FakeIMAP, code_re, make_msg
 from test_purge import OLD, Spy, _env, _mails, _recent, _uids, _uv_flips
 
 client = TestClient(app)
@@ -116,7 +117,7 @@ def test_a_purge_rule_always_starts_in_report_mode(scope):
 
 def test_execute_is_refused_before_a_report_run():
     rule = _rule()
-    with pytest.raises(ValueError, match="report mode first"):
+    with pytest.raises(ValueError, match=code_re(mailops.RULE_REPORT_FIRST)):
         rulesmod.update_rule(rule["id"], {"mode": "execute"})
     assert client.post(f"/api/rules/{rule['id']}",
                        json={"mode": "execute"}).status_code == 400
@@ -219,9 +220,9 @@ def test_unknown_scope_and_unsupported_settings_are_refused():
             rulesmod.create_rule({"name": "x", "scope": "trash",
                                   "older_than_days": 30, **bad})
     rule = _rule("trash")
-    with pytest.raises(ValueError, match="older_than_days"):
+    with pytest.raises(ValueError, match=code_re(mailops.RULE_PURGE_NEEDS_AGE)):
         rulesmod.update_rule(rule["id"], {"older_than_days": None})
-    with pytest.raises(ValueError, match="keep_latest"):
+    with pytest.raises(ValueError, match=code_re(mailops.RULE_PURGE_KEEP_LATEST)):
         rulesmod.update_rule(rule["id"], {"keep_latest": 2,
                                           "older_than_days": None})
     assert client.post("/api/rules", json={
@@ -235,10 +236,11 @@ def test_unknown_scope_and_unsupported_settings_are_refused():
 def test_filter_qualifiers_the_role_index_cannot_answer_are_refused(query):
     """A qualifier answered from missing data would widen the match (`eng:low`
     would hit every sender); no new syntax, only a narrower set."""
-    with pytest.raises(ValueError, match="filter not available"):
+    refused = r"^rule_purge_filter:names="      # names the qualifier(s)
+    with pytest.raises(ValueError, match=refused):
         _rule("trash", query=query)
     rule = _rule("trash")
-    with pytest.raises(ValueError, match="filter not available"):
+    with pytest.raises(ValueError, match=refused):
         rulesmod.update_rule(rule["id"], {"query": query})
 
 
@@ -255,7 +257,7 @@ def test_editing_the_definition_of_an_execute_rule_resets_it_to_report(
         reset = rulesmod.update_rule(rule["id"], body)
         assert reset["mode"] == "report" and reset["report_runs"] == 0, body
         assert not rulesmod.purge_armed(reset)
-        with pytest.raises(ValueError, match="report mode first"):
+        with pytest.raises(ValueError, match=code_re(mailops.RULE_REPORT_FIRST)):
             rulesmod.update_rule(rule["id"], {"mode": "execute"})
         rule = _armed(_stored(rule["id"]))          # preview, execute again
         assert rule["mode"] == "execute"
@@ -276,7 +278,7 @@ def test_a_changed_definition_and_execute_in_one_update_is_refused(
         monkeypatch):
     _env(monkeypatch)
     rule = _armed(_rule("trash", query="gone"))
-    with pytest.raises(ValueError, match="report mode first"):
+    with pytest.raises(ValueError, match=code_re(mailops.RULE_REPORT_FIRST)):
         rulesmod.update_rule(rule["id"], {"query": "wider", "mode": "execute"})
     kept = _stored(rule["id"])               # the refused edit changed nothing
     assert kept["query"] == "gone" and kept["mode"] == "execute"
@@ -297,7 +299,7 @@ def test_a_report_run_that_started_before_an_edit_does_not_arm_the_edit(
     monkeypatch.setattr(mailops, "purge_preview", orig)
     stored = _stored(rule["id"])
     assert stored["report_runs"] == 0 and not rulesmod.purge_armed(stored)
-    with pytest.raises(ValueError, match="report mode first"):
+    with pytest.raises(ValueError, match=code_re(mailops.RULE_REPORT_FIRST)):
         rulesmod.update_rule(rule["id"], {"mode": "execute"})
     assert _uids(fake, "Trash") == [3]
 
@@ -336,7 +338,7 @@ def test_an_imported_backup_cannot_smuggle_an_execute_purge_rule():
     assert rules["smuggled"]["mode"] == "report" \
         and rules["smuggled"]["report_runs"] == 0
     assert rules["mail"]["mode"] == "report"
-    with pytest.raises(ValueError, match="report mode first"):
+    with pytest.raises(ValueError, match=code_re(mailops.RULE_REPORT_FIRST)):
         rulesmod.update_rule(rules["smuggled"]["id"], {"mode": "execute"})
 
 
@@ -653,10 +655,12 @@ def test_uidvalidity_change_after_the_listing_refuses_and_deletes_nothing(
         return out
     monkeypatch.setattr(mailops, "purge_preview", recreated)
     spy = Spy(fake)
-    with pytest.raises(RuntimeError, match="changed on the server"):
+    with pytest.raises(RuntimeError, match=code_re(mailops.FOLDER_CHANGED,
+                                                   role="trash")):
         _run(rule)
     assert spy.destructive() == [] and _uids(fake, "Trash") == [3, 4]
-    assert "changed on the server" in _stored(rule["id"])["last_run"]["error"]
+    assert _stored(rule["id"])["last_run"]["error"] == mailops.coded(
+        mailops.FOLDER_CHANGED, role="trash")
     assert _entries("purge") == []
     (e,) = _entries("rule_execute")
     assert e["outcome"] == "error"
@@ -675,7 +679,8 @@ def test_a_changed_junk_uidvalidity_refuses_and_deletes_nothing(
         return out
     monkeypatch.setattr(mailops, "purge_preview", recreated)
     spy = Spy(fake)
-    with pytest.raises(RuntimeError, match="changed on the server"):
+    with pytest.raises(RuntimeError, match=code_re(mailops.FOLDER_CHANGED,
+                                                   role="junk")):
         _run(rule)
     assert spy.destructive() == []
     assert _uids(fake, "Spam") == [3, 4] and _uids(fake, "Trash") == [8]
@@ -686,14 +691,15 @@ def test_no_uidplus_refuses_a_partial_purge_and_junk_altogether(monkeypatch):
                 + [make_msg(6, date=_recent())], uidplus=False)
     rule = _armed(_rule("trash"))
     spy = Spy(fake)
-    with pytest.raises(RuntimeError, match="cannot delete part of a folder"):
+    with pytest.raises(RuntimeError, match=code_re(
+            mailops.PARTIAL_UNSAFE_CHANGED)):
         _run(rule)
     assert spy.destructive() == [] and _uids(fake, "Trash") == [3, 4, 5, 6]
     fake = _env(monkeypatch, junk=_mails([3], date=OLD),
                 trash=_mails([8]), uidplus=False)
     rule = _armed(_rule("junk"))
     spy = Spy(fake)
-    with pytest.raises(RuntimeError, match="cannot delete part of a folder"):
+    with pytest.raises(RuntimeError, match=code_re(mailops.PARTIAL_UNSAFE)):
         _run(rule)
     assert spy.destructive() == [] and _uids(fake, "Spam") == [3]
 
@@ -717,13 +723,15 @@ def test_an_ambiguous_unconfirmed_role_refuses_and_deletes_nothing(
     fake.uv[extra] = 1
     before = {f: list(m) for f, m in fake.mailbox.items()}
     spy = Spy(fake)
-    with pytest.raises(RuntimeError, match="ambiguous"):
+    unconfirmed = code_re(mailops.ROLE_UNCONFIRMED,
+                          role="junk" if which == "junk-own" else "trash")
+    with pytest.raises(RuntimeError, match=unconfirmed):
         _run(rule)
     assert spy.destructive() == [] and fake.mailbox == before
     assert _entries("purge") == []
     # ... also in report mode: nothing to preview on a folder we may not pick
     rulesmod.update_rule(rule["id"], {"mode": "report"})
-    with pytest.raises(RuntimeError, match="ambiguous"):
+    with pytest.raises(RuntimeError, match=unconfirmed):
         _run(rule)
     assert fake.mailbox == before
 
@@ -732,9 +740,11 @@ def test_a_missing_role_folder_is_the_runs_error(monkeypatch):
     fake = FakeIMAP({"INBOX": [make_msg(1)]})
     monkeypatch.setattr(mailops, "connect", lambda cfg, name=None: fake)
     rule = _rule("junk")
-    with pytest.raises(RuntimeError, match="No Junk folder"):
+    with pytest.raises(RuntimeError, match=code_re(mailops.ROLE_MISSING,
+                                                   role="junk")):
         _run(rule)
-    assert "No Junk folder" in _stored(rule["id"])["last_run"]["error"]
+    assert _stored(rule["id"])["last_run"]["error"] == mailops.coded(
+        mailops.ROLE_MISSING, role="junk")
     assert _stored(rule["id"])["report_runs"] == 0      # no report happened
 
 
@@ -861,7 +871,7 @@ def test_a_second_rule_run_is_refused_while_one_is_running(monkeypatch):
     spy = Spy(fake)
     try:
         for r in (rule, other):
-            with pytest.raises(RuntimeError, match="busy"):
+            with pytest.raises(RuntimeError, match=code_re(mailops.BUSY_RULE)):
                 _run(r)
         assert client.post(f"/api/rules/{rule['id']}/run").status_code == 409
     finally:
@@ -876,12 +886,12 @@ def test_a_manual_purge_in_progress_makes_the_rule_back_off(monkeypatch):
     assert acc.purge_lock.acquire(blocking=False)
     spy = Spy(fake)
     try:
-        with pytest.raises(RuntimeError, match="busy"):
+        with pytest.raises(RuntimeError, match=code_re(mailops.BUSY_PURGE)):
             _run(rule)
     finally:
         acc.purge_lock.release()
     assert spy.destructive() == [] and _uids(fake, "Trash") == [3]
-    assert "busy" in _stored(rule["id"])["last_run"]["error"]
+    assert _stored(rule["id"])["last_run"]["error"] == mailops.BUSY_PURGE
     assert _run(rule)["acted"] == 1                 # next run is fine
 
 
@@ -897,7 +907,8 @@ def test_a_running_scan_or_delete_job_makes_the_rule_back_off(
     old = acc.state[key]
     acc.state[key] = val
     spy = Spy(fake)
-    with pytest.raises(RuntimeError, match="busy"):
+    with pytest.raises(RuntimeError, match=code_re(
+            mailops.BUSY_ACTION if key == "delete" else mailops.BUSY_SCAN)):
         _run(rule)
     acc.state[key] = old
     assert spy.destructive() == [] and _uids(fake, "Trash") == [3]
@@ -979,7 +990,8 @@ def test_a_refusal_in_a_scheduled_run_is_recorded_and_deletes_nothing(
     fake.uv["Deleted Items"] = 1
     _write_last_run_old(rule["id"])
     rulesmod._tick()                                  # never raises
-    assert "ambiguous" in _stored(rule["id"])["last_run"]["error"]
+    assert _stored(rule["id"])["last_run"]["error"] == mailops.coded(
+        mailops.ROLE_UNCONFIRMED, role="trash")
     assert _uids(fake, "Trash") == [3] and _uids(fake, "Deleted Items") == [4]
 
 
@@ -1009,7 +1021,8 @@ def test_the_run_endpoint_answers_409_with_the_refusal(monkeypatch):
     rule = client.post("/api/rules", json={"name": "p",
                                            "scope": "trash"}).json()
     r = client.post(f"/api/rules/{rule['id']}/run")
-    assert r.status_code == 409 and "ambiguous" in r.json()["detail"]
+    assert r.status_code == 409 and r.json()["detail"] == mailops.coded(
+        mailops.ROLE_UNCONFIRMED, role="trash")
     assert _uids(fake, "Trash") == [3]
 
 
@@ -1027,8 +1040,7 @@ def _ambiguous_trash(monkeypatch, **kw):
 def _refused_back_to_report(rule, fake, *untouched):
     before = {f: list(fake.mailbox[f]) for f in untouched}
     spy = Spy(fake)
-    with pytest.raises(RuntimeError, match="folder changed since the last "
-                                            "report"):
+    with pytest.raises(RuntimeError, match=code_re(mailops.RULE_FOLDER_CHANGED)):
         _run(rule)
     assert spy.destructive() == []
     assert {f: list(fake.mailbox[f]) for f in untouched} == before
@@ -1036,9 +1048,9 @@ def _refused_back_to_report(rule, fake, *untouched):
     assert stored["mode"] == "report" and stored["report_runs"] == 0
     assert stored["reset_reason"] == "folder" and not rulesmod.purge_armed(
         stored)
-    assert "folder changed" in stored["last_run"]["error"]
+    assert stored["last_run"]["error"] == mailops.RULE_FOLDER_CHANGED
     assert _entries("purge") == []
-    with pytest.raises(ValueError, match="report mode first"):
+    with pytest.raises(ValueError, match=code_re(mailops.RULE_REPORT_FIRST)):
         rulesmod.update_rule(rule["id"], {"mode": "execute"})
 
 
@@ -1122,7 +1134,7 @@ def test_changing_the_server_or_login_of_an_account_disarms_its_rules(
         stored = _stored(rule["id"])
         assert stored["mode"] == "report" and stored["report_runs"] == 0
         assert stored["reset_reason"] == "account"
-        with pytest.raises(ValueError, match="report mode first"):
+        with pytest.raises(ValueError, match=code_re(mailops.RULE_REPORT_FIRST)):
             rulesmod.update_rule(rule["id"], {"mode": "execute"})
     assert _uids(boxes["host-one"], "Trash") == [3, 4]
 
@@ -1202,11 +1214,12 @@ def test_a_run_that_stops_part_way_books_what_was_really_deleted(
                 return "NO", [b"denied"]
         return orig(cmd, *a)
     fake.uid = uid
-    with pytest.raises(RuntimeError, match="500 mails were permanently "
-                                           "deleted"):
+    failed = mailops.coded(mailops.DELETED_THEN_FAILED, n=500,
+                           cause=mailops.CANNOT_FLAG)
+    with pytest.raises(RuntimeError, match=re.escape(failed)):
         _run(rule)
     last = _stored(rule["id"])["last_run"]
-    assert last["acted"] == 500 and "500 mails" in last["error"]
+    assert last["acted"] == 500 and last["error"] == failed
     (e,) = _entries("rule_execute")
     assert e["count"] == 500 and e["outcome"] == "error"
     (p,) = _entries("purge")
@@ -1227,11 +1240,23 @@ def test_the_rule_audit_counts_what_was_deleted_not_what_matched(monkeypatch):
 
 # ============================================================ filter / cap
 
+def test_a_refused_filter_names_the_qualifier_in_its_code():
+    with pytest.raises(ValueError, match=code_re(
+            mailops.RULE_PURGE_FILTER, names="tag:")):
+        _rule("trash", query="tag:shipping")
+    with pytest.raises(ValueError, match=code_re(
+            mailops.RULE_PURGE_FILTER, names="tag:, ai:")):
+        _rule("trash", query="tag:a ai:safe")
+
+
 def test_domain_is_refused_for_purge_rules_with_a_clear_message():
-    with pytest.raises(ValueError, match=r"domain:.*never matches sender"):
+    # its own code: the text adds that `domain:` never matches sender groups
+    with pytest.raises(ValueError, match=code_re(
+            mailops.RULE_PURGE_FILTER_DOMAIN, names="domain:")):
         _rule("trash", query="domain:gone.example")
     rule = _rule("trash")
-    with pytest.raises(ValueError, match="domain:"):
+    with pytest.raises(ValueError, match=code_re(
+            mailops.RULE_PURGE_FILTER_DOMAIN, names="domain:")):
         rulesmod.update_rule(rule["id"], {"query": "age:>1m domain:x"})
     assert client.post("/api/rules", json={
         "name": "d", "scope": "junk",
@@ -1254,7 +1279,7 @@ def test_a_hand_edited_purge_rule_with_an_unsupported_filter_never_runs(
                  "dest": "", "account": "default", "schedule": "manual",
                  "mode": "report", "report_runs": 0, "older_than_days": 1,
                  "origin": "manual", "created": 1, "last_run": None}])
-        with pytest.raises(RuntimeError, match="filter not available"):
+        with pytest.raises(RuntimeError, match=r"^rule_purge_filter:names="):
             rulesmod.run_rule("r1")
     assert spy.calls == [] and _uids(fake, "Trash") == [3, 4]
 
@@ -1277,7 +1302,7 @@ def test_requests_and_imports_cannot_forge_the_report_record(monkeypatch):
     rule = rulesmod.update_rule(rule["id"], {"name": "g", **forged}
                                 | {"mode": "report"})
     assert rule["report_runs"] == 0 and rule["report_sig"] == ""
-    with pytest.raises(ValueError, match="report mode first"):
+    with pytest.raises(ValueError, match=code_re(mailops.RULE_REPORT_FIRST)):
         rulesmod.update_rule(rule["id"], {"mode": "execute", **forged})
     r = client.post(f"/api/rules/{rule['id']}", json=forged)
     assert r.status_code == 400
@@ -1298,7 +1323,7 @@ def test_switching_an_armed_purge_rule_back_to_a_mail_rule_resets_it(
                                              "action": "trash"})
     assert back["mode"] == "report" and back["report_runs"] == 0
     assert _stored(rule["id"])["mode"] == "report"   # not an execute rule
-    with pytest.raises(ValueError, match="report mode first"):
+    with pytest.raises(ValueError, match=code_re(mailops.RULE_REPORT_FIRST)):
         rulesmod.update_rule(rule["id"], {"mode": "execute"})
 
 
@@ -1316,7 +1341,8 @@ def test_a_folder_recreated_before_the_delete_step_is_refused_by_the_rule(
     rule = _armed(_rule(scope))
     _uv_flips(fake, folder, readonly_uv=1, rw_uv=9)
     spy = Spy(fake)
-    with pytest.raises(RuntimeError, match="changed on the server"):
+    with pytest.raises(RuntimeError, match=code_re(mailops.FOLDER_CHANGED,
+                                                   role=scope)):
         _run(rule)
     assert spy.destructive() == []
     assert _uids(fake, folder) == ([3, 4] if scope == "trash" else [13, 14])
@@ -1405,7 +1431,7 @@ def test_the_mailbox_fingerprint_is_taken_at_the_start_of_a_report(
     monkeypatch.setattr(mailops, "purge_preview", orig)
     stored = _stored(rule["id"])
     assert stored["report_runs"] == 0 and not rulesmod.purge_armed(stored)
-    with pytest.raises(ValueError, match="report mode first"):
+    with pytest.raises(ValueError, match=code_re(mailops.RULE_REPORT_FIRST)):
         rulesmod.update_rule(rule["id"], {"mode": "execute"})
 
 

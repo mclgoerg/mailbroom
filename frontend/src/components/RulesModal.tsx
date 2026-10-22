@@ -1,6 +1,6 @@
 import { ClipboardList, Pin, Shield, TriangleAlert } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { api } from "../api";
+import { api, errorText } from "../api";
 import { t } from "../i18n";
 import { matchGroup, parseFilter } from "../lib";
 import type { AppState, Grouping, Rule, RuleScope } from "../types";
@@ -30,7 +30,7 @@ const isPurge = (scope: RuleScope | undefined) =>
 function RunSummary({ rule }: { rule: Rule }) {
   const r = rule.last_run;
   if (!r) return <span className="text-muted">{t("rule.never_ran")}</span>;
-  if (r.error) return <span className="text-danger-fg">{r.error}</span>;
+  if (r.error) return <span className="text-danger-fg">{errorText(r.error)}</span>;
   const purge = isPurge(rule.scope);
   return (
     <>

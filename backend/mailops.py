@@ -24,6 +24,7 @@ import time
 from email.utils import getaddresses, parseaddr
 from pathlib import Path
 from typing import NamedTuple
+from urllib.parse import quote
 
 import imaplib
 imaplib._MAXLINE = 10_000_000  # bulk FETCH responses exceed the default 1MB
@@ -91,6 +92,112 @@ ROLE_NOT_CANDIDATE = "role_not_candidate"  # set_role_override: not that role's
 ROLE_AMBIGUOUS = "role_ambiguous"    # lookalike_*: choose the role folder first
 NOT_LOOKALIKE = "not_lookalike"      # lookalike_*: no look-alike of a role
 MOVE_UNSAFE = "move_unsafe"          # lookalike_*: server has no MOVE/UIDPLUS
+# Refusals / failures of the special-folder features (Empty Trash, permanent
+# delete, Folders panel moves, look-alike moves, undo, purge rules): the same
+# mechanism, with params where the text needs them (see `coded`). The UI has
+# an entry for each in api.ts ERROR_CODES (a test checks both lists). Which
+# condition refuses is unchanged - only the text became a code.
+BUSY_ACTION = "busy_action"          # a move / deletion job is running
+BUSY_PURGE = "busy_purge"            # another permanent deletion is running
+BUSY_SCAN = "busy_scan"              # a scan is running
+BUSY_RULE = "busy_rule"              # rules: another rule is running
+COUNT_REQUIRED = "count_required"    # no counted listing (uv / UIDs) sent
+ROLE_MISSING = "role_missing"        # role=: no Trash / Junk folder found
+INBOX_MISSING = "inbox_missing"
+JUNK_NEEDS_TRASH = "junk_needs_trash"    # Junk goes via Trash: none found
+ROLE_UNCONFIRMED = "role_unconfirmed"    # role=: ambiguous, choose in Settings
+JUNK_IS_TRASH = "junk_is_trash"
+FOLDER_CHANGED = "folder_changed"    # role= or folder=: changed since counted
+PARTIAL_UNSAFE = "partial_unsafe"    # server cannot delete single mails safely
+PARTIAL_UNSAFE_CHANGED = "partial_unsafe_changed"    # ... folder changed
+CANNOT_OPEN = "cannot_open"          # role= or folder=
+CANNOT_LIST = "cannot_list"
+CANNOT_FLAG = "cannot_flag"
+CANNOT_EXPUNGE = "cannot_expunge"
+CANNOT_MOVE = "cannot_move"
+CANNOT_REMOVE_COPIES = "cannot_remove_copies"
+CANNOT_READ_MOVED = "cannot_read_moved"
+UV_UNREADABLE = "uv_unreadable"      # role=
+NO_KNOWN_SELECTED = "no_known_selected"
+UNKNOWN_TARGET = "unknown_target"    # folder=
+TARGET_IS_TRASH = "target_is_trash"
+NOTHING_TO_UNDO = "nothing_to_undo"
+# a failure after part of the work was done: n= mails, cause= the failure
+DELETED_THEN_FAILED = "deleted_then_failed"
+STRANDED_THEN_FAILED = "stranded_then_failed"
+MOVED_THEN_FAILED = "moved_then_failed"
+# purge rules (backend/rules.py)
+RULE_REPORT_FIRST = "rule_report_first"
+RULE_FOLDER_CHANGED = "rule_folder_changed"
+RULE_PURGE_GROUPING = "rule_purge_grouping"
+RULE_PURGE_KEEP_LATEST = "rule_purge_keep_latest"
+RULE_PURGE_NEEDS_AGE = "rule_purge_needs_age"
+RULE_PURGE_FILTER = "rule_purge_filter"                  # names=
+RULE_PURGE_FILTER_DOMAIN = "rule_purge_filter_domain"    # names=
+FOLDER_ERROR_CODES = frozenset({
+    NO_MESSAGE_ID, PINNED_MAILS, PROTECTED_MAILS, ALL_PINNED,
+    ROLE_NOT_CANDIDATE, ROLE_AMBIGUOUS, NOT_LOOKALIKE, MOVE_UNSAFE,
+    BUSY_ACTION,
+    BUSY_PURGE,
+    BUSY_SCAN,
+    BUSY_RULE,
+    COUNT_REQUIRED,
+    ROLE_MISSING,
+    INBOX_MISSING,
+    JUNK_NEEDS_TRASH,
+    ROLE_UNCONFIRMED,
+    JUNK_IS_TRASH,
+    FOLDER_CHANGED,
+    PARTIAL_UNSAFE,
+    PARTIAL_UNSAFE_CHANGED,
+    CANNOT_OPEN,
+    CANNOT_LIST,
+    CANNOT_FLAG,
+    CANNOT_EXPUNGE,
+    CANNOT_MOVE,
+    CANNOT_REMOVE_COPIES,
+    CANNOT_READ_MOVED,
+    UV_UNREADABLE,
+    NO_KNOWN_SELECTED,
+    UNKNOWN_TARGET,
+    TARGET_IS_TRASH,
+    NOTHING_TO_UNDO,
+    DELETED_THEN_FAILED,
+    STRANDED_THEN_FAILED,
+    MOVED_THEN_FAILED,
+    RULE_REPORT_FIRST,
+    RULE_FOLDER_CHANGED,
+    RULE_PURGE_GROUPING,
+    RULE_PURGE_KEEP_LATEST,
+    RULE_PURGE_NEEDS_AGE,
+    RULE_PURGE_FILTER,
+    RULE_PURGE_FILTER_DOMAIN})
+
+
+def coded(code: str, **params) -> str:
+    """The `detail` of a coded refusal: `code`, or `code:key=value,...` with
+    percent-encoded values (so a folder name or a nested `cause=` may hold
+    any character) - parsed back by frontend/src/api.ts. Counts are always
+    called `n`; `role=` is a role id (trash | junk), `folder=` a decoded
+    folder name. Never put mail subjects or addresses in a param."""
+    if not params:
+        return code
+    return code + ":" + ",".join(
+        f"{k}={quote(str(v), safe='')}" for k, v in params.items())
+
+
+def is_coded(text: str) -> bool:
+    """Whether `text` is a `coded()` string of one of our codes."""
+    return text.partition(":")[0] in FOLDER_ERROR_CODES
+
+
+def error_text(exc: Exception) -> str:
+    """What a job records as its error: a coded refusal as it is (the UI
+    translates it), anything else as `TypeName: message`."""
+    text = str(exc)
+    return text if is_coded(text) else f"{type(exc).__name__}: {text}"
+
+
 UNDO_MAX = 10
 
 # All mutable mail state lives in per-account AccountState objects (see
@@ -366,7 +473,11 @@ def _undo_summaries(acc) -> list[dict]:
     return [{"ts": u["ts"], "label": u["label"], "count": u["count"],
              "action": u.get("action", "trash"),
              # the Folders panel toasts these itself; absent = ordinary
-             **({"quiet": True} if u.get("quiet") else {})}
+             **({"quiet": True} if u.get("quiet") else {}),
+             # a label the UI words itself (key + params); absent = `label`
+             **({"label_key": u["label_key"],
+                 "label_params": u["label_params"]}
+                if u.get("label_key") else {})}
             for u in acc.undo_log]
 
 
@@ -2114,11 +2225,10 @@ def _resolve_dest(conn, action: str, dest: str, acc=None) -> str:
     if action in ("trash", "archive"):
         name = folder_roles(conn, acc).get(action)
         if not name:
-            raise RuntimeError(
-                f"No {action.capitalize()} folder found on the server")
+            raise RuntimeError(coded(ROLE_MISSING, role=action))
         return name
     if dest not in list_folders(conn):
-        raise RuntimeError(f"unknown target folder {decode_mutf7(dest)!r}")
+        raise RuntimeError(coded(UNKNOWN_TARGET, folder=decode_mutf7(dest)))
     return dest
 
 
@@ -2150,9 +2260,8 @@ def _move_uids(by_folder: dict[str, set[int]], action: str, dest: str,
                 role = role_of_folder(folder, acc)
                 expected = role_uvalidity(role, folder, acc) if role else 0
             if expected and uv and uv != expected:
-                raise RuntimeError(
-                    f"mailbox {decode_mutf7(folder)!r} changed on the server "
-                    "(UIDVALIDITY mismatch) - rescan before deleting")
+                raise RuntimeError(coded(FOLDER_CHANGED,
+                                         folder=decode_mutf7(folder)))
             uids = sorted(uidset)
             for start in range(0, len(uids), MOVE_CHUNK):
                 if cancel_requested("delete", acc):
@@ -2229,11 +2338,22 @@ def _apply_seen(folder: str, uids: list[int], acc) -> None:
 # practice (one Bridge connection) and keeps the bookkeeping exact.
 
 
+def _from_role_label(n: int, role: str) -> tuple[str, dict]:
+    """`(English label, label fields)` of an undo entry for `n` mails moved
+    out of a role folder: the UI words it in its own language from the
+    structured fields (`undo.from_junk` / `undo.from_trash`, plural by `n`),
+    `label` stays the entry's identity (and what an older client shows)."""
+    text = f"{n} mail{'' if n == 1 else 's'} from {ROLE_LABELS[role]}"
+    return text, {"label_key": f"undo.from_{role}", "label_params": {"n": n}}
+
+
 def _record_undo(label: str, meta: dict, action: str, dest: str,
-                 acc, quiet: bool = False) -> None:
+                 acc, quiet: bool = False,
+                 label_fields: dict | None = None) -> None:
     """Append a move job to the undo log (acc.lock held). `quiet` = the
     caller shows its own toast (Folders panel), so the UI's generic "moved
-    N" toast for new undo entries stays silent."""
+    N" toast for new undo entries stays silent. `label_fields`: optional
+    structured label (see `_from_role_label`)."""
     items = [(folder, m["msgid"])
              for folder, by_uid in meta.items()
              for m in by_uid.values() if m.get("msgid")]
@@ -2241,7 +2361,8 @@ def _record_undo(label: str, meta: dict, action: str, dest: str,
         return
     acc.undo_log.append({"ts": int(time.time()), "label": label,
                          "action": action, "count": len(items),
-                         "items": items, "in": dest, "quiet": quiet})
+                         "items": items, "in": dest, "quiet": quiet,
+                         **(label_fields or {})})
     del acc.undo_log[:-UNDO_MAX]
     acc.state["undo"] = _undo_summaries(acc)
 
@@ -2319,7 +2440,7 @@ def _delete_worker(acc) -> None:
                 acc.delete_pending.clear()
                 acc.state["notice"] = {"key": "action_cancelled", "params": {}}
         except Exception as exc:
-            error = f"{type(exc).__name__}: {exc}"
+            error = error_text(exc)
             log.exception("action %r failed after %.1fs", action,
                           time.time() - t0)
             # Fold in whatever DID get moved before the failure, so the state
@@ -2938,11 +3059,11 @@ def undo_last(index: int = -1, acc=None, ident: dict | None = None) -> dict:
                           (ident.get("ts"), ident.get("label"),
                            ident.get("count"))), len(acc.undo_log))
         if not acc.undo_log:
-            raise RuntimeError("nothing to undo")
+            raise RuntimeError(NOTHING_TO_UNDO)
         if not -len(acc.undo_log) <= index < len(acc.undo_log):
-            raise RuntimeError("bad undo index")
+            raise RuntimeError(NOTHING_TO_UNDO)     # a stale list position
         if acc.state["delete"]["status"] == "running":
-            raise RuntimeError("busy: an action is running")
+            raise RuntimeError(BUSY_ACTION)
         entry = acc.undo_log.pop(index)
         acc.state["undo"] = _undo_summaries(acc)
 
@@ -2953,11 +3074,10 @@ def undo_last(index: int = -1, acc=None, ident: dict | None = None) -> dict:
     try:
         trash = entry.get("in") or folder_roles(conn, acc).get("trash")
         if not trash:
-            raise RuntimeError("No Trash folder found on the server")
+            raise RuntimeError(coded(ROLE_MISSING, role="trash"))
         status, _ = conn.select(quote_folder(trash), readonly=False)
         if status != "OK":
-            raise RuntimeError(
-                f"cannot open {decode_mutf7(trash)!r}")
+            raise RuntimeError(coded(CANNOT_OPEN, folder=decode_mutf7(trash)))
         # Find each message in Trash by Message-ID, batch moves per target.
         by_target: dict[str, list[bytes]] = {}
         for folder, msgid in entry["items"]:
@@ -3003,8 +3123,13 @@ def undo_last(index: int = -1, acc=None, ident: dict | None = None) -> dict:
         # the mails went back to a folder that is never scanned: nothing
         # in the index changes, so no rescan and no "rescan" notice
         return {"restored": restored, "of": entry["count"], "rescan": False}
-    rescan = _rescan_after_restore(acc, restored, "restored", {
-        "restored": restored, "of": entry["count"], "label": entry["label"]})
+    params = {"restored": restored, "of": entry["count"],
+              "label": entry["label"]}
+    if entry.get("label_key"):     # the notice words the label itself, too
+        params["label_key"] = entry["label_key"]
+        params.update({f"label_{k}": v
+                       for k, v in entry["label_params"].items()})
+    rescan = _rescan_after_restore(acc, restored, "restored", params)
     return {"restored": restored, "of": entry["count"], "rescan": rescan}
 
 
@@ -3033,7 +3158,7 @@ def refresh_role_index(conn, role: str, folder: str,
     acc = acc or accounts.get()
     status, _ = conn.select(quote_folder(folder), readonly=True)
     if status != "OK":
-        raise RuntimeError(f"cannot open {decode_mutf7(folder)!r}")
+        raise RuntimeError(coded(CANNOT_OPEN, folder=decode_mutf7(folder)))
     with acc.lock:
         old = acc.role_index.get(role, {})
         old_uv = acc.role_uv.get(role) or {}
@@ -3157,12 +3282,11 @@ def role_list(role: str, limit: int = 1000, acc=None) -> dict:
     read from the server and must be sent back on restore / empty so we never
     act on stale UIDs. `senders` groups the WHOLE folder by sender."""
     acc = acc or accounts.get()
-    label = ROLE_LABELS.get(role, role)
     conn = connect(cfgmod.account_imap(acc.name), acc.name)
     try:
         folder = folder_roles(conn, acc).get(role)
         if not folder:
-            raise RuntimeError(f"No {label} folder found on the server")
+            raise RuntimeError(coded(ROLE_MISSING, role=role))
         uv, messages = refresh_role_index(conn, role, folder, acc)
     finally:
         try:
@@ -3208,22 +3332,21 @@ def role_move(role: str, action: str, uids: list[int], uv: int = 0,
     acc = acc or accounts.get()
     if (role, action) not in ROLE_MOVES:
         raise ValueError("bad action")
-    label = ROLE_LABELS.get(role, role)
     with acc.lock:
         if acc.state["delete"]["status"] == "running":
-            raise RuntimeError("busy: an action is running")
+            raise RuntimeError(BUSY_ACTION)
     clean = sorted({int(u) for u in uids})
     conn = connect(cfgmod.account_imap(acc.name), acc.name)
     try:
         roles = folder_roles(conn, acc)
         src = roles.get(role)
         if not src:
-            raise RuntimeError(f"No {label} folder found on the server")
+            raise RuntimeError(coded(ROLE_MISSING, role=role))
         if action == "not_junk":
             inbox = next((f for f in list_folders(conn)
                           if f.upper() == "INBOX"), None)
             if not inbox:
-                raise RuntimeError("No Inbox found on the server")
+                raise RuntimeError(INBOX_MISSING)
             dest, move_action = inbox, "move"
         else:
             dest, move_action = _resolve_dest(conn, "trash", "", acc), "trash"
@@ -3234,12 +3357,11 @@ def role_move(role: str, action: str, uids: list[int], uv: int = 0,
             pass
     cached_uv, mails = role_state(role, src, acc)
     if uv and cached_uv and uv != cached_uv:
-        raise RuntimeError(f"{label} changed on the server - reload it "
-                           "before moving")
+        raise RuntimeError(coded(FOLDER_CHANGED, role=role))
     known = {m["uid"]: m for m in mails if m["folder"] == src}
     clean = [u for u in clean if u in known]     # exact, known UIDs only
     if not clean:
-        raise RuntimeError("no known messages selected")
+        raise RuntimeError(NO_KNOWN_SELECTED)
     if action == "trash" and not force:
         pinned = pinstore.load_account(acc.name)
         if any(known[u]["msgid"] in pinned for u in clean
@@ -3262,9 +3384,10 @@ def role_move(role: str, action: str, uids: list[int], uv: int = 0,
     size = sum(m["size"] for m in meta.get(src, {}).values())
     if moved:
         role_drop(role, src, moved, acc)
+        label, fields = _from_role_label(len(moved), role)
         with acc.lock:
-            _record_undo(f"{len(moved)} mails from {label}", meta,
-                         move_action, dest, acc, quiet=True)
+            _record_undo(label, meta, move_action, dest, acc, quiet=True,
+                         label_fields=fields)
             key = ROLE_COUNTED.get(role)
             if key and acc.state[key] is not None:
                 acc.state[key] = max(0, acc.state[key] - len(moved))
@@ -3274,7 +3397,7 @@ def role_move(role: str, action: str, uids: list[int], uv: int = 0,
         save_snapshot(acc)
     auditlog.record(
         move_action, account=acc.name, count=len(moved), size=size,
-        label=f"{len(moved)} mails from {label}",
+        label=_from_role_label(len(moved), role)[0],
         outcome="error" if error else "ok",
         error=f"{type(error).__name__}: {error}" if error else "")
     if error:
@@ -3299,7 +3422,7 @@ def trash_restore(uids: list[int], dest: str, uv: int = 0,
     acc = acc or accounts.get()
     with acc.lock:
         if acc.state["delete"]["status"] == "running":
-            raise RuntimeError("busy: a deletion is running")
+            raise RuntimeError(BUSY_ACTION)
     restored = 0
     moved: list[int] = []
     trash = ""
@@ -3308,17 +3431,17 @@ def trash_restore(uids: list[int], dest: str, uv: int = 0,
         folders = list_folders(conn)
         trash = folder_roles(conn, acc).get("trash")
         if not trash:
-            raise RuntimeError("No Trash folder found on the server")
+            raise RuntimeError(coded(ROLE_MISSING, role="trash"))
         if dest not in folders:
-            raise RuntimeError(f"unknown target folder {decode_mutf7(dest)!r}")
+            raise RuntimeError(coded(UNKNOWN_TARGET,
+                                     folder=decode_mutf7(dest)))
         if dest == trash:
-            raise RuntimeError("target is the Trash folder itself")
+            raise RuntimeError(TARGET_IS_TRASH)
         status, _ = conn.select(quote_folder(trash), readonly=False)
         if status != "OK":
-            raise RuntimeError("cannot open Trash")
+            raise RuntimeError(coded(CANNOT_OPEN, role="trash"))
         if uv and uidvalidity(conn) not in (0, uv):
-            raise RuntimeError("Trash changed on the server - reload it "
-                               "before restoring")
+            raise RuntimeError(coded(FOLDER_CHANGED, role="trash"))
         clean = sorted({int(u) for u in uids})
         for start in range(0, len(clean), MOVE_CHUNK):
             chunk = clean[start:start + MOVE_CHUNK]
@@ -3405,7 +3528,7 @@ def _lookalike_target(conn, folder: str, acc) -> tuple[str, str]:
 def _all_uids(conn) -> list[int]:
     status, data = conn.uid("SEARCH", None, "ALL")
     if status != "OK":
-        raise RuntimeError("cannot list the folder")
+        raise RuntimeError(CANNOT_LIST)
     return sorted(int(u) for u in (data[0].split() if data and data[0]
                                    else []))
 
@@ -3420,7 +3543,7 @@ def lookalike_count(folder: str, acc=None) -> dict:
         role, target = _lookalike_target(conn, folder, acc)
         status, _ = conn.select(quote_folder(folder), readonly=True)
         if status != "OK":
-            raise RuntimeError(f"cannot open {decode_mutf7(folder)!r}")
+            raise RuntimeError(coded(CANNOT_OPEN, folder=decode_mutf7(folder)))
         uv = uidvalidity(conn)
         uids = _all_uids(conn)
     finally:
@@ -3443,10 +3566,9 @@ def move_lookalike(folder: str, uv: int, max_uid: int, acc=None) -> dict:
     acc = acc or accounts.get()
     with acc.lock:
         if acc.state["delete"]["status"] == "running":
-            raise RuntimeError("busy: an action is running")
+            raise RuntimeError(BUSY_ACTION)
     if uv <= 0:
-        raise RuntimeError("the folder was not counted - reload it and "
-                           "confirm again")
+        raise RuntimeError(COUNT_REQUIRED)
     if max_uid <= 0:
         return {"moved": 0, "undo": None}
     conn = connect(cfgmod.account_imap(acc.name), acc.name)
@@ -3458,18 +3580,17 @@ def move_lookalike(folder: str, uv: int, max_uid: int, acc=None) -> dict:
         role, target = _lookalike_target(conn, folder, acc)
         status, _ = conn.select(quote_folder(folder), readonly=False)
         if status != "OK":
-            raise RuntimeError(f"cannot open {decode_mutf7(folder)!r}")
+            raise RuntimeError(coded(CANNOT_OPEN, folder=decode_mutf7(folder)))
         if uidvalidity(conn) != uv:
-            raise RuntimeError(f"mailbox {decode_mutf7(folder)!r} changed on "
-                               "the server (UIDVALIDITY mismatch) - reload "
-                               "it before moving")
+            raise RuntimeError(coded(FOLDER_CHANGED,
+                                     folder=decode_mutf7(folder)))
         chosen = [u for u in _all_uids(conn) if u <= max_uid]
         for start in range(0, len(chosen), MOVE_CHUNK):
             chunk = chosen[start:start + MOVE_CHUNK]
             uidstr = ",".join(str(u) for u in chunk)
             ids = _fetch_msgids(conn, chunk)
             if not _uid_move(conn, uidstr, target):
-                raise RuntimeError("the server refused the move")
+                raise RuntimeError(CANNOT_MOVE)
             moved += len(chunk)
             items.extend((folder, mid) for mid in sorted(ids))
     except Exception as exc:
@@ -3501,8 +3622,8 @@ def move_lookalike(folder: str, uv: int, max_uid: int, acc=None) -> dict:
                         error="" if failure is None else str(failure))
     if failure is not None:
         if moved:
-            raise RuntimeError(f"{failure} ({moved} mails were moved "
-                               "before the failure)") from failure
+            raise RuntimeError(coded(MOVED_THEN_FAILED, n=moved,
+                                     cause=str(failure))) from failure
         raise failure
     return {"moved": moved, "target": decode_mutf7(target), "role": role,
             "undo": undo}
@@ -3552,7 +3673,7 @@ def empty_trash(acc=None, uv: int = 0, max_uid: int = 0) -> dict:
     permanent deletion of the same account."""
     acc = acc or accounts.get()
     if not acc.purge_lock.acquire(blocking=False):
-        raise RuntimeError("busy: a permanent deletion is running")
+        raise RuntimeError(BUSY_PURGE)
     try:
         return _empty_trash(acc, uv, max_uid)
     finally:
@@ -3572,10 +3693,9 @@ def _empty_trash(acc, uv: int, max_uid: int) -> dict:
     deleted (audit, undo pruning, count) and then raises."""
     with acc.lock:
         if acc.state["delete"]["status"] == "running":
-            raise RuntimeError("busy: a deletion is running")
+            raise RuntimeError(BUSY_ACTION)
     if uv <= 0:
-        raise RuntimeError("Empty Trash needs the counted listing - "
-                           "reload Trash and confirm again")
+        raise RuntimeError(COUNT_REQUIRED)
     if max_uid <= 0:
         return {"deleted": 0}            # the count was 0: nothing to delete
 
@@ -3591,34 +3711,30 @@ def _empty_trash(acc, uv: int, max_uid: int) -> dict:
         acc.folder_roles.update(found["roles"])
         trash = found["roles"].get("trash")
         if not trash:
-            raise RuntimeError("No Trash folder found on the server")
+            raise RuntimeError(coded(ROLE_MISSING, role="trash"))
         if "trash" in found["ambiguous"]:
             # permanent deletion needs a confirmed target (role_overrides)
-            raise RuntimeError("Trash is ambiguous - choose it in Settings "
-                               "first")
+            raise RuntimeError(coded(ROLE_UNCONFIRMED, role="trash"))
         status, _ = conn.select(quote_folder(trash), readonly=False)
         if status != "OK":
-            raise RuntimeError("cannot open Trash")
+            raise RuntimeError(coded(CANNOT_OPEN, role="trash"))
         if uidvalidity(conn) != uv:      # also refuses an unreadable (0) one
-            raise RuntimeError("Trash changed on the server - reload it "
-                               "before emptying")
+            raise RuntimeError(coded(FOLDER_CHANGED, role="trash"))
         status, data = conn.uid("SEARCH", None, "ALL")
         if status != "OK":
-            raise RuntimeError("cannot list Trash")
+            raise RuntimeError(CANNOT_LIST)
         present = sorted(int(u) for u in (data[0].split() if data and data[0]
                                           else []))
         chosen = [u for u in present if u <= max_uid]
         uidplus = _supports_uidplus(conn)
         if chosen and not uidplus and len(chosen) != len(present):
-            raise RuntimeError("this server cannot delete part of a folder "
-                               "safely - Trash changed since it was counted")
+            raise RuntimeError(PARTIAL_UNSAFE_CHANGED)
         if chosen and not uidplus:       # whole-folder Empty: re-check
             status, data = conn.uid("SEARCH", None, "ALL")
             again = sorted(int(u) for u in (data[0].split()
                                             if data and data[0] else []))
             if status != "OK" or again != chosen:
-                raise RuntimeError("Trash changed since it was counted - "
-                                   "reload it before emptying")
+                raise RuntimeError(coded(FOLDER_CHANGED, role="trash"))
         want_ids = bool(acc.undo_log)
         for start in range(0, len(chosen), MOVE_CHUNK):
             chunk = chosen[start:start + MOVE_CHUNK]
@@ -3626,13 +3742,13 @@ def _empty_trash(acc, uv: int, max_uid: int) -> dict:
             ids = _fetch_msgids(conn, chunk) if want_ids else set()
             status, _ = conn.uid("STORE", uidstr, "+FLAGS", r"(\Deleted)")
             if status != "OK":
-                raise RuntimeError("cannot flag mails in Trash")
+                raise RuntimeError(CANNOT_FLAG)
             if uidplus:
                 status, _ = conn.uid("EXPUNGE", uidstr)
             else:
                 status, _ = conn.expunge()
             if status != "OK":
-                raise RuntimeError("cannot expunge Trash")
+                raise RuntimeError(CANNOT_EXPUNGE)
             deleted += len(chunk)
             gone.extend(chunk)
             purged |= ids
@@ -3664,9 +3780,8 @@ def _empty_trash(acc, uv: int, max_uid: int) -> dict:
                         error="" if failure is None else str(failure))
     if failure is not None:
         if deleted:
-            raise RuntimeError(f"{failure} ({deleted} mails were "
-                               "permanently deleted before the failure)"
-                               ) from failure
+            raise RuntimeError(coded(DELETED_THEN_FAILED, n=deleted,
+                                     cause=str(failure))) from failure
         raise failure
     return {"deleted": deleted}
 
@@ -3706,26 +3821,22 @@ def _purge_targets(conn, role: str, acc) -> tuple[str, str | None]:
     resolvable, unambiguous Trash to go through (D7)."""
     if role not in PURGE_ROLES:
         raise ValueError("bad role")
-    label = ROLE_LABELS[role]
     found = resolve_roles(conn, acc)
     acc.folder_roles.update(found["roles"])
     src = found["roles"].get(role)
     if not src:
-        raise RuntimeError(f"No {label} folder found on the server")
+        raise RuntimeError(coded(ROLE_MISSING, role=role))
     if role in found["ambiguous"]:
-        raise RuntimeError(f"{label} is ambiguous - choose it in Settings "
-                           "first")
+        raise RuntimeError(coded(ROLE_UNCONFIRMED, role=role))
     if role != "junk":
         return src, None
     trash = found["roles"].get("trash")
     if not trash:
-        raise RuntimeError("No Trash folder found on the server - deleting "
-                           "Junk permanently goes through Trash")
+        raise RuntimeError(JUNK_NEEDS_TRASH)
     if "trash" in found["ambiguous"]:
-        raise RuntimeError("Trash is ambiguous - choose it in Settings "
-                           "first")
+        raise RuntimeError(coded(ROLE_UNCONFIRMED, role="trash"))
     if trash == src:
-        raise RuntimeError("Junk and Trash are the same folder")
+        raise RuntimeError(JUNK_IS_TRASH)
     return src, trash
 
 
@@ -3787,8 +3898,7 @@ def purge_preview(role: str, *, uids=None, senders=None,
         except Exception:
             pass
     if uv <= 0:
-        raise RuntimeError(f"cannot read the {ROLE_LABELS[role]} "
-                           "UIDVALIDITY - not deleting")
+        raise RuntimeError(coded(UV_UNREADABLE, role=role))
     if uids is not None:
         wanted = {int(u) for u in uids}
     elif senders is not None:
@@ -3814,17 +3924,17 @@ def purge_preview(role: str, *, uids=None, senders=None,
             "via_trash": role == "junk"}
 
 
-def _select_rw(conn, folder: str, what: str) -> None:
+def _select_rw(conn, folder: str, role: str) -> None:
     status, _ = conn.select(quote_folder(folder), readonly=False)
     if status != "OK":
-        raise RuntimeError(f"cannot open {what}")
+        raise RuntimeError(coded(CANNOT_OPEN, role=role))
 
 
 def _list_uids(conn) -> list[int]:
     """Every UID of the selected folder, ascending."""
     status, data = conn.uid("SEARCH", None, "ALL")
     if status != "OK":
-        raise RuntimeError("cannot list the folder")
+        raise RuntimeError(CANNOT_LIST)
     return sorted(int(u) for u in (data[0].split() if data and data[0]
                                    else []))
 
@@ -3842,7 +3952,7 @@ def _expunge_uids(conn, uids: list[int], uidplus: bool, on_chunk) -> None:
         uidstr = ",".join(str(u) for u in chunk)
         status, _ = conn.uid("STORE", uidstr, "+FLAGS", r"(\Deleted)")
         if status != "OK":
-            raise RuntimeError("cannot flag mails for deletion")
+            raise RuntimeError(CANNOT_FLAG)
         failed: Exception | None = None
         try:
             if uidplus:
@@ -3858,7 +3968,7 @@ def _expunge_uids(conn, uids: list[int], uidplus: bool, on_chunk) -> None:
                 pass
             if failed is not None:
                 raise failed
-            raise RuntimeError("cannot expunge the folder")
+            raise RuntimeError(CANNOT_EXPUNGE)
         on_chunk(chunk)
 
 
@@ -3917,7 +4027,7 @@ def _fetch_msgid_map(conn, uids: list[int]) -> dict[int, str]:
             "FETCH", ",".join(str(u) for u in part),
             "(UID BODY.PEEK[HEADER.FIELDS (MESSAGE-ID)])")
         if status != "OK":
-            raise RuntimeError("cannot read the moved mails in Trash")
+            raise RuntimeError(CANNOT_READ_MOVED)
         for item in data or []:
             if isinstance(item, tuple) and len(item) >= 2:
                 m = _UID_RE.search(item[0])
@@ -3942,7 +4052,7 @@ def _move_into_trash(conn, chunk: list[int], trash: str, dest_uv: int):
         verb, args = "COPY", (",".join(map(str, chunk)), quote_folder(trash))
     status, _ = conn.uid(verb, *args)
     if status != "OK":
-        raise RuntimeError("cannot move mails from Junk to Trash")
+        raise RuntimeError(CANNOT_MOVE)
     entries = conn.response("COPYUID")[1]
     if verb == "COPY":
         uidstr = ",".join(map(str, chunk))
@@ -3950,7 +4060,7 @@ def _move_into_trash(conn, chunk: list[int], trash: str, dest_uv: int):
         if status == "OK":
             status, _ = conn.uid("EXPUNGE", uidstr)
         if status != "OK":
-            raise RuntimeError("cannot remove the copied mails from Junk")
+            raise RuntimeError(CANNOT_REMOVE_COPIES)
     return _parse_copyuid(entries, dest_uv, chunk)
 
 
@@ -3964,7 +4074,7 @@ def _identify_moved(conn, trash: str, trash_uv: int, pre_max: int,
     Trash UID from before the move are exactly as many as the moved mails
     and carry exactly their Message-IDs (every moved mail has one). A
     foreign arrival, a missing ID, any difference: None."""
-    _select_rw(conn, trash, "Trash")
+    _select_rw(conn, trash, "trash")
     if uidvalidity(conn) != trash_uv:
         return None
     if mapping is not None:
@@ -4012,10 +4122,9 @@ class _Ledger:
 def _purge_in_trash(conn, src: str, uv: int, keep: list[dict], uidplus: bool,
                     led: _Ledger) -> None:
     by_uid = {m["uid"]: m for m in keep}
-    _select_rw(conn, src, "Trash")
+    _select_rw(conn, src, "trash")
     if uidvalidity(conn) != uv:          # also refuses an unreadable (0) one
-        raise RuntimeError("Trash changed on the server - reload it before "
-                           "deleting")
+        raise RuntimeError(coded(FOLDER_CHANGED, role="trash"))
     present = _list_uids(conn)
     there = set(present)
     chosen = [u for u in by_uid if u in there]           # ascending
@@ -4023,11 +4132,9 @@ def _purge_in_trash(conn, src: str, uv: int, keep: list[dict], uidplus: bool,
         # a plain EXPUNGE also removes other clients' \Deleted mail: only
         # the whole folder may go that way, re-checked
         if chosen != present:
-            raise RuntimeError("this server cannot delete part of a folder "
-                               "safely - Trash changed since it was counted")
+            raise RuntimeError(PARTIAL_UNSAFE_CHANGED)
         if _list_uids(conn) != chosen:
-            raise RuntimeError("Trash changed since it was counted - "
-                               "reload it before deleting")
+            raise RuntimeError(coded(FOLDER_CHANGED, role="trash"))
 
     def done(chunk: list[int]) -> None:
         led.gone.extend(chunk)
@@ -4045,17 +4152,15 @@ def _purge_junk_via_trash(conn, src: str, trash: str, uv: int,
     uids = list(by_uid)
     trash_uv = 0
     for start in range(0, len(uids), MOVE_CHUNK):
-        _select_rw(conn, trash, "Trash")
+        _select_rw(conn, trash, "trash")
         t_uv = uidvalidity(conn)
         if t_uv <= 0 or (trash_uv and t_uv != trash_uv):
-            raise RuntimeError("Trash changed on the server - reload it "
-                               "before deleting")
+            raise RuntimeError(coded(FOLDER_CHANGED, role="trash"))
         trash_uv = t_uv
         pre_max = max(_list_uids(conn), default=0)
-        _select_rw(conn, src, "Junk")
+        _select_rw(conn, src, "junk")
         if uidvalidity(conn) != uv:
-            raise RuntimeError("Junk changed on the server - reload it "
-                               "before deleting")
+            raise RuntimeError(coded(FOLDER_CHANGED, role="junk"))
         present = set(_list_uids(conn))
         chunk = [u for u in uids[start:start + MOVE_CHUNK] if u in present]
         if not chunk:
@@ -4107,17 +4212,15 @@ def purge_mails(role: str, uids, uv: int, acc=None, *, folder: str = "",
     wanted = sorted({int(u) for u in uids or () if int(u) > 0})
     if uv <= 0 or not wanted or not folder \
             or (role == "junk" and not trash_folder):
-        raise ValueError("permanent deletion needs the counted listing "
-                         "(folder, UIDVALIDITY and UIDs) - reload and "
-                         "confirm again")
+        raise ValueError(COUNT_REQUIRED)
     if not acc.purge_lock.acquire(blocking=False):
-        raise RuntimeError("busy: a permanent deletion is running")
+        raise RuntimeError(BUSY_PURGE)
     try:
         with acc.lock:
             if acc.state["delete"]["status"] == "running":
-                raise RuntimeError("busy: a deletion is running")
+                raise RuntimeError(BUSY_ACTION)
             if acc.state["status"] == "scanning":
-                raise RuntimeError("busy: scan running")
+                raise RuntimeError(BUSY_SCAN)
         return _purge_run(role, wanted, uv, folder, trash_folder, acc, actor,
                           cap)
     finally:
@@ -4136,17 +4239,14 @@ def _purge_run(role: str, wanted: list[int], uv: int, folder: str,
     try:
         src, via = _purge_targets(conn, role, acc)
         if src != folder or (role == "junk" and via != trash_folder):
-            raise RuntimeError(f"{label} folder changed since it was counted "
-                               "- reload it before deleting")
+            raise RuntimeError(coded(FOLDER_CHANGED, role=role))
         trash = via or src
         uidplus = _supports_uidplus(conn)
         if role == "junk" and not uidplus:
-            raise RuntimeError("this server cannot delete part of a folder "
-                               "safely")
+            raise RuntimeError(PARTIAL_UNSAFE)
         live_uv, mails = refresh_role_index(conn, role, src, acc)
         if live_uv != uv:
-            raise RuntimeError(f"{label} changed on the server - reload it "
-                               "before deleting")
+            raise RuntimeError(coded(FOLDER_CHANGED, role=role))
         led.total = len(mails)
         keep, protected, pinned, missing = _purge_split(mails, wanted, acc)
         res.update(skipped_protected=len(protected),
@@ -4188,10 +4288,11 @@ def _purge_run(role: str, wanted: list[int], uv: int, folder: str,
                 acc.state["trash_count"] = tc + len(stranded)
         if stranded:
             meta = {src: {m["uid"]: m for m in stranded}}
-            _record_undo(f"{len(stranded)} mails from {label}", meta,
-                         "trash", trash, acc, quiet=True)
+            stranded_label, fields = _from_role_label(len(stranded), role)
+            _record_undo(stranded_label, meta, "trash", trash, acc,
+                         quiet=True, label_fields=fields)
             last = acc.undo_log[-1] if acc.undo_log else None
-            if last and last["label"] == f"{len(stranded)} mails from {label}":
+            if last and last["label"] == stranded_label:
                 res["undo"] = {"ts": last["ts"], "label": last["label"],
                                "count": last["count"]}
     if led.deleted:
@@ -4202,7 +4303,7 @@ def _purge_run(role: str, wanted: list[int], uv: int, folder: str,
         auditlog.record("trash", actor=actor, account=acc.name,
                         count=len(stranded),
                         size=sum(m["size"] for m in stranded),
-                        label=f"{len(stranded)} mails from {label}")
+                        label=_from_role_label(len(stranded), role)[0])
     if led.deleted or stranded:
         skipped = []
         if res["skipped_protected"]:
@@ -4222,16 +4323,13 @@ def _purge_run(role: str, wanted: list[int], uv: int, folder: str,
         log.info("purge %s: %d mails permanently deleted%s", role,
                  led.deleted, "" if failure is None else " (then stopped)")
     if failure is not None and not unverified:
-        parts = []
-        if led.deleted:
-            parts.append(f"{led.deleted} mails were permanently deleted "
-                         "before the failure")
+        text = str(failure)
         if stranded:
-            parts.append(f"{len(stranded)} mails were moved to Trash and "
-                         "not deleted")
-        if parts:
-            raise PurgeError(f"{failure} ({'; '.join(parts)})",
-                             led.deleted, len(stranded)) from failure
+            text = coded(STRANDED_THEN_FAILED, n=len(stranded), cause=text)
+        if led.deleted:
+            text = coded(DELETED_THEN_FAILED, n=led.deleted, cause=text)
+        if led.deleted or stranded:
+            raise PurgeError(text, led.deleted, len(stranded)) from failure
         raise failure
     return res
 

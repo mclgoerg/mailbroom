@@ -1,6 +1,6 @@
 import { ChevronLeft, ChevronRight, ScrollText } from "lucide-react";
 import { useEffect, useState } from "react";
-import { api, downloadFile, fmtSize } from "../api";
+import { api, downloadFile, errorText, fmtSize } from "../api";
 import { t } from "../i18n";
 import type { AuditEntry, Rule } from "../types";
 import { Button, EmptyState, Loading, PanelHeader, Modal } from "./ui";
@@ -95,7 +95,7 @@ export function AuditLogPanel({ rules, onClose }: {
             <span className={`type-meta whitespace-nowrap ${
               e.outcome === "error" || e.outcome === "failed"
                 ? "text-danger-fg" : "text-muted"}`}
-              title={e.error || undefined}>
+              title={e.error ? errorText(e.error) : undefined}>
               {tOr("audit.outcome", e.outcome)}
             </span>
           </div>

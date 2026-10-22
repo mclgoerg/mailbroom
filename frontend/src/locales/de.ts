@@ -1575,4 +1575,101 @@ export const DE: Record<string, string> = {
   "know.download_tip":
     "Diese Liste als Datei herunterladen. Sie listet Absenderadressen und Notizen – halte sie privat.",
   "know.col_actions": "Aktionen",
+  // -- Fehler der Ordner-Funktionen (Backend-Codes, siehe api.ts ERROR_CODES)
+  "ferr.folder_named": "„{name}“",
+  "ferr.role_archive": "Archiv",
+  "ferr.busy_action":
+    "Es läuft noch eine andere Aktion – versuche es erneut, sobald "
+    + "sie fertig ist.",
+  "ferr.busy_purge":
+    "Es läuft bereits ein endgültiges Löschen – versuche "
+    + "es erneut, sobald es fertig ist.",
+  "ferr.busy_scan":
+    "Ein Scan läuft – versuche es erneut, sobald er fertig ist.",
+  "ferr.busy_rule":
+    "Eine andere Regel läuft – versuche es erneut, sobald sie "
+    + "fertig ist.",
+  "ferr.count_required":
+    "Der Ordner wurde noch nicht gezählt – lade ihn neu und "
+    + "bestätige erneut.",
+  "ferr.role_missing":
+    "Auf dem Server wurde kein {folder}-Ordner gefunden.",
+  "ferr.inbox_missing": "Auf dem Server wurde kein Posteingang gefunden.",
+  "ferr.junk_needs_trash":
+    "Auf dem Server wurde kein Papierkorb gefunden – Spam wird "
+    + "endgültig über den Papierkorb gelöscht.",
+  "ferr.role_unconfirmed":
+    "{folder} ist nicht eindeutig – wähle zuerst in den "
+    + "Einstellungen den richtigen Ordner.",
+  "ferr.junk_is_trash": "Spam und Papierkorb sind derselbe Ordner.",
+  "ferr.folder_changed":
+    "{folder} hat sich auf dem Server geändert – lade die Liste "
+    + "neu und versuche es erneut.",
+  "ferr.partial_unsafe":
+    "Dieser Server kann einzelne Mails eines Ordners nicht sicher löschen, "
+    + "deshalb wurde nichts gelöscht.",
+  "ferr.partial_unsafe_changed":
+    "Dieser Server kann einzelne Mails eines Ordners nicht sicher löschen, "
+    + "und der Ordner hat sich seit dem Zählen geändert – lade "
+    + "ihn neu und versuche es erneut. Es wurde nichts gelöscht.",
+  "ferr.cannot_open": "{folder} konnte auf dem Server nicht geöffnet werden.",
+  "ferr.cannot_list": "Die Mailliste des Ordners konnte nicht gelesen werden.",
+  "ferr.cannot_flag":
+    "Der Server hat das Markieren der Mails zum Löschen nicht "
+    + "akzeptiert.",
+  "ferr.cannot_expunge":
+    "Der Server hat die markierten Mails nicht entfernt.",
+  "ferr.cannot_move": "Der Server hat das Verschieben abgelehnt.",
+  "ferr.cannot_remove_copies":
+    "Der Server hat die kopierten Mails nicht aus Spam entfernt.",
+  "ferr.cannot_read_moved":
+    "Die verschobenen Mails im Papierkorb konnten nicht gelesen werden.",
+  "ferr.uv_unreadable":
+    "Der Zustand von {folder} konnte nicht gelesen werden – es wird "
+    + "nichts gelöscht.",
+  "ferr.no_known_selected":
+    "Keine der ausgewählten Mails ist noch im Ordner – lade ihn neu.",
+  "ferr.unknown_target": "Der Zielordner {folder} existiert nicht.",
+  "ferr.target_is_trash": "Das Ziel ist der Papierkorb selbst.",
+  "ferr.nothing_to_undo":
+    "Es gibt nichts mehr rückgängig zu machen.",
+  "ferr.deleted_then_failed":
+    "{cause} ({n} Mails wurden vor dem Fehler endgültig gelöscht)",
+  "ferr.deleted_then_failed_one":
+    "{cause} (1 Mail wurde vor dem Fehler endgültig gelöscht)",
+  "ferr.stranded_then_failed":
+    "{cause} ({n} Mails wurden in den Papierkorb verschoben und nicht "
+    + "gelöscht)",
+  "ferr.stranded_then_failed_one":
+    "{cause} (1 Mail wurde in den Papierkorb verschoben und nicht "
+    + "gelöscht)",
+  "ferr.moved_then_failed":
+    "{cause} ({n} Mails wurden vor dem Fehler verschoben)",
+  "ferr.moved_then_failed_one":
+    "{cause} (1 Mail wurde vor dem Fehler verschoben)",
+  "ferr.rule_report_first":
+    "Führe diese Regel zuerst im Berichtsmodus aus.",
+  "ferr.rule_folder_changed":
+    "Der Spam- oder Papierkorb-Ordner hat sich seit dem letzten Bericht "
+    + "geändert – die Regel ist wieder im Berichtsmodus, es wurde "
+    + "nichts gelöscht.",
+  "ferr.rule_purge_grouping":
+    "Spam- und Papierkorb-Regeln gelten für Absender.",
+  "ferr.rule_purge_keep_latest":
+    "„Neueste N behalten“ gibt es für Spam- und "
+    + "Papierkorb-Regeln nicht.",
+  "ferr.rule_purge_needs_age":
+    "Eine Spam- oder Papierkorb-Regel braucht ein Alter (Mails älter "
+    + "als N Tage).",
+  "ferr.rule_purge_filter":
+    "Dieser Filter ist für Spam- und Papierkorb-Regeln nicht "
+    + "verfügbar: {names}",
+  "ferr.rule_purge_filter_domain":
+    "Dieser Filter ist für Spam- und Papierkorb-Regeln nicht "
+    + "verfügbar: {names} (er trifft nie auf Absender – nutze "
+    + "stattdessen Freitext wie den Domainnamen).",
+  "undo.from_junk": "{n} Mails aus Spam",
+  "undo.from_junk_one": "1 Mail aus Spam",
+  "undo.from_trash": "{n} Mails aus dem Papierkorb",
+  "undo.from_trash_one": "1 Mail aus dem Papierkorb",
 };

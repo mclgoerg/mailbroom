@@ -130,7 +130,7 @@ def test_uidvalidity_mismatch_aborts_delete(bridge):
     bridge.uv["INBOX"] = 2                         # simulate Bridge resync
     mailops.delete_groups("sender", ["noreply@dhl.example"])
     d = wait_delete_done()
-    assert "UIDVALIDITY" in d["error"]
+    assert d["error"] == mailops.coded(mailops.FOLDER_CHANGED, folder="INBOX")
     assert len(bridge.mailbox["Trash"]) == 0       # nothing was moved
 
 

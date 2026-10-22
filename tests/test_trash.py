@@ -80,7 +80,8 @@ def test_restore_guards(trashed):
     trashed.uv["Trash"] = 99
     res = client.post("/api/trash/restore", json={
         "uids": [30], "dest": "INBOX", "uv": r["uv"]})
-    assert res.status_code == 409 and "reload" in res.json()["detail"]
+    assert res.status_code == 409 and res.json()["detail"] == mailops.coded(
+        mailops.FOLDER_CHANGED, role="trash")
     trashed.uv["Trash"] = 1
 
     # unknown folder / trash itself -> refuse
