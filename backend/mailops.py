@@ -183,8 +183,13 @@ SNAPSHOT_DIR = Path(os.environ.get("SNAPSHOT_DIR", "/data"))
 # header in full - otherwise old cached mails would silently never thread.
 # `label_copies` (Gmail label dedupe) is optional: a snapshot without it
 # loads as "no label copies cached", and records without `gmid` get it from
-# the next Gmail scan's flags refresh - no version bump, no refetch.
-_SNAP_VERSION = 2
+# the next Gmail scan's flags refresh - no refetch.
+# v3: adds the role indexes (`role_index` / `role_uv`, e.g. Trash). A v2
+# snapshot still loads (read-side migration: empty role indexes, the first
+# open of a role view fetches it in full); a v3 file is ignored by v2 code,
+# i.e. a rollback costs one full rescan and loses nothing else.
+_SNAP_VERSION = 3
+_SNAP_READABLE = (2, 3)
 
 
 def _snap_path(name: str, tenant=None) -> Path:
@@ -209,6 +214,9 @@ def save_snapshot(acc) -> None:
             "trash_count": acc.state["trash_count"],
             "index": list(acc.index.values()),
             "label_copies": list(acc.label_copies.values()),
+            "role_index": {r: list(ix.values())
+                           for r, ix in acc.role_index.items() if ix},
+            "role_uv": {r: dict(uv) for r, uv in acc.role_uv.items() if uv},
             "groups": acc.state["groups"],
             # what the smart groups were built with (restore compares)
             "smart_sig": [acc.smart_sig[0], list(acc.smart_sig[1]),
@@ -226,6 +234,31 @@ def save_snapshot(acc) -> None:
         log.exception("[%s] could not persist scan snapshot", acc.name)
 
 
+_ROLE_REC_FIELDS = frozenset(("uid", "folder", "addr", "subject", "size",
+                              "seen", "ts", "date"))
+
+
+def _read_role_snapshot(data: dict) -> tuple[dict, dict]:
+    """The role indexes of a snapshot; absent (v2) or malformed = empty - a
+    bad role cache must never cost the main snapshot."""
+    index: dict[str, dict] = {}
+    uv: dict[str, dict[str, int]] = {}
+    try:
+        for role, recs in (data.get("role_index") or {}).items():
+            # A record missing a field the listing reads is dropped (it is
+            # simply fetched again) rather than failing every open.
+            index[role] = {ikey(m["folder"], m["uid"]): m for m in recs
+                           if isinstance(m, dict) and isinstance(
+                               m.get("uid"), int)
+                           and _ROLE_REC_FIELDS <= m.keys()}
+        for role, per in (data.get("role_uv") or {}).items():
+            uv[role] = {str(f): int(v) for f, v in per.items()}
+    except (KeyError, TypeError, ValueError, AttributeError):
+        log.warning("role indexes in the scan snapshot unusable - dropped")
+        return {}, {}
+    return index, uv
+
+
 def load_snapshot(acc) -> bool:
     """Restore the last scan from disk into an idle, empty account.
     Cached AI verdicts are re-applied like after a real scan."""
@@ -233,9 +266,10 @@ def load_snapshot(acc) -> bool:
         data = json.loads(_snap_path(acc.name, acc.tenant).read_text())
     except (OSError, json.JSONDecodeError):
         return False
-    if not isinstance(data, dict) or data.get("version") != _SNAP_VERSION:
+    if not isinstance(data, dict) or data.get("version") not in _SNAP_READABLE:
         return False
     try:
+        role_index, role_uv = _read_role_snapshot(data)
         cached = verdictstore.apply_to_groups(data["groups"], acc.name)
         with acc.lock:
             if acc.state["status"] != "idle" or acc.index:
@@ -247,6 +281,8 @@ def load_snapshot(acc) -> bool:
                 for m in data.get("label_copies") or []})
             acc.folder_uv.update(data.get("folder_uv") or {})
             acc.folder_roles.update(data.get("folder_roles") or {})
+            acc.role_index.update(role_index)
+            acc.role_uv.update(role_uv)
             acc.state["groups"] = data["groups"]
             acc.state["folders"] = data.get("folders") or []
             acc.state["folders_raw"] = data.get("folders_raw") or []
@@ -850,7 +886,8 @@ def _refresh_flags_chunk(conn, folder: str, chunk: list[bytes],
 
 
 def scan_folder(conn, folder: str, messages: list, progress_cb,
-                acc=None, gm: bool = False) -> int:
+                acc=None, gm: bool = False, index: dict | None = None,
+                uv: dict | None = None) -> int:
     """Scan one folder into `messages`; returns how many messages had to
     be SKIPPED because their metadata could not be parsed (real-world
     mail contains arbitrarily broken headers - one bad message must
@@ -862,15 +899,21 @@ def scan_folder(conn, folder: str, messages: list, progress_cb,
     no prior cache) falls back to fetching everything, same as before.
 
     `gm` (server advertises X-GM-EXT-1): every record also carries Gmail's
-    message id, see dedupe_gmail_labels."""
+    message id, see dedupe_gmail_labels.
+
+    `index` / `uv` name the cache to read and the UIDVALIDITY map to
+    update (default: the account's main `index` / `folder_uv`); role views
+    pass their own."""
     acc = acc or accounts.get()
+    index = acc.index if index is None else index
+    uv = acc.folder_uv if uv is None else uv
     status, _ = conn.select(quote_folder(folder), readonly=True)
     if status != "OK":
         return 0
     new_uv = uidvalidity(conn)
-    old_uv = acc.folder_uv.get(folder)
+    old_uv = uv.get(folder)
     stale = old_uv in (None, 0) or new_uv != old_uv
-    acc.folder_uv[folder] = new_uv
+    uv[folder] = new_uv
     status, data = conn.uid("SEARCH", None, "ALL")
     if status != "OK" or not data or not data[0]:
         return 0
@@ -881,8 +924,9 @@ def scan_folder(conn, folder: str, messages: list, progress_cb,
     else:
         cached = {}
         for u in uids:
-            rec = (acc.index.get(ikey(folder, int(u)))
-                   or acc.label_copies.get(ikey(folder, int(u))))
+            rec = index.get(ikey(folder, int(u)))
+            if rec is None and index is acc.index:
+                rec = acc.label_copies.get(ikey(folder, int(u)))
             if rec is not None:
                 cached[int(u)] = rec
         new_uids = [u for u in uids if int(u) not in cached]
@@ -2865,6 +2909,8 @@ def undo_last(index: int = -1, acc=None) -> dict:
         acc.state["undo"] = _undo_summaries(acc)
 
     restored = 0
+    moved: list[int] = []
+    trash = ""
     conn = connect(cfgmod.account_imap(acc.name), acc.name)
     try:
         trash = entry.get("in") or folder_roles(conn, acc).get("trash")
@@ -2888,7 +2934,11 @@ def undo_last(index: int = -1, acc=None) -> dict:
                 chunk = uids[start:start + MOVE_CHUNK]
                 if _uid_move(conn, b",".join(chunk).decode(), folder):
                     restored += len(chunk)
+                    moved.extend(int(u) for u in chunk)
     finally:
+        role = role_of_folder(trash, acc) if trash else None
+        if role:
+            role_drop(role, trash, moved, acc)
         try:
             conn.logout()
         except Exception:
@@ -2907,33 +2957,135 @@ def undo_last(index: int = -1, acc=None) -> dict:
     return {"restored": restored, "of": entry["count"], "rescan": rescan}
 
 
-def trash_list(limit: int = 1000, acc=None) -> dict:
-    """Live Trash contents (Trash stays out of the cleanup index). The
-    returned uv must be sent back on restore so we never MOVE stale UIDs."""
+# -- role indexes ----------------------------------------------------------
+# Special folders (Trash now, Junk next) stay out of the main cleanup index
+# but keep a small cache of their own (acc.role_index / acc.role_uv, same
+# record shape and UIDVALIDITY rules as the main index). Opening a role view
+# refreshes it incrementally; moves out of the folder keep it consistent.
+
+ROLE_LABELS = {"trash": "Trash", "junk": "Junk"}
+
+
+def refresh_role_index(conn, role: str, folder: str,
+                       acc=None) -> tuple[int, list[dict]]:
+    """Bring the `role` index up to date with `folder` on the server and
+    return `(uvalidity, mails)` of the folder as they are NOW, both from this
+    one refresh (never re-read from the cache, which a concurrent refresh
+    may have swapped meanwhile): known UIDs get a flags-only
+    refresh, only new UIDs a header fetch, UIDs that vanished are dropped,
+    a UIDVALIDITY change rebuilds. The returned list is built from this very
+    listing - callers deriving a count / highest UID from it (Empty Trash)
+    see the server state just read, never a stale cache. The cache is only
+    swapped in once the refresh completed."""
     acc = acc or accounts.get()
+    status, _ = conn.select(quote_folder(folder), readonly=True)
+    if status != "OK":
+        raise RuntimeError(f"cannot open {decode_mutf7(folder)!r}")
+    with acc.lock:
+        old = acc.role_index.get(role, {})
+        old_uv = acc.role_uv.get(role) or {}
+        cache = {k: m for k, m in old.items() if m["folder"] == folder}
+        uv = dict(old_uv)
+    messages: list = []
+    scan_folder(conn, folder, messages, lambda *a: None, acc,
+                index=cache, uv=uv)
+    fresh = {ikey(m["folder"], m["uid"]): m for m in messages}
+    new_uv = {folder: uv.get(folder, 0)}
+    with acc.lock:
+        changed = fresh != old or new_uv != old_uv
+        acc.role_index[role] = fresh
+        acc.role_uv[role] = new_uv
+    if changed:                  # persist only when something moved
+        save_snapshot(acc)
+    return new_uv[folder], messages
+
+
+def role_state(role: str, folder: str, acc=None) -> tuple[int, list[dict]]:
+    """`(uvalidity, mails)` of a role index read under ONE lock hold, so the
+    pair always belongs together (cache as of the last refresh; no IMAP)."""
+    acc = acc or accounts.get()
+    with acc.lock:
+        return ((acc.role_uv.get(role) or {}).get(folder, 0),
+                list(acc.role_index.get(role, {}).values()))
+
+
+def role_of_folder(folder: str, acc=None) -> str | None:
+    """The indexed role a raw folder name currently stands for, if any."""
+    acc = acc or accounts.get()
+    with acc.lock:
+        for role, per in acc.role_uv.items():
+            if folder in per:
+                return role
+        for role, f in acc.folder_roles.items():
+            if f == folder and role in ROLE_LABELS:
+                return role
+    return None
+
+
+def role_mails(role: str, acc=None) -> list[dict]:
+    """The cached mails of a role folder (no IMAP access; as of the last
+    refresh)."""
+    acc = acc or accounts.get()
+    with acc.lock:
+        return list(acc.role_index.get(role, {}).values())
+
+
+def role_uvalidity(role: str, folder: str, acc=None) -> int:
+    """UIDVALIDITY the `role` index of `folder` was refreshed under (0 =
+    never)."""
+    acc = acc or accounts.get()
+    with acc.lock:
+        return (acc.role_uv.get(role) or {}).get(folder, 0)
+
+
+def role_drop(role: str, folder: str, uids, acc=None) -> None:
+    """Forget mails that were moved out of / deleted from a role folder, so
+    the cache matches the server without a refetch."""
+    acc = acc or accounts.get()
+    with acc.lock:
+        index = acc.role_index.get(role)
+        if index:
+            for u in uids:
+                index.pop(ikey(folder, int(u)), None)
+
+
+def role_list(role: str, limit: int = 1000, acc=None) -> dict:
+    """Live listing of a role folder through its incremental index. The
+    returned uv (and, for Empty, max_uid / total) describe the listing just
+    read from the server and must be sent back on restore / empty so we never
+    act on stale UIDs."""
+    acc = acc or accounts.get()
+    label = ROLE_LABELS.get(role, role)
     conn = connect(cfgmod.account_imap(acc.name), acc.name)
     try:
-        trash = folder_roles(conn, acc).get("trash")
-        if not trash:
-            raise RuntimeError("No Trash folder found on the server")
-        messages: list = []
-        scan_folder(conn, trash, messages, lambda *a: None, acc)
+        folder = folder_roles(conn, acc).get(role)
+        if not folder:
+            raise RuntimeError(f"No {label} folder found on the server")
+        uv, messages = refresh_role_index(conn, role, folder, acc)
     finally:
         try:
             conn.logout()
         except Exception:
             pass
     messages.sort(key=lambda m: -m["ts"])
-    with acc.lock:
-        acc.state["trash_count"] = len(messages)
-    return {"folder": trash, "uv": acc.folder_uv.get(trash, 0),
+    return {"folder": folder, "uv": uv,
             "total": len(messages),
             "max_uid": max((m["uid"] for m in messages), default=0),
-            "mails": [{"uid": m["uid"], "folder": trash, "date": m["date"],
+            "mails": [{"uid": m["uid"], "folder": folder, "date": m["date"],
                        "ts": m["ts"], "subject": m["subject"],
                        "addr": m["addr"], "size": m["size"],
                        "seen": m["seen"], "ai": None}
                       for m in messages[:limit]]}
+
+
+def trash_list(limit: int = 1000, acc=None) -> dict:
+    """Live Trash contents (Trash stays out of the cleanup index; it has its
+    own incremental role index)."""
+    acc = acc or accounts.get()
+    out = role_list("trash", limit, acc)
+    with acc.lock:
+        acc.state["trash_count"] = out["total"]
+    return out
 
 
 def trash_restore(uids: list[int], dest: str, uv: int = 0,
@@ -2944,6 +3096,8 @@ def trash_restore(uids: list[int], dest: str, uv: int = 0,
         if acc.state["delete"]["status"] == "running":
             raise RuntimeError("busy: a deletion is running")
     restored = 0
+    moved: list[int] = []
+    trash = ""
     conn = connect(cfgmod.account_imap(acc.name), acc.name)
     try:
         folders = list_folders(conn)
@@ -2965,7 +3119,9 @@ def trash_restore(uids: list[int], dest: str, uv: int = 0,
             chunk = clean[start:start + MOVE_CHUNK]
             if _uid_move(conn, ",".join(str(u) for u in chunk), dest):
                 restored += len(chunk)
+                moved.extend(chunk)
     finally:
+        role_drop("trash", trash, moved, acc)
         try:
             conn.logout()
         except Exception:
@@ -3043,6 +3199,7 @@ def empty_trash(acc=None, uv: int = 0, max_uid: int = 0) -> dict:
     purged: set[str] = set()             # Message-IDs of chunks really gone
     deleted = 0
     present: list[int] = []
+    gone: list[int] = []                 # UIDs really expunged
     failure: Exception | None = None
     trash = ""
     try:
@@ -3093,10 +3250,12 @@ def empty_trash(acc=None, uv: int = 0, max_uid: int = 0) -> dict:
             if status != "OK":
                 raise RuntimeError("cannot expunge Trash")
             deleted += len(chunk)
+            gone.extend(chunk)
             purged |= ids
     except Exception as exc:
         failure = exc
     finally:
+        role_drop("trash", trash, gone, acc)
         try:
             conn.logout()
         except Exception:
