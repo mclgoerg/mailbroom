@@ -108,6 +108,7 @@ JUNK_NEEDS_TRASH = "junk_needs_trash"    # Junk goes via Trash: none found
 ROLE_UNCONFIRMED = "role_unconfirmed"    # role=: ambiguous, choose in Settings
 JUNK_IS_TRASH = "junk_is_trash"
 FOLDER_CHANGED = "folder_changed"    # role= or folder=: changed since counted
+FOLDER_CHANGED_RESCAN = "folder_changed_rescan"    # folder=: the scan is stale
 PARTIAL_UNSAFE = "partial_unsafe"    # server cannot delete single mails safely
 PARTIAL_UNSAFE_CHANGED = "partial_unsafe_changed"    # ... folder changed
 CANNOT_OPEN = "cannot_open"          # role= or folder=
@@ -147,7 +148,7 @@ FOLDER_ERROR_CODES = frozenset({
     JUNK_NEEDS_TRASH,
     ROLE_UNCONFIRMED,
     JUNK_IS_TRASH,
-    FOLDER_CHANGED,
+    FOLDER_CHANGED, FOLDER_CHANGED_RESCAN,
     PARTIAL_UNSAFE,
     PARTIAL_UNSAFE_CHANGED,
     CANNOT_OPEN,
@@ -2256,12 +2257,16 @@ def _move_uids(by_folder: dict[str, set[int]], action: str, dest: str,
             # different messages now. Refuse rather than trash blindly.
             uv = uidvalidity(conn)
             expected = acc.folder_uv.get(folder)
+            from_scan = bool(expected)
             if not expected:       # a role folder: its index remembers it
                 role = role_of_folder(folder, acc)
                 expected = role_uvalidity(role, folder, acc) if role else 0
             if expected and uv and uv != expected:
-                raise RuntimeError(coded(FOLDER_CHANGED,
-                                         folder=decode_mutf7(folder)))
+                # the scan index is stale: only a rescan helps; a role
+                # folder's panel listing is reloaded instead
+                raise RuntimeError(coded(
+                    FOLDER_CHANGED_RESCAN if from_scan else FOLDER_CHANGED,
+                    folder=decode_mutf7(folder)))
             uids = sorted(uidset)
             for start in range(0, len(uids), MOVE_CHUNK):
                 if cancel_requested("delete", acc):
@@ -3399,7 +3404,7 @@ def role_move(role: str, action: str, uids: list[int], uv: int = 0,
         move_action, account=acc.name, count=len(moved), size=size,
         label=_from_role_label(len(moved), role)[0],
         outcome="error" if error else "ok",
-        error=f"{type(error).__name__}: {error}" if error else "")
+        error=error_text(error) if error else "")
     if error:
         raise error
     rescan = False

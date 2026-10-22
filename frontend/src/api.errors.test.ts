@@ -60,17 +60,41 @@ describe("errorText", () => {
 
   test("a role param is named in the interface language", () => {
     expect(errorText("role_unconfirmed:role=trash")).toBe(
-      "Trash is ambiguous - choose the right folder in Settings first.");
+      "More than one folder could be “Trash” - choose the right one in "
+      + "Settings first.");
     expect(errorText("folder_changed:role=junk")).toBe(
-      "Junk changed on the server - reload the list and try again.");
+      "The “Junk” folder changed on the server - reload the list and try "
+      + "again.");
     setLang("de");
     expect(errorText("role_unconfirmed:role=trash")).toBe(
-      "Papierkorb ist nicht eindeutig – wähle zuerst in den Einstellungen "
-      + "den richtigen Ordner.");
+      "Für „Papierkorb“ kommen mehrere Ordner infrage – wähle zuerst in den "
+      + "Einstellungen den richtigen.");
+    expect(errorText("folder_changed:role=junk")).toBe(
+      "Der Ordner „Spam“ hat sich auf dem Server geändert – lade die Liste "
+      + "neu und versuche es erneut.");
+    expect(errorText("cannot_open:role=trash")).toBe(
+      "Der Ordner „Papierkorb“ konnte auf dem Server nicht geöffnet werden.");
+    expect(errorText("uv_unreadable:role=trash")).toBe(
+      "Der Zustand des Ordners „Papierkorb“ konnte nicht gelesen werden – es "
+      + "wird nichts gelöscht.");
     expect(errorText("role_missing:role=junk"))
-      .toBe("Auf dem Server wurde kein Spam-Ordner gefunden.");
+      .toBe("Auf dem Server wurde kein Ordner für „Spam“ gefunden.");
     expect(errorText("role_missing:role=archive"))
-      .toBe("Auf dem Server wurde kein Archiv-Ordner gefunden.");
+      .toBe("Auf dem Server wurde kein Ordner für „Archiv“ gefunden.");
+  });
+
+  test("a folder that changed under the scan says rescan, not reload", () => {
+    // the main cleanup delete works on the scan's UIDs: reloading a list
+    // does not help there (backend: folder_changed_rescan)
+    expect(errorText("folder_changed_rescan:folder=INBOX")).toBe(
+      "The “INBOX” folder changed on the server - rescan and try again.");
+    expect(errorText("folder_changed_rescan:folder=INBOX"))
+      .not.toContain("reload");
+    setLang("de");
+    expect(errorText("folder_changed_rescan:folder=INBOX")).toBe(
+      "Der Ordner „INBOX“ hat sich auf dem Server geändert – scanne neu und "
+      + "versuche es erneut.");
+    expect(errorText("folder_changed:folder=INBOX")).toContain("Liste neu");
   });
 
   test("a folder name is quoted the way its language quotes", () => {
@@ -144,13 +168,14 @@ describe("the request layer", () => {
     fail(409, JSON.stringify({ detail: "folder_changed:role=trash" }));
     const e: any = await api.emptyTrash({ uv: 1, max_uid: 5 }).catch((x) => x);
     expect(e.message)
-      .toBe("Trash changed on the server - reload the list and try again.");
+      .toBe("The “Trash” folder changed on the server - reload the list and "
+        + "try again.");
     expect(e.code).toBe("folder_changed");
     setLang("de");
     fail(409, JSON.stringify({ detail: "folder_changed:role=trash" }));
     const d: any = await api.emptyTrash({ uv: 1, max_uid: 5 }).catch((x) => x);
-    expect(d.message).toBe("Papierkorb hat sich auf dem Server geändert – "
-      + "lade die Liste neu und versuche es erneut.");
+    expect(d.message).toBe("Der Ordner „Papierkorb“ hat sich auf dem Server "
+      + "geändert – lade die Liste neu und versuche es erneut.");
     expect(d.code).toBe("folder_changed");
   });
 
@@ -231,6 +256,25 @@ describe("EN / DE parity of the new texts", () => {
       expect(DE[`${k}_one`], k).toBeTruthy();
       expect(EN[`${k}_one`], k).not.toContain("{n}");
     }
+  });
+
+  test("a German text names a role / folder only inside quotes, so it reads " +
+    "for Papierkorb, Spam and Archiv alike", () => {
+    const withName = mine(DE).filter((k) => DE[k].includes("{folder}"));
+    expect(withName.length).toBeGreaterThanOrEqual(7);
+    for (const k of withName) {
+      // „{folder}“ (never a bare name that would need an article / case) ...
+      expect(DE[k].replaceAll("„{folder}“", ""), k).not.toContain("{folder}");
+      // ... and no hyphen compound or preposition glued to it
+      expect(DE[k], k).not.toMatch(/\{folder\}-|[a-zäöü]\{folder\}/);
+    }
+    setLang("de");
+    for (const role of ["trash", "junk", "archive"])
+      for (const k of withName) {
+        const text = errorText(`${k.slice(5)}:role=${role}`);
+        expect(text, k).not.toContain("{");
+        expect(text, k).toMatch(/„(Papierkorb|Spam|Archiv)“/);
+      }
   });
 
   test("no German text is left in English, and 'pinned' is not used", () => {

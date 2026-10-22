@@ -11,9 +11,12 @@ import pytest
 from fastapi.testclient import TestClient
 
 from backend import accounts as accountsmod
+from backend import auditlog
+from backend import errortext
+from backend import knowledgestore
 from backend import mailops
 from backend.main import app
-from conftest import FakeIMAP, make_msg, wait_scan_done
+from conftest import FakeIMAP, make_msg, wait_delete_done, wait_scan_done
 from test_folders_panel import _junk, _list, _move, junked  # noqa: F401
 from test_purge import _env, _junk_via, _mails
 
@@ -83,12 +86,26 @@ def _locale_keys(name: str) -> set[str]:
                           .read_text(), re.M))
 
 
+def _backend_codes() -> set[str]:
+    """Every code any backend module answers with (HTTP `detail`)."""
+    return set(mailops.FOLDER_ERROR_CODES) | {
+        v for k, v in vars(knowledgestore).items()
+        if k.isupper() and isinstance(v, str) and v.startswith("knowledge_")}
+
+
 def test_every_code_has_a_translated_text_in_the_ui():
     ui = _ui_codes()
     assert set(mailops.FOLDER_ERROR_CODES) <= set(ui)
     for locale in ("en.ts", "de.ts"):
         keys = _locale_keys(locale)
         assert {k for k in ui.values() if k not in keys} == set(), locale
+
+
+def test_the_ui_maps_no_code_the_backend_does_not_define():
+    """Both directions: a UI entry nothing answers with is dead (a typo or a
+    code that was removed), so `ERROR_CODES` equals the union of the codes
+    the backend modules define (folder features, pins, knowledge)."""
+    assert set(_ui_codes()) == _backend_codes()
 
 
 def test_every_code_constant_is_registered():
@@ -258,3 +275,125 @@ def test_the_restore_notice_carries_the_label_parts(junked):
     assert notice["params"]["label"] == "2 mails from Junk"
     assert notice["params"]["label_key"] == "undo.from_junk"
     assert notice["params"]["label_n"] == 2
+
+
+# ------------------------------- the main delete job vs the panel's lists
+
+def test_the_main_delete_job_says_rescan_and_the_panel_says_reload(junked):
+    """Same UIDVALIDITY check, two wordings: the cleanup delete works on the
+    scan index (only a rescan helps), a role folder's move on its panel
+    listing (reload the list)."""
+    mailops.run_scan()
+    junked.uv["INBOX"] = 5
+    mailops.delete_groups("sender", ["news@shop.example"])
+    done = wait_delete_done()
+    assert done["error"] == "folder_changed_rescan:folder=INBOX"
+    assert "rescan" in errortext.describe(done["error"])
+    junked.uv["INBOX"] = 1
+    listing = _list()
+    junked.uv["Spam"] = 9
+    r = _move("trash", [42], listing["uv"])
+    assert r.status_code == 409
+    assert r.json()["detail"] == "folder_changed:folder=Spam"
+    assert "reload the list" in errortext.describe(r.json()["detail"])
+
+
+# ------------------------------------------------- the audit entry's error
+
+def test_a_failed_role_move_audits_its_error_as_a_code(junked, monkeypatch):
+    listing = _list()
+    junked.uv["Spam"] = 9                    # the move itself refuses
+    assert _move("trash", [42], listing["uv"]).status_code == 409
+    junked.uv["Spam"] = 1
+
+    def boom(*a, **k):
+        raise RuntimeError(mailops.CANNOT_MOVE)
+    monkeypatch.setattr(mailops, "_uid_move", boom)
+    r = _move("trash", [42], listing["uv"])
+    assert r.status_code == 409 and r.json()["detail"] == "cannot_move"
+    errors = [e["error"] for e in auditlog.load("default", 0, 50)["entries"]
+              if e["outcome"] == "error"]
+    # a code, never "RuntimeError: ..." (which the tooltip cannot word)
+    assert sorted(errors) == ["cannot_move", "folder_changed:folder=Spam"]
+    assert errortext.describe("cannot_move") == "The server refused the move."
+
+
+def test_a_non_coded_failure_keeps_its_type_in_the_audit_error():
+    assert mailops.error_text(OSError("boom")) == "OSError: boom"
+
+
+# ----------------------------------------------- the audit CSV export text
+
+def test_the_csv_export_words_coded_errors_in_english(bridge):
+    auditlog.record("empty_trash", count=2, outcome="partial",
+                    error="deleted_then_failed:n=2,cause=cannot_expunge")
+    auditlog.record("purge", outcome="error", error="folder_changed:role=junk")
+    auditlog.record("trash", outcome="error",
+                    error="RuntimeError: some older plain text")
+    body = client.get("/api/audit/export").text
+    assert "The server did not remove the marked mails. (2 mails were " \
+        "permanently deleted before the failure)" in body
+    assert "The “Junk” folder changed on the server" in body
+    assert "RuntimeError: some older plain text" in body
+    assert "deleted_then_failed" not in body and "folder_changed" not in body
+
+
+# ----------------------------------------- backend English == the locale
+
+def _en_text(key: str) -> str | None:
+    src = (SRC / "locales" / "en.ts").read_text()
+    m = re.search(r'^  "%s":\s*((?:"(?:[^"\\]|\\.)*"\s*\+?\s*)+),'
+                  % re.escape(key), src, re.M)
+    if not m:
+        return None
+    text = "".join(re.findall(r'"((?:[^"\\]|\\.)*)"', m.group(1)))
+    return re.sub(r"\\u([0-9a-f]{4})", lambda x: chr(int(x.group(1), 16)),
+                  text)
+
+
+def test_the_backends_english_equals_the_english_locale():
+    ui = _ui_codes()
+    new = {c for c in ui if ui[c].startswith("ferr.")}
+    assert set(errortext.TEXT) == new
+    for code in new:
+        text = errortext.TEXT[code]
+        many, one = text if isinstance(text, tuple) else (text, None)
+        assert many == _en_text(ui[code]), code
+        assert one == _en_text(ui[code] + "_one"), code
+
+
+def test_every_new_code_has_an_english_text():
+    ours = set(mailops.FOLDER_ERROR_CODES) - {
+        mailops.NO_MESSAGE_ID, mailops.PINNED_MAILS, mailops.PROTECTED_MAILS,
+        mailops.ALL_PINNED, mailops.ROLE_NOT_CANDIDATE, mailops.ROLE_AMBIGUOUS,
+        mailops.NOT_LOOKALIKE, mailops.MOVE_UNSAFE}
+    assert set(errortext.TEXT) == ours
+
+
+def test_describe_words_params_plurals_and_causes():
+    d = errortext.describe
+    assert d("busy_purge") == errortext.TEXT["busy_purge"]
+    assert d("role_missing:role=archive") == \
+        "No “Archive” folder found on the server."
+    assert d("role_missing:role=trash") == \
+        "No “Trash” folder found on the server."
+    assert d("role_missing:role=junk") == \
+        "No “Junk” folder found on the server."
+    assert d("unknown_target:folder=Projekte%2C%20neu") == \
+        "The target folder “Projekte, neu” does not exist."
+    inner = mailops.coded(mailops.STRANDED_THEN_FAILED, n=1,
+                          cause=mailops.CANNOT_EXPUNGE)
+    assert d(mailops.coded(mailops.DELETED_THEN_FAILED, n=3, cause=inner)) == (
+        "The server did not remove the marked mails. (1 mail was moved to "
+        "Trash and not deleted) (3 mails were permanently deleted before "
+        "the failure)")
+    assert d("rule_purge_filter:names=tag%3A%2C%20ai%3A").endswith(
+        "Trash rules: tag:, ai:")
+
+
+@pytest.mark.parametrize("raw", [
+    "", "a_future_code", "a_future_code:n=2", "RuntimeError: x",
+    "cannot_open:folder", "cannot_open:=x", "cannot_open:folder=%E0%A4%A",
+    "cannot_open:a=1,,b=2"])
+def test_describe_returns_anything_else_as_it_is(raw):
+    assert errortext.describe(raw) == raw

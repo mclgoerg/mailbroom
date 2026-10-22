@@ -633,28 +633,29 @@ const failedRun = (error: string): Rule => ({ ...purgeRule, last_run: {
 test("a purge rule's failed run is worded in the interface language", () => {
   renderCards([failedRun("role_unconfirmed:role=trash")]);
   expect(screen.getByText(
-    "Trash is ambiguous - choose the right folder in Settings first."))
+    "More than one folder could be “Trash” - choose the right one in "
+    + "Settings first."))
     .toBeTruthy();
   expect(screen.queryByText(/role_unconfirmed|RuntimeError/)).toBeNull();
   cleanup();
   setLang("de");
   renderCards([failedRun("role_unconfirmed:role=trash")]);
-  expect(screen.getByText("Papierkorb ist nicht eindeutig – wähle zuerst in "
-    + "den Einstellungen den richtigen Ordner.")).toBeTruthy();
+  expect(screen.getByText("Für „Papierkorb“ kommen mehrere Ordner infrage – "
+    + "wähle zuerst in den Einstellungen den richtigen.")).toBeTruthy();
 });
 
 test("a failed run keeps its numbers and its singular / plural form", () => {
   renderCards([failedRun(
     "deleted_then_failed:n=1,cause=folder_changed%3Arole%3Djunk")]);
-  expect(screen.getByText("Junk changed on the server - reload the list and "
-    + "try again. (1 mail was permanently deleted before the failure)"))
+  expect(screen.getByText("The “Junk” folder changed on the server - reload "
+    + "the list and try again. (1 mail was permanently deleted before the failure)"))
     .toBeTruthy();
   cleanup();
   setLang("de");
   renderCards([failedRun(
     "deleted_then_failed:n=7,cause=folder_changed%3Arole%3Djunk")]);
-  expect(screen.getByText("Spam hat sich auf dem Server geändert – lade die "
-    + "Liste neu und versuche es erneut. (7 Mails wurden vor dem Fehler "
+  expect(screen.getByText("Der Ordner „Spam“ hat sich auf dem Server "
+    + "geändert – lade die Liste neu und versuche es erneut. (7 Mails wurden vor dem Fehler "
     + "endgültig gelöscht)")).toBeTruthy();
 });
 

@@ -1379,7 +1379,6 @@ export const EN: Record<string, string> = {
     "Download this list as a file. It lists sender addresses and notes - keep it private.",
   "know.col_actions": "Actions",
   // -- errors of the folder features (backend codes, see api.ts ERROR_CODES)
-  "ferr.folder_named": "“{name}”",
   "ferr.role_archive": "Archive",
   "ferr.busy_action":
     "Another action is still running - try again when it has finished.",
@@ -1391,16 +1390,20 @@ export const EN: Record<string, string> = {
     "Another rule is running - try again when it has finished.",
   "ferr.count_required":
     "The folder was not counted yet - reload it and confirm again.",
-  "ferr.role_missing": "No {folder} folder found on the server.",
+  "ferr.role_missing": "No “{folder}” folder found on the server.",
   "ferr.inbox_missing": "No Inbox found on the server.",
   "ferr.junk_needs_trash":
     "No Trash folder found on the server - deleting Junk permanently goes "
     + "through Trash.",
   "ferr.role_unconfirmed":
-    "{folder} is ambiguous - choose the right folder in Settings first.",
+    "More than one folder could be “{folder}” - choose the right one in "
+    + "Settings first.",
   "ferr.junk_is_trash": "Junk and Trash are the same folder.",
   "ferr.folder_changed":
-    "{folder} changed on the server - reload the list and try again.",
+    "The “{folder}” folder changed on the server - reload the list and try "
+    + "again.",
+  "ferr.folder_changed_rescan":
+    "The “{folder}” folder changed on the server - rescan and try again.",
   "ferr.partial_unsafe":
     "This server cannot safely delete only some of a folder's mails, so "
     + "nothing was deleted.",
@@ -1408,7 +1411,7 @@ export const EN: Record<string, string> = {
     "This server cannot safely delete only some of a folder's mails, and "
     + "the folder changed since it was counted - reload it and try again. "
     + "Nothing was deleted.",
-  "ferr.cannot_open": "Could not open {folder} on the server.",
+  "ferr.cannot_open": "Could not open the “{folder}” folder on the server.",
   "ferr.cannot_list": "Could not read the folder's mail list.",
   "ferr.cannot_flag":
     "The server did not accept marking the mails for deletion.",
@@ -1418,10 +1421,10 @@ export const EN: Record<string, string> = {
     "The server did not remove the copied mails from Junk.",
   "ferr.cannot_read_moved": "Could not read the moved mails in Trash.",
   "ferr.uv_unreadable":
-    "Could not read the state of {folder} - nothing is deleted.",
+    "Could not read the state of the “{folder}” folder - nothing is deleted.",
   "ferr.no_known_selected":
     "None of the selected mails are in the folder any more - reload it.",
-  "ferr.unknown_target": "The target folder {folder} does not exist.",
+  "ferr.unknown_target": "The target folder “{folder}” does not exist.",
   "ferr.target_is_trash": "The target is the Trash folder itself.",
   "ferr.nothing_to_undo": "There is nothing to undo any more.",
   "ferr.deleted_then_failed":

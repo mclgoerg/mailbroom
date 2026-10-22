@@ -212,7 +212,7 @@ test("selecting a sender selects all of its mails; actions only with a selection
 test("Not junk moves the exact UIDs, toasts with Undo and Protect sender",
   async () => {
     const onChanged = vi.fn();
-    const undo = { ts: 9, label: "1 mails from Junk", count: 1 };
+    const undo = { ts: 9, label: "1 mail from Junk", count: 1 };
     folderMove.mockResolvedValue({ moved: 1, rescan: true,
       senders: ["bob@friends.example"], undo });
     panel({ initialRole: "junk", onChanged });

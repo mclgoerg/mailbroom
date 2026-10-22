@@ -1576,7 +1576,6 @@ export const DE: Record<string, string> = {
     "Diese Liste als Datei herunterladen. Sie listet Absenderadressen und Notizen – halte sie privat.",
   "know.col_actions": "Aktionen",
   // -- Fehler der Ordner-Funktionen (Backend-Codes, siehe api.ts ERROR_CODES)
-  "ferr.folder_named": "„{name}“",
   "ferr.role_archive": "Archiv",
   "ferr.busy_action":
     "Es läuft noch eine andere Aktion – versuche es erneut, sobald "
@@ -1593,17 +1592,20 @@ export const DE: Record<string, string> = {
     "Der Ordner wurde noch nicht gezählt – lade ihn neu und "
     + "bestätige erneut.",
   "ferr.role_missing":
-    "Auf dem Server wurde kein {folder}-Ordner gefunden.",
+    "Auf dem Server wurde kein Ordner für „{folder}“ gefunden.",
   "ferr.inbox_missing": "Auf dem Server wurde kein Posteingang gefunden.",
   "ferr.junk_needs_trash":
     "Auf dem Server wurde kein Papierkorb gefunden – Spam wird "
     + "endgültig über den Papierkorb gelöscht.",
   "ferr.role_unconfirmed":
-    "{folder} ist nicht eindeutig – wähle zuerst in den "
-    + "Einstellungen den richtigen Ordner.",
+    "Für „{folder}“ kommen mehrere Ordner infrage – wähle zuerst in "
+    + "den Einstellungen den richtigen.",
   "ferr.junk_is_trash": "Spam und Papierkorb sind derselbe Ordner.",
   "ferr.folder_changed":
-    "{folder} hat sich auf dem Server geändert – lade die Liste "
+    "Der Ordner „{folder}“ hat sich auf dem Server geändert – lade die "
+    + "Liste neu und versuche es erneut.",
+  "ferr.folder_changed_rescan":
+    "Der Ordner „{folder}“ hat sich auf dem Server geändert – scanne "
     + "neu und versuche es erneut.",
   "ferr.partial_unsafe":
     "Dieser Server kann einzelne Mails eines Ordners nicht sicher löschen, "
@@ -1612,7 +1614,8 @@ export const DE: Record<string, string> = {
     "Dieser Server kann einzelne Mails eines Ordners nicht sicher löschen, "
     + "und der Ordner hat sich seit dem Zählen geändert – lade "
     + "ihn neu und versuche es erneut. Es wurde nichts gelöscht.",
-  "ferr.cannot_open": "{folder} konnte auf dem Server nicht geöffnet werden.",
+  "ferr.cannot_open":
+    "Der Ordner „{folder}“ konnte auf dem Server nicht geöffnet werden.",
   "ferr.cannot_list": "Die Mailliste des Ordners konnte nicht gelesen werden.",
   "ferr.cannot_flag":
     "Der Server hat das Markieren der Mails zum Löschen nicht "
@@ -1625,11 +1628,11 @@ export const DE: Record<string, string> = {
   "ferr.cannot_read_moved":
     "Die verschobenen Mails im Papierkorb konnten nicht gelesen werden.",
   "ferr.uv_unreadable":
-    "Der Zustand von {folder} konnte nicht gelesen werden – es wird "
-    + "nichts gelöscht.",
+    "Der Zustand des Ordners „{folder}“ konnte nicht gelesen werden – es "
+    + "wird nichts gelöscht.",
   "ferr.no_known_selected":
     "Keine der ausgewählten Mails ist noch im Ordner – lade ihn neu.",
-  "ferr.unknown_target": "Der Zielordner {folder} existiert nicht.",
+  "ferr.unknown_target": "Der Zielordner „{folder}“ existiert nicht.",
   "ferr.target_is_trash": "Das Ziel ist der Papierkorb selbst.",
   "ferr.nothing_to_undo":
     "Es gibt nichts mehr rückgängig zu machen.",

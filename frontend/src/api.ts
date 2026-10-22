@@ -91,6 +91,7 @@ const ERROR_CODES: Record<string, string> = {
   role_unconfirmed: "ferr.role_unconfirmed",
   junk_is_trash: "ferr.junk_is_trash",
   folder_changed: "ferr.folder_changed",
+  folder_changed_rescan: "ferr.folder_changed_rescan",
   partial_unsafe: "ferr.partial_unsafe",
   partial_unsafe_changed: "ferr.partial_unsafe_changed",
   cannot_open: "ferr.cannot_open",
@@ -162,8 +163,6 @@ export function errorText(detail: string): string {
   if (typeof params.cause === "string") text.cause = errorText(params.cause);
   if (typeof params.role === "string")
     text.folder = t(ROLE_NAMES[params.role] ?? params.role);
-  else if (typeof params.folder === "string")
-    text.folder = t("ferr.folder_named", { name: params.folder });
   return t(ERROR_CODES[code], text);
 }
 

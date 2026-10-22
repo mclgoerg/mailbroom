@@ -38,7 +38,7 @@ const panel = () => render(<ToastProvider><DialogProvider>
 test("the Folders panel's listing error reads in English", async () => {
   answers({ "/api/folders_panel": [409, { detail: "role_missing:role=junk" }] });
   panel();
-  expect(await screen.findByText("No Junk folder found on the server."))
+  expect(await screen.findByText("No “Junk” folder found on the server."))
     .toBeTruthy();
 });
 
@@ -47,8 +47,8 @@ test("... and in German, with a role that is ambiguous", async () => {
   answers({ "/api/folders_panel": [409, {
     detail: "role_unconfirmed:role=trash" }] });
   panel();
-  expect(await screen.findByText("Papierkorb ist nicht eindeutig – wähle "
-    + "zuerst in den Einstellungen den richtigen Ordner.")).toBeTruthy();
+  expect(await screen.findByText("Für „Papierkorb“ kommen mehrere Ordner "
+    + "infrage – wähle zuerst in den Einstellungen den richtigen.")).toBeTruthy();
 });
 
 const folder = (raw: string, over = {}) =>

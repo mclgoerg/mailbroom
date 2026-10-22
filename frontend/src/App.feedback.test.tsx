@@ -399,3 +399,14 @@ test("a failed move job shows its coded error in the user's language",
       "Fehler: Der Zielordner „Elsewhere“ existiert nicht."))
       .toBeTruthy();
   });
+
+test("a cleanup delete refused because the scan is stale says rescan",
+  async () => {
+    await mount({ ...baseState });
+    tick({ delete: job("running", { progress: "1/2" }) as any });
+    tick({ delete: job("error", { error: "folder_changed_rescan:folder=INBOX",
+      moved: 0 }) as any });
+    expect(await screen.findByText(
+      "Error: The “INBOX” folder changed on the server - rescan and try "
+      + "again.")).toBeTruthy();
+  });
