@@ -182,7 +182,8 @@ def test_uidvalidity_mismatch_refuses(junked):
     # the client's listing is older than the server's folder
     junked.uv["Spam"] = 9
     res = _move("not_junk", [42], r["uv"])
-    assert res.status_code == 409 and "UIDVALIDITY" in res.json()["detail"]
+    assert res.status_code == 409 and res.json()["detail"] == mailops.coded(
+        mailops.FOLDER_CHANGED, folder="Spam")
     assert len(junked.mailbox["Spam"]) == 3 and junked.mailbox["Trash"] == []
     # and a listing older than the cached index is refused up front
     _list()                                       # rebuilds under uv 9

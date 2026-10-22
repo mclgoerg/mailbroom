@@ -11,7 +11,7 @@ from fastapi.testclient import TestClient
 from backend import auditlog
 from backend import mailops
 from backend.main import app
-from conftest import FakeIMAP, make_msg, wait_delete_done
+from conftest import FakeIMAP, code_re, make_msg, wait_delete_done
 
 client = TestClient(app)
 
@@ -93,7 +93,7 @@ def test_no_counted_listing_refuses_and_deletes_nothing(monkeypatch, uv,
                                                         max_uid):
     fake = _bridge(monkeypatch, _trash_msgs(3, 4))
     spy = Spy(fake)
-    with pytest.raises(RuntimeError, match="counted listing"):
+    with pytest.raises(RuntimeError, match=code_re(mailops.COUNT_REQUIRED)):
         if uv is None:
             mailops.empty_trash()
         else:
@@ -113,7 +113,7 @@ def test_unreadable_uidvalidity_refuses(monkeypatch):
     fake = _bridge(monkeypatch, _trash_msgs(3, 4))
     fake.response = lambda key: (key, [None])      # server never announces it
     spy = Spy(fake)
-    with pytest.raises(RuntimeError, match="changed"):
+    with pytest.raises(RuntimeError, match=code_re(mailops.FOLDER_CHANGED, role="trash")):
         mailops.empty_trash(uv=1, max_uid=4)
     assert _trash_uids(fake) == [3, 4]
     assert not [c for c in spy.calls if "STORE" in c or "EXPUNGE" in c]
@@ -143,7 +143,7 @@ def test_uidvalidity_mismatch_refuses_and_deletes_nothing(monkeypatch):
     listing = mailops.trash_list()
     fake.uv["Trash"] = 2                    # server re-numbered the folder
     spy = Spy(fake)
-    with pytest.raises(RuntimeError, match="changed"):
+    with pytest.raises(RuntimeError, match=code_re(mailops.FOLDER_CHANGED, role="trash")):
         mailops.empty_trash(uv=listing["uv"], max_uid=listing["max_uid"])
     assert _trash_uids(fake) == [3, 4]
     assert not [c for c in spy.calls if "STORE" in c or "EXPUNGE" in c]
@@ -168,7 +168,7 @@ def test_no_uidplus_refuses_a_partial_purge(monkeypatch):
     fake = _bridge(monkeypatch, _trash_msgs(3, 4, 5), uidplus=False)
     fake.mailbox["Trash"].append(make_msg(6))       # arrived after the count
     spy = Spy(fake)
-    with pytest.raises(RuntimeError, match="cannot delete part"):
+    with pytest.raises(RuntimeError, match=code_re(mailops.PARTIAL_UNSAFE_CHANGED)):
         mailops.empty_trash(uv=1, max_uid=5)
     assert _trash_uids(fake) == [3, 4, 5, 6]
     assert not [c for c in spy.calls if "STORE" in c or "EXPUNGE" in c]
@@ -193,7 +193,7 @@ def test_no_uidplus_refuses_when_trash_changes_during_the_recheck(monkeypatch):
                 fake.mailbox["Trash"].append(make_msg(5))
         return r
     fake.uid = uid
-    with pytest.raises(RuntimeError, match="changed"):
+    with pytest.raises(RuntimeError, match=code_re(mailops.FOLDER_CHANGED, role="trash")):
         mailops.empty_trash(uv=1, max_uid=10_000)
     assert _trash_uids(fake) == [3, 4, 5]
 
@@ -244,8 +244,8 @@ def test_partial_failure_books_what_was_really_deleted(monkeypatch):
                 return "NO", [b"denied"]
         return orig(cmd, *a)
     fake.uid = uid
-    with pytest.raises(RuntimeError, match="500 mails were permanently "
-                                           "deleted before the failure"):
+    with pytest.raises(RuntimeError, match=code_re(
+            mailops.DELETED_THEN_FAILED, n=500, cause=mailops.CANNOT_FLAG)):
         mailops.empty_trash(uv=1, max_uid=1201)
     assert _trash_uids(fake) == list(range(501, 1202))
     e = [e for e in auditlog.load("default", 0, 100)["entries"]

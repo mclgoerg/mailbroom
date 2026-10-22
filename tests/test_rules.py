@@ -10,7 +10,7 @@ from backend import mailops
 from backend import rules as rulesmod
 from backend.main import app
 
-from conftest import wait_delete_done
+from conftest import code_re, wait_delete_done
 
 client = TestClient(app)
 
@@ -214,7 +214,8 @@ def test_run_errors_are_recorded(bridge):
         "action": "move", "dest": "NoSuchFolder"})
     rulesmod.run_rule(rule["id"])                  # report mode: no move yet
     rulesmod.update_rule(rule["id"], {"mode": "execute"})
-    with pytest.raises(RuntimeError, match="unknown target folder"):
+    with pytest.raises(RuntimeError, match=code_re(mailops.UNKNOWN_TARGET,
+                                                   folder="NoSuchFolder")):
         rulesmod.run_rule(rule["id"], rescan=False)
     saved = rulesmod.load_rules()[0]
     assert saved["last_run"]["error"]

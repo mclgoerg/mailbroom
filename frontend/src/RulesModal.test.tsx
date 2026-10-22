@@ -17,7 +17,8 @@ const deleteRule = vi.fn().mockResolvedValue({});
 const runRule = vi.fn().mockResolvedValue({});
 const listRules = vi.fn().mockResolvedValue({ rules: [], cap: 37 });
 
-vi.mock("./api", () => ({
+vi.mock("./api", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("./api")>()),
   api: { createRule: (body: unknown) => createRule(body),
          updateRule: (id: string, body: unknown) => updateRule(id, body),
          deleteRule: (id: string) => deleteRule(id),
@@ -625,3 +626,47 @@ test("German: the editor help says an empty filter means ALL senders and " +
     expect(help.textContent, fam).toContain(fam);
   }
 });
+
+// ---------------------------------------- errors in the interface language
+
+const failedRun = (error: string): Rule => ({ ...purgeRule, last_run: {
+  ts: 1, mode: "execute", groups: 0, mails: 0, acted: 0, capped: 0,
+  skipped_protected: 0, skipped_pinned: 0, preview: [], error } });
+
+test("a purge rule's failed run is worded in the interface language", () => {
+  renderCards([failedRun("role_unconfirmed:role=trash")]);
+  expect(screen.getByText(
+    "More than one folder could be “Trash” - choose the right one in "
+    + "Settings first."))
+    .toBeTruthy();
+  expect(screen.queryByText(/role_unconfirmed|RuntimeError/)).toBeNull();
+  cleanup();
+  setLang("de");
+  renderCards([failedRun("role_unconfirmed:role=trash")]);
+  expect(screen.getByText("Für „Papierkorb“ kommen mehrere Ordner infrage – "
+    + "wähle zuerst in den Einstellungen den richtigen.")).toBeTruthy();
+});
+
+test("a failed run keeps its numbers and its singular / plural form", () => {
+  renderCards([failedRun(
+    "deleted_then_failed:n=1,cause=folder_changed%3Arole%3Djunk")]);
+  expect(screen.getByText("The “Junk” folder changed on the server - reload "
+    + "the list and try again. (1 mail was permanently deleted before the failure)"))
+    .toBeTruthy();
+  cleanup();
+  setLang("de");
+  renderCards([failedRun(
+    "deleted_then_failed:n=7,cause=folder_changed%3Arole%3Djunk")]);
+  expect(screen.getByText("Der Ordner „Spam“ hat sich auf dem Server "
+    + "geändert – lade die Liste neu und versuche es erneut. (7 Mails wurden vor dem Fehler "
+    + "endgültig gelöscht)")).toBeTruthy();
+});
+
+test("an error that is not a code (an older run, a raw failure) stays as is",
+  () => {
+    setLang("de");
+    renderCards([failedRun("RuntimeError: Trash is ambiguous - choose it in "
+      + "Settings first")]);
+    expect(screen.getByText("RuntimeError: Trash is ambiguous - choose it in "
+      + "Settings first")).toBeTruthy();
+  });

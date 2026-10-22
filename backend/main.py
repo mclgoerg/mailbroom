@@ -29,6 +29,7 @@ from . import bodyindex
 from . import autoscan as autoscanmod
 from . import config as cfgmod
 from . import digest as digestmod
+from . import errortext
 from . import knowledge as knowledgemod
 from . import knowledgestore
 from . import knownsenders
@@ -895,7 +896,9 @@ def get_audit_export(account: str | None = Query(None)):
     for e in entries:
         w.writerow([e["ts"], e["account"], e["actor"], e["action"],
                     e["count"], e["bytes"], e["label"], e["outcome"],
-                    e["error"]])
+                    # a coded error as English text (the UI's tooltip words
+                    # it in its language); older plain text as written
+                    errortext.describe(e["error"])])
     return StreamingResponse(
         iter([buf.getvalue()]), media_type="text/csv",
         headers={"Content-Disposition":

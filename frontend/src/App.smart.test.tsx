@@ -24,7 +24,8 @@ const deleteGroups = vi.fn()
   .mockResolvedValue({ ok: true, queued: 1, skipped: 0 });
 const groupMails = vi.fn().mockResolvedValue([]);
 
-vi.mock("./api", () => ({
+vi.mock("./api", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("./api")>()),
   api: {
     authProbe: () => Promise.resolve({ mode: "none", authed: true }),
     getConfig: () => Promise.resolve(cfg),

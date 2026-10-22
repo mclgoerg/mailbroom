@@ -267,6 +267,13 @@ def purge_unsupported(query: str) -> list[str]:
                 else bool(f[key]))]
 
 
+def _purge_filter_error(bad: list[str]) -> str:
+    """The coded refusal naming the qualifiers a purge rule cannot use."""
+    return mailops.coded(
+        mailops.RULE_PURGE_FILTER_DOMAIN if "domain:" in bad
+        else mailops.RULE_PURGE_FILTER, names=", ".join(bad))
+
+
 def _normalise(r: dict) -> None:
     """Read-side defaults and the purge safety floor for one rule loaded
     from disk (an old rules.json, an imported or restored file)."""
@@ -399,22 +406,17 @@ def _validate(body: dict, rule: dict) -> dict:
             rule["action"] = PURGE_ACTION    # the scope changed under it
         if rule["grouping"] != "sender":
             if "grouping" in body:
-                raise ValueError("Junk and Trash rules match sender groups")
+                raise ValueError(mailops.RULE_PURGE_GROUPING)
             rule["grouping"] = "sender"
         if rule.get("keep_latest") is not None:
-            raise ValueError("keep_latest is not available for Junk and "
-                             "Trash rules")
+            raise ValueError(mailops.RULE_PURGE_KEEP_LATEST)
         if rule.get("older_than_days") is None:
-            raise ValueError("a Junk or Trash rule needs older_than_days")
+            raise ValueError(mailops.RULE_PURGE_NEEDS_AGE)
         if rule.get("origin") != "manual":
             raise ValueError("bad origin")
         bad = purge_unsupported(rule["query"])
         if bad:
-            raise ValueError(
-                "filter not available for Junk and Trash rules: "
-                + ", ".join(bad)
-                + (" (it never matches sender groups - use plain text such "
-                   "as the domain name)" if "domain:" in bad else ""))
+            raise ValueError(_purge_filter_error(bad))
         rule["dest"] = ""
     elif rule["action"] not in mailops.ACTIONS:
         raise ValueError("bad action")       # e.g. a purge rule moved to mail
@@ -434,7 +436,7 @@ def _validate(body: dict, rule: dict) -> dict:
         if body["mode"] == "execute" and (
                 rule.get("report_runs", 0) < 1
                 or (purge and not purge_armed(rule))):
-            raise ValueError("run this rule in report mode first")
+            raise ValueError(mailops.RULE_REPORT_FIRST)
         rule["mode"] = body["mode"]
     return rule
 
@@ -570,7 +572,7 @@ def run_rule(rule_id: str, rescan: bool = True) -> dict:
     except KeyError as exc:
         raise RuntimeError(str(exc))
     if not _RUN_LOCK.acquire(blocking=False):
-        raise RuntimeError("busy: another rule is running")
+        raise RuntimeError(mailops.BUSY_RULE)
     try:
         result = {"ts": int(time.time()), "mode": rule["mode"],
                   "groups": 0, "mails": 0, "acted": 0, "capped": 0,
@@ -634,8 +636,9 @@ def run_rule(rule_id: str, rescan: bool = True) -> dict:
         if rule["mode"] == "execute" and rule["action"] == "move":
             with acc.lock:
                 if rule["dest"] not in acc.state["folders_raw"]:
-                    raise RuntimeError(
-                        f"unknown target folder {rule['dest']!r}")
+                    raise RuntimeError(mailops.coded(
+                        mailops.UNKNOWN_TARGET,
+                        folder=mailops.decode_mutf7(rule["dest"])))
         if rule["mode"] == "execute" and picked:
             r = mailops.delete_groups(
                 rule["grouping"], [g["key"] for g in picked],
@@ -657,7 +660,7 @@ def run_rule(rule_id: str, rescan: bool = True) -> dict:
     except _RunFailed:
         raise                      # a purge run, already recorded
     except Exception as exc:
-        result["error"] = f"{type(exc).__name__}: {exc}"
+        result["error"] = mailops.error_text(exc)
         log.exception("rule %s failed", rule_id)
     finally:
         _RUN_LOCK.release()
@@ -706,11 +709,12 @@ def _run_purge(rule: dict, acc, result: dict) -> None:
                 or rule.get("older_than_days") is None \
                 or rule.get("keep_latest") is not None:
             raise ValueError("not a valid Junk / Trash rule")
-        if purge_unsupported(rule["query"]):
-            raise ValueError("filter not available for Junk and Trash rules")
+        bad = purge_unsupported(rule["query"])
+        if bad:
+            raise ValueError(_purge_filter_error(bad))
         result["sig"], result["box"] = definition_sig(rule), box_sig(rule)
         if rule["mode"] == "execute" and not purge_armed(rule):
-            raise RuntimeError("run this rule in report mode first")
+            raise RuntimeError(mailops.RULE_REPORT_FIRST)
         f = parse_filter(rule["query"])
         now = time.time()
 
@@ -731,9 +735,7 @@ def _run_purge(rule: dict, acc, result: dict) -> None:
             # report was computed on (role choice changed in Settings, or
             # the server moved the role): nothing was previewed there.
             _disarm(rule["id"], "folder")
-            raise RuntimeError(
-                "the Junk / Trash folder changed since the last report - "
-                "the rule is back in report mode, nothing was deleted")
+            raise RuntimeError(mailops.RULE_FOLDER_CHANGED)
         picked = sorted(pv["uids"])[:RULE_CAP]
         by_uid = {m["uid"]: m for m in mailops.role_mails(role, acc)}
         senders: dict[str, dict] = {}
@@ -780,7 +782,7 @@ def _run_purge(rule: dict, acc, result: dict) -> None:
                 "params": {"name": rule["name"], "groups": result["groups"],
                            "mails": total, "acted": result["acted"]}}
     except Exception as exc:
-        result["error"] = f"{type(exc).__name__}: {exc}"
+        result["error"] = mailops.error_text(exc)
         log.exception("purge rule %s failed", rule["id"])
 
 
