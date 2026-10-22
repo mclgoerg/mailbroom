@@ -1236,7 +1236,11 @@ export function ConfirmDialog({ title, body, bullets, confirmLabel,
   const titleId = useId();
   const bodyId = useId();
   const hasBody = body != null || (bullets?.length ?? 0) > 0;
-  useEffect(() => {
+  // Layout effect: the dialog is focused in the same commit that inserts it,
+  // so nothing that reacts to its appearance (a fast Enter, findBy*, a
+  // MutationObserver) can see another element focused - for a danger dialog
+  // that is the safety property "Cancel has focus".
+  useLayoutEffect(() => {
     (tone === "danger" ? safe : ok).current?.focus();
   }, [tone]);
   return (
@@ -1290,7 +1294,7 @@ export function PromptDialog({ title, label, initial = "", confirmLabel,
   // the submit button with `detail === 0`; a tap/click has `detail >= 1`.
   const viaKeyboard = useRef(true);
   const titleId = useId();
-  useEffect(() => { input.current?.focus(); input.current?.select(); }, []);
+  useLayoutEffect(() => { input.current?.focus(); input.current?.select(); }, []);
   const error = validate?.(value) ?? null;
   return (
     <Modal size="sm" labelledBy={titleId} onClose={() => onResult(null)}>

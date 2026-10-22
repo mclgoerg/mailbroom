@@ -480,6 +480,52 @@ test("confirmDialog rejects without a provider (the action must not proceed)", a
     .rejects.toThrow(/DialogProvider/);
 });
 
+test("a dialog already has its focus the moment it appears in the DOM", async () => {
+  // Regression (flaky CI): focus used to be set in a passive effect, which
+  // runs AFTER whatever reacts to the dialog's insertion - findBy*, a
+  // MutationObserver, a fast Enter key. A MutationObserver callback is a
+  // microtask, i.e. it runs before React's deferred passive effects, so it
+  // deterministically sees what has focus at insertion time.
+  render(<DialogProvider><span>app</span></DialogProvider>);
+  let seen: Element | null | undefined;
+  const watch = () => {
+    seen = undefined;
+    const mo = new MutationObserver(() => {
+      if (seen === undefined && document.querySelector('[role="dialog"]'))
+        seen = document.activeElement;
+    });
+    mo.observe(document.body, { childList: true, subtree: true });
+    return mo;
+  };
+
+  // danger confirm: Cancel (the safe choice) is focused on arrival
+  let mo = watch();
+  let p = confirmDialog({ title: "T", confirmLabel: "Do", tone: "danger" });
+  await screen.findByRole("dialog");
+  mo.disconnect();
+  expect(seen).toBe(screen.getByText("Cancel"));
+  fireEvent.click(screen.getByText("Cancel"));
+  expect(await p).toBe(false);
+
+  // primary confirm: the confirm button
+  mo = watch();
+  p = confirmDialog({ title: "T", confirmLabel: "Do" });
+  await screen.findByRole("dialog");
+  mo.disconnect();
+  expect(seen).toBe(screen.getByText("Do"));
+  fireEvent.click(screen.getByText("Cancel"));
+  expect(await p).toBe(false);
+
+  // prompt: the text field
+  mo = watch();
+  const q = promptDialog({ title: "Rename", label: "Name", initial: "old" });
+  const input = await screen.findByLabelText("Name");
+  mo.disconnect();
+  expect(seen).toBe(input);
+  fireEvent.click(screen.getByText("Cancel"));
+  expect(await q).toBeNull();
+});
+
 test("promptDialog validates, submits the value, and cancels with null", async () => {
   render(<DialogProvider><span>app</span></DialogProvider>);
   const validate = (v: string) => (v.trim() ? null : "Name required");
