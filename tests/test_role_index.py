@@ -431,3 +431,13 @@ def test_incomplete_role_record_is_dropped_by_the_loader(env):
     assert gone not in {m["uid"] for m in mailops.role_mails("trash", acc2)}
     r = mailops.trash_list(acc=acc2)               # sorts fine, refetches it
     assert r["total"] == 3
+
+
+def test_role_index_reads_the_resolved_folder_never_a_look_alike(monkeypatch):
+    fake = FakeIMAP({"INBOX": [make_msg(1)], "Bin": _trash(3, 4),
+                     "Trash": _trash(70, 71), "Sent": []},
+                    flags={"Bin": "\\Trash"})
+    monkeypatch.setattr(mailops, "connect", lambda cfg, name=None: fake)
+    r = mailops.trash_list()
+    assert r["folder"] == "Bin" and [m["uid"] for m in r["mails"]] == [4, 3]
+    assert {m["folder"] for m in mailops.role_mails("trash")} == {"Bin"}
