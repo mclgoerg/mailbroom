@@ -986,15 +986,21 @@ export function useMediaQuery(query: string): boolean {
   return match;
 }
 
-/** Dismissible inline notice (replaces the one-off banners). */
-export function Notice({ children, icon, onClose, className = "" }: {
+/** Dismissible inline notice (replaces the one-off banners). `tone="danger"`
+ *  is the same red pair as the error toast (`keep`): a warning about
+ *  something irreversible (e.g. deleting mail on the server for good). */
+export function Notice({ children, icon, onClose, tone = "neutral",
+  className = "" }: {
   children: ReactNode; icon?: ReactNode; onClose?: () => void;
+  tone?: "neutral" | "danger";
   className?: string;
 }) {
   return (
     <div role="status" className={`flex items-start gap-2 rounded-card
-      bg-panel2 px-3 py-2 type-meta text-body ${className}`}>
-      {icon != null && <span className="mt-0.5 shrink-0 text-muted">{icon}</span>}
+      px-3 py-2 type-meta ${tone === "danger" ? "bg-keep-bg text-keep-fg"
+        : "bg-panel2 text-body"} ${className}`}>
+      {icon != null && <span className={`mt-0.5 shrink-0 ${tone === "danger"
+        ? "text-keep-fg" : "text-muted"}`}>{icon}</span>}
       <div className="min-w-0 flex-1 py-0.5">{children}</div>
       {onClose && (
         <Button variant="quiet" size="icon" label={t("Dismiss")}
