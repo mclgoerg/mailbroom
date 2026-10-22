@@ -26,7 +26,7 @@ from backend import rules as rulesmod
 from backend import stats as statsmod
 from backend.main import app
 from conftest import FakeIMAP, make_msg
-from test_purge import OLD, Spy, _env, _mails, _recent, _uids
+from test_purge import OLD, Spy, _env, _mails, _recent, _uids, _uv_flips
 
 client = TestClient(app)
 
@@ -65,7 +65,8 @@ def _entries(action=None, account="default"):
 def test_no_rule_exists_by_default_and_nothing_creates_one():
     import pathlib
     assert rulesmod.load_rules() == []
-    assert client.get("/api/rules").json() == {"rules": []}
+    assert client.get("/api/rules").json() == {"rules": [],
+                                              "cap": rulesmod.RULE_CAP}
     root = pathlib.Path(__file__).resolve().parent.parent
     demo = (root / "scripts" / "demo.py")
     if demo.exists():
@@ -1010,3 +1011,336 @@ def test_the_run_endpoint_answers_409_with_the_refusal(monkeypatch):
     r = client.post(f"/api/rules/{rule['id']}/run")
     assert r.status_code == 409 and "ambiguous" in r.json()["detail"]
     assert _uids(fake, "Trash") == [3]
+
+
+# ================================== the folder the report was computed on
+
+def _ambiguous_trash(monkeypatch, **kw):
+    """Trash + Deleted Items, the user confirmed 'Trash' in Settings."""
+    fake = _env(monkeypatch, trash=_mails([3, 4], date=OLD), **kw)
+    fake.mailbox["Deleted Items"] = _mails([13, 14], date=OLD)
+    fake.uv["Deleted Items"] = 1
+    mailops.set_role_override("trash", "Trash")
+    return fake
+
+
+def _refused_back_to_report(rule, fake, *untouched):
+    before = {f: list(fake.mailbox[f]) for f in untouched}
+    spy = Spy(fake)
+    with pytest.raises(RuntimeError, match="folder changed since the last "
+                                            "report"):
+        _run(rule)
+    assert spy.destructive() == []
+    assert {f: list(fake.mailbox[f]) for f in untouched} == before
+    stored = _stored(rule["id"])
+    assert stored["mode"] == "report" and stored["report_runs"] == 0
+    assert stored["reset_reason"] == "folder" and not rulesmod.purge_armed(
+        stored)
+    assert "folder changed" in stored["last_run"]["error"]
+    assert _entries("purge") == []
+    with pytest.raises(ValueError, match="report mode first"):
+        rulesmod.update_rule(rule["id"], {"mode": "execute"})
+
+
+def test_a_role_choice_changed_after_the_report_disarms_the_rule(monkeypatch):
+    """The reviewer's repro: report on 'Trash', arm, then confirm the
+    look-alike 'Deleted Items' - the armed rule must not delete there."""
+    fake = _ambiguous_trash(monkeypatch)
+    rule = _armed(_rule("trash"))
+    mailops.set_role_override("trash", "Deleted Items")
+    _refused_back_to_report(rule, fake, "Trash", "Deleted Items")
+    # a fresh report shows the NEW folder; only then may it execute there
+    assert _run(rule)["mails"] == 2
+    assert _stored(rule["id"])["reset_reason"] == ""
+    rulesmod.update_rule(rule["id"], {"mode": "execute"})
+    assert _run(rule)["acted"] == 2
+    assert _uids(fake, "Deleted Items") == [] and _uids(fake, "Trash") == [3, 4]
+
+
+def test_a_server_side_role_change_after_the_report_disarms_the_rule(
+        monkeypatch):
+    fake = _env(monkeypatch, trash=_mails([3, 4], date=OLD),
+                flags={"Trash": "\\Trash"})
+    fake.mailbox["Bin"] = _mails([13, 14], date=OLD)
+    fake.uv["Bin"] = 1
+    rule = _armed(_rule("trash"))
+    fake.flags = {"Bin": "\\Trash"}              # the server moved the role
+    _refused_back_to_report(rule, fake, "Trash", "Bin")
+
+
+def test_a_junk_purges_trash_folder_changed_after_the_report_disarms_it(
+        monkeypatch):
+    fake = _env(monkeypatch, junk=_mails([3, 4], date=OLD),
+                trash=_mails([8], date=OLD), renumber=True, copyuid=True)
+    fake.mailbox["Deleted Items"] = _mails([18], date=OLD)
+    fake.uv["Deleted Items"] = 1
+    mailops.set_role_override("trash", "Trash")
+    rule = _armed(_rule("junk"))
+    mailops.set_role_override("trash", "Deleted Items")
+    _refused_back_to_report(rule, fake, "Spam", "Trash", "Deleted Items")
+
+
+def test_a_junk_folder_change_after_the_report_disarms_the_rule(monkeypatch):
+    fake = _env(monkeypatch, junk=_mails([3, 4], date=OLD),
+                trash=_mails([8], date=OLD))
+    fake.mailbox["Junk Email"] = _mails([14], date=OLD)
+    fake.uv["Junk Email"] = 1
+    mailops.set_role_override("junk", "Spam")
+    rule = _armed(_rule("junk"))
+    mailops.set_role_override("junk", "Junk Email")
+    _refused_back_to_report(rule, fake, "Spam", "Junk Email", "Trash")
+
+
+def test_a_report_without_a_recorded_folder_does_not_arm(monkeypatch):
+    _env(monkeypatch, trash=_mails([3], date=OLD))
+    rule = _armed(_rule("trash"))
+    raw = json.loads(rulesmod._path().read_text())
+    raw["rules"][0]["report_at"] = None
+    rulesmod._path().write_text(json.dumps(raw))
+    stored = _stored(rule["id"])
+    assert stored["mode"] == "report" and stored["report_runs"] == 0
+
+
+# ========================================================= mailbox identity
+
+def _login(user="u1", host="host-one"):
+    cfg = json.loads(cfgmod.CONFIG_PATH.read_text())
+    cfg["accounts"]["one"].update(user=user, host=host)
+    cfgmod.CONFIG_PATH.write_text(json.dumps(cfg))
+
+
+def test_changing_the_server_or_login_of_an_account_disarms_its_rules(
+        monkeypatch):
+    boxes, _ = _two_accounts(monkeypatch)
+    boxes["host-one2"] = boxes["host-one"]
+    rule = _armed(_rule("trash", account="one"))
+    assert _stored(rule["id"])["mode"] == "execute"
+    for kw in ({"user": "someone-else"}, {"host": "host-one2"}):
+        _login()                                    # back to the original
+        rule = _armed(_rule("trash", account="one"))
+        _login(**kw)
+        stored = _stored(rule["id"])
+        assert stored["mode"] == "report" and stored["report_runs"] == 0
+        assert stored["reset_reason"] == "account"
+        with pytest.raises(ValueError, match="report mode first"):
+            rulesmod.update_rule(rule["id"], {"mode": "execute"})
+    assert _uids(boxes["host-one"], "Trash") == [3, 4]
+
+
+def test_the_mailbox_identity_is_a_hash_never_a_secret():
+    cfgmod.CONFIG_PATH.write_text(json.dumps({"accounts": {
+        "one": {"host": "Host-One", "user": "U1", "password": "s3cret"}}}))
+    a = rulesmod.mailbox_id("one")
+    assert len(a) == 16 and "s3cret" not in a and "u1" not in a.lower()
+    assert a == rulesmod.mailbox_id("one")
+    assert rulesmod.mailbox_id("nope") == ""
+    _armed_rule = _rule("trash", account="one")
+    blob = json.dumps(_armed_rule)
+    assert "s3cret" not in blob and "u1" not in blob.lower()
+
+
+def test_an_account_rename_disarms_its_purge_rules_with_a_reason(monkeypatch):
+    _two_accounts(monkeypatch)
+    rule = _armed(_rule("trash", account="two"))
+    other = _armed(_rule("trash", account="one"))
+    # the config rename succeeded too: same host and login under a new name
+    cfg = json.loads(cfgmod.CONFIG_PATH.read_text())
+    cfg["accounts"]["renamed"] = cfg["accounts"].pop("two")
+    cfgmod.CONFIG_PATH.write_text(json.dumps(cfg))
+    rulesmod.rename_account("two", "renamed")
+    stored = _stored(rule["id"])
+    assert stored["account"] == "renamed" and stored["mode"] == "report"
+    assert stored["report_runs"] == 0 and stored["reset_reason"] == "account"
+    assert _stored(other["id"])["mode"] == "execute"      # others untouched
+
+
+def test_deleting_an_account_removes_its_rules_so_a_new_one_starts_clean(
+        monkeypatch):
+    _two_accounts(monkeypatch)
+    gone = _rule("trash", account="two")
+    keep = _rule("trash", account="one")
+    mail = rulesmod.create_rule({"name": "m", "account": "two"})
+    r = client.post("/api/config", json={"delete_account": "two"})
+    assert r.status_code == 200
+    ids = [r_["id"] for r_ in rulesmod.load_rules()]
+    assert ids == [keep["id"]] and gone["id"] not in ids \
+        and mail["id"] not in ids
+
+
+def test_a_report_for_another_mailbox_does_not_arm_a_rewritten_account(
+        monkeypatch):
+    _two_accounts(monkeypatch)
+    rule = _armed(_rule("trash", account="one"))
+    raw = json.loads(rulesmod._path().read_text())
+    # identity of the report is stored as a hash, a stale one disarms
+    raw["rules"][0]["report_box"] = "0123456789abcdef"
+    rulesmod._path().write_text(json.dumps(raw))
+    assert _stored(rule["id"])["mode"] == "report"
+
+
+# ============================================================ partial failure
+
+def test_a_run_that_stops_part_way_books_what_was_really_deleted(
+        monkeypatch):
+    monkeypatch.setattr(rulesmod, "RULE_CAP", 1201)
+    fake = _env(monkeypatch, trash=_mails(range(1, 1202), date=OLD))
+    rule = _armed(_rule("trash"))
+    orig = fake.uid
+    stores = []
+
+    def uid(cmd, *a):
+        if cmd == "STORE" and a[1] == "+FLAGS":
+            stores.append(1)
+            if len(stores) == 2:
+                return "NO", [b"denied"]
+        return orig(cmd, *a)
+    fake.uid = uid
+    with pytest.raises(RuntimeError, match="500 mails were permanently "
+                                           "deleted"):
+        _run(rule)
+    last = _stored(rule["id"])["last_run"]
+    assert last["acted"] == 500 and "500 mails" in last["error"]
+    (e,) = _entries("rule_execute")
+    assert e["count"] == 500 and e["outcome"] == "error"
+    (p,) = _entries("purge")
+    assert p["count"] == 500 and p["outcome"] == "partial"
+    assert len(fake.mailbox["Trash"]) == 701
+
+
+def test_the_rule_audit_counts_what_was_deleted_not_what_matched(monkeypatch):
+    monkeypatch.setattr(rulesmod, "RULE_CAP", 2)
+    _env(monkeypatch, trash=_mails([3, 4, 5, 6, 7], date=OLD))
+    rule = _armed(_rule("trash"))
+    assert _run(rule)["acted"] == 2
+    (e,) = _entries("rule_execute")
+    assert e["count"] == 2                          # 5 matched, 2 deleted
+    (r,) = _entries("rule_report")
+    assert r["count"] == 5                          # a report counts matches
+
+
+# ============================================================ filter / cap
+
+def test_domain_is_refused_for_purge_rules_with_a_clear_message():
+    with pytest.raises(ValueError, match=r"domain:.*never matches sender"):
+        _rule("trash", query="domain:gone.example")
+    rule = _rule("trash")
+    with pytest.raises(ValueError, match="domain:"):
+        rulesmod.update_rule(rule["id"], {"query": "age:>1m domain:x"})
+    assert client.post("/api/rules", json={
+        "name": "d", "scope": "junk",
+        "query": "domain:x"}).status_code == 400
+
+
+def test_an_empty_filter_is_every_sender_in_the_folder(monkeypatch):
+    _mixed(monkeypatch)
+    rule = _rule("trash", query="")
+    assert _run(rule)["mails"] == 3 and rule["query"] == ""
+
+
+def test_a_hand_edited_purge_rule_with_an_unsupported_filter_never_runs(
+        monkeypatch):
+    fake = _env(monkeypatch, trash=_mails([3, 4], date=OLD))
+    spy = Spy(fake)
+    for q in ("eng:low", "tag:x", "is:replied"):
+        _write([{"id": "r1", "name": "x", "scope": "trash",
+                 "action": "purge", "grouping": "sender", "query": q,
+                 "dest": "", "account": "default", "schedule": "manual",
+                 "mode": "report", "report_runs": 0, "older_than_days": 1,
+                 "origin": "manual", "created": 1, "last_run": None}])
+        with pytest.raises(RuntimeError, match="filter not available"):
+            rulesmod.run_rule("r1")
+    assert spy.calls == [] and _uids(fake, "Trash") == [3, 4]
+
+
+def test_the_rules_api_returns_the_effective_cap(monkeypatch):
+    monkeypatch.setattr(rulesmod, "RULE_CAP", 37)
+    assert client.get("/api/rules").json()["cap"] == 37
+
+
+# ================================================ the gate against forgeries
+
+def test_requests_and_imports_cannot_forge_the_report_record(monkeypatch):
+    _env(monkeypatch)
+    forged = {"report_runs": 9, "report_sig": "x", "report_box": "y",
+              "report_at": {"folder": "Trash", "trash_folder": None},
+              "reset_reason": "", "mode": "execute"}
+    rule = rulesmod.create_rule({"name": "f", "scope": "trash", **forged})
+    assert rule["report_runs"] == 0 and rule["report_sig"] == "" \
+        and rule["report_at"] is None and rule["mode"] == "report"
+    rule = rulesmod.update_rule(rule["id"], {"name": "g", **forged}
+                                | {"mode": "report"})
+    assert rule["report_runs"] == 0 and rule["report_sig"] == ""
+    with pytest.raises(ValueError, match="report mode first"):
+        rulesmod.update_rule(rule["id"], {"mode": "execute", **forged})
+    r = client.post(f"/api/rules/{rule['id']}", json=forged)
+    assert r.status_code == 400
+    imp = client.post("/api/import_config", json={"rules": [
+        {"name": "i", "scope": "junk", **forged}]})
+    assert imp.status_code == 200
+    (i,) = [x for x in rulesmod.load_rules() if x["name"] == "i"]
+    assert i["mode"] == "report" and i["report_runs"] == 0 \
+        and i["report_at"] is None
+
+
+def test_switching_an_armed_purge_rule_back_to_a_mail_rule_resets_it(
+        monkeypatch):
+    _env(monkeypatch)
+    rule = _armed(_rule("trash"))
+    assert rule["mode"] == "execute"
+    back = rulesmod.update_rule(rule["id"], {"scope": "mail",
+                                             "action": "trash"})
+    assert back["mode"] == "report" and back["report_runs"] == 0
+    assert _stored(rule["id"])["mode"] == "report"   # not an execute rule
+    with pytest.raises(ValueError, match="report mode first"):
+        rulesmod.update_rule(rule["id"], {"mode": "execute"})
+
+
+# ======================================= UIDVALIDITY seen from the rule side
+
+@pytest.mark.parametrize("scope,folder,kw", [
+    ("trash", "Trash", {}),
+    ("junk", "Spam", dict(renumber=True, copyuid=True))])
+def test_a_folder_recreated_before_the_delete_step_is_refused_by_the_rule(
+        monkeypatch, scope, folder, kw):
+    """Only the read-write select (right before the destructive command)
+    sees a new UIDVALIDITY: the rule's run must still refuse."""
+    fake = _env(monkeypatch, trash=_mails([3, 4], date=OLD),
+                junk=_mails([13, 14], date=OLD), **kw)
+    rule = _armed(_rule(scope))
+    _uv_flips(fake, folder, readonly_uv=1, rw_uv=9)
+    spy = Spy(fake)
+    with pytest.raises(RuntimeError, match="changed on the server"):
+        _run(rule)
+    assert spy.destructive() == []
+    assert _uids(fake, folder) == ([3, 4] if scope == "trash" else [13, 14])
+
+
+def test_moving_a_rule_to_another_account_disarms_it_with_that_reason(
+        monkeypatch):
+    _two_accounts(monkeypatch)
+    rule = _armed(_rule("trash", account="two"))
+    moved = rulesmod.update_rule(rule["id"], {"account": "one"})
+    assert moved["mode"] == "report" and moved["report_runs"] == 0
+    assert moved["reset_reason"] == "account"
+    edited = _armed(_rule("trash", account="one", query="gone"))
+    again = rulesmod.update_rule(edited["id"], {"query": "other"})
+    assert again["reset_reason"] == "edited"
+
+
+def test_the_account_name_is_part_of_the_fingerprint_even_for_one_mailbox(
+        monkeypatch):
+    """Two names for the SAME host and login: a rule armed on one is not
+    armed on the other (the report ran under the first name)."""
+    boxes, _ = _two_accounts(monkeypatch)
+    cfg = json.loads(cfgmod.CONFIG_PATH.read_text())
+    cfg["accounts"]["twin"] = dict(cfg["accounts"]["one"])
+    cfgmod.CONFIG_PATH.write_text(json.dumps(cfg))
+    assert rulesmod.mailbox_id("one") == rulesmod.mailbox_id("twin") != ""
+    rule = _armed(_rule("trash", account="one"))
+    moved = rulesmod.update_rule(rule["id"], {"account": "twin"})
+    assert moved["mode"] == "report" and moved["reset_reason"] == "account"
+    # and a file that says otherwise does not arm it either
+    raw = json.loads(rulesmod._path().read_text())
+    raw["rules"][0].update(mode="execute", report_runs=1)
+    rulesmod._path().write_text(json.dumps(raw))
+    assert _stored(rule["id"])["mode"] == "report"

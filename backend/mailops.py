@@ -3685,6 +3685,15 @@ def _empty_trash(acc, uv: int, max_uid: int) -> dict:
 PURGE_ROLES = ("trash", "junk")
 
 
+class PurgeError(RuntimeError):
+    """A permanent deletion stopped part-way: `deleted` mails are gone for
+    good, `unverified` were moved to Trash and not deleted."""
+
+    def __init__(self, msg: str, deleted: int = 0, unverified: int = 0):
+        super().__init__(msg)
+        self.deleted, self.unverified = deleted, unverified
+
+
 class _Unverified(Exception):
     """Mails were moved from Junk to Trash but their copies there cannot be
     identified with certainty: stop, nothing permanent happens."""
@@ -4221,8 +4230,8 @@ def _purge_run(role: str, wanted: list[int], uv: int, folder: str,
             parts.append(f"{len(stranded)} mails were moved to Trash and "
                          "not deleted")
         if parts:
-            raise RuntimeError(f"{failure} ({'; '.join(parts)})") \
-                from failure
+            raise PurgeError(f"{failure} ({'; '.join(parts)})",
+                             led.deleted, len(stranded)) from failure
         raise failure
     return res
 

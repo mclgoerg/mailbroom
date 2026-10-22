@@ -236,11 +236,13 @@ presets.
   new one starts in report mode (counts and a sender-level preview, nothing
   is deleted), may only be switched to execute after a report run of its
   current definition behind a confirm, and goes back to report mode when
-  its folder, filter or age is edited. Every run is capped at 500 mails
-  (oldest first), skips protected senders and protected mails with no
-  override, and deletes through the same exact-UID path as the manual
-  delete above (refused when the role is ambiguous, UIDVALIDITY changed or
-  the server lacks UIDPLUS). Audited as `rule:<id>`, counted as permanent
+  its folder, filter or age is edited - or when its account, the Junk /
+  Trash folder it resolves to, or the server / login changes. Every run is
+  capped per run (oldest first; the confirm names the cap), skips protected
+  senders and protected mails with no override, and deletes through the
+  same exact-UID path as the manual delete above (refused when the role is
+  ambiguous, UIDVALIDITY changed or the server lacks UIDPLUS). An empty
+  filter means all senders in that folder. Audited as `rule:<id>`, counted as permanent
   deletes in the digest and statistics.
 - **Persistent audit log** - every mailbox action (trash/archive/move/
   mark-read, incl. rule-triggered ones, rule runs, unsubscribes, undo,

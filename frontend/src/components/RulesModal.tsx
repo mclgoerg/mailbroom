@@ -1,5 +1,5 @@
 import { ClipboardList, Pin, Shield, TriangleAlert } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { api } from "../api";
 import { t } from "../i18n";
 import { matchGroup, parseFilter } from "../lib";
@@ -41,6 +41,7 @@ function RunSummary({ rule }: { rule: Rule }) {
           : t("rule.purge_run_report", { n: r.mails, groups: r.groups })
         : t(r.mode === "execute" ? "rule.run_executed" : "rule.run_report", {
           groups: r.groups, mails: r.mails, acted: r.acted })}
+      {purge && !rule.query.trim() && <> · {t("rule.purge_all_short")}</>}
       {(r.unverified ?? 0) > 0 &&
         <> · {t("rule.purge_unverified", { n: r.unverified ?? 0 })}</>}
       {r.capped > 0 && <> · {t("rule.capped", { n: r.capped })}</>}
@@ -72,8 +73,15 @@ export function RulesModal({ state, onClose, onChanged }: {
   const [editId, setEditId] = useState<string | null>(null);
   const [busyId, setBusyId] = useState("");
   const [msg, setMsg] = useState("");
-
   const rules = state.rules ?? [];
+
+  // The effective per-run cap, from the server (purge confirms name it).
+  const capRef = useRef<number | null>(null);
+  const getCap = async (): Promise<number> => {
+    if (capRef.current == null) capRef.current = (await api.rules()).cap;
+    return capRef.current;
+  };
+  useEffect(() => { getCap().catch(() => {}); }, []);
 
   // Live match count against the current scan, using the SAME filter code
   // the group list uses (the backend port mirrors it).
@@ -130,13 +138,36 @@ export function RulesModal({ state, onClose, onChanged }: {
     }
   };
 
+  /** The danger confirm of a purge rule (execute switch / run): says what
+   *  is deleted, how much per run, and - for an empty filter - that it
+   *  means ALL senders of the folder. */
+  const purgeConfirm = async (rule: Rule, title: string,
+                              bodyKey: string): Promise<boolean> => {
+    const cap = await getCap();
+    return confirmDialog({
+      title, tone: "danger", confirmLabel: t("rule.purge_confirm_btn", { cap }),
+      body: <>
+        <p>{t(bodyKey, { cap, n: cap })}</p>
+        {!rule.query.trim() && <p className="mt-2 font-medium">
+          {t("rule.purge_all_senders",
+            { folder: t(rule.scope === "junk" ? "Junk" : "Trash") })}</p>}
+      </> });
+  };
+
   const run = async (rule: Rule) => {
-    if (rule.mode === "execute" && !await confirmDialog({
-      title: t("rule.confirm_execute", { name: rule.name }), tone: "danger",
-      body: isPurge(rule.scope) ? t("rule.purge_run_body") : undefined,
-      confirmLabel: t("rule.run_now") })) return;
-    setBusyId(rule.id);
     setMsg("");
+    try {
+      if (rule.mode === "execute" && !(isPurge(rule.scope)
+        ? await purgeConfirm(rule,
+          t("rule.confirm_execute", { name: rule.name }), "rule.purge_run_body")
+        : await confirmDialog({
+          title: t("rule.confirm_execute", { name: rule.name }),
+          tone: "danger", confirmLabel: t("rule.run_now") }))) return;
+    } catch (e: any) {
+      setMsg(t("err.generic", { msg: e.message ?? e }));
+      return;
+    }
+    setBusyId(rule.id);
     try {
       await api.runRule(rule.id);
       onChanged();
@@ -148,13 +179,15 @@ export function RulesModal({ state, onClose, onChanged }: {
 
   const toggleMode = async (rule: Rule) => {
     const mode = rule.mode === "report" ? "execute" : "report";
-    if (mode === "execute" && !await confirmDialog({
-      title: t("rule.enable_title", { name: rule.name }),
-      body: t(isPurge(rule.scope) ? "rule.purge_enable_body"
-        : "rule.enable_body"), tone: "danger",
-      confirmLabel: t("rule.enable_execute") })) return;
     setMsg("");
     try {
+      if (mode === "execute" && !(isPurge(rule.scope)
+        ? await purgeConfirm(rule,
+          t("rule.enable_title", { name: rule.name }), "rule.purge_enable_body")
+        : await confirmDialog({
+          title: t("rule.enable_title", { name: rule.name }),
+          body: t("rule.enable_body"), tone: "danger",
+          confirmLabel: t("rule.enable_execute") }))) return;
       await api.updateRule(rule.id, { mode });
       onChanged();
     } catch (e: any) {
@@ -218,10 +251,21 @@ export function RulesModal({ state, onClose, onChanged }: {
                 {t(`mode.${rule.mode}`)}
               </Tag>
             </div>
-            {rule.query && (
+            {rule.query ? (
               <code className="mt-1 block type-meta text-chiptext">
                 {rule.query}
               </code>
+            ) : isPurge(rule.scope) && (
+              <span className="mt-1 block type-meta text-chiptext">
+                {t("rule.purge_all_short")}
+              </span>
+            )}
+            {isPurge(rule.scope) && rule.mode === "report"
+              && rule.reset_reason && (
+              <div className="mt-1 flex items-start gap-1 type-meta text-review-fg">
+                <TriangleAlert size={14} className="mt-0.5 shrink-0" />
+                {t(`rule.reset_${rule.reset_reason}`)}
+              </div>
             )}
             <div className="mt-1 type-meta text-muted">
               <RunSummary rule={rule} />

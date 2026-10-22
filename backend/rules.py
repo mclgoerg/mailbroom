@@ -188,8 +188,10 @@ def match_group(g: dict, f: dict, now: float | None = None) -> bool:
 
 # ------------------------------------------------------------- purge rules
 
-_DEF_FIELDS = ("scope", "grouping", "query", "action", "dest", "account",
+_DEF_FIELDS = ("scope", "grouping", "query", "action", "dest",
                "keep_latest", "older_than_days")
+# Why an armed purge rule was sent back to report mode (shown on its card).
+RESET_REASONS = ("edited", "account", "folder")
 
 
 def definition_sig(rule: dict) -> str:
@@ -200,11 +202,46 @@ def definition_sig(rule: dict) -> str:
     return hashlib.sha256(blob.encode()).hexdigest()[:16]
 
 
+def mailbox_id(account) -> str:
+    """Identity of the MAILBOX an account name points at: a SHA-256 of host
+    and login (never a secret, nothing reversible). Another server / login
+    under the same name - or a deleted and re-created account - is another
+    mailbox."""
+    try:
+        im = cfgmod.account_imap(account)
+    except (ValueError, KeyError, TypeError, AttributeError):
+        return ""
+    blob = json.dumps([str(im.get("host", "")).strip().lower(),
+                       str(im.get("user", "")).strip().lower()])
+    return hashlib.sha256(blob.encode()).hexdigest()[:16]
+
+
+def box_sig(rule: dict) -> str:
+    """The account the rule runs on: its name AND the mailbox behind it."""
+    acct = rule.get("account")
+    return hashlib.sha256(json.dumps(
+        [acct, mailbox_id(acct)]).encode()).hexdigest()[:16]
+
+
 def purge_armed(rule: dict) -> bool:
     """A purge rule may execute only after a report run of its CURRENT
-    definition (the report-first gate, bound to the definition)."""
+    definition, on the same mailbox, with the folder(s) that report was
+    computed on on record (the report-first gate, bound to what was
+    previewed; the folders themselves are re-checked at every run)."""
     return rule.get("report_runs", 0) >= 1 \
-        and rule.get("report_sig") == definition_sig(rule)
+        and bool(rule.get("report_at")) \
+        and rule.get("report_sig") == definition_sig(rule) \
+        and rule.get("report_box") == box_sig(rule)
+
+
+def _reset_to_report(rule: dict, reason: str) -> None:
+    """Send a purge rule back to report mode: no report on record, so the
+    next execute needs a fresh one."""
+    rule["mode"] = "report"
+    rule["report_runs"] = 0
+    rule["report_sig"] = rule["report_box"] = ""
+    rule["report_at"] = None
+    rule["reset_reason"] = reason
 
 
 # Filter qualifiers a purge rule refuses: the role index holds sender, date
@@ -216,12 +253,15 @@ _PURGE_UNSUPPORTED = (
     ("tags", "tag:"), ("ai", "ai:"), ("unsub", "is:unsub"),
     ("protected_only", "is:protected"), ("replied", "is:replied"),
     ("unsubscribed", "is:unsubscribed"), ("new_only", "is:new"),
-    ("pinned_only", "has:pinned"), ("eng", "eng:"), ("att_min", "att:"))
+    ("pinned_only", "has:pinned"), ("eng", "eng:"), ("att_min", "att:"),
+    ("domain", "domain:"))
 
 
 def purge_unsupported(query: str) -> list[str]:
     f = parse_filter(query)
-    # `replied` / `unsubscribed` are tri-state: False is a qualifier too
+    # `replied` / `unsubscribed` are tri-state: False is a qualifier too.
+    # `domain:` compares a DOMAIN group's key; sender groups never match it,
+    # so it would report 0 mails forever.
     return [name for key, name in _PURGE_UNSUPPORTED
             if (f[key] is not None if key in ("replied", "unsubscribed")
                 else bool(f[key]))]
@@ -237,16 +277,20 @@ def _normalise(r: dict) -> None:
     if r["scope"] == "mail":
         return
     # A purge rule can never carry an ordinary action, and never executes
-    # without a report run of its current definition - whatever the file
-    # (a hand edit, a restored backup) claims.
+    # without a report run of its current definition on this mailbox -
+    # whatever the file (a hand edit, a restored backup, a renamed or
+    # re-created account) claims.
+    r.setdefault("report_at", None)
+    r.setdefault("reset_reason", "")
     if r.get("action") != PURGE_ACTION:
         r["action"] = PURGE_ACTION
         r["report_sig"] = ""
     if not purge_armed(r):
         if r.get("mode") == "execute":
-            r["mode"] = "report"
-        if r.get("report_sig") != definition_sig(r):
-            r["report_runs"] = 0
+            _reset_to_report(
+                r, "account" if r.get("report_sig") == definition_sig(r)
+                and r.get("report_box") != box_sig(r) else "edited")
+        r["report_runs"] = 0
 
 
 def load_rules() -> list[dict]:
@@ -294,7 +338,7 @@ def publish() -> None:
 
 def _validate(body: dict, rule: dict) -> dict:
     was_purge = rule.get("scope", "mail") in PURGE_SCOPES
-    before = definition_sig(rule)
+    before, before_box = definition_sig(rule), box_sig(rule)
     if "name" in body:
         rule["name"] = str(body["name"]).strip()[:80]
     if "scope" in body:
@@ -366,19 +410,22 @@ def _validate(body: dict, rule: dict) -> dict:
             raise ValueError("bad origin")
         bad = purge_unsupported(rule["query"])
         if bad:
-            raise ValueError("filter not available for Junk and Trash "
-                             "rules: " + ", ".join(bad))
+            raise ValueError(
+                "filter not available for Junk and Trash rules: "
+                + ", ".join(bad)
+                + (" (it never matches sender groups - use plain text such "
+                   "as the domain name)" if "domain:" in bad else ""))
         rule["dest"] = ""
     elif rule["action"] not in mailops.ACTIONS:
         raise ValueError("bad action")       # e.g. a purge rule moved to mail
     elif rule["action"] == "move" and not rule["dest"]:
         raise ValueError("move needs a target folder")
-    if (purge or was_purge) and definition_sig(rule) != before:
-        # What was previewed is what runs: a changed definition starts over
-        # in report mode, with no report run on record.
-        rule["mode"] = "report"
-        rule["report_runs"] = 0
-        rule["report_sig"] = ""
+    if (purge or was_purge) and (definition_sig(rule) != before
+                                 or box_sig(rule) != before_box):
+        # What was previewed is what runs: a changed definition (or another
+        # account) starts over in report mode, with no report run on record.
+        _reset_to_report(rule, "edited" if definition_sig(rule) != before
+                         else "account")
     if "mode" in body:
         if body["mode"] not in ("report", "execute"):
             raise ValueError("bad mode")
@@ -405,6 +452,19 @@ def rename_account(old: str, new: str) -> None:
             _save(rules)
 
 
+def drop_account(name: str) -> None:
+    """A deleted account takes its rules with it (a purge rule must never
+    outlive its mailbox: a re-created account of the same name is another
+    mailbox)."""
+    with _LOCK:
+        rules = load_rules()
+        mine = [r for r in rules if r.get("account") == name]
+        if mine:
+            _save([r for r in rules if r.get("account") != name])
+            log.info("account %r deleted: %d rule(s) removed", name,
+                     len(mine))
+
+
 def create_rule(body: dict) -> dict:
     rule = {"id": uuid.uuid4().hex[:8], "name": "", "scope": "mail",
             "grouping": "sender",
@@ -412,7 +472,9 @@ def create_rule(body: dict) -> dict:
             "account": accounts.default_name(),
             "schedule": "manual", "mode": "report",   # ALWAYS starts report
             "keep_latest": None, "older_than_days": None, "origin": "manual",
-            "report_runs": 0, "created": int(time.time()), "last_run": None}
+            "report_runs": 0, "created": int(time.time()), "last_run": None,
+            "report_sig": "", "report_box": "", "report_at": None,
+            "reset_reason": ""}
     body = dict(body)
     body.pop("mode", None)                            # not on create
     if body.get("scope") in PURGE_SCOPES:
@@ -458,14 +520,19 @@ def _record_run(rule_id: str, result: dict) -> None:
         rule = next((r for r in rules if r["id"] == rule_id), None)
         if not rule:
             return
+        # what a purge report was computed on is rule state, not run output
+        sig, box, at = (result.pop(k, None) for k in ("sig", "box", "at"))
         rule["last_run"] = result
         if result.get("mode") == "report" and not result.get("error"):
             rule["report_runs"] = rule.get("report_runs", 0) + 1
             if rule.get("scope", "mail") in PURGE_SCOPES:
-                # which definition this report previewed (see purge_armed):
-                # a run that started before an edit must not arm the edit
-                rule["report_sig"] = result.get("sig") \
-                    or definition_sig(rule)
+                # the definition, mailbox and folder(s) this report
+                # previewed (see purge_armed): a run that started before an
+                # edit must not arm the edit
+                rule["report_sig"] = sig or definition_sig(rule)
+                rule["report_box"] = box or box_sig(rule)
+                rule["report_at"] = at
+                rule["reset_reason"] = ""
         _save(rules)
     auditlog.record(
         f"rule_{result.get('mode', 'report')}", actor=f"rule:{rule_id}",
@@ -595,6 +662,15 @@ def run_rule(rule_id: str, rescan: bool = True) -> dict:
     return _finish_run(rule_id, result)
 
 
+def _disarm(rule_id: str, reason: str) -> None:
+    with _LOCK:
+        rules = load_rules()
+        rule = next((r for r in rules if r["id"] == rule_id), None)
+        if rule:
+            _reset_to_report(rule, reason)
+            _save(rules)
+
+
 class _RunFailed(RuntimeError):
     """A run that failed and was recorded (see _finish_run)."""
 
@@ -630,7 +706,7 @@ def _run_purge(rule: dict, acc, result: dict) -> None:
             raise ValueError("not a valid Junk / Trash rule")
         if purge_unsupported(rule["query"]):
             raise ValueError("filter not available for Junk and Trash rules")
-        result["sig"] = definition_sig(rule)
+        result["sig"], result["box"] = definition_sig(rule), box_sig(rule)
         if rule["mode"] == "execute" and not purge_armed(rule):
             raise RuntimeError("run this rule in report mode first")
         f = parse_filter(rule["query"])
@@ -643,6 +719,16 @@ def _run_purge(rule: dict, acc, result: dict) -> None:
 
         pv = mailops.purge_preview(role, older_than_days=rule["older_than_days"],
                                    match=match, acc=acc)
+        at = {"folder": pv["folder"], "trash_folder": pv["trash_folder"]}
+        result["at"] = at
+        if rule["mode"] == "execute" and at != rule["report_at"]:
+            # The folder(s) the role resolves to now are not the ones the
+            # report was computed on (role choice changed in Settings, or
+            # the server moved the role): nothing was previewed there.
+            _disarm(rule["id"], "folder")
+            raise RuntimeError(
+                "the Junk / Trash folder changed since the last report - "
+                "the rule is back in report mode, nothing was deleted")
         picked = sorted(pv["uids"])[:RULE_CAP]
         by_uid = {m["uid"]: m for m in mailops.role_mails(role, acc)}
         senders: dict[str, dict] = {}
@@ -662,10 +748,15 @@ def _run_purge(rule: dict, acc, result: dict) -> None:
                            key=lambda g: (-g["count"], g["key"]))[:10])
         total = len(picked)
         if rule["mode"] == "execute" and picked:
-            r = mailops.purge_mails(
-                role, picked, pv["uv"], acc, folder=pv["folder"],
-                trash_folder=pv["trash_folder"], actor=f"rule:{rule['id']}",
-                cap=RULE_CAP)
+            try:
+                r = mailops.purge_mails(
+                    role, picked, pv["uv"], acc, folder=pv["folder"],
+                    trash_folder=pv["trash_folder"],
+                    actor=f"rule:{rule['id']}", cap=RULE_CAP)
+            except mailops.PurgeError as exc:   # stopped part-way
+                result["acted"] = exc.deleted
+                result["unverified"] = exc.unverified
+                raise
             result["acted"] = r["deleted"]
             # skips found at delete time on top (a mail protected or pinned
             # since the count a moment ago)

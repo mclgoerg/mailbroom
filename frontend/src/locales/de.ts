@@ -1162,7 +1162,7 @@ export const DE: Record<string, string> = {
   "rule.f_retention_n": "Anzahl",
   "rule.f_dest": "Ordner",
   "rule.f_name": "Name",
-  "rule.f_scope": "Ordner",
+  "rule.f_scope": "Gilt für",
   "rule.scope_mail": "Posteingang & Ordner",
   "action.purge": "Endgültig löschen",
   "rule.purge_warning":
@@ -1171,17 +1171,19 @@ export const DE: Record<string, string> = {
     + "nie angefasst. Eine neue Regel meldet nur, was sie löschen würde, "
     + "bis sie auf Ausführen umgeschaltet wird.",
   "rule.purge_filter_help":
-    "Trifft die Absender in diesem Ordner: Freitext, from:, age: und "
-    + "unread:. Tag-, KI- und Engagement-Filter sind hier nicht verfügbar. "
-    + "Im Berichtsmodus ausführen, um die Vorschau zu sehen.",
+    "Trifft die Absender in diesem Ordner: Freitext, from:, age: (neueste "
+    + "Mail des Absenders) und unread:. Ein leerer Filter bedeutet ALLE "
+    + "Absender. Hier nicht verfügbar: tag:, ai:, eng:, att:, is: und has:. "
+    + "„Vor mehr als N Tagen empfangen“ gilt für jede einzelne Mail. Im "
+    + "Berichtsmodus ausführen, um die Vorschau zu sehen.",
   "rule.purge_edit_reset":
     "Wird Ordner, Filter oder Alter geändert, wechselt die Regel zurück in "
     + "den Berichtsmodus - so läuft nur, was zuvor geprüft wurde.",
   "rule.run_report_btn": "Bericht erstellen",
   "rule.purge_run_report":
-    "Bericht: {n} Mails würden endgültig gelöscht ({groups} Absender)",
+    "Bericht: {n} Mails würden endgültig gelöscht · Absender: {groups}",
   "rule.purge_run_report_one":
-    "Bericht: 1 Mail würde endgültig gelöscht ({groups} Absender)",
+    "Bericht: 1 Mail würde endgültig gelöscht · Absender: {groups}",
   "rule.purge_run_exec":
     "ausgeführt: {n} Mails endgültig gelöscht ({matched} gefunden)",
   "rule.purge_run_exec_one":
@@ -1193,14 +1195,41 @@ export const DE: Record<string, string> = {
     "1 Mail in den Papierkorb verschoben, aber nicht gelöscht (nicht "
     + "überprüfbar)",
   "rule.purge_run_body":
-    "Das löscht passende Mails endgültig auf dem Server, bis zu 500 Mails "
+    "Das löscht passende Mails endgültig auf dem Server, bis zu {cap} Mails "
     + "pro Lauf. Geschützte Absender und geschützte Mails werden nie "
-    + "angefasst. Das lässt sich nicht rückgängig machen.",
+    + "angefasst. Das lässt sich nicht rückgängig machen. Danach kann die "
+    + "Regel zurück in den Berichtsmodus geschaltet werden.",
+  "rule.purge_run_body_one":
+    "Das löscht passende Mails endgültig auf dem Server, bis zu {cap} Mail "
+    + "pro Lauf. Geschützte Absender und geschützte Mails werden nie "
+    + "angefasst. Das lässt sich nicht rückgängig machen. Danach kann die "
+    + "Regel zurück in den Berichtsmodus geschaltet werden.",
   "rule.purge_enable_body":
-    "Ab jetzt löscht diese Regel Mails endgültig auf dem Server, bis zu 500 "
+    "Ab jetzt löscht diese Regel Mails endgültig auf dem Server, bis zu {cap} "
     + "Mails pro Lauf (auch nach Zeitplan). Geschützte Absender und "
     + "geschützte Mails werden nie angefasst. Der Wechsel zurück in den "
     + "Berichtsmodus ist jederzeit möglich.",
+  "rule.purge_enable_body_one":
+    "Ab jetzt löscht diese Regel Mails endgültig auf dem Server, bis zu {cap} "
+    + "Mail pro Lauf (auch nach Zeitplan). Geschützte Absender und "
+    + "geschützte Mails werden nie angefasst. Der Wechsel zurück in den "
+    + "Berichtsmodus ist jederzeit möglich.",
+  "rule.purge_confirm_btn": "Endgültig löschen (bis zu {cap})",
+  "rule.purge_all_senders":
+    "Der Filter ist leer: Die Regel gilt für ALLE Absender in {folder}.",
+  "rule.purge_all_short": "alle Absender",
+  "rule.reset_edited":
+    "Zurück im Berichtsmodus: Ordner, Filter oder Alter wurden geändert. "
+    + "Vor dem Umschalten auf Ausführen erneut einen Bericht erstellen.",
+  "rule.reset_account":
+    "Zurück im Berichtsmodus: Das Konto wurde umbenannt, oder Server oder "
+    + "Login haben sich geändert. Vor dem Umschalten auf Ausführen erneut "
+    + "einen Bericht erstellen.",
+  "rule.reset_folder":
+    "Zurück im Berichtsmodus: Der Spam-/Papierkorb-Ordner hat sich seit dem "
+    + "letzten Bericht geändert. Es wurde nichts gelöscht. Erneut einen "
+    + "Bericht erstellen.",
+  "qb.age_sender": "Neueste Mail des Absenders älter als",
 
   "ai.review_body":
     "Schon bewertet: {rated} von {total}. Beim Neubewerten gehen sie erneut "

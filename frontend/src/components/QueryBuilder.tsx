@@ -120,7 +120,7 @@ export function QueryBuilder({ value, onChange, className = "",
             <option value="review">{t("qb.ai_review")}</option>
             <option value="keep">{t("qb.ai_keep")}</option>
           </Select>, `ai:${ai}`)}
-        {row(t("qb.age"), <>
+        {row(t(senderOnly ? "qb.age_sender" : "qb.age"), <>
           <Input className="w-16 shrink-0 sm:w-20" type="number" min="1"
             value={age} onChange={(e) => setAge(e.target.value)} />
           <Select className="min-w-0 flex-1" value={ageUnit}

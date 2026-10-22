@@ -15,12 +15,14 @@ const createRule = vi.fn().mockResolvedValue({});
 const updateRule = vi.fn().mockResolvedValue({});
 const deleteRule = vi.fn().mockResolvedValue({});
 const runRule = vi.fn().mockResolvedValue({});
+const listRules = vi.fn().mockResolvedValue({ rules: [], cap: 37 });
 
 vi.mock("./api", () => ({
   api: { createRule: (body: unknown) => createRule(body),
          updateRule: (id: string, body: unknown) => updateRule(id, body),
          deleteRule: (id: string) => deleteRule(id),
-         runRule: (id: string) => runRule(id) },
+         runRule: (id: string) => runRule(id),
+         rules: () => listRules() },
 }));
 
 const baseState: AppState = {
@@ -50,6 +52,7 @@ afterEach(() => {
   updateRule.mockClear();
   deleteRule.mockClear();
   runRule.mockClear();
+  listRules.mockClear();
   setLang("en");
 });
 
@@ -199,12 +202,12 @@ const purgeRule: Rule = {
 };
 
 const pickScope = (value: string) =>
-  fireEvent.change(screen.getByLabelText("Folder"), { target: { value } });
+  fireEvent.change(screen.getByLabelText("Applies to"), { target: { value } });
 
 test("the Folder select offers Inbox & folders, Junk and Trash", () => {
   render(<RulesModal state={baseState} onClose={() => {}}
     onChanged={() => {}} />);
-  const sel = screen.getByLabelText("Folder") as HTMLSelectElement;
+  const sel = screen.getByLabelText("Applies to") as HTMLSelectElement;
   expect([...sel.options].map((o) => [o.value, o.textContent]))
     .toEqual([["mail", "Inbox & folders"], ["junk", "Junk"],
       ["trash", "Trash"]]);
@@ -287,7 +290,7 @@ test("the query builder of a purge rule only offers sender conditions",
   const trigger = screen.getAllByRole("button")
     .find((b) => b.getAttribute("aria-expanded") !== null)!;
   fireEvent.click(trigger);
-  expect(screen.getByText(EN["qb.age"])).toBeTruthy();
+  expect(screen.getByText(EN["qb.age_sender"])).toBeTruthy();
   expect(screen.getByText(EN["qb.unread"])).toBeTruthy();
   for (const k of ["qb.tag", "qb.ai", "qb.att", "qb.flags"]) {
     expect(screen.queryByText(EN[k]), k).toBeNull();
@@ -307,7 +310,7 @@ test("a purge rule card shows folder, action, mode and a sender-level " +
   expect(tags).toContain("Junk");           // the folder tag (not the option)
   expect(screen.getByText("Delete permanently")).toBeTruthy();
   expect(screen.getByText("report")).toBeTruthy();
-  expect(screen.getByText(/5 mails would be deleted permanently \(2 senders\)/))
+  expect(screen.getByText(/5 mails would be deleted permanently · senders: 2/))
     .toBeTruthy();
   expect(screen.getByText(/Anna \(3\) · b@gone.example \(2\)/)).toBeTruthy();
   expect(screen.getByText(/2 protected mails skipped/)).toBeTruthy();
@@ -329,11 +332,12 @@ test("Enable execute on a purge rule opens a danger dialog with the " +
   const dlg = (await findDialog()).textContent ?? "";
   expect(dlg).toContain("permanently");
   expect(dlg).toContain("on the server");
-  expect(dlg).toContain("500 mails per run");
+  expect(dlg).toContain("up to 37 mails per run");       // from the API
+  expect(dlg).not.toContain("500");
   expect(dlg).toContain("Protected senders and protected mails are never touched");
   expect(dlg).toContain("switch back to report mode");
   expect(updateRule).not.toHaveBeenCalled();
-  await pressDialog("Enable execute");
+  await pressDialog("Delete permanently (up to 37)");
   await waitFor(() => expect(updateRule)
     .toHaveBeenCalledWith("pg1", { mode: "execute" }));
 });
@@ -360,8 +364,11 @@ test("Run on an execute-mode purge rule confirms with the permanent wording",
   fireEvent.click(screen.getByText("Run now"));
   const dlg = (await findDialog()).textContent ?? "";
   expect(dlg).toContain("permanently, on the server");
+  expect(dlg).toContain("up to 37 mails per run");
+  expect(dlg).toContain("Protected senders and protected mails are never touched");
+  expect(dlg).toContain("switch the rule back to report mode");
   expect(runRule).not.toHaveBeenCalled();
-  await pressDialog("Run now");
+  await pressDialog("Delete permanently (up to 37)");
   await waitFor(() => expect(runRule).toHaveBeenCalledWith("pg1"));
 });
 
@@ -378,7 +385,7 @@ test("editing an execute-mode purge rule says it goes back to report mode",
   fireEvent.click(screen.getByText("Edit"));
   expect(screen.getByText(/switches this rule back to report mode/))
     .toBeTruthy();
-  expect(screen.getByLabelText("Folder")).toHaveProperty("value", "junk");
+  expect(screen.getByLabelText("Applies to")).toHaveProperty("value", "junk");
   expect(screen.getByLabelText("Received more than this many days ago"))
     .toHaveProperty("value", "30");
   fireEvent.click(screen.getByText("Save"));
@@ -400,9 +407,9 @@ test("a purge run's unverified mails are named", () => {
 test("German: folder select, warning, defaults and the confirm", async () => {
   setLang("de");
   renderCards([purgeRule]);
-  expect(screen.getByLabelText("Ordner")).toBeTruthy();
+  expect(screen.getByLabelText("Gilt für")).toBeTruthy();
   expect(screen.getByText("Endgültig löschen")).toBeTruthy();
-  fireEvent.change(screen.getByLabelText("Ordner"), { target: { value: "trash" } });
+  fireEvent.change(screen.getByLabelText("Gilt für"), { target: { value: "trash" } });
   expect(screen.getByText(/Löscht Mails auf dem Server, endgültig/))
     .toBeTruthy();
   expect(screen.getByLabelText("Vor mehr als so vielen Tagen empfangen"))
@@ -413,21 +420,193 @@ test("German: folder select, warning, defaults and the confirm", async () => {
   const dlg = (await findDialog()).textContent ?? "";
   expect(dlg).toContain("endgültig");
   expect(dlg).toContain("auf dem Server");
-  expect(dlg).toContain("500");
+  expect(dlg).toContain("bis zu 37 Mails pro Lauf");
+  expect(dlg).toContain("Geschützte Absender und geschützte Mails werden nie");
   expect(dlg).toContain("Berichtsmodus");
+  expect(screen.getByRole("button", { name: "Endgültig löschen (bis zu 37)" }))
+    .toBeTruthy();
 });
 
 test("every purge-rule string exists in English and German with _one forms",
   async () => {
   const { EN } = await import("./locales/en");
   const { DE } = await import("./locales/de");
-  const keys = Object.keys(EN).filter((k) => /^rule\.purge_|^action\.purge$|^rule\.(f_scope|scope_mail|run_report_btn)$/
+  const keys = Object.keys(EN).filter((k) => /^rule\.purge_|^rule\.reset_|^action\.purge$|^qb\.age_sender$|^rule\.(f_scope|scope_mail|run_report_btn)$/
     .test(k));
   expect(keys.length).toBeGreaterThan(10);
   for (const k of keys) expect(DE[k], k).toBeTruthy();
   for (const base of ["rule.purge_run_report", "rule.purge_run_exec",
-    "rule.purge_unverified"]) {
+    "rule.purge_unverified", "rule.purge_run_body", "rule.purge_enable_body"]) {
     expect(EN[`${base}_one`], base).toBeTruthy();
     expect(DE[`${base}_one`], base).toBeTruthy();
   }
+});
+
+const tonedConfirm = async () => {
+  const dlg = await findDialog();
+  const buttons = [...dlg.querySelectorAll("button")];
+  const ok = buttons.at(-1)!;
+  return { ok, cancel: buttons.find((b) => b.textContent === "Cancel")! };
+};
+
+test("both purge confirms are danger dialogs: Cancel focused, red confirm " +
+  "button 'Delete permanently (up to N)'", async () => {
+  const { unmount } = renderCards([purgeRule]);
+  fireEvent.click(screen.getByText("Enable execute"));
+  let { ok, cancel } = await tonedConfirm();
+  expect(ok.className).toContain("bg-danger");
+  expect(document.activeElement).toBe(cancel);
+  expect(ok.textContent).toBe("Delete permanently (up to 37)");
+  await cancelDialog();
+  unmount();
+  renderCards([{ ...purgeRule, mode: "execute" }]);
+  fireEvent.click(screen.getByText("Run now"));
+  ({ ok, cancel } = await tonedConfirm());
+  expect(ok.className).toContain("bg-danger");
+  expect(document.activeElement).toBe(cancel);
+  expect(ok.textContent).toBe("Delete permanently (up to 37)");
+  await cancelDialog();
+});
+
+test("an empty filter says ALL senders in the editor help, the card, the " +
+  "report preview and both confirms", async () => {
+  const ran = { ...purgeRule, query: "", last_run: {
+    ts: 1, mode: "report" as const, groups: 2, mails: 3, acted: 0, capped: 0,
+    skipped_protected: 0, skipped_pinned: 0, preview: [], error: "" } };
+  const { unmount } = renderCards([ran]);
+  expect(screen.getAllByText(/all senders/).length).toBeGreaterThanOrEqual(2);
+  fireEvent.click(screen.getByText("Enable execute"));
+  expect((await findDialog()).textContent)
+    .toContain("The filter is empty: this applies to ALL senders in Junk.");
+  await cancelDialog();
+  unmount();
+  renderCards([{ ...ran, mode: "execute" }]);
+  fireEvent.click(screen.getByText("Run now"));
+  expect((await findDialog()).textContent)
+    .toContain("applies to ALL senders in Junk");
+  await cancelDialog();
+  cleanup();
+  render(<RulesModal state={baseState} onClose={() => {}}
+    onChanged={() => {}} />);
+  pickScope("trash");
+  expect(screen.getByText(/An empty filter means ALL senders/)).toBeTruthy();
+  for (const fam of ["tag:", "ai:", "eng:", "att:", "is:", "has:"]) {
+    expect(screen.getByText(new RegExp(`${fam.replace(":", ":")}`)), fam)
+      .toBeTruthy();
+  }
+});
+
+test("a filter with text does not claim ALL senders", async () => {
+  renderCards([{ ...purgeRule, query: "from:a@gone.example" }]);
+  expect(screen.queryByText(/all senders/)).toBeNull();
+  fireEvent.click(screen.getByText("Enable execute"));
+  expect((await findDialog()).textContent).not.toContain("ALL senders");
+  await cancelDialog();
+});
+
+test("German: empty filter says alle Absender in both confirms", async () => {
+  setLang("de");
+  renderCards([{ ...purgeRule, query: "" }]);
+  expect(screen.getByText("alle Absender")).toBeTruthy();
+  fireEvent.click(screen.getByText("Ausführen aktivieren"));
+  expect((await findDialog()).textContent)
+    .toContain("gilt für ALLE Absender in Spam");
+  await pressDialog("Abbrechen");
+});
+
+test("the preview line has no plural trap for one mail or one sender", () => {
+  renderCards([{ ...purgeRule, last_run: {
+    ts: 1, mode: "report", groups: 1, mails: 1, acted: 0, capped: 0,
+    skipped_protected: 0, skipped_pinned: 0, preview: [], error: "" } }]);
+  expect(screen.getByText(/1 mail would be deleted permanently · senders: 1/))
+    .toBeTruthy();
+  expect(document.body.textContent).not.toMatch(/1 senders/);
+});
+
+test("the folder select is labelled apart from the Move destination", () => {
+  render(<RulesModal state={baseState} onClose={() => {}}
+    onChanged={() => {}} />);
+  expect(screen.getByLabelText("Applies to")).toBeTruthy();
+  fireEvent.change(screen.getByLabelText("Action"),
+    { target: { value: "move" } });
+  expect(screen.getByLabelText("Folder")).toBeTruthy();    // the target
+  expect(screen.getByLabelText("Applies to")).toBeTruthy();
+  setLang("de");
+  cleanup();
+  render(<RulesModal state={baseState} onClose={() => {}}
+    onChanged={() => {}} />);
+  const sel = screen.getByLabelText("Gilt für") as HTMLSelectElement;
+  expect([...sel.options].map((o) => o.textContent))
+    .toEqual(["Posteingang & Ordner", "Spam", "Papierkorb"]);
+});
+
+test("the query builder of a purge rule says the age is the sender's " +
+  "newest mail", () => {
+  render(<RulesModal state={baseState} onClose={() => {}}
+    onChanged={() => {}} />);
+  pickScope("junk");
+  fireEvent.click(screen.getAllByRole("button")
+    .find((b) => b.getAttribute("aria-expanded") !== null)!);
+  expect(screen.getByText("Sender's newest mail older than")).toBeTruthy();
+  expect(screen.queryByText("Older than")).toBeNull();
+});
+
+test("a card says why an armed rule went back to report mode", () => {
+  for (const why of ["edited", "account", "folder"] as const) {
+    const { unmount } = renderCards([{ ...purgeRule, reset_reason: why }]);
+    expect(screen.getByText(new RegExp("Back in report mode"))).toBeTruthy();
+    expect(document.body.textContent).toContain(EN[`rule.reset_${why}`]);
+    unmount();
+  }
+  renderCards([{ ...purgeRule, reset_reason: "" }]);
+  expect(screen.queryByText(/Back in report mode:/)).toBeNull();
+});
+
+test("a refused save is shown in the modal", async () => {
+  createRule.mockRejectedValueOnce(new Error(
+    "filter not available for Junk and Trash rules: tag:"));
+  render(<RulesModal state={baseState} onClose={() => {}}
+    onChanged={() => {}} />);
+  pickScope("junk");
+  fireEvent.change(screen.getByLabelText("Name"), { target: { value: "x" } });
+  fireEvent.change(screen.getByLabelText("Filter"),
+    { target: { value: "tag:shipping" } });
+  fireEvent.click(screen.getByText("Create rule (report only)"));
+  await waitFor(() => expect(screen.getByText(/filter not available for Junk/))
+    .toBeTruthy());
+});
+
+test("a refused run (ambiguous folder) is shown in the modal", async () => {
+  runRule.mockRejectedValueOnce(new Error(
+    "Trash is ambiguous - choose it in Settings first"));
+  renderCards([purgeRule]);
+  fireEvent.click(screen.getByText("Run report"));
+  await waitFor(() => expect(screen.getByText(/ambiguous - choose it/))
+    .toBeTruthy());
+});
+
+test("if the cap cannot be read no destructive confirm opens", async () => {
+  listRules.mockRejectedValue(new Error("offline"));
+  renderCards([purgeRule]);
+  fireEvent.click(screen.getByText("Enable execute"));
+  await waitFor(() => expect(screen.getByText(/offline/)).toBeTruthy());
+  expect(screen.queryAllByRole("dialog")
+    .filter((d) => d.hasAttribute("aria-labelledby"))).toHaveLength(0);
+  expect(updateRule).not.toHaveBeenCalled();
+  listRules.mockResolvedValue({ rules: [], cap: 37 });
+});
+
+test("German: the run confirm of an execute-mode rule has the full " +
+  "wording", async () => {
+  setLang("de");
+  renderCards([{ ...purgeRule, mode: "execute" }]);
+  fireEvent.click(screen.getByText("Jetzt ausführen"));
+  const dlg = (await findDialog()).textContent ?? "";
+  expect(dlg).toContain("endgültig auf dem Server, bis zu 37 Mails pro Lauf");
+  expect(dlg).toContain("Geschützte Absender und geschützte Mails werden nie "
+    + "angefasst");
+  expect(dlg).toContain("zurück in den Berichtsmodus");
+  expect(screen.getByRole("button", { name: "Endgültig löschen (bis zu 37)" }))
+    .toBeTruthy();
+  await pressDialog("Abbrechen");
 });

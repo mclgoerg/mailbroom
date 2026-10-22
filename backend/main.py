@@ -929,7 +929,8 @@ class RuleBody(BaseModel):
 
 @app.get("/api/rules")
 def get_rules():
-    return {"rules": rulesmod.load_rules()}
+    """`cap`: the effective per-run cap (mails) every rule run obeys."""
+    return {"rules": rulesmod.load_rules(), "cap": rulesmod.RULE_CAP}
 
 
 @app.post("/api/rules")
@@ -1641,6 +1642,7 @@ def post_config(body: dict):
         digestmod.drop_account(str(body["delete_account"]))
         knownsenders.drop_account(str(body["delete_account"]))
         pinstore.drop_account(str(body["delete_account"]))
+        rulesmod.drop_account(str(body["delete_account"]))
         autoscanmod.drop_account(str(body["delete_account"]))
     if isinstance(body.get("rename_account"), dict):
         # The config rename succeeded - carry every per-account artifact

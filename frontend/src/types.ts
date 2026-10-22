@@ -304,6 +304,9 @@ export interface Rule {
   older_than_days: number | null;
   origin: "manual" | "block";
   report_runs: number;
+  /** Purge rules: why an armed rule went back to report mode (shown on the
+   *  card). */
+  reset_reason?: "" | "edited" | "account" | "folder";
   created: number;
   last_run: RuleRun | null;
 }
