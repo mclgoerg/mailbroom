@@ -32,7 +32,11 @@ def _configure_account(user="me@x.example", schedule="off", recipient=""):
 
 def test_compose_aggregates_seeded_entries_and_respects_since_boundary():
     rule = rulesmod.create_rule({"name": "r", "query": "x"})
-    auditlog.record("trash", account="default", count=5, size=5000)
+    auditlog.record("trash", account="default", count=5, size=7168)
+    # D10: "Space freed" counts permanent deletes only - the 7 KB
+    # moved to Trash above no longer count, a purge / Empty Trash does
+    auditlog.record("purge", account="default", count=4, size=5000)
+    auditlog.record("empty_trash", account="default", count=3, size=1024)
     auditlog.record("archive", account="default", count=2)
     auditlog.record("unsubscribe", account="default", count=1,
                     label="a@x.example", outcome="done")
@@ -50,12 +54,17 @@ def test_compose_aggregates_seeded_entries_and_respects_since_boundary():
     for body in (text, html):
         assert f"{digestmod.STRINGS['trash']}" in body and "5" in body
         assert f"{digestmod.STRINGS['archive']}" in body
-        assert f"{digestmod.STRINGS['freed']}" in body and "4.9 KB" in body
+        assert f"{digestmod.STRINGS['purge']}" in body
+        # 5000 + 1024 bytes of purge + empty_trash; the 7168 moved bytes
+        # (a different figure) must not be in it
+        assert f"{digestmod.STRINGS['freed']}" in body and "5.9 KB" in body
+        assert "7.0 KB" not in body and "12." not in body
         assert f"{digestmod.STRINGS['rule_preview']}" in body
         assert f"{digestmod.STRINGS['rule_applied']}" in body
         assert f"{digestmod.STRINGS['unsubscribe_attempts']}" in body
         assert "3" in body                   # unsub attempts count
     assert f"{digestmod.STRINGS['trash']}: 5" in text
+    assert f"{digestmod.STRINGS['purge']}: 7" in text   # purge + empty_trash
     assert f"{digestmod.STRINGS['rule_preview']}: 10" in text
     assert f"{digestmod.STRINGS['rule_applied']}: 3" in text
     assert f"{digestmod.STRINGS['unsub_done']}: 1" in text
@@ -66,6 +75,16 @@ def test_compose_aggregates_seeded_entries_and_respects_since_boundary():
     assert "<!doctype html>" in html.lower()
     assert "<img" not in html.lower() and "http://" not in html \
         and "https://" not in html
+
+
+def test_freed_is_zero_when_mail_was_only_moved_to_trash():
+    """Moving to Trash frees nothing: no "Space freed" row without a
+    permanent delete (D10)."""
+    auditlog.record("trash", account="default", count=5, size=5000)
+    _, text, _ = digestmod.compose("default", 0)
+    assert f"{digestmod.STRINGS['trash']}: 5" in text
+    assert digestmod.STRINGS["freed"] not in text
+    assert digestmod.STRINGS["purge"] not in text
 
 
 def test_compose_ignores_runs_of_a_since_deleted_rule():

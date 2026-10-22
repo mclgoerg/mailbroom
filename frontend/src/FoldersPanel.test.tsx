@@ -200,8 +200,11 @@ test("selecting a sender selects all of its mails; actions only with a selection
     fireEvent.click(screen.getByLabelText("Select win@lottery.example"));
     expect(screen.getByRole("button", { name: "Not junk (2)" })).toBeTruthy();
     expect(screen.getByLabelText("Action…")).toBeTruthy();
-    // no permanent delete in this panel
-    expect(screen.queryByText(/permanently/i)).toBeNull();
+    // permanent delete lives in the Action select only (P6), never as a
+    // button of its own - the primary action stays the safe "Not junk"
+    expect(screen.queryByRole("button", { name: /permanently/i })).toBeNull();
+    expect(screen.getByRole("option", { name: "Delete permanently…" }))
+      .toBeTruthy();
     fireEvent.click(screen.getByLabelText("Select win@lottery.example"));
     expect(screen.queryByRole("button", { name: /Not junk/ })).toBeNull();
   });

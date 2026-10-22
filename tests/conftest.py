@@ -107,6 +107,11 @@ class FakeIMAP:
     `list_order` names folders LIST returns first, in that order (the rest
     follow in mailbox order) - role detection must not depend on it.
 
+    `renumber=True`: MOVE / COPY give the copies fresh UIDs above everything
+    the destination ever held (a real server does; the default keeps the
+    source UID). `copyuid=True` additionally answers them with the UIDPLUS
+    COPYUID response code (read through `response("COPYUID")`).
+
     STORE applies the flags to exactly the given set and EXPUNGE removes
     only \\Deleted mail, like a real server.
 
@@ -119,7 +124,11 @@ class FakeIMAP:
                  flags: dict[str, str] | None = None, move: bool = True,
                  uidplus: bool = True, gmail: bool = False,
                  trash: str = "[Gmail]/Trash", delimiter: str | None = "/",
-                 list_order: list[str] | None = None):
+                 list_order: list[str] | None = None,
+                 renumber: bool = False, copyuid: bool = False):
+        self.renumber = renumber
+        self.copyuid = copyuid
+        self._answers: dict[str, list[bytes]] = {}   # imaplib's response()
         self.delimiter = delimiter
         self.list_order = list_order or []
         self.mailbox = mailbox            # folder -> list of make_msg dicts
@@ -134,6 +143,7 @@ class FakeIMAP:
             + (("X-GM-EXT-1",) if gmail else ())
         self.gm_fetches: list[str] = []      # FETCH specs asking X-GM-MSGID
         self.uv = {f: 1 for f in mailbox}
+        self._high: dict[str, int] = {}      # highest UID a folder ever held
         self.selected: str | None = None
         self.logged_out = False
         # imaplib's single-literal slot: UID SEARCH BODY sends its term here
@@ -182,7 +192,29 @@ class FakeIMAP:
     def response(self, key):
         if key == "UIDVALIDITY" and self.selected:
             return key, [str(self.uv.get(self.selected, 1)).encode()]
+        if key in self._answers:
+            return key, self._answers.pop(key)
         return key, [None]
+
+    def _land(self, moving: list[dict], dest: str) -> None:
+        """Put `moving` into `dest` (fresh UIDs when `renumber`) and note the
+        COPYUID answer."""
+        moving = sorted(moving, key=lambda m: m["uid"])
+        copies = [dict(m) for m in moving]
+        if self.renumber:
+            held = self.mailbox.setdefault(dest, [])
+            top = max([self._high.get(dest, 0)] + [m["uid"] for m in held])
+            for i, c in enumerate(copies, 1):
+                c["uid"] = top + i
+            self._high[dest] = top + len(copies)
+        else:
+            self.mailbox.setdefault(dest, [])
+        self.mailbox[dest].extend(copies)
+        if self.copyuid and moving:
+            src = ",".join(str(m["uid"]) for m in moving)
+            dst = ",".join(str(c["uid"]) for c in copies)
+            self._answers["COPYUID"] = [
+                f"{self.uv.get(dest, 1)} {src} {dst}".encode()]
 
     def status(self, qname, what):
         name = qname.strip('"')
@@ -329,7 +361,7 @@ class FakeIMAP:
             moving = [m for m in msgs if m["uid"] in wanted]
             self.mailbox[self.selected] = [m for m in msgs
                                            if m["uid"] not in wanted]
-            self.mailbox.setdefault(dest, []).extend(moving)
+            self._land(moving, dest)
             if self.gmail and dest == self.trash:
                 # trashing a Gmail message drops it from every label
                 gone = {m["gmid"] for m in moving if m.get("gmid")}
@@ -342,8 +374,7 @@ class FakeIMAP:
         if cmd == "COPY":
             wanted = {int(u) for u in args[0].split(",")}
             dest = args[1].strip('"')
-            self.mailbox.setdefault(dest, []).extend(
-                dict(m) for m in msgs if m["uid"] in wanted)
+            self._land([m for m in msgs if m["uid"] in wanted], dest)
             return "OK", [b""]
 
         if cmd == "EXPUNGE":     # UIDPLUS: expunge only the given UIDs

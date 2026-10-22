@@ -5,7 +5,7 @@ import type {
   Config, ConversationResp, DupSet, FilterPreset, FoldersResp, Grouping, IndexInfo,
   Mail, MessageDetail,
   LookalikeCount, MailsResp, Rule, RuleRun, SearchResp, SortEstimate, StatsResp, TrashResp,
-  FolderMoveResp, FolderRole,
+  FolderMoveResp, FolderRole, PurgePreview, PurgeResult, PurgeSelect,
   UndoIdent, UnsubBulkResult, UnsubResult,
 } from "./types";
 
@@ -253,6 +253,15 @@ export const api = {
                uids: number[], uv: number, force = false) =>
     req<FolderMoveResp>("/api/folders_panel/move",
       { role, action, uids, uv, force }),
+  // Permanent delete (Trash / Junk): count first (a fresh server listing),
+  // then send back exactly the counted uv + UIDs.
+  purgePreview: (role: FolderRole, select: PurgeSelect) =>
+    req<PurgePreview>("/api/folders_panel/purge_preview", { role, ...select }),
+  // role / folder / trash_folder / uv / uids all come from the preview.
+  purge: (role: FolderRole, uids: number[], uv: number, folder: string,
+          trash_folder: string | null) =>
+    req<PurgeResult>("/api/folders_panel/purge",
+      { role, uids, uv, folder, trash_folder }),
   trashRestore: (uids: number[], dest: string, uv: number) =>
     req<{ restored: number; rescan: boolean }>("/api/trash/restore", { uids, dest, uv }),
   testConnection: () =>

@@ -59,6 +59,7 @@ STRINGS = {
     "since": "Since {since}",
     "since_ever": "the beginning",
     "trash": "Moved to Trash",
+    "purge": "Permanently deleted",
     "archive": "Archived",
     "move": "Moved to a folder",
     "mark_read": "Marked as read",
@@ -85,7 +86,8 @@ STRINGS = {
 
 # audit-log action -> STRINGS key, in the order they're shown.
 _ACTION_LABELS = (
-    ("trash", "trash"), ("archive", "archive"), ("move", "move"),
+    ("trash", "trash"), ("purge", "purge"), ("archive", "archive"),
+    ("move", "move"),
     ("mark_read", "mark_read"), ("rule_report", "rule_preview"),
     ("rule_execute", "rule_applied"),
 )
@@ -206,9 +208,11 @@ def _aggregate(entries: list[dict],
                 else None
             if rule_id not in known_rule_ids:
                 continue
+        if a == "empty_trash":      # Empty Trash is a permanent delete too
+            a = "purge"
         if any(a == action for action, _ in _ACTION_LABELS):
             mail_counts[a] = mail_counts.get(a, 0) + e.get("count", 0)
-        if a == "trash":
+        if a == "purge":            # "freed" = permanently deleted only
             freed += e.get("bytes", 0)
         if a == "unsubscribe":
             unsub_attempts += 1
@@ -390,8 +394,8 @@ def compose_demo(account: str) -> tuple[str, str, str]:
     POST /api/digest/test when there's genuinely nothing real to show
     yet, so a first-time user can see what the mail looks like without
     having to go clean up mail first. Never counted as a real send."""
-    mail_counts = {"trash": 42, "archive": 6, "move": 2, "mark_read": 15,
-                   "rule_report": 7, "rule_execute": 3}
+    mail_counts = {"trash": 42, "purge": 12, "archive": 6, "move": 2,
+                   "mark_read": 15, "rule_report": 7, "rule_execute": 3}
     freed = 18_400_000
     unsub_attempts = 4
     unsub_outcomes = {"done": 2, "link": 1, "failed": 1}

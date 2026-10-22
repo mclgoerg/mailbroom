@@ -31,7 +31,7 @@ def _path() -> Path:
 
 _LOCK = threading.Lock()
 
-_ACTIONS = ("trash", "archive", "move", "mark_read")
+_ACTIONS = ("trash", "archive", "move", "mark_read", "purge")
 
 _EMPTY = {"scans": [], "actions": {}}
 
@@ -60,8 +60,14 @@ def load(account: str | None = None) -> dict:
     """One account's history (default: the default account)."""
     account = account or accounts.default_name()
     entry = _load_all()["accounts"].get(account) or {}
-    return {"scans": entry.get("scans", []),
-            "actions": entry.get("actions", {})}
+    actions = {}
+    for month, tally in (entry.get("actions") or {}).items():
+        # `purged_bytes` (bytes really freed by permanent deletes) exists
+        # from the version that added permanent deletes on; earlier months
+        # have none (their `freed` was a move-based figure, kept as history
+        # but never shown as freed space)
+        actions[month] = {"purge": 0, "purged_bytes": 0, **tally}
+    return {"scans": entry.get("scans", []), "actions": actions}
 
 
 def _write(data: dict) -> None:
@@ -121,7 +127,7 @@ def admin_overview() -> list[dict]:
                 if e.get("scans"):
                     mails += e["scans"][-1].get("mails", 0)
                     size += e["scans"][-1].get("size", 0)
-            acts = {a: 0 for a in _ACTIONS} | {"freed": 0}
+            acts = {a: 0 for a in _ACTIONS} | {"freed": 0, "purged_bytes": 0}
             for e in hist.values():
                 for k, v in (e.get("actions", {}).get(month) or {}).items():
                     acts[k] = acts.get(k, 0) + v
@@ -166,7 +172,11 @@ def admin_overview() -> list[dict]:
 def record_action(action: str, count: int, size: int,
                   account: str | None = None) -> None:
     """Tally one finished job into the current month. `size` should be the
-    bytes moved; only trash counts towards 'freed'."""
+    bytes affected; only a permanent delete (`purge`: Empty Trash, Junk /
+    Trash purge) books bytes, under `purged_bytes` - the space really
+    freed. Moving mail to Trash frees nothing on the server until it is
+    deleted there. The old `freed` key (move-based, written by earlier
+    versions) is left alone as history and never written again."""
     if action not in _ACTIONS or count <= 0:
         return
     account = account or accounts.default_name()
@@ -176,8 +186,9 @@ def record_action(action: str, count: int, size: int,
         entry = data["accounts"].setdefault(
             account, json.loads(json.dumps(_EMPTY)))
         m = entry.setdefault("actions", {}).setdefault(
-            month, {a: 0 for a in _ACTIONS} | {"freed": 0})
+            month, {a: 0 for a in _ACTIONS} | {"freed": 0,
+                                                 "purged_bytes": 0})
         m[action] = m.get(action, 0) + count
-        if action == "trash":
-            m["freed"] = m.get("freed", 0) + size
+        if action == "purge":
+            m["purged_bytes"] = m.get("purged_bytes", 0) + size
         _write(data)

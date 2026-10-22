@@ -83,6 +83,9 @@ class AccountState:
         self.cancel = {"scan": False, "ai": False, "delete": False,
                        "atts": False, "unsub": False, "index": False}
         self.delete_pending: list[dict] = []
+        # Held for the whole of one permanent deletion (Empty Trash, purge of
+        # Trash / Junk mails): two of them never run side by side.
+        self.purge_lock = threading.Lock()
         # UIDs of the delete job currently being processed (guarded by
         # `lock`) - new jobs dedup against these too, not just the queue.
         self.inflight: dict[str, set[int]] = {}

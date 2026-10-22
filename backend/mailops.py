@@ -3518,6 +3518,18 @@ def _prune_undo(acc, trash: str, purged: set[str]) -> None:
 
 
 def empty_trash(acc=None, uv: int = 0, max_uid: int = 0) -> dict:
+    """Empty Trash (see `_empty_trash`); never runs next to another
+    permanent deletion of the same account."""
+    acc = acc or accounts.get()
+    if not acc.purge_lock.acquire(blocking=False):
+        raise RuntimeError("busy: a permanent deletion is running")
+    try:
+        return _empty_trash(acc, uv, max_uid)
+    finally:
+        acc.purge_lock.release()
+
+
+def _empty_trash(acc, uv: int, max_uid: int) -> dict:
     """Permanently delete the mails in Trash that the confirm counted:
     exactly the UIDs <= `max_uid` (the highest UID listed when the user
     confirmed), after a UIDVALIDITY check against `uv`. Both come from the
@@ -3528,7 +3540,6 @@ def empty_trash(acc=None, uv: int = 0, max_uid: int = 0) -> dict:
     clients' \\Deleted mail, so that is only done when the selection is
     the whole folder. A failure part-way still books what was really
     deleted (audit, undo pruning, count) and then raises."""
-    acc = acc or accounts.get()
     with acc.lock:
         if acc.state["delete"]["status"] == "running":
             raise RuntimeError("busy: a deletion is running")
@@ -3598,6 +3609,8 @@ def empty_trash(acc=None, uv: int = 0, max_uid: int = 0) -> dict:
     except Exception as exc:
         failure = exc
     finally:
+        _, cached = role_state("trash", trash, acc)
+        sizes = {m["uid"]: m["size"] for m in cached}
         role_drop("trash", trash, gone, acc)
         try:
             conn.logout()
@@ -3605,6 +3618,8 @@ def empty_trash(acc=None, uv: int = 0, max_uid: int = 0) -> dict:
             pass
 
     if deleted:
+        freed = sum(sizes.get(u, 0) for u in gone)
+        statsmod.record_action("purge", deleted, freed, acc.name)
         if purged:
             _prune_undo(acc, trash, purged)
         log.info("emptied Trash: %d mails permanently deleted%s", deleted,
@@ -3615,7 +3630,7 @@ def empty_trash(acc=None, uv: int = 0, max_uid: int = 0) -> dict:
                 acc.state["notice"] = {"key": "emptied_trash",
                                        "params": {"count": deleted}}
         auditlog.record("empty_trash", account=acc.name, count=deleted,
-                        outcome="ok" if failure is None else "partial",
+                        size=freed, outcome="ok" if failure is None else "partial",
                         error="" if failure is None else str(failure))
     if failure is not None:
         if deleted:
@@ -3624,6 +3639,559 @@ def empty_trash(acc=None, uv: int = 0, max_uid: int = 0) -> dict:
                                ) from failure
         raise failure
     return {"deleted": deleted}
+
+
+# ------------------------------------------------- permanent deletion (P6)
+# Trash and Junk mails the user chose (selection / sender / older than N
+# days / everything listed) are deleted for good, on the SAME safety pattern
+# as Empty Trash: the exact UIDs the confirm counted, the UIDVALIDITY of that
+# count, UID STORE + UID EXPUNGE per MOVE_CHUNK, protected senders and
+# pinned mails always skipped (there is no override), an ambiguous or
+# missing role folder refused before any destructive command. Junk goes via
+# Trash (one path on every provider): MOVE exactly those UIDs, identify the
+# copies exactly, delete exactly those. `purge_mails` is the single code
+# path; the purge rules (later) call it with a rule-selected UID list.
+
+PURGE_ROLES = ("trash", "junk")
+
+
+class _Unverified(Exception):
+    """Mails were moved from Junk to Trash but their copies there cannot be
+    identified with certainty: stop, nothing permanent happens."""
+
+
+def _purge_targets(conn, role: str, acc) -> tuple[str, str | None]:
+    """`(role folder, Trash folder or None)` a permanent deletion of `role`
+    works on. Refuses (before any destructive command) when the role folder
+    is missing or ambiguous and unconfirmed (D6); Junk also needs a
+    resolvable, unambiguous Trash to go through (D7)."""
+    if role not in PURGE_ROLES:
+        raise ValueError("bad role")
+    label = ROLE_LABELS[role]
+    found = resolve_roles(conn, acc)
+    acc.folder_roles.update(found["roles"])
+    src = found["roles"].get(role)
+    if not src:
+        raise RuntimeError(f"No {label} folder found on the server")
+    if role in found["ambiguous"]:
+        raise RuntimeError(f"{label} is ambiguous - choose it in Settings "
+                           "first")
+    if role != "junk":
+        return src, None
+    trash = found["roles"].get("trash")
+    if not trash:
+        raise RuntimeError("No Trash folder found on the server - deleting "
+                           "Junk permanently goes through Trash")
+    if "trash" in found["ambiguous"]:
+        raise RuntimeError("Trash is ambiguous - choose it in Settings "
+                           "first")
+    if trash == src:
+        raise RuntimeError("Junk and Trash are the same folder")
+    return src, trash
+
+
+def _purge_split(mails: list[dict], wanted, acc):
+    """Sort the wanted UIDs of a fresh listing: `(deletable mails, protected
+    UIDs, pinned UIDs, missing count)`, each mail in exactly one bucket.
+    Protected senders (the account-wide protect list) and pinned mails (by
+    Message-ID, this account's pins) are never deletable; a UID the listing
+    does not hold any more counts as missing."""
+    known = {m["uid"]: m for m in mails}
+    pinned = pinstore.load_account(acc.name)
+    plist = cfgmod.normalize_protected(cfgmod.load_config().get("protected"))
+    keep: list[dict] = []
+    protected: list[int] = []
+    pins: list[int] = []
+    missing = 0
+    for uid in sorted(set(wanted)):
+        m = known.get(uid)
+        if m is None:
+            missing += 1
+        elif plist and cfgmod.is_protected(m["addr"], plist):
+            protected.append(uid)
+        elif m.get("msgid") and m["msgid"] in pinned:
+            pins.append(uid)
+        else:
+            keep.append(m)
+    return keep, protected, pins, missing
+
+
+def purge_preview(role: str, *, uids=None, senders=None,
+                  older_than_days: int | None = None,
+                  everything: bool = False, acc=None) -> dict:
+    """The live count a permanent deletion of `role` would act on - read
+    from a fresh listing of the server (never the cache), selected by
+    exactly one of: `uids` (a selection), `senders` (every mail of those
+    addresses), `older_than_days` (INTERNALDATE: received more than N days
+    ago), `everything`. Returns the counted `uv` and the exact `uids` that
+    would be deleted plus what is skipped (protected / pinned) and the
+    `folder` (for Junk also the `trash_folder` it goes through) the count
+    was read from; the confirm sends all of it back to `purge_mails`, which
+    refuses when the role resolves to another folder now. Deletes
+    nothing."""
+    acc = acc or accounts.get()
+    if role not in PURGE_ROLES:
+        raise ValueError("bad role")
+    if sum([uids is not None, senders is not None,
+            older_than_days is not None, bool(everything)]) != 1:
+        raise ValueError("choose exactly one way to select mails")
+    if older_than_days is not None and int(older_than_days) < 1:
+        raise ValueError("bad age")
+    conn = connect(cfgmod.account_imap(acc.name), acc.name)
+    try:
+        folder, via = _purge_targets(conn, role, acc)
+        uv, mails = refresh_role_index(conn, role, folder, acc)
+    finally:
+        try:
+            conn.logout()
+        except Exception:
+            pass
+    if uv <= 0:
+        raise RuntimeError(f"cannot read the {ROLE_LABELS[role]} "
+                           "UIDVALIDITY - not deleting")
+    if uids is not None:
+        wanted = {int(u) for u in uids}
+    elif senders is not None:
+        addrs = {str(a).strip().lower() for a in senders}
+        wanted = {m["uid"] for m in mails if m["addr"] in addrs}
+    elif older_than_days is not None:
+        cutoff = time.time() - int(older_than_days) * 86400
+        wanted = {m["uid"] for m in mails if 0 < m["ts"] < cutoff}
+    else:
+        wanted = {m["uid"] for m in mails}
+    keep, protected, pinned, _ = _purge_split(mails, wanted, acc)
+    key = ROLE_COUNTED[role]
+    with acc.lock:
+        acc.state[key] = len(mails)
+    return {"role": role, "folder": folder, "trash_folder": via,
+            "uv": uv, "total": len(mails),
+            "uids": [m["uid"] for m in keep], "count": len(keep),
+            "size": sum(m["size"] for m in keep),
+            "skipped_protected": len(protected),
+            "skipped_pinned": len(pinned),
+            "via_trash": role == "junk"}
+
+
+def _select_rw(conn, folder: str, what: str) -> None:
+    status, _ = conn.select(quote_folder(folder), readonly=False)
+    if status != "OK":
+        raise RuntimeError(f"cannot open {what}")
+
+
+def _list_uids(conn) -> list[int]:
+    """Every UID of the selected folder, ascending."""
+    status, data = conn.uid("SEARCH", None, "ALL")
+    if status != "OK":
+        raise RuntimeError("cannot list the folder")
+    return sorted(int(u) for u in (data[0].split() if data and data[0]
+                                   else []))
+
+
+def _expunge_uids(conn, uids: list[int], uidplus: bool, on_chunk) -> None:
+    """`UID STORE +FLAGS \\Deleted` + `UID EXPUNGE` of exactly `uids` in
+    the selected (read-write) folder, MOVE_CHUNK at a time; `on_chunk(chunk)`
+    runs after each chunk really went, so a failure part-way still tells
+    what is gone. Without UIDPLUS only a plain EXPUNGE exists - the callers
+    allow that for a whole-folder selection only. A chunk whose expunge
+    fails is un-flagged again (best effort) so it does not linger as
+    \\Deleted."""
+    for start in range(0, len(uids), MOVE_CHUNK):
+        chunk = uids[start:start + MOVE_CHUNK]
+        uidstr = ",".join(str(u) for u in chunk)
+        status, _ = conn.uid("STORE", uidstr, "+FLAGS", r"(\Deleted)")
+        if status != "OK":
+            raise RuntimeError("cannot flag mails for deletion")
+        failed: Exception | None = None
+        try:
+            if uidplus:
+                status, _ = conn.uid("EXPUNGE", uidstr)
+            else:
+                status, _ = conn.expunge()
+        except Exception as exc:
+            status, failed = "NO", exc
+        if status != "OK":
+            try:
+                conn.uid("STORE", uidstr, "-FLAGS", r"(\Deleted)")
+            except Exception:
+                pass
+            if failed is not None:
+                raise failed
+            raise RuntimeError("cannot expunge the folder")
+        on_chunk(chunk)
+
+
+_COPYUID_MAX = 100_000
+
+
+def _uid_set(text: str) -> list[int] | None:
+    """Expand an IMAP UID set ("304,319:320") into UIDs in the order
+    written; None when it is not one (or absurdly large)."""
+    out: list[int] = []
+    for part in text.split(","):
+        lo, sep, hi = part.partition(":")
+        if not lo.isdigit() or (sep and not hi.isdigit()):
+            return None
+        a, b = int(lo), int(hi) if sep else int(lo)
+        a, b = min(a, b), max(a, b)
+        if len(out) + (b - a + 1) > _COPYUID_MAX:
+            return None
+        out.extend(range(a, b + 1))
+    return out
+
+
+def _parse_copyuid(entries, dest_uv: int, chunk: list[int]):
+    """`{source UID: UID in the destination}` from the COPYUID response
+    codes of one MOVE / COPY (a server may send several for one command),
+    or None unless they describe EXACTLY `chunk`, in the destination's
+    UIDVALIDITY `dest_uv`. Anything else is not used."""
+    src: list[int] = []
+    dst: list[int] = []
+    for entry in entries or ():
+        if not isinstance(entry, (bytes, bytearray, str)):
+            return None
+        text = (entry.decode("utf-8", "replace")
+                if isinstance(entry, (bytes, bytearray)) else entry)
+        bits = text.split()
+        if len(bits) != 3 or not bits[0].isdigit() or int(bits[0]) != dest_uv:
+            return None
+        s, d = _uid_set(bits[1]), _uid_set(bits[2])
+        if s is None or d is None or len(s) != len(d):
+            return None
+        src += s
+        dst += d
+    if not src or sorted(src) != sorted(chunk) or len(set(dst)) != len(dst):
+        return None
+    return dict(zip(src, dst))
+
+
+def _fetch_msgid_map(conn, uids: list[int]) -> dict[int, str]:
+    """`{uid: Message-ID}` of `uids` in the selected folder, the ID
+    normalised exactly like the index (a mail without one maps to ""); a
+    UID the server did not answer for is absent."""
+    out: dict[int, str] = {}
+    for start in range(0, len(uids), FETCH_CHUNK):
+        part = uids[start:start + FETCH_CHUNK]
+        status, data = conn.uid(
+            "FETCH", ",".join(str(u) for u in part),
+            "(UID BODY.PEEK[HEADER.FIELDS (MESSAGE-ID)])")
+        if status != "OK":
+            raise RuntimeError("cannot read the moved mails in Trash")
+        for item in data or []:
+            if isinstance(item, tuple) and len(item) >= 2:
+                m = _UID_RE.search(item[0])
+                if m:
+                    out[int(m.group(1))] = header_text(
+                        email.message_from_bytes(item[1]).get(
+                            "Message-ID")).strip()[:300]
+    return out
+
+
+def _move_into_trash(conn, chunk: list[int], trash: str, dest_uv: int):
+    """UID MOVE `chunk` out of the selected (read-write) Junk folder into
+    `trash`. Returns `{source UID: destination UID}` from the server's
+    COPYUID answer when it exactly describes the chunk, else None (the
+    caller then identifies the copies by Message-ID). Raises when the move
+    failed. A server without MOVE copies, flags the originals and expunges
+    exactly those UIDs (UIDPLUS is required for Junk purges)."""
+    conn.response("COPYUID")                 # drop a stale answer
+    if _supports_move(conn):
+        verb, args = "MOVE", (",".join(map(str, chunk)), quote_folder(trash))
+    else:
+        verb, args = "COPY", (",".join(map(str, chunk)), quote_folder(trash))
+    status, _ = conn.uid(verb, *args)
+    if status != "OK":
+        raise RuntimeError("cannot move mails from Junk to Trash")
+    entries = conn.response("COPYUID")[1]
+    if verb == "COPY":
+        uidstr = ",".join(map(str, chunk))
+        status, _ = conn.uid("STORE", uidstr, "+FLAGS", r"(\Deleted)")
+        if status == "OK":
+            status, _ = conn.uid("EXPUNGE", uidstr)
+        if status != "OK":
+            raise RuntimeError("cannot remove the copied mails from Junk")
+    return _parse_copyuid(entries, dest_uv, chunk)
+
+
+def _identify_moved(conn, trash: str, trash_uv: int, pre_max: int,
+                    metas: list[dict], mapping: dict[int, int] | None):
+    """The Trash UIDs of the mails just moved out of Junk, or None when that
+    cannot be established with certainty. With a COPYUID `mapping`: the
+    mapped UIDs, each checked to hold the Message-ID of the mail it
+    replaced, and all of them above the pre-move highest Trash UID. Without:
+    ONLY an exact match - the UIDs above the highest
+    Trash UID from before the move are exactly as many as the moved mails
+    and carry exactly their Message-IDs (every moved mail has one). A
+    foreign arrival, a missing ID, any difference: None."""
+    _select_rw(conn, trash, "Trash")
+    if uidvalidity(conn) != trash_uv:
+        return None
+    if mapping is not None:
+        dst = sorted(mapping.values())
+        if dst[0] <= pre_max:    # a copy cannot be older than the move
+            return None
+        ids = _fetch_msgid_map(conn, dst)
+        if set(ids) != set(dst):
+            return None
+        if any(ids[mapping[m["uid"]]] != (m.get("msgid") or "")
+               for m in metas):
+            return None
+        return dst
+    if any(not m.get("msgid") for m in metas):
+        return None
+    new = [u for u in _list_uids(conn) if u > pre_max]
+    ids = _fetch_msgid_map(conn, new)
+    # equal multisets of Message-IDs: as many new mails as moved ones, each
+    # carrying exactly one moved mail's ID (a foreign arrival breaks this)
+    if set(ids) != set(new) or sorted(ids.values()) \
+            != sorted(m["msgid"] for m in metas):
+        return None
+    return new
+
+
+class _Ledger:
+    """What one permanent deletion really did, as it goes: mails gone for
+    good, their bytes, their Message-IDs (undo pruning), the UIDs removed
+    from the role folder, and Junk mails that sit in Trash unverified."""
+
+    def __init__(self):
+        self.deleted = 0
+        self.freed = 0
+        self.ids: set[str] = set()
+        self.gone: list[int] = []
+        self.stranded: list[dict] = []
+        self.total = 0               # mails the role folder held when read
+
+    def book(self, metas: list[dict], deleted: int | None = None) -> None:
+        self.deleted += len(metas) if deleted is None else deleted
+        self.freed += sum(m["size"] for m in metas)
+        self.ids |= {m["msgid"] for m in metas if m.get("msgid")}
+
+
+def _purge_in_trash(conn, src: str, uv: int, keep: list[dict], uidplus: bool,
+                    led: _Ledger) -> None:
+    by_uid = {m["uid"]: m for m in keep}
+    _select_rw(conn, src, "Trash")
+    if uidvalidity(conn) != uv:          # also refuses an unreadable (0) one
+        raise RuntimeError("Trash changed on the server - reload it before "
+                           "deleting")
+    present = _list_uids(conn)
+    there = set(present)
+    chosen = [u for u in by_uid if u in there]           # ascending
+    if chosen and not uidplus:
+        # a plain EXPUNGE also removes other clients' \Deleted mail: only
+        # the whole folder may go that way, re-checked
+        if chosen != present:
+            raise RuntimeError("this server cannot delete part of a folder "
+                               "safely - Trash changed since it was counted")
+        if _list_uids(conn) != chosen:
+            raise RuntimeError("Trash changed since it was counted - "
+                               "reload it before deleting")
+
+    def done(chunk: list[int]) -> None:
+        led.gone.extend(chunk)
+        led.book([by_uid[u] for u in chunk])
+
+    _expunge_uids(conn, chosen, uidplus, done)
+
+
+def _purge_junk_via_trash(conn, src: str, trash: str, uv: int,
+                          keep: list[dict], led: _Ledger, acc) -> None:
+    """Per MOVE_CHUNK: note Trash's UIDVALIDITY and highest UID, MOVE
+    exactly the chunk out of Junk, identify the copies, delete exactly
+    those. Any doubt -> _Unverified (the chunk stays in Trash)."""
+    by_uid = {m["uid"]: m for m in keep}
+    uids = list(by_uid)
+    trash_uv = 0
+    for start in range(0, len(uids), MOVE_CHUNK):
+        _select_rw(conn, trash, "Trash")
+        t_uv = uidvalidity(conn)
+        if t_uv <= 0 or (trash_uv and t_uv != trash_uv):
+            raise RuntimeError("Trash changed on the server - reload it "
+                               "before deleting")
+        trash_uv = t_uv
+        pre_max = max(_list_uids(conn), default=0)
+        _select_rw(conn, src, "Junk")
+        if uidvalidity(conn) != uv:
+            raise RuntimeError("Junk changed on the server - reload it "
+                               "before deleting")
+        present = set(_list_uids(conn))
+        chunk = [u for u in uids[start:start + MOVE_CHUNK] if u in present]
+        if not chunk:
+            continue                     # all of them vanished meanwhile
+        metas = [by_uid[u] for u in chunk]
+        mapping = _move_into_trash(conn, chunk, trash, trash_uv)
+        led.stranded.extend(metas)       # in Trash now, until deleted there
+        role_drop("junk", src, chunk, acc)
+        dst = _identify_moved(conn, trash, trash_uv, pre_max, metas, mapping)
+        if dst is None:
+            raise _Unverified()
+        present_t = set(_list_uids(conn))       # Trash is selected (rw)
+        gone_t: list[int] = []
+        _expunge_uids(conn, [u for u in dst if u in present_t], True,
+                      gone_t.extend)
+        del led.stranded[-len(metas):]          # these are gone, not stranded
+        led.book(metas, deleted=len(gone_t))
+
+
+def purge_mails(role: str, uids, uv: int, acc=None, *, folder: str = "",
+                trash_folder: str | None = None, actor: str = "user",
+                cap: int = 0) -> dict:
+    """Permanently delete mails of `role` (trash | junk) - the single code
+    path for the manual action and (later) purge rules.
+
+    `uids` + `uv` + `folder` (+ `trash_folder` for Junk) are the counted
+    listing (see purge_preview): exactly these UIDs, nothing else, in
+    exactly that folder (UIDVALIDITY is not unique across folders: the role
+    must still resolve to it, and for Junk its Trash too, or the request is
+    refused), and only while the folder's UIDVALIDITY is still `uv`; a
+    request without all of them is refused, there is no range and no "all". A mail that arrived after the count is never touched. Protected
+    senders and pinned mails are SKIPPED and reported - always, for every
+    caller (there is no override). `cap` (> 0) deletes at most that many
+    (the oldest UIDs first). Refused before any destructive command when
+    the role folder is missing, ambiguous and unconfirmed (D6), the server
+    has no UIDPLUS (Junk always; Trash unless the selection is the whole
+    folder) or the UIDVALIDITY differs / is unreadable.
+
+    Junk goes via Trash (D7): the exact UIDs are MOVEd to the Trash role,
+    their copies there identified exactly (the COPYUID answer, else an exact
+    Message-ID match above the highest Trash UID seen before the move) and
+    only those deleted. If the copies cannot be identified with certainty
+    the mails stay in Trash (a reversible move; reported as `unverified`).
+    A failure part-way books what really went (audit `purge` outcome
+    partial, undo entries pruned, counts) and raises naming that number."""
+    acc = acc or accounts.get()
+    if role not in PURGE_ROLES:
+        raise ValueError("bad role")
+    wanted = sorted({int(u) for u in uids or () if int(u) > 0})
+    if uv <= 0 or not wanted or not folder \
+            or (role == "junk" and not trash_folder):
+        raise ValueError("permanent deletion needs the counted listing "
+                         "(folder, UIDVALIDITY and UIDs) - reload and "
+                         "confirm again")
+    if not acc.purge_lock.acquire(blocking=False):
+        raise RuntimeError("busy: a permanent deletion is running")
+    try:
+        with acc.lock:
+            if acc.state["delete"]["status"] == "running":
+                raise RuntimeError("busy: a deletion is running")
+            if acc.state["status"] == "scanning":
+                raise RuntimeError("busy: scan running")
+        return _purge_run(role, wanted, uv, folder, trash_folder, acc, actor,
+                          cap)
+    finally:
+        acc.purge_lock.release()
+
+
+def _purge_run(role: str, wanted: list[int], uv: int, folder: str,
+               trash_folder: str | None, acc, actor: str, cap: int) -> dict:
+    label = ROLE_LABELS[role]
+    led = _Ledger()
+    res = {"deleted": 0, "skipped_protected": 0, "skipped_pinned": 0,
+           "missing": 0, "capped": 0, "unverified": 0, "undo": None}
+    failure: Exception | None = None
+    src = trash = ""
+    conn = connect(cfgmod.account_imap(acc.name), acc.name)
+    try:
+        src, via = _purge_targets(conn, role, acc)
+        if src != folder or (role == "junk" and via != trash_folder):
+            raise RuntimeError(f"{label} folder changed since it was counted "
+                               "- reload it before deleting")
+        trash = via or src
+        uidplus = _supports_uidplus(conn)
+        if role == "junk" and not uidplus:
+            raise RuntimeError("this server cannot delete part of a folder "
+                               "safely")
+        live_uv, mails = refresh_role_index(conn, role, src, acc)
+        if live_uv != uv:
+            raise RuntimeError(f"{label} changed on the server - reload it "
+                               "before deleting")
+        led.total = len(mails)
+        keep, protected, pinned, missing = _purge_split(mails, wanted, acc)
+        res.update(skipped_protected=len(protected),
+                   skipped_pinned=len(pinned), missing=missing)
+        if cap > 0 and len(keep) > cap:
+            res["capped"] = len(keep) - cap
+            keep = keep[:cap]
+        if keep and role == "trash":
+            _purge_in_trash(conn, src, uv, keep, uidplus, led)
+        elif keep:
+            _purge_junk_via_trash(conn, src, trash, uv, keep, led, acc)
+    except Exception as exc:
+        failure = exc
+    finally:
+        if role == "trash":
+            role_drop("trash", src, led.gone, acc)
+        try:
+            conn.logout()
+        except Exception:
+            pass
+
+    unverified = isinstance(failure, _Unverified)
+    stranded = led.stranded
+    res["deleted"] = led.deleted
+    res["unverified"] = len(stranded) if unverified else 0
+    if led.ids:
+        _prune_undo(acc, trash, led.ids)
+        if role == "junk":       # entries that moved mail INTO Junk, too
+            _prune_undo(acc, src, led.ids)
+    with acc.lock:
+        # counts from the listing just read (not the post-scan numbers)
+        if led.total and role == "trash":
+            acc.state["trash_count"] = max(0, led.total - led.deleted)
+        if led.total and role == "junk":
+            acc.state["junk_count"] = max(
+                0, led.total - led.deleted - len(stranded))
+            tc = acc.state["trash_count"]
+            if tc is not None:
+                acc.state["trash_count"] = tc + len(stranded)
+        if stranded:
+            meta = {src: {m["uid"]: m for m in stranded}}
+            _record_undo(f"{len(stranded)} mails from {label}", meta,
+                         "trash", trash, acc, quiet=True)
+            last = acc.undo_log[-1] if acc.undo_log else None
+            if last and last["label"] == f"{len(stranded)} mails from {label}":
+                res["undo"] = {"ts": last["ts"], "label": last["label"],
+                               "count": last["count"]}
+    if led.deleted:
+        statsmod.record_action("purge", led.deleted, led.freed, acc.name)
+    if stranded:
+        statsmod.record_action("trash", len(stranded),
+                               sum(m["size"] for m in stranded), acc.name)
+        auditlog.record("trash", actor=actor, account=acc.name,
+                        count=len(stranded),
+                        size=sum(m["size"] for m in stranded),
+                        label=f"{len(stranded)} mails from {label}")
+    if led.deleted or stranded:
+        skipped = []
+        if res["skipped_protected"]:
+            skipped.append(f"{res['skipped_protected']} protected")
+        if res["skipped_pinned"]:
+            skipped.append(f"{res['skipped_pinned']} pinned")
+        auditlog.record(
+            "purge", actor=actor, account=acc.name, count=led.deleted,
+            size=led.freed,
+            label=label + (f" (skipped {', '.join(skipped)})"
+                           if skipped else ""),
+            outcome="ok" if failure is None else "partial",
+            error="" if failure is None else (
+                "moved to Trash, could not verify for permanent deletion"
+                if unverified else str(failure)))
+        save_snapshot(acc)
+        log.info("purge %s: %d mails permanently deleted%s", role,
+                 led.deleted, "" if failure is None else " (then stopped)")
+    if failure is not None and not unverified:
+        parts = []
+        if led.deleted:
+            parts.append(f"{led.deleted} mails were permanently deleted "
+                         "before the failure")
+        if stranded:
+            parts.append(f"{len(stranded)} mails were moved to Trash and "
+                         "not deleted")
+        if parts:
+            raise RuntimeError(f"{failure} ({'; '.join(parts)})") \
+                from failure
+        raise failure
+    return res
 
 
 def _search_row(m: dict) -> dict:

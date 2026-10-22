@@ -526,8 +526,8 @@ export const EN: Record<string, string> = {
   "dups.wasted": "{size} reclaimable",
   "dups.newest": "newest",
   "dups.none": "No duplicates found",
-  "stats.this_month": "trashed this month: {n} mails · {size}",
-  "stats.this_month_one": "trashed this month: 1 mail · {size}",
+  "stats.this_month": "moved to Trash this month: {n} mails",
+  "stats.this_month_one": "moved to Trash this month: 1 mail",
   "stats.per_year": "Mails per year",
   "stats.per_month": "Mails per month (last 12)",
   "stats.total_size": "total size",
@@ -547,8 +547,9 @@ export const EN: Record<string, string> = {
   "stats.top_domains": "Top domains by size",
   "stats.cleanup": "Cleanup by month",
   "stats.actions_line":
-    "{trash} trashed ({size}) · {archive} archived · {move} moved · "
+    "{trash} moved to Trash · {archive} archived · {move} moved · "
     + "{read} marked read",
+  "stats.actions_purged": " · {purge} deleted permanently ({size} freed)",
   "stats.scans": "Recent scans",
   "sieve.button": "Sieve filter",
   "sieve.intro": "Auto-handle future mail from this sender in Proton:",
@@ -566,6 +567,52 @@ export const EN: Record<string, string> = {
   "notice.trash_restored_rescan_one":
     "Restored 1 mail from Trash to {dest} - rescan to see it again.",
   "trash.browse": "Browse Trash",
+  "fp.delete_permanently": "Delete permanently…",
+  "fp.older": "Delete older than…",
+  "fp.older_title": "Delete old mails permanently",
+  "fp.older_label": "Received more than this many days ago",
+  "fp.older_invalid": "Enter a whole number of days from 1 to 36500.",
+  "fp.older_btn": "Count mails",
+  "fp.empty_junk": "Empty Junk",
+  "fp.purge_title": "Permanently delete from {folder}?",
+  "fp.purge_title_empty": "Empty {folder} permanently?",
+  "fp.purge_body_junk":
+    "These mails are moved to Trash first and then deleted there, on the "
+    + "server. This cannot be undone.",
+  "fp.purge_body_trash":
+    "These mails are deleted on the server. This cannot be undone.",
+  "fp.purge_scope_older": "Mails received more than {n} days ago.",
+  "fp.purge_scope_older_one": "Mails received more than 1 day ago.",
+  "fp.purge_b_delete": "{n} mails will be deleted permanently",
+  "fp.purge_b_delete_one": "1 mail will be deleted permanently",
+  "fp.purge_b_protected": "{n} mails from protected senders are skipped",
+  "fp.purge_b_protected_one": "1 mail from a protected sender is skipped",
+  "fp.purge_b_pinned": "{n} protected mails are skipped",
+  "fp.purge_b_pinned_one": "1 protected mail is skipped",
+  "fp.purge_btn": "Delete permanently ({n})",
+  "fp.purge_none": "Nothing to delete.",
+  "fp.purge_none_skipped":
+    "Nothing to delete. {skipped}. Remove the protection first to delete "
+    + "them.",
+  "fp.purge_nothing_left":
+    "Nothing was left to delete - the mails were already gone.",
+  "fp.purged": "Permanently deleted {n} mails",
+  "fp.purged_one": "Permanently deleted 1 mail",
+  "fp.purged_skipped": "Permanently deleted {n} mails ({k} skipped)",
+  "fp.purged_skipped_one": "Permanently deleted 1 mail ({k} skipped)",
+  "fp.purge_unverified":
+    "Moved {n} mails to Trash, but could not verify them for permanent "
+    + "deletion. Nothing was deleted permanently - they are still in Trash. "
+    + "You can undo the move.",
+  "fp.purge_unverified_one":
+    "Moved 1 mail to Trash, but could not verify it for permanent "
+    + "deletion. Nothing was deleted permanently - it is still in Trash. "
+    + "You can undo the move.",
+  "audit.act.purge": "Deleted permanently",
+  "stats.freed_month":
+    "permanently deleted this month: {n} mails · {size} freed",
+  "stats.freed_month_one":
+    "permanently deleted this month: 1 mail · {size} freed",
   "fp.menu": "Junk & Trash",
   "fp.which": "Folder",
   "fp.grouping": "Group by",

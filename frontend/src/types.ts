@@ -192,6 +192,43 @@ export interface FolderMoveResp {
   undo: { ts: number; label: string; count: number } | null;
 }
 
+/** What a permanent delete acts on: exactly one of these. */
+export type PurgeSelect =
+  | { uids: number[] } | { senders: string[] }
+  | { older_than_days: number } | { everything: true };
+
+/** The live count of a permanent delete (fresh server listing): the counted
+ *  UIDVALIDITY and the exact UIDs to send back, plus what is skipped. */
+export interface PurgePreview {
+  role: FolderRole;
+  /** the folder the count was read from (and, for Junk, the Trash folder it
+   *  goes through): sent back with the delete, the server refuses if the
+   *  role resolves to another folder by then */
+  folder: string;
+  trash_folder: string | null;
+  uv: number;
+  uids: number[];
+  count: number;
+  total: number;
+  size: number;
+  skipped_protected: number;
+  skipped_pinned: number;
+  via_trash: boolean;
+}
+
+export interface PurgeResult {
+  deleted: number;
+  skipped_protected: number;
+  skipped_pinned: number;
+  missing: number;
+  capped: number;
+  /** Junk mails moved to Trash that could not be verified for permanent
+   *  deletion: they are still in Trash. */
+  unverified: number;
+  /** the undo entry of the mails left in Trash (when unverified > 0) */
+  undo: { ts: number; label: string; count: number } | null;
+}
+
 export interface StatsResp {
   mails: number;
   size: number;
@@ -211,7 +248,10 @@ export interface StatsResp {
     size: number }[];
   scans: { ts: number; mails: number; size: number; senders: number }[];
   actions: Record<string, { trash: number; archive: number; move: number;
-    mark_read: number; freed: number }>;
+    mark_read: number; freed: number; purge?: number;
+    /** bytes really freed by permanent deletes (the old `freed` was
+     *  move-based history and is never shown as freed space) */
+    purged_bytes?: number }>;
 }
 
 export interface AuditEntry {
@@ -529,7 +569,8 @@ export interface AdminTenantStats {
   rules: number;
   verdicts: number;
   actions_month: { trash: number; archive: number; move: number;
-    mark_read: number; freed: number };
+    mark_read: number; freed: number; purge?: number;
+    purged_bytes?: number };
   ai: { source: "own" | "shared" | null; runs: number;
     input_tokens: number; output_tokens: number; cost: number;
     month_cost: number; budget_usd: number };

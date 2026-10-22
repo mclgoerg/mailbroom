@@ -1161,6 +1161,62 @@ def post_folders_panel_move(body: FolderMoveBody,
         raise HTTPException(500, f"{type(exc).__name__}: {exc}")
 
 
+class PurgePreviewBody(BaseModel):
+    role: str = "junk"
+    # exactly one of these selects the mails (a selection, every mail of
+    # some senders, received more than N days ago, everything listed)
+    uids: list[int] | None = None
+    senders: list[str] | None = None
+    older_than_days: int | None = Field(None, ge=1, le=36500)
+    everything: bool = False
+
+
+class PurgeBody(BaseModel):
+    role: str = "junk"
+    uids: list[int] = []     # the exact UIDs the confirm counted
+    uv: int = 0              # UIDVALIDITY of the listing they were counted in
+    folder: str = ""         # the folder they were counted in (from the preview)
+    trash_folder: str | None = None   # Junk: the Trash it goes through
+
+
+@app.post("/api/folders_panel/purge_preview")
+def post_purge_preview(body: PurgePreviewBody,
+                       account: str | None = Query(None)):
+    """The live count a permanent delete would act on (fresh server
+    listing): counted uv + exact UIDs + skipped protected / pinned. Deletes
+    nothing."""
+    acc = _acc(account)
+    try:
+        return mailops.purge_preview(
+            body.role, uids=body.uids, senders=body.senders,
+            older_than_days=body.older_than_days,
+            everything=body.everything, acc=acc)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc))
+    except RuntimeError as exc:
+        raise HTTPException(409, str(exc))
+    except Exception as exc:
+        raise HTTPException(500, f"{type(exc).__name__}: {exc}")
+
+
+@app.post("/api/folders_panel/purge")
+def post_purge(body: PurgeBody, account: str | None = Query(None)):
+    """Permanently delete exactly the counted UIDs of Trash / Junk (Junk
+    goes via Trash). Refused without the counted uv and UIDs; protected
+    and pinned mails are skipped; irreversible."""
+    acc = _acc(account)
+    try:
+        return mailops.purge_mails(
+            body.role, body.uids, body.uv, acc, folder=body.folder,
+            trash_folder=body.trash_folder)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc))
+    except RuntimeError as exc:
+        raise HTTPException(409, str(exc))
+    except Exception as exc:
+        raise HTTPException(500, f"{type(exc).__name__}: {exc}")
+
+
 class EmptyTrashBody(BaseModel):
     uv: int = 0           # UIDVALIDITY of the Trash the count was read from
     max_uid: int = 0      # highest UID the confirm counted (0 = count was 0)
