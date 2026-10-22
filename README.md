@@ -135,8 +135,8 @@ presets.
   Proton IMAP can't strip single attachments, so cleanup means deleting
   the whole mail (reversible as always).
 - **Statistics** (Tools → Statistics) - mails-per-year histogram, top
-  domains by size, scan history and per-month cleanup tallies ("freed
-  this month"), persisted across restarts.
+  domains by size, scan history and per-month cleanup tallies ("moved to
+  Trash" and, for permanent deletes only, "freed"), persisted across restarts.
 - **Duplicate finder** - mails with the same Message-ID (e.g. copies
   across folders) or identical sender + subject + size, grouped into sets
   with one click to select everything but the newest copy.
@@ -167,7 +167,7 @@ presets.
   seeds silently, nothing is ever auto-actioned); the window it stays
   flagged for (default 7 days) is configurable in settings.
 - **Activity digest email** - an optional daily/weekly summary per
-  account (actions taken, mails/bytes freed, rule previews still
+  account (actions taken, permanently deleted mails/bytes freed, rule previews still
   awaiting review, unsubscribe outcomes), sent as a branded HTML +
   plain-text mail at a time of day you pick; skipped entirely when
   nothing happened, with a "send test digest" button to preview it
@@ -221,6 +221,14 @@ presets.
   to any folder, or empty it. "Empty Trash…" is also in the profile menu
   while the Trash isn't empty, and always asks first, naming how many
   mails will be deleted permanently.
+- **Delete permanently (Trash and Junk)** - in the Folders panel, select
+  mails or a sender, delete everything received more than N days ago, or
+  use "Empty Junk…". The count is read live from the server, the confirm
+  shows it (plus the protected senders and pinned mails that are skipped -
+  they are never deleted) and only exactly those mails are deleted, on the
+  server, irreversibly. Junk mails go through Trash first. Refused while
+  Trash/Junk is ambiguous and not confirmed in Settings. Nothing is ever
+  deleted without your click and the confirm.
 - **Persistent audit log** - every mailbox action (trash/archive/move/
   mark-read, incl. rule-triggered ones, rule runs, unsubscribes, undo,
   empty-trash) is recorded with a timestamp, actor, outcome and bytes

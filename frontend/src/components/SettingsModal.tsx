@@ -1120,8 +1120,11 @@ export function SettingsModal({ cfg, account, onClose, onSaved,
                         </td>
                         <td className="px-2 py-1.5">
                           {u.actions_month.trash.toLocaleString()}
-                          <span className="text-muted">
-                            {" "}· {fmtSize(u.actions_month.freed)}</span>
+                          {(u.actions_month.purged_bytes ?? 0) > 0 && (
+                            <span className="text-muted">
+                              {" "}· {fmtSize(u.actions_month.purged_bytes ?? 0)}
+                            </span>
+                          )}
                         </td>
                         <td className="px-2 py-1.5">
                           {fmtUsd(u.ai.month_cost)}

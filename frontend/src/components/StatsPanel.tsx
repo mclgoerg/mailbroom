@@ -95,8 +95,13 @@ export function StatsPanel({ onClose }: { onClose: () => void }) {
             </div>
             {thisMonth && (
               <div className="type-meta text-muted">
-                {t("stats.this_month", { n: thisMonth.trash,
-                  size: fmtSize(thisMonth.freed) })}
+                {t("stats.this_month", { n: thisMonth.trash })}
+                {(thisMonth.purge ?? 0) > 0 && (
+                  <div>
+                    {t("stats.freed_month", { n: thisMonth.purge ?? 0,
+                      size: fmtSize(thisMonth.purged_bytes ?? 0) })}
+                  </div>
+                )}
               </div>
             )}
 
@@ -202,7 +207,10 @@ export function StatsPanel({ onClose }: { onClose: () => void }) {
                       <span>
                         {t("stats.actions_line", { trash: a.trash,
                           archive: a.archive, move: a.move,
-                          read: a.mark_read, size: fmtSize(a.freed) })}
+                          read: a.mark_read })}
+                        {(a.purge ?? 0) > 0 && t("stats.actions_purged", {
+                          purge: a.purge ?? 0,
+                          size: fmtSize(a.purged_bytes ?? 0) })}
                       </span>
                     </div>
                   );

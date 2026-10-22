@@ -2,11 +2,12 @@ import { RefreshCw, ShieldAlert, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { api, fmtSize, mailKey } from "../api";
 import { t } from "../i18n";
-import type { AppState, FolderRole, Mail, SenderGroup, TrashResp }
+import type { AppState, FolderRole, Mail, PurgeSelect, SenderGroup, TrashResp }
   from "../types";
 import { MessageView } from "./MailList";
 import { Button, confirmDialog, EmptyState, Input, Loading, MailRow, Modal,
-  PanelHeader, Segmented, Select, Spinner, Toolbar, useMediaQuery, useToast } from "./ui";
+  PanelHeader, promptDialog, Segmented, Select, Spinner, Toolbar,
+  useMediaQuery, useToast } from "./ui";
 
 type Grouping = "sender" | "mails";
 
@@ -14,7 +15,10 @@ type Grouping = "sender" | "mails";
  *  place - live contents (also mail that arrived or was deleted elsewhere),
  *  search, a by-sender view, and per-folder actions: Junk "Not junk" (to the
  *  Inbox, undoable, then offers Protect) and "Move to Trash"; Trash
- *  "Restore to…" and the Empty Trash footer. */
+ *  "Restore to…" and the Empty Trash footer. Both folders also get the
+ *  irreversible "Delete permanently…" (selection / sender / older than N
+ *  days / Empty Junk): always counted live on the server first, confirmed
+ *  with the counts, and sent back as the counted UIDVALIDITY + exact UIDs. */
 export function FoldersPanel({ state, initialRole = "trash", onClose,
   onChanged, onEmptyTrash, onUndo, onProtect }: {
   state: AppState;
@@ -155,6 +159,100 @@ export function FoldersPanel({ state, initialRole = "trash", onClose,
     setBusy(false);
   };
 
+  // Permanent delete: the live count (fresh server listing, protected /
+  // pinned mails already skipped there) -> a danger confirm showing the
+  // counts -> the delete of exactly the counted UIDs. Nothing happens
+  // without the confirm.
+  const purge = async (select: PurgeSelect) => {
+    setBusy(true);
+    setNote("");
+    try {
+      const folder = role === "junk" ? t("Junk") : t("Trash");
+      const c = await api.purgePreview(role, select);
+      setBusy(false);
+      if (c.count === 0) {
+        const skipped = [
+          c.skipped_protected > 0
+            && t("fp.purge_b_protected", { n: c.skipped_protected }),
+          c.skipped_pinned > 0
+            && t("fp.purge_b_pinned", { n: c.skipped_pinned }),
+        ].filter(Boolean).join("; ");
+        toast.show(skipped ? t("fp.purge_none_skipped", { skipped })
+          : t("fp.purge_none"));
+        return;
+      }
+      const everything = "everything" in select;
+      const bullets = [t("fp.purge_b_delete", { n: c.count })];
+      if (c.skipped_protected > 0) {
+        bullets.push(t("fp.purge_b_protected", { n: c.skipped_protected }));
+      }
+      if (c.skipped_pinned > 0) {
+        bullets.push(t("fp.purge_b_pinned", { n: c.skipped_pinned }));
+      }
+      const scope = "older_than_days" in select
+        ? t("fp.purge_scope_older", { n: select.older_than_days }) + " "
+        : "";
+      if (!await confirmDialog({
+        title: t(everything ? "fp.purge_title_empty" : "fp.purge_title",
+          { folder }),
+        body: scope + t(c.via_trash ? "fp.purge_body_junk"
+          : "fp.purge_body_trash"),
+        bullets, tone: "danger",
+        confirmLabel: t("fp.purge_btn", { n: c.count }) })) return;
+      setBusy(true);
+      // role + folder + uv + UIDs: exactly what the count read
+      const r = await api.purge(c.role, c.uids, c.uv, c.folder,
+        c.trash_folder);
+      const skipped = r.skipped_protected + r.skipped_pinned;
+      if (r.unverified > 0) {
+        // Junk mails moved to Trash that could not be matched with
+        // certainty: nothing was deleted permanently for them
+        toast.show(t("fp.purge_unverified", { n: r.unverified }), {
+          variant: "error", duration: 0,
+          action: r.undo ? { label: t("Undo"),
+            onClick: () => onUndo(r.undo!) } : undefined });
+      }
+      if (r.deleted > 0) {
+        toast.show(t(skipped ? "fp.purged_skipped" : "fp.purged",
+          { n: r.deleted, k: skipped }), { variant: "success" });
+      } else if (r.unverified === 0) {
+        toast.show(t("fp.purge_nothing_left"));       // all of them vanished
+      }
+      load();
+      onChanged();
+    } catch (e: any) {
+      const msg = t("err.generic", { msg: e.message ?? e });
+      setNote(msg);
+      toast.show(msg, { variant: "error" });
+    }
+    setBusy(false);
+  };
+
+  // The selection as a purge request: whole sender rows -> those senders
+  // (the server then counts all their mails live), else the exact UIDs.
+  const purgeSelection = () => {
+    if (!list || sel.size === 0) return;
+    const whole = (list.senders ?? []).filter((g) =>
+      g.uids.every((u) => sel.has(u)));
+    const covered = new Set(whole.flatMap((g) => g.uids));
+    if (grouping === "sender" && whole.length > 0
+        && covered.size === sel.size && [...sel].every((u) => covered.has(u))) {
+      void purge({ senders: whole.map((g) => g.addr) });
+    } else {
+      void purge({ uids: [...sel] });
+    }
+  };
+
+  const purgeOlder = async () => {
+    const v = await promptDialog({
+      title: t("fp.older_title"), label: t("fp.older_label"),
+      initial: "30", confirmLabel: t("fp.older_btn"),
+      validate: (x) => /^\d{1,5}$/.test(x.trim()) && Number(x) >= 1
+        && Number(x) <= 36500
+        ? null : t("fp.older_invalid") });
+    if (v !== null) void purge({ older_than_days: Number(v) });
+  };
+
   const title = role === "junk" ? t("Junk") : t("Trash");
   const hasRows = !!list && (list.mails.length > 0 || !!note);
   return (
@@ -204,16 +302,25 @@ export function FoldersPanel({ state, initialRole = "trash", onClose,
                   { value: "mails", label: t("fp.mails") },
                 ]} />
               {sel.size > 0 && role === "trash" && (
-                <Select value="" disabled={busy}
-                  className="max-sm:min-h-11 max-sm:coarse:min-h-11"
-                  onChange={(e) => restore(e.target.value)}>
-                  <option value="" disabled>
-                    {t("trash.restore_to")} ({sel.size})
-                  </option>
-                  {(state.folders_raw ?? []).map((f, i) => (
-                    <option key={f} value={f}>{state.folders[i] ?? f}</option>
-                  ))}
-                </Select>
+                <>
+                  <Select value="" disabled={busy}
+                    className="max-sm:min-h-11 max-sm:coarse:min-h-11"
+                    onChange={(e) => restore(e.target.value)}>
+                    <option value="" disabled>
+                      {t("trash.restore_to")} ({sel.size})
+                    </option>
+                    {(state.folders_raw ?? []).map((f, i) => (
+                      <option key={f} value={f}>{state.folders[i] ?? f}</option>
+                    ))}
+                  </Select>
+                  <Select value="" disabled={busy} aria-label={t("fp.action")}
+                    className="max-sm:min-h-11 max-sm:coarse:min-h-11"
+                    onChange={(e) => e.target.value === "delete"
+                      && purgeSelection()}>
+                    <option value="" disabled>{t("fp.action")}</option>
+                    <option value="delete">{t("fp.delete_permanently")}</option>
+                  </Select>
+                </>
               )}
               {sel.size > 0 && role === "junk" && (
                 <>
@@ -223,10 +330,13 @@ export function FoldersPanel({ state, initialRole = "trash", onClose,
                   </Button>
                   <Select value="" disabled={busy} aria-label={t("fp.action")}
                     className="max-sm:min-h-11 max-sm:coarse:min-h-11"
-                    onChange={(e) => e.target.value === "trash"
-                      && moveJunk("trash")}>
+                    onChange={(e) => {
+                      if (e.target.value === "trash") void moveJunk("trash");
+                      if (e.target.value === "delete") purgeSelection();
+                    }}>
                     <option value="" disabled>{t("fp.action")}</option>
                     <option value="trash">{t("fp.to_trash")}</option>
+                    <option value="delete">{t("fp.delete_permanently")}</option>
                   </Select>
                 </>
               )}
@@ -269,16 +379,30 @@ export function FoldersPanel({ state, initialRole = "trash", onClose,
                   meta={[m.addr, fmtSize(m.size)].join(" · ")} />
               ))}
           </div>
-          {role === "trash" && list && list.total > 0 && (
-            <div className="flex justify-end border-t border-line px-4 py-2
+          {list && list.total > 0 && (
+            <div className="flex flex-wrap justify-end gap-2 border-t
+              border-line px-4 py-2
               max-sm:pb-[calc(0.5rem+env(safe-area-inset-bottom))]">
               <Button variant="danger-quiet" disabled={busy}
                 className="max-sm:min-h-11 max-sm:coarse:min-h-11"
-                onClick={async () => {
-                  if (await onEmptyTrash(list)) load();
-                }}>
-                {t("Empty Trash")} ({list.total})…
+                onClick={() => void purgeOlder()}>
+                {t("fp.older")}
               </Button>
+              {role === "trash" ? (
+                <Button variant="danger-quiet" disabled={busy}
+                  className="max-sm:min-h-11 max-sm:coarse:min-h-11"
+                  onClick={async () => {
+                    if (await onEmptyTrash(list)) load();
+                  }}>
+                  {t("Empty Trash")} ({list.total})…
+                </Button>
+              ) : (
+                <Button variant="danger-quiet" disabled={busy}
+                  className="max-sm:min-h-11 max-sm:coarse:min-h-11"
+                  onClick={() => void purge({ everything: true })}>
+                  {t("fp.empty_junk")} ({list.total})…
+                </Button>
+              )}
             </div>
           )}
         </>

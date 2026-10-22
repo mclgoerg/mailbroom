@@ -1,6 +1,7 @@
 """Append-only, per-tenant audit log of every action Mailbroom performs on
 a mailbox: trash/archive/move/mark_read (incl. rule-triggered), rule runs,
-unsubscribes, undo and empty-trash.
+unsubscribes, undo, empty-trash and permanent deletes (`purge`: role and
+counts only).
 
 Persisted as JSONL (one JSON object per line) via
 `tenants.current().file(...)`, the same per-tenant pattern as

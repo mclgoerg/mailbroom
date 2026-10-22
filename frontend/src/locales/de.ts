@@ -387,8 +387,8 @@ export const DE: Record<string, string> = {
   "dups.newest": "neueste",
   "dups.none": "Keine Duplikate gefunden",
   "Statistics": "Statistik",
-  "stats.this_month": "diesen Monat gelöscht: {n} Mails · {size}",
-  "stats.this_month_one": "diesen Monat gelöscht: 1 Mail · {size}",
+  "stats.this_month": "diesen Monat in den Papierkorb verschoben: {n} Mails",
+  "stats.this_month_one": "diesen Monat in den Papierkorb verschoben: 1 Mail",
   "stats.per_year": "Mails pro Jahr",
   "stats.per_month": "Mails pro Monat (letzte 12)",
   "stats.total_size": "Gesamtgröße",
@@ -408,8 +408,9 @@ export const DE: Record<string, string> = {
   "stats.top_domains": "Top-Domains nach Größe",
   "stats.cleanup": "Aufräumen pro Monat",
   "stats.actions_line":
-    "{trash} gelöscht ({size}) · {archive} archiviert · {move} verschoben "
+    "{trash} in den Papierkorb · {archive} archiviert · {move} verschoben "
     + "· {read} gelesen markiert",
+  "stats.actions_purged": " · {purge} endgültig gelöscht ({size} frei)",
   "stats.scans": "Letzte Scans",
   "sieve.button": "Sieve-Filter",
   "sieve.intro":
@@ -431,6 +432,54 @@ export const DE: Record<string, string> = {
     "1 Mail aus dem Papierkorb nach {dest} wiederhergestellt - zum Anzeigen neu scannen.",
   "trash.browse": "Papierkorb durchsuchen",
   "Junk": "Spam",
+  "fp.delete_permanently": "Endgültig löschen…",
+  "fp.older": "Ältere löschen…",
+  "fp.older_title": "Alte Mails endgültig löschen",
+  "fp.older_label": "Vor mehr als so vielen Tagen empfangen",
+  "fp.older_invalid": "Bitte eine ganze Zahl von Tagen von 1 bis 36500 eingeben.",
+  "fp.older_btn": "Mails zählen",
+  "fp.empty_junk": "Spam leeren",
+  "fp.purge_title": "Endgültig aus „{folder}“ löschen?",
+  "fp.purge_title_empty": "„{folder}“ endgültig leeren?",
+  "fp.purge_body_junk":
+    "Diese Mails werden zuerst in den Papierkorb verschoben und dort auf "
+    + "dem Server gelöscht. Das lässt sich nicht rückgängig machen.",
+  "fp.purge_body_trash":
+    "Diese Mails werden auf dem Server gelöscht. Das lässt sich nicht "
+    + "rückgängig machen.",
+  "fp.purge_scope_older": "Mails, die vor mehr als {n} Tagen empfangen wurden.",
+  "fp.purge_scope_older_one": "Mails, die vor mehr als 1 Tag empfangen wurden.",
+  "fp.purge_b_delete": "{n} Mails werden endgültig gelöscht",
+  "fp.purge_b_delete_one": "1 Mail wird endgültig gelöscht",
+  "fp.purge_b_protected": "{n} Mails geschützter Absender werden übersprungen",
+  "fp.purge_b_protected_one": "1 Mail eines geschützten Absenders wird übersprungen",
+  "fp.purge_b_pinned": "{n} geschützte Mails werden übersprungen",
+  "fp.purge_b_pinned_one": "1 geschützte Mail wird übersprungen",
+  "fp.purge_btn": "Endgültig löschen ({n})",
+  "fp.purge_none": "Nichts zu löschen.",
+  "fp.purge_none_skipped":
+    "Nichts zu löschen. {skipped}. Zum Löschen zuerst den Schutz aufheben.",
+  "fp.purge_nothing_left":
+    "Es war nichts mehr zu löschen - die Mails sind schon weg.",
+  "fp.purged": "{n} Mails endgültig gelöscht",
+  "fp.purged_one": "1 Mail endgültig gelöscht",
+  "fp.purged_skipped": "{n} Mails endgültig gelöscht ({k} übersprungen)",
+  "fp.purged_skipped_one": "1 Mail endgültig gelöscht ({k} übersprungen)",
+  "fp.purge_unverified":
+    "{n} Mails in den Papierkorb verschoben, aber ihre endgültige Löschung "
+    + "ließ sich nicht sicher überprüfen. Es wurde nichts endgültig "
+    + "gelöscht - sie liegen noch im Papierkorb. Das Verschieben lässt sich "
+    + "rückgängig machen.",
+  "fp.purge_unverified_one":
+    "1 Mail in den Papierkorb verschoben, aber ihre endgültige Löschung "
+    + "ließ sich nicht sicher überprüfen. Es wurde nichts endgültig "
+    + "gelöscht - sie liegt noch im Papierkorb. Das Verschieben lässt sich "
+    + "rückgängig machen.",
+  "audit.act.purge": "Endgültig gelöscht",
+  "stats.freed_month":
+    "diesen Monat endgültig gelöscht: {n} Mails · {size} frei",
+  "stats.freed_month_one":
+    "diesen Monat endgültig gelöscht: 1 Mail · {size} frei",
   "fp.menu": "Spam & Papierkorb",
   "fp.which": "Ordner",
   "fp.grouping": "Gruppieren nach",

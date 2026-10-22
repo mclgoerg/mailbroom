@@ -48,7 +48,7 @@ vi.mock("./api", () => ({
       accounts: 1, mails: 42, size: 1048576, scans: 3,
       last_scan_ts: Date.now() / 1000 - 3600, rules: 0, verdicts: 5,
       actions_month: { trash: 7, archive: 0, move: 0, mark_read: 0,
-        freed: 2048 },
+        freed: 2048, purge: 3, purged_bytes: 4096 },
       ai: { source: "shared" as const, runs: 2, input_tokens: 100,
         output_tokens: 10, cost: 0.5, month_cost: 0.5, budget_usd: 5 },
       disk_bytes: 4096,
@@ -462,6 +462,11 @@ test("the admin sees and saves the shared AI section", async () => {
   // the per-user usage table loads (id + shared-key spend/cap visible)
   expect(await screen.findByText(/alice_x.example/)).toBeTruthy();
   expect(screen.getByText(/\$0.50/)).toBeTruthy();
+  // "Cleaned (month)": the size is what permanent deletes freed
+  // (purged_bytes), never the old move-based `freed`
+  const cleaned = screen.getByText("7").closest("td")!.textContent!;
+  expect(cleaned).toContain("4 KB");
+  expect(cleaned).not.toContain("2 KB");
   fireEvent.click(screen.getByText("Save"));
   expect(saveCalls[0].auth.mode).toBe("oidc");
   expect(saveCalls[0].auth.admin).toBe("me@x");
