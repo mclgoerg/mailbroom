@@ -355,6 +355,21 @@ test("nesting follows a '.' delimiter (Dovecot INBOX.)", () => {
   expect(pad("Reports")).toBe("2.5rem");
 });
 
+test("folders under INBOX/ stay directly under INBOX, not under the next folder", () => {
+  // GMX-style: the user's own folders live below INBOX/, and other top-level
+  // folders (a backup folder, an outbox) sort between "INBOX" and "INBOX/..."
+  // when only the INBOX row itself is pinned to the top
+  mount({ wildcards: [], folders: [folder("INBOX"), folder("Backup"),
+    folder("INBOX/Alpha"), folder("INBOX/Beta"), folder("OUTBOX"),
+    folder("Zeta")] });
+  const order = screen.getAllByRole("checkbox")
+    .map((c) => c.closest("label")!.textContent);
+  expect(order).toEqual(["INBOX", "Alpha", "Beta", "Backup", "OUTBOX", "Zeta"]);
+  expect(pad("Alpha")).toBe("1.25rem");
+  expect(pad("Backup")).toBe("0rem");
+  expect(pad("OUTBOX")).toBe("0rem");
+});
+
 test("folders without a delimiter (NIL) stay flat", () => {
   mount({ wildcards: [], folders: [folder("INBOX", { delim: null }),
     folder("Work.Reports", { delim: null }), folder("Work", { delim: null })] });

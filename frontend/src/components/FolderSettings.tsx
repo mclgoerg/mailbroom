@@ -25,9 +25,12 @@ function nest(items: FolderInfo[]):
   const names = new Set(items.map((x) => x.name));
   const segs = (x: FolderInfo) => x.delim ? x.name.split(x.delim) : [x.name];
   const key = (x: FolderInfo) => segs(x).map((s) => s.toLowerCase());
+  // INBOX comes first together with everything below it (GMX keeps the
+  // user's own folders under INBOX/): pinning only the INBOX row itself
+  // would strand its children under whichever folder sorts next.
+  const inInbox = (x: FolderInfo) => segs(x)[0].toUpperCase() === "INBOX";
   const sorted = [...items].sort((a, b) => {
-    if ((a.name.toUpperCase() === "INBOX") !== (b.name.toUpperCase() === "INBOX"))
-      return a.name.toUpperCase() === "INBOX" ? -1 : 1;
+    if (inInbox(a) !== inInbox(b)) return inInbox(a) ? -1 : 1;
     const ka = key(a), kb = key(b);
     for (let i = 0; i < Math.min(ka.length, kb.length); i++)
       if (ka[i] !== kb[i]) return ka[i] < kb[i] ? -1 : 1;
