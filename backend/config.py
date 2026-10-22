@@ -477,8 +477,20 @@ def _write_tenant_config(cfg: dict) -> None:
     _write(config_path(), out)
 
 
+# Roles a confirmed folder choice (`role_overrides`) can be saved for.
+SPECIAL_ROLES = ("trash", "junk", "sent", "drafts", "archive", "all")
+
+
 def _apply_imap(block: dict, imap_in: dict) -> None:
     """Fold a partial imap update into one account's block (in place)."""
+    if isinstance(imap_in.get("role_overrides"), dict):
+        # Shape only: whether the folder is a candidate of its role needs
+        # the live folder list, so it is checked where the choice is made
+        # (POST /api/folders/role) and again every time roles resolve
+        # (mailops.resolve_roles ignores an override that does not fit).
+        block["role_overrides"] = {
+            str(r): f for r, f in imap_in["role_overrides"].items()
+            if r in SPECIAL_ROLES and isinstance(f, str) and f}
     if isinstance(imap_in.get("excluded_folders"), list):
         block["excluded_folders"] = [str(f)
                                      for f in imap_in["excluded_folders"]]

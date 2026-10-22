@@ -637,6 +637,74 @@ export const DE: Record<string, string> = {
     + "anderer Ordner) - wird nie mitgescannt, seine Mails werden nicht "
     + "zum Aufr\u00e4umen angeboten",
   "folder.view": "Ansicht",
+  "role.trash": "Papierkorb",
+  "role.junk": "Spam",
+  "role.sent": "Gesendet",
+  "role.drafts": "Entw\u00fcrfe",
+  "role.archive": "Archiv",
+  "role.all": "Alle Nachrichten",
+  "folders.scan": "Zu scannende Ordner",
+  "folders.special": "Spezialordner",
+  "folders.special_hint":
+    "Nicht Teil des Aufr\u00e4um-Scans. Der pro Rolle angezeigte Ordner ist der, "
+    + "in den Mailbroom Mails verschiebt - und der, den dauerhafte Aktionen "
+    + "verwenden.",
+  "folders.none": "Keine Ordner gefunden.",
+  "folder.src.flag": "Server-Markierung",
+  "folder.src.name": "nach Name",
+  "folder.src.override": "von dir gew\u00e4hlt",
+  "folder.view_row": "Ansichten anderer Ordner - werden nie gescannt",
+  "folder.archive_scanned":
+    "Das Archiv wird weiterhin gescannt - unten ankreuzen.",
+  "folder.ambiguous":
+    "Mehr als ein Ordner kommt als dein Ordner \u201e{role}\u201c in Frage. "
+    + "Bis du w\u00e4hlst, verwendet Mailbroom \u201e{pick}\u201c f\u00fcr "
+    + "Verschiebungen dorthin und l\u00f6scht nicht endg\u00fcltig und leert ihn "
+    + "nicht.",
+  "folder.choose": "Noch nicht best\u00e4tigt - ausw\u00e4hlen\u2026",
+  "folder.choose_label": "Welcher Ordner ist dein Ordner \u201e{role}\u201c?",
+  "folder.confirmed":
+    "Du hast diesen Ordner gew\u00e4hlt. Dauerhafte Aktionen f\u00fcr "
+    + "\u201e{role}\u201c (etwa Papierkorb leeren) verwenden genau ihn.",
+  "folder.choice_note":
+    "Der Ordner, den du hier w\u00e4hlst, wird f\u00fcr dauerhafte Aktionen "
+    + "verwendet.",
+  "folder.auto": "Automatische Wahl verwenden",
+  "folder.choice_saved":
+    "Ordner \u201e{role}\u201c ist jetzt \u201e{name}\u201c.",
+  "folder.choice_reset":
+    "Ordner \u201e{role}\u201c wird wieder automatisch gew\u00e4hlt.",
+  "folder.lookalike_tag": "sieht auch aus wie \u201e{role}\u201c",
+  "folder.move_contents": "Inhalt nach \u201e{role}\u201c verschieben",
+  "folder.move_needs_choice":
+    "W\u00e4hle zuerst oben den Ordner \u201e{role}\u201c.",
+  "folder.move_title": "{n} Mails nach \u201e{role}\u201c verschieben?",
+  "folder.move_title_one": "1 Mail nach \u201e{role}\u201c verschieben?",
+  "folder.move_body":
+    "Die Mails in \u201e{folder}\u201c werden nach \u201e{target}\u201c "
+    + "verschoben - nicht gel\u00f6scht. Du kannst das gleich danach "
+    + "r\u00fcckg\u00e4ngig machen.",
+  "folder.move_confirm": "{n} Mails verschieben",
+  "folder.move_confirm_one": "1 Mail verschieben",
+  "folder.move_empty":
+    "\u201e{folder}\u201c ist leer - nichts zu verschieben.",
+  "folder.moved": "{n} Mails nach \u201e{role}\u201c verschoben.",
+  "folder.moved_one": "1 Mail nach \u201e{role}\u201c verschoben.",
+  "folder.err.not_candidate":
+    "Dieser Ordner kann f\u00fcr diese Rolle nicht gew\u00e4hlt werden.",
+  "folder.err.ambiguous":
+    "W\u00e4hle zuerst den richtigen Ordner f\u00fcr diese Rolle, dann "
+    + "versuche es erneut.",
+  "folder.err.not_lookalike":
+    "Dieser Ordner sieht nicht mehr wie ein zweiter Spezialordner aus - "
+    + "Liste neu laden.",
+  "folder.err.move_unsafe":
+    "Dieser Server kann weder verschieben noch einzelne Mails sicher "
+    + "entfernen, deshalb wird das Verschieben abgelehnt - nichts wurde "
+    + "ge\u00e4ndert.",
+  "folder.undone": "{n} Mails zur\u00fcck verschoben.",
+  "folder.undone_one": "1 Mail zur\u00fcck verschoben.",
+  "audit.act.move_contents": "Ordnerinhalt verschoben",
   "account.label": "Zu bearbeitendes Konto",
   "account.add": "Konto hinzufügen",
   "account.hint":

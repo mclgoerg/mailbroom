@@ -465,6 +465,7 @@ class DeleteMessagesBody(BaseModel):
 
 class UndoBody(BaseModel):
     index: int = -1
+    ident: dict | None = None    # {ts, label, count}: pick by identity
 
 
 class AiGroupBody(BaseModel):
@@ -1083,7 +1084,7 @@ def post_protect(body: ProtectBody):
 def post_undo(body: UndoBody, account: str | None = Query(None)):
     acc = _acc(account)
     try:
-        return mailops.undo_last(body.index, acc)
+        return mailops.undo_last(body.index, acc, body.ident)
     except RuntimeError as exc:
         raise HTTPException(409, str(exc))
     except Exception as exc:
@@ -1177,6 +1178,57 @@ def post_empty_trash(body: EmptyTrashBody,
         raise HTTPException(500, f"{type(exc).__name__}: {exc}")
 
 
+class RoleBody(BaseModel):
+    role: str
+    folder: str = ""       # "" = back to the automatic pick
+
+
+@app.post("/api/folders/role")
+def post_folder_role(body: RoleBody, account: str | None = Query(None)):
+    """Confirm which folder is the account's Trash / Junk / ... (config
+    `role_overrides`); anything but one of that role's candidates is
+    refused with a stable error code."""
+    acc = _acc(account)
+    try:
+        return mailops.set_role_override(body.role, body.folder, acc)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc))
+    except Exception as exc:
+        raise HTTPException(500, f"{type(exc).__name__}: {exc}")
+
+
+class LookalikeBody(BaseModel):
+    folder: str
+    uv: int = 0           # UIDVALIDITY of the folder the count was read from
+    max_uid: int = 0      # highest UID the confirm counted
+
+
+@app.get("/api/folders/lookalike")
+def get_lookalike(folder: str = Query(...), account: str | None = Query(None)):
+    """Live count for moving a look-alike folder's mail to its role folder."""
+    acc = _acc(account)
+    try:
+        return mailops.lookalike_count(folder, acc)
+    except ValueError as exc:
+        raise HTTPException(409, str(exc))
+    except RuntimeError as exc:
+        raise HTTPException(409, str(exc))
+    except Exception as exc:
+        raise HTTPException(500, f"{type(exc).__name__}: {exc}")
+
+
+@app.post("/api/folders/move_contents")
+def post_move_lookalike(body: LookalikeBody,
+                        account: str | None = Query(None)):
+    acc = _acc(account)
+    try:
+        return mailops.move_lookalike(body.folder, body.uv, body.max_uid, acc)
+    except (ValueError, RuntimeError) as exc:
+        raise HTTPException(409, str(exc))
+    except Exception as exc:
+        raise HTTPException(500, f"{type(exc).__name__}: {exc}")
+
+
 class CancelBody(BaseModel):
     target: str  # "scan" | "ai" | "delete" | "atts" | "unsub"
 
@@ -1251,9 +1303,21 @@ def get_folders(account: str | None = Query(None)):
             role_of.setdefault(roles[role], role)
             held.setdefault(roles[role], set()).add(role)
     looks_like = found["looks_like"]
+    delims = getattr(pairs, "delims", {})
     return {
+        # one row per detected role: where it points, how it was found,
+        # and - when several folders tie - the choices with their counts
+        "special": [
+            {"role": role, "raw": raw, "name": mailops.decode_mutf7(raw),
+             "source": found["source"][role],
+             "ambiguous": role in found["ambiguous"],
+             "choices": [{"raw": c, "name": mailops.decode_mutf7(c),
+                          "count": found["counts"].get(c)}
+                         for c in found["choices"].get(role, [])]}
+            for role, raw in roles.items()],
         "folders": [
             {"raw": f, "name": mailops.decode_mutf7(f),
+             "delim": delims.get(f),
              "role": role_of.get(f),
              # how the role was found ("flag" / "name" / "override"), and
              # whether another folder is just as good a candidate

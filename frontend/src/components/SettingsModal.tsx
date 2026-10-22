@@ -7,6 +7,7 @@ import { fmtAgo, fmtSize } from "../lib";
 import type { AdminTenantStats, AuthMode, AutoScanUnit, BodySearchMode, Config,
   DigestSchedule, FoldersResp, OauthProvider, Preset, Security,
   SmtpSecurity } from "../types";
+import { FolderSettings } from "./FolderSettings";
 import { IndexPanel } from "./IndexPanel";
 import { KnowledgeSettings } from "./KnowledgeSettings";
 import { Button, Checkbox, confirmDialog, Field, Input, LINK_ACCENT, Loading,
@@ -182,17 +183,28 @@ export function SettingsModal({ cfg, account, onClose, onSaved,
 
   // Folder discovery is PER ACCOUNT (each provider names folders
   // differently) and needs that account's SAVED credentials.
-  const discoverFolders = (name: string) => {
+  // `merge` (a reload after a role choice or a move) keeps the ticks and
+  // wildcard chips the user already changed instead of resetting them.
+  const touched = useRef(new Set<string>());
+  const discoverFolders = (name: string, merge = false) => {
+    if (!merge) touched.current.clear();
     setFolders(null);
     setFoldersErr("");
     api.folders(name)
       .then((r) => {
         setFolders(r);
-        setWildcards(r.wildcards);
-        setIncluded(new Set(
-          r.folders.filter((x) => !x.excluded).map((x) => x.raw)));
+        if (!merge) setWildcards(r.wildcards);
+        setIncluded((prev) => new Set(r.folders
+          .filter((x) => merge && touched.current.has(x.raw)
+            ? prev.has(x.raw) : !x.excluded)
+          .map((x) => x.raw)));
       })
       .catch((e) => setFoldersErr(String(e.message ?? e)));
+  };
+  const tick = (next: Set<string>) => {
+    for (const raw of new Set([...included, ...next]))
+      if (included.has(raw) !== next.has(raw)) touched.current.add(raw);
+    setIncluded(next);
   };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { discoverFolders(editAcct); }, [editAcct]);
@@ -748,63 +760,10 @@ export function SettingsModal({ cfg, account, onClose, onSaved,
             </div>
           )}
           {folders && (
-            <div className="rounded-card border border-line bg-panel2 p-3">
-              <div className="grid gap-1 sm:grid-cols-2">
-                {folders.folders
-                  .filter((x) => !wildcards.some((w) =>
-                    x.raw.toLowerCase().startsWith(
-                      w.trim().toLowerCase().slice(0, -1))
-                    || x.name.toLowerCase().startsWith(
-                      w.trim().toLowerCase().slice(0, -1))))
-                  .map((x) => {
-                  // trash/junk/sent/drafts/all roles and virtual views (Gmail
-                  // Starred / Important) are excluded on the backend - their
-                  // checkboxes are informational only.
-                  const locked = x.view
-                    || (!!x.looks_like && x.looks_like !== "archive")
-                    || (!!x.role && x.role !== "archive");
-                  return (
-                  <span key={x.raw} className="min-w-0"
-                    title={locked ? t(x.view ? "folder.view_excluded"
-                      : x.looks_like ? "folder.lookalike_excluded"
-                      : "folder.role_excluded") : undefined}>
-                    <Checkbox className="max-w-full"
-                      checked={included.has(x.raw)}
-                      disabled={locked}
-                      onChange={() => {
-                        const next = new Set(included);
-                        next.has(x.raw) ? next.delete(x.raw)
-                          : next.add(x.raw);
-                        setIncluded(next);
-                      }}
-                      label={<span className="flex min-w-0 items-center gap-2">
-                        <span className="truncate">{x.name}</span>
-                        {x.view ? <Tag>{t("folder.view")}</Tag>
-                          : x.role && <Tag>{x.role}</Tag>}
-                      </span>} />
-                  </span>
-                  );
-                })}
-              </div>
-              {wildcards.length > 0 && (
-                <div className="mt-2 flex flex-wrap items-center gap-1.5
-                  border-t border-line pt-2 type-meta text-muted">
-                  {t("Excluded by rule:")}
-                  {wildcards.map((w) => (
-                    <Tag key={w}>
-                      {w}{" "}
-                      <button className="inline-flex align-text-bottom
-                          text-muted hover:text-body"
-                        title={t("Remove")} aria-label={t("Remove")}
-                        onClick={() => setWildcards(
-                          wildcards.filter((x) => x !== w))}>
-                        <X size={14} />
-                      </button>
-                    </Tag>
-                  ))}
-                </div>
-              )}
-            </div>
+            <FolderSettings account={editAcct} data={folders}
+              included={included} setIncluded={tick} wildcards={wildcards}
+              setWildcards={setWildcards}
+              reload={() => discoverFolders(editAcct, true)} />
           )}
         </div>
 

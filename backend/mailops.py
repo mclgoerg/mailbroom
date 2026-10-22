@@ -87,6 +87,10 @@ NO_MESSAGE_ID = "no_message_id"      # set_pin: nothing stable to key a pin on
 PINNED_MAILS = "pinned_mails"        # delete_messages: needs force
 PROTECTED_MAILS = "protected_mails"  # role_move trash: needs force
 ALL_PINNED = "all_pinned"            # delete_groups: nothing but pinned mails
+ROLE_NOT_CANDIDATE = "role_not_candidate"  # set_role_override: not that role's
+ROLE_AMBIGUOUS = "role_ambiguous"    # lookalike_*: choose the role folder first
+NOT_LOOKALIKE = "not_lookalike"      # lookalike_*: no look-alike of a role
+MOVE_UNSAFE = "move_unsafe"          # lookalike_*: server has no MOVE/UIDPLUS
 UNDO_MAX = 10
 
 # All mutable mail state lives in per-account AccountState objects (see
@@ -595,6 +599,10 @@ def resolve_roles(conn, acc=None, pairs=None) -> dict:
                   Permanent actions must refuse these roles.
       looks_like  {raw folder: role} - folders that look like a role another
                   folder holds (a client's second Trash, a second \\Sent)
+      candidates  {role: [raw, ...]} - every folder an override may name
+      choices     {role: [raw, ...]} - the tied folders Settings offers
+                  (also after the user confirmed one), `counts` their mail
+                  counts (STATUS, only fetched for those)
     A flag always beats a name; Gmail's virtual views are never a role.
     An override naming anything but a candidate of its role is ignored."""
     acc = acc or accounts.get()
@@ -626,41 +634,52 @@ def resolve_roles(conn, acc=None, pairs=None) -> dict:
     source: dict[str, str] = {}
     ambiguous: dict[str, list[str]] = {}
     looks_like: dict[str, str] = {}
+    candidates: dict[str, list[str]] = {}
+    choices: dict[str, list[str]] = {}
+    counts: dict[str, int] = {}
     for role in _ROLE_NAMES:
         flag_c = flagged.get(role, [])
         exact_c, prefixed_c = named.get(role, ([], []))
         if not (flag_c or exact_c or prefixed_c):
             continue
+        # flag > a name matching the whole path > a name that only matches
+        # below INBOX / [Gmail]; within a tier most mail, then the folder
+        # name (never LIST order)
+        src, tier = next((s_, c) for s_, c in (
+            ("flag", flag_c), ("name", exact_c),
+            ("name", prefixed_c)) if c)
+        if len(tier) > 1:
+            for n in tier:
+                counts[n] = folder_message_count(conn, n) or 0
+            tier = sorted(tier, key=lambda n: (
+                -counts[n], decode_mutf7(n).lower(), n))
         # An override only counts for a folder this role could be (flagged
         # for it, or named like it - look-alikes included, so the user can
         # pick between them), never INBOX; a view or another role's folder
         # is not a candidate. Anything else is ignored, as if absent.
+        cands = [n for n in (*flag_c, *exact_c, *prefixed_c)
+                 if n.upper() != "INBOX"]
+        candidates[role] = cands
         ov = overrides.get(role)
-        if ov not in (*flag_c, *exact_c, *prefixed_c) \
-                or ov.upper() == "INBOX":
+        if ov not in cands:
             ov = None
+        if len(tier) > 1:
+            # what Settings offers: the tied folders (also once confirmed,
+            # so the choice can be changed), plus a confirmed outsider
+            choices[role] = tier + ([ov] if ov and ov not in tier else [])
         if ov:
             holder, src = ov, "override"
         else:
-            # flag > a name matching the whole path > a name that only
-            # matches below INBOX / [Gmail]; within a tier most mail, then
-            # the folder name (never LIST order)
-            src, tier = next((s_, c) for s_, c in (
-                ("flag", flag_c), ("name", exact_c),
-                ("name", prefixed_c)) if c)
-            if len(tier) > 1:
-                counts = {n: folder_message_count(conn, n) or 0
-                          for n in tier}
-                tier = sorted(tier, key=lambda n: (
-                    -counts[n], decode_mutf7(n).lower(), n))
-                ambiguous[role] = tier
             holder = tier[0]
+            if len(tier) > 1:
+                ambiguous[role] = tier
         roles[role], source[role] = holder, src
         for n in flag_c + exact_c + prefixed_c:
             if n != holder:
                 looks_like.setdefault(n, role)
     return {"roles": roles, "source": source, "ambiguous": ambiguous,
-            "looks_like": looks_like}
+            "looks_like": looks_like, "candidates": candidates,
+            "choices": choices, "counts": counts}
 
 
 def folder_roles(conn, acc=None, pairs=None) -> dict[str, str]:
@@ -2907,10 +2926,17 @@ def _rescan_after_restore(acc, restored: int, key: str,
     return False
 
 
-def undo_last(index: int = -1, acc=None) -> dict:
-    """Restore a recorded move job (found by Message-ID in its target)."""
+def undo_last(index: int = -1, acc=None, ident: dict | None = None) -> dict:
+    """Restore a recorded move job (found by Message-ID in its target).
+    `ident` ({ts, label, count} of the entry, as returned when it was
+    recorded) picks the entry by identity instead of by position."""
     acc = acc or accounts.get()
     with acc.lock:
+        if ident is not None:
+            index = next((i for i, u in enumerate(acc.undo_log)
+                          if (u["ts"], u["label"], u["count"]) ==
+                          (ident.get("ts"), ident.get("label"),
+                           ident.get("count"))), len(acc.undo_log))
         if not acc.undo_log:
             raise RuntimeError("nothing to undo")
         if not -len(acc.undo_log) <= index < len(acc.undo_log):
@@ -2973,6 +2999,10 @@ def undo_last(index: int = -1, acc=None) -> dict:
     auditlog.record(
         "undo", account=acc.name, count=restored, label=entry["label"],
         outcome="ok" if restored == entry["count"] else "partial")
+    if entry.get("action") == "move_contents":
+        # the mails went back to a folder that is never scanned: nothing
+        # in the index changes, so no rescan and no "rescan" notice
+        return {"restored": restored, "of": entry["count"], "rescan": False}
     rescan = _rescan_after_restore(acc, restored, "restored", {
         "restored": restored, "of": entry["count"], "label": entry["label"]})
     return {"restored": restored, "of": entry["count"], "rescan": rescan}
@@ -3278,6 +3308,174 @@ def trash_restore(uids: list[int], dest: str, uv: int = 0,
     rescan = _rescan_after_restore(acc, restored, "trash_restored", {
         "n": restored, "dest": decode_mutf7(dest)})
     return {"restored": restored, "rescan": rescan}
+
+
+# Roles a look-alike folder's mail can be moved into. Archive look-alikes
+# are scanned like Archive itself (D11) and All Mail is a view, so neither
+# is offered.
+LOOKALIKE_ROLES = ("trash", "junk", "sent", "drafts")
+
+
+def set_role_override(role: str, folder: str, acc=None) -> dict:
+    """Confirm `folder` as the account's `role` folder (empty `folder`
+    clears the choice, back to the automatic pick). The choice must be one
+    of the role's candidates on the live folder list, else
+    ValueError(ROLE_NOT_CANDIDATE) and nothing is written. Returns the
+    role's resolved {role, folder, source}."""
+    acc = acc or accounts.get()
+    if role not in cfgmod.SPECIAL_ROLES:
+        raise ValueError(ROLE_NOT_CANDIDATE)
+    conn = connect(cfgmod.account_imap(acc.name), acc.name)
+    try:
+        pairs = list_folders_ex(conn)
+        if folder and folder not in resolve_roles(
+                conn, acc, pairs)["candidates"].get(role, []):
+            raise ValueError(ROLE_NOT_CANDIDATE)
+        current = dict(cfgmod.account_imap(acc.name).get("role_overrides")
+                       or {})
+        if folder:
+            current[role] = folder
+        else:
+            current.pop(role, None)
+        cfgmod.update_config({"account": acc.name,
+                              "imap": {"role_overrides": current}})
+        found = resolve_roles(conn, acc, pairs)
+    finally:
+        try:
+            conn.logout()
+        except Exception:
+            pass
+    acc.folder_roles.pop(role, None)
+    acc.folder_roles.update(found["roles"])
+    log.info("role %s %s", role, "confirmed" if folder else "reset")
+    return {"role": role, "folder": found["roles"].get(role),
+            "source": found["source"].get(role)}
+
+
+def _lookalike_target(conn, folder: str, acc) -> tuple[str, str]:
+    """(role, raw role folder) a look-alike folder's mail goes to. Refuses
+    (ValueError with a stable code) when `folder` is no look-alike of a
+    movable role, is the role folder itself, or the role is ambiguous and
+    unconfirmed."""
+    found = resolve_roles(conn, acc)
+    role = found["looks_like"].get(folder)
+    target = found["roles"].get(role) if role else None
+    if role not in LOOKALIKE_ROLES or not target or target == folder:
+        raise ValueError(NOT_LOOKALIKE)
+    if role in found["ambiguous"]:
+        raise ValueError(ROLE_AMBIGUOUS)
+    if not (_supports_move(conn) or _supports_uidplus(conn)):
+        # the COPY + plain EXPUNGE fallback of _uid_move would also remove
+        # other clients' \\Deleted mail from the folder (e.g. mail that
+        # arrived after the count): refuse rather than risk it
+        raise ValueError(MOVE_UNSAFE)
+    return role, target
+
+
+def _all_uids(conn) -> list[int]:
+    status, data = conn.uid("SEARCH", None, "ALL")
+    if status != "OK":
+        raise RuntimeError("cannot list the folder")
+    return sorted(int(u) for u in (data[0].split() if data and data[0]
+                                   else []))
+
+
+def lookalike_count(folder: str, acc=None) -> dict:
+    """Live numbers for the confirm of moving a look-alike folder's mail
+    into its role folder: {role, target, count, uv, max_uid}. `uv` and
+    `max_uid` go back with the move so it only touches what was counted."""
+    acc = acc or accounts.get()
+    conn = connect(cfgmod.account_imap(acc.name), acc.name)
+    try:
+        role, target = _lookalike_target(conn, folder, acc)
+        status, _ = conn.select(quote_folder(folder), readonly=True)
+        if status != "OK":
+            raise RuntimeError(f"cannot open {decode_mutf7(folder)!r}")
+        uv = uidvalidity(conn)
+        uids = _all_uids(conn)
+    finally:
+        try:
+            conn.logout()
+        except Exception:
+            pass
+    return {"role": role, "target": target, "target_name":
+            decode_mutf7(target), "count": len(uids), "uv": uv,
+            "max_uid": uids[-1] if uids else 0}
+
+
+def move_lookalike(folder: str, uv: int, max_uid: int, acc=None) -> dict:
+    """MOVE the mail of a look-alike folder (UIDs <= `max_uid`, the highest
+    the confirm counted, after a UIDVALIDITY check against `uv`) into the
+    role folder it looks like. Reversible, never permanent: chunked UID
+    MOVEs, one undo entry (found again by Message-ID in the target) and an
+    audit entry for what really moved, even when a chunk fails part-way
+    (the failure is then raised). Mail that arrived later stays."""
+    acc = acc or accounts.get()
+    with acc.lock:
+        if acc.state["delete"]["status"] == "running":
+            raise RuntimeError("busy: an action is running")
+    if uv <= 0:
+        raise RuntimeError("the folder was not counted - reload it and "
+                           "confirm again")
+    if max_uid <= 0:
+        return {"moved": 0, "undo": None}
+    conn = connect(cfgmod.account_imap(acc.name), acc.name)
+    items: list[tuple[str, str]] = []
+    moved = 0
+    failure: Exception | None = None
+    role = target = ""
+    try:
+        role, target = _lookalike_target(conn, folder, acc)
+        status, _ = conn.select(quote_folder(folder), readonly=False)
+        if status != "OK":
+            raise RuntimeError(f"cannot open {decode_mutf7(folder)!r}")
+        if uidvalidity(conn) != uv:
+            raise RuntimeError(f"mailbox {decode_mutf7(folder)!r} changed on "
+                               "the server (UIDVALIDITY mismatch) - reload "
+                               "it before moving")
+        chosen = [u for u in _all_uids(conn) if u <= max_uid]
+        for start in range(0, len(chosen), MOVE_CHUNK):
+            chunk = chosen[start:start + MOVE_CHUNK]
+            uidstr = ",".join(str(u) for u in chunk)
+            ids = _fetch_msgids(conn, chunk)
+            if not _uid_move(conn, uidstr, target):
+                raise RuntimeError("the server refused the move")
+            moved += len(chunk)
+            items.extend((folder, mid) for mid in sorted(ids))
+    except Exception as exc:
+        failure = exc
+    finally:
+        try:
+            conn.logout()
+        except Exception:
+            pass
+    undo = None
+    if moved:
+        label = decode_mutf7(folder)
+        with acc.lock:
+            if items:
+                acc.undo_log.append({
+                    "ts": int(time.time()), "label": label,
+                    "action": "move_contents", "count": len(items),
+                    "items": items, "in": target})
+                del acc.undo_log[:-UNDO_MAX]
+                acc.state["undo"] = _undo_summaries(acc)
+                undo = {"ts": acc.undo_log[-1]["ts"], "label": label,
+                        "count": len(items)}
+            if role == "trash" and acc.state["trash_count"] is not None:
+                acc.state["trash_count"] += moved
+        log.info("moved %d mails from a look-alike %s folder", moved, role)
+        auditlog.record("move_contents", account=acc.name, count=moved,
+                        label=f"{label} \u2192 {decode_mutf7(target)}",
+                        outcome="ok" if failure is None else "partial",
+                        error="" if failure is None else str(failure))
+    if failure is not None:
+        if moved:
+            raise RuntimeError(f"{failure} ({moved} mails were moved "
+                               "before the failure)") from failure
+        raise failure
+    return {"moved": moved, "target": decode_mutf7(target), "role": role,
+            "undo": undo}
 
 
 def _supports_uidplus(conn) -> bool:

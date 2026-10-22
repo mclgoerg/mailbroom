@@ -2,13 +2,15 @@
 /* Provider presets: selecting one prefills the connection fields but
  * keeps everything editable; "custom" changes nothing. */
 
-import { cleanup, fireEvent, render, screen, waitFor, within }
+import { cleanup, fireEvent, render as rtlRender, screen, waitFor, within }
   from "@testing-library/react";
+import type { ReactElement } from "react";
 import { afterEach, expect, test, vi } from "vitest";
 
 const foldersCalls: (string | undefined)[] = [];
 const saveCalls: any[] = [];
 const testDigestCalls: string[] = [];
+const roleCalls: unknown[][] = [];
 const oauthDisconnectCalls: string[] = [];
 let foldersResult: unknown = null;   // null: picker stays loading
 let testDigestResult: { sent: boolean; demo: boolean } =
@@ -20,6 +22,11 @@ vi.mock("./api", () => ({
       return foldersResult
         ? Promise.resolve(foldersResult)
         : new Promise(() => {});                 // picker stays loading
+    },
+    setFolderRole: (...a: unknown[]) => {
+      roleCalls.push(a);
+      return Promise.resolve({ role: "trash", folder: "Trash",
+        source: "override" });
     },
     saveConfig: (body: any) => {
       saveCalls.push(body);
@@ -52,6 +59,9 @@ vi.mock("./api", () => ({
 
 import { SettingsModal } from "./components/SettingsModal";
 import { DialogProvider, ToastProvider } from "./components/ui";
+// The folder picker toasts its outcomes, so every render has a provider.
+const render = (ui: ReactElement) =>
+  rtlRender(<ToastProvider>{ui}</ToastProvider>);
 import { cancelDialog, expectNoDialog, findDialog, pressDialog }
   from "./dialogTestUtils";
 import type { Config } from "./types";
@@ -151,26 +161,26 @@ test("folder discovery follows the account being edited", () => {
   expect(foldersCalls).toEqual(["default", "icloud", "icloud"]);
 });
 
-test("a virtual view folder is listed as a locked, tagged row", async () => {
-  foldersResult = { wildcards: [], folders: [
-    { raw: "INBOX", name: "INBOX", role: null, view: false, excluded: false },
-    { raw: "[Gmail]/Starred", name: "[Gmail]/Starred", role: null,
-      view: true, excluded: true }] };
-  try {
-    render(<SettingsModal cfg={cfg} account="default" onClose={() => {}}
-      onSaved={() => {}} onAccountsChanged={() => {}} />);
-    const box = await screen.findByLabelText(/\[Gmail\]\/Starred/);
-    expect((box as HTMLInputElement).disabled).toBe(true);
-    expect((box as HTMLInputElement).checked).toBe(false);
-    expect(screen.getByText("view")).toBeTruthy();
-    expect(box.closest("span[title]")?.getAttribute("title"))
-      .toMatch(/Virtual view/);
-    expect((screen.getByLabelText("INBOX") as HTMLInputElement).disabled)
-      .toBe(false);
-  } finally {
-    foldersResult = null;
-  }
-});
+test("a virtual view folder is listed under special folders, no checkbox",
+  async () => {
+    foldersResult = { wildcards: [], folders: [
+      { raw: "INBOX", name: "INBOX", role: null, view: false,
+        excluded: false },
+      { raw: "[Gmail]/Starred", name: "[Gmail]/Starred", role: null,
+        view: true, excluded: true }] };
+    try {
+      render(<SettingsModal cfg={cfg} account="default" onClose={() => {}}
+        onSaved={() => {}} onAccountsChanged={() => {}} />);
+      expect(await screen.findByText("[Gmail]/Starred")).toBeTruthy();
+      expect(screen.getByText(/Views of other folders - never scanned/))
+        .toBeTruthy();
+      expect(screen.queryByLabelText(/\[Gmail\]\/Starred/)).toBeNull();
+      expect((screen.getByLabelText("INBOX") as HTMLInputElement).disabled)
+        .toBe(false);
+    } finally {
+      foldersResult = null;
+    }
+  });
 
 test("a look-alike of a special folder is locked and unticked", async () => {
   foldersResult = { wildcards: [], folders: [
@@ -188,6 +198,63 @@ test("a look-alike of a special folder is locked and unticked", async () => {
     expect((box as HTMLInputElement).checked).toBe(false);
     expect(box.closest("span[title]")?.getAttribute("title"))
       .toMatch(/second special folder/);
+  } finally {
+    foldersResult = null;
+  }
+});
+
+const tiedTrash = () => ({ wildcards: [], special: [{
+  role: "trash", raw: "Deleted Items", name: "Deleted Items",
+  source: "name", ambiguous: true, choices: [
+    { raw: "Deleted Items", name: "Deleted Items", count: 3 },
+    { raw: "Trash", name: "Trash", count: 1 }] }],
+folders: [
+  { raw: "INBOX", name: "INBOX", role: null, excluded: false },
+  { raw: "Projects", name: "Projects", role: null, excluded: false },
+  { raw: "Deleted Items", name: "Deleted Items", role: "trash",
+    excluded: true },
+  { raw: "Trash", name: "Trash", looks_like: "trash", role: null,
+    excluded: true }] });
+
+test("choosing a role folder acts on the edited account, not the active one",
+  async () => {
+    roleCalls.length = 0;
+    foldersResult = tiedTrash();
+    try {
+      render(<SettingsModal cfg={cfg} account="default" onClose={() => {}}
+        onSaved={() => {}} onAccountsChanged={() => {}} />);
+      fireEvent.change(
+        screen.getByLabelText(/Account to edit/) as HTMLSelectElement,
+        { target: { value: "icloud" } });
+      fireEvent.change(await screen.findByLabelText(
+        "Which folder is your Trash folder?"),
+      { target: { value: "Trash" } });
+      await waitFor(() => expect(roleCalls).toEqual(
+        [["trash", "Trash", "icloud"]]));
+    } finally {
+      foldersResult = null;
+    }
+  });
+
+test("unsaved ticks survive the reload after a role choice", async () => {
+  foldersResult = tiedTrash();
+  try {
+    render(<SettingsModal cfg={cfg} account="default" onClose={() => {}}
+      onSaved={() => {}} onAccountsChanged={() => {}} />);
+    const box = await screen.findByLabelText("Projects") as HTMLInputElement;
+    expect(box.checked).toBe(true);
+    fireEvent.click(box);                       // untick, not saved yet
+    expect(box.checked).toBe(false);
+    const before = foldersCalls.length;
+    fireEvent.change(screen.getByLabelText(
+      "Which folder is your Trash folder?"), { target: { value: "Trash" } });
+    await waitFor(() => expect(foldersCalls.length).toBeGreaterThan(before));
+    // the reload answers "Projects is scanned" again - the user's untick stays
+    await waitFor(() => expect(
+      (screen.getByLabelText("Projects") as HTMLInputElement).checked)
+      .toBe(false));
+    expect((screen.getByLabelText("INBOX") as HTMLInputElement).checked)
+      .toBe(true);
   } finally {
     foldersResult = null;
   }

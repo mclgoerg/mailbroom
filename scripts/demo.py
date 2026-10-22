@@ -290,6 +290,9 @@ PROTON = FakeIMAP({
             unread=0.9)
     + mails('"Anna Weber" <anna.weber@mailfox.example>',
             ["Fwd: Wanderkarte"], 1, newest_days=2, unread=1.0),
+    # a client-made second Junk folder: Settings > Folders asks which one
+    "Junk Email": mails('"Old Newsletter" <bye@gone.example>',
+                        ["Special offer"], 3, unread=0.9),
     "Archive": [],
     "Drafts": [],
 })
@@ -310,7 +313,10 @@ ICLOUD = FakeIMAP({
         subject="Re: Sonntag bei Oma?",
         to="lisa@familienpost.example", seen=True)],
     "Deleted Messages": [],
-})
+    # a client-made look-alike of the server's Trash (Settings can move it)
+    "Gelöschte Elemente": mails('"Cloud Photos" <no-reply@cloudphotos.example>',
+                                ["Storage reminder"], 5, unread=0.5),
+}, flags={"Deleted Messages": "\\Trash"})
 
 FAKES = {"demo-proton": PROTON, "demo-icloud": ICLOUD}
 mailops.connect = lambda im, name=None: FAKES[im["host"]]
