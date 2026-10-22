@@ -319,7 +319,7 @@ export function RulesModal({ state, onClose, onChanged }: {
             </Field>
             {purge && (
               <div className="sm:col-span-2">
-                <Notice icon={<TriangleAlert size={16} />}>
+                <Notice tone="danger" icon={<TriangleAlert size={16} />}>
                   {t("rule.purge_warning")}
                 </Notice>
               </div>

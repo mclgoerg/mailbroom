@@ -223,6 +223,9 @@ test("choosing Junk fixes the action, shows the warning and offers the " +
   pickScope("junk");
   expect(screen.getByText(/Deletes mail on the server, permanently/))
     .toBeTruthy();
+  // shown as a real warning (the red danger tone), not as a neutral note
+  expect(screen.getByText(/Deletes mail on the server, permanently/)
+    .closest('[role="status"]')!.className).toContain("bg-keep-bg");
   const action = screen.getByLabelText("Action") as HTMLSelectElement;
   expect(action.disabled).toBe(true);
   expect([...action.options].map((o) => o.textContent))
