@@ -234,6 +234,10 @@ def save_snapshot(acc) -> None:
         log.exception("[%s] could not persist scan snapshot", acc.name)
 
 
+_ROLE_REC_FIELDS = frozenset(("uid", "folder", "addr", "subject", "size",
+                              "seen", "ts", "date"))
+
+
 def _read_role_snapshot(data: dict) -> tuple[dict, dict]:
     """The role indexes of a snapshot; absent (v2) or malformed = empty - a
     bad role cache must never cost the main snapshot."""
@@ -241,7 +245,12 @@ def _read_role_snapshot(data: dict) -> tuple[dict, dict]:
     uv: dict[str, dict[str, int]] = {}
     try:
         for role, recs in (data.get("role_index") or {}).items():
-            index[role] = {ikey(m["folder"], m["uid"]): m for m in recs}
+            # A record missing a field the listing reads is dropped (it is
+            # simply fetched again) rather than failing every open.
+            index[role] = {ikey(m["folder"], m["uid"]): m for m in recs
+                           if isinstance(m, dict) and isinstance(
+                               m.get("uid"), int)
+                           and _ROLE_REC_FIELDS <= m.keys()}
         for role, per in (data.get("role_uv") or {}).items():
             uv[role] = {str(f): int(v) for f, v in per.items()}
     except (KeyError, TypeError, ValueError, AttributeError):
@@ -2927,7 +2936,9 @@ def undo_last(index: int = -1, acc=None) -> dict:
                     restored += len(chunk)
                     moved.extend(int(u) for u in chunk)
     finally:
-        role_drop("trash", trash, moved, acc)
+        role = role_of_folder(acc, trash) if trash else None
+        if role:
+            role_drop(role, trash, moved, acc)
         try:
             conn.logout()
         except Exception:
@@ -2955,9 +2966,12 @@ def undo_last(index: int = -1, acc=None) -> dict:
 ROLE_LABELS = {"trash": "Trash", "junk": "Junk"}
 
 
-def refresh_role_index(conn, role: str, folder: str, acc=None) -> list[dict]:
+def refresh_role_index(conn, role: str, folder: str,
+                       acc=None) -> tuple[int, list[dict]]:
     """Bring the `role` index up to date with `folder` on the server and
-    return the folder's mails as they are NOW: known UIDs get a flags-only
+    return `(uvalidity, mails)` of the folder as they are NOW, both from this
+    one refresh (never re-read from the cache, which a concurrent refresh
+    may have swapped meanwhile): known UIDs get a flags-only
     refresh, only new UIDs a header fetch, UIDs that vanished are dropped,
     a UIDVALIDITY change rebuilds. The returned list is built from this very
     listing - callers deriving a count / highest UID from it (Empty Trash)
@@ -2983,7 +2997,28 @@ def refresh_role_index(conn, role: str, folder: str, acc=None) -> list[dict]:
         acc.role_uv[role] = new_uv
     if changed:                  # persist only when something moved
         save_snapshot(acc)
-    return messages
+    return new_uv[folder], messages
+
+
+def role_state(role: str, folder: str, acc=None) -> tuple[int, list[dict]]:
+    """`(uvalidity, mails)` of a role index read under ONE lock hold, so the
+    pair always belongs together (cache as of the last refresh; no IMAP)."""
+    acc = acc or accounts.get()
+    with acc.lock:
+        return ((acc.role_uv.get(role) or {}).get(folder, 0),
+                list(acc.role_index.get(role, {}).values()))
+
+
+def role_of_folder(acc, folder: str) -> str | None:
+    """The indexed role a raw folder name currently stands for, if any."""
+    with acc.lock:
+        for role, per in acc.role_uv.items():
+            if folder in per:
+                return role
+        for role, f in acc.folder_roles.items():
+            if f == folder and role in ROLE_LABELS:
+                return role
+    return None
 
 
 def role_mails(role: str, acc=None) -> list[dict]:
@@ -3025,8 +3060,7 @@ def role_list(role: str, limit: int = 1000, acc=None) -> dict:
         folder = folder_roles(conn, acc).get(role)
         if not folder:
             raise RuntimeError(f"No {label} folder found on the server")
-        messages = refresh_role_index(conn, role, folder, acc)
-        uv = role_uvalidity(role, folder, acc)
+        uv, messages = refresh_role_index(conn, role, folder, acc)
     finally:
         try:
             conn.logout()

@@ -44,6 +44,10 @@ def env(monkeypatch):
     fake = FakeIMAP({"INBOX": [make_msg(1), make_msg(2, msgid="<k@a.example>")],
                      "Trash": _trash(3, 4, 5), "Sent": []})
     monkeypatch.setattr(mailops, "connect", lambda cfg, name=None: fake)
+    # restore starts a background rescan on the shared fake connection, which
+    # would race with the FETCH counting; no test here is about it
+    monkeypatch.setattr(mailops, "_rescan_after_restore",
+                        lambda *a, **k: False)
     return fake, Spy(fake)
 
 
@@ -97,7 +101,7 @@ def test_uidvalidity_change_rebuilds(env):
     assert sorted(spy.header_uids) == [3, 40] and spy.flag_uids == []
     assert r["uv"] == 7
     assert {m["uid"]: m["subject"] for m in r["mails"]}[3] == "Different mail"
-    assert mailops.accounts.get().role_uv["trash"] == {"Trash": 7}
+    assert accountsmod.get().role_uv["trash"] == {"Trash": 7}
 
 
 def test_vanished_uids_are_dropped(env):
@@ -145,15 +149,22 @@ def test_listing_equals_old_full_fetch(env):
 def test_main_scan_numbers_unchanged(env):
     fake, _ = env
     mailops.run_scan()
-    before = (dict(mailops.INDEX), mailops.index_stats(accountsmod.get()),
-              dict(mailops.FOLDER_UV))
-    mailops.trash_list()
     acc = accountsmod.get()
-    assert (dict(mailops.INDEX), mailops.index_stats(acc),
-            dict(mailops.FOLDER_UV)) == before
+
+    def numbers():
+        g = mailops.STATE["groups"]
+        return (dict(mailops.INDEX), mailops.index_stats(acc),
+                dict(mailops.FOLDER_UV),
+                {k: {a: (r["count"], r["size"], r["unread"])
+                     for a, r in recs.items()} for k, recs in g.items()})
+
+    before = numbers()
+    mailops.trash_list()
+    assert numbers() == before
     assert not any(m["folder"] == "Trash" for m in mailops.INDEX.values())
     assert "Trash" not in mailops.FOLDER_UV
     mailops.run_scan()                              # role index survives scans
+    assert numbers() == before
     assert {m["uid"] for m in mailops.role_mails("trash")} == {3, 4, 5}
     assert not any(m["folder"] == "Trash" for m in mailops.INDEX.values())
 
@@ -223,7 +234,7 @@ def test_malformed_role_index_does_not_cost_the_main_snapshot(env):
     accountsmod.reset()
     acc2 = accountsmod.get()
     assert mailops.load_snapshot(acc2) is True
-    assert len(acc2.index) == 2 and acc2.role_index == {}
+    assert len(acc2.index) == 2 and not any(acc2.role_index.values())
 
 
 def test_open_with_no_change_does_not_rewrite_the_snapshot(env):
@@ -296,3 +307,127 @@ def test_role_accessors_are_generic(env):
     assert mailops.role_uvalidity("junk", "Spam") == 0
     mailops.role_drop("junk", "Spam", [1, 2])       # no-op, no error
     assert acc.role_index.get("junk", {}) == {}
+
+
+# ------------------------------------------------ safety / failure paths
+
+def test_returned_uv_belongs_to_its_own_listing(env):
+    """Two concurrent opens: the uv sent back with a listing must be the one
+    that very refresh read, not whatever the cache holds by then."""
+    fake, _ = env
+    orig = fake.uid
+    inner = {}
+
+    def uid(cmd, *args):
+        if cmd == "FETCH" and "done" not in inner:
+            inner["done"] = True
+            fake.uv["Trash"] = 2                   # a second tab, new generation
+            fake.mailbox["Trash"] = _trash(60, 61)
+            inner["b"] = mailops.trash_list()
+            fake.uv["Trash"] = 1
+        return orig(cmd, *args)
+    fake.uid = uid
+    a = mailops.trash_list()
+    assert inner["b"]["uv"] == 2 and inner["b"]["max_uid"] == 61
+    assert a["uv"] == 1                            # A read uv 1 itself
+    assert accountsmod.get().role_uv["trash"] == {"Trash": 1}
+
+
+def test_role_state_is_one_consistent_pair(env):
+    fake, _ = env
+    mailops.trash_list()
+    uv, mails = mailops.role_state("trash", "Trash")
+    assert uv == 1 and {m["uid"] for m in mails} == {3, 4, 5}
+    assert mailops.role_state("junk", "Spam") == (0, [])
+
+
+def test_role_of_folder_is_generic(env):
+    acc = accountsmod.get()
+    mailops.trash_list()
+    assert mailops.role_of_folder(acc, "Trash") == "trash"
+    assert mailops.role_of_folder(acc, "INBOX") is None
+
+
+def test_aborted_refresh_leaves_cache_and_uv_untouched(env):
+    fake, _ = env
+    mailops.trash_list()
+    acc = accountsmod.get()
+    snap = ({k: dict(v) for k, v in acc.role_index["trash"].items()},
+            dict(acc.role_uv["trash"]))
+    fake.uv["Trash"] = 5                           # would rebuild ...
+    orig = fake.uid
+
+    def boom(cmd, *a):
+        if cmd == "FETCH":
+            raise OSError("connection reset")      # ... but dies midway
+        return orig(cmd, *a)
+    fake.uid = boom
+    with pytest.raises(OSError):
+        mailops.trash_list()
+    assert (acc.role_index["trash"], acc.role_uv["trash"]) == snap
+
+
+def test_failed_flags_fetch_keeps_cached_records(env):
+    fake, _ = env
+    mailops.trash_list()
+    orig = fake.uid
+
+    def uid(cmd, *a):
+        if cmd == "FETCH" and a[1] == "(UID FLAGS)":
+            return "NO", [b""]
+        return orig(cmd, *a)
+    fake.uid = uid
+    r = mailops.trash_list()
+    assert r["total"] == 3 and r["max_uid"] == 5
+    assert {m["uid"] for m in mailops.role_mails("trash")} == {3, 4, 5}
+
+
+def test_failed_search_lists_nothing_and_empty_does_nothing(env):
+    fake, _ = env
+    mailops.trash_list()
+    orig = fake.uid
+
+    def uid(cmd, *a):
+        if cmd == "SEARCH" and a[-1] == "ALL" and fake.selected == "Trash":
+            return "NO", [b""]
+        return orig(cmd, *a)
+    fake.uid = uid
+    r = mailops.trash_list()
+    assert r["total"] == 0 and r["max_uid"] == 0
+    assert mailops.empty_trash(uv=r["uv"], max_uid=r["max_uid"]) \
+        == {"deleted": 0}
+    assert [m["uid"] for m in fake.mailbox["Trash"]] == [3, 4, 5]
+
+
+def test_partial_restore_failure_keeps_the_index_consistent(env, monkeypatch):
+    fake, _ = env
+    monkeypatch.setattr(mailops, "MOVE_CHUNK", 1)
+    r = mailops.trash_list()
+    orig = fake.uid
+
+    def uid(cmd, *a):
+        if cmd == "MOVE" and a[0] == "4":
+            return "NO", [b""]
+        return orig(cmd, *a)
+    fake.uid = uid
+    res = mailops.trash_restore([3, 4, 5], "INBOX", uv=r["uv"])
+    assert res["restored"] == 2
+    assert [m["uid"] for m in fake.mailbox["Trash"]] == [4]
+    assert {m["uid"] for m in mailops.role_mails("trash")} == {4}
+
+
+def test_incomplete_role_record_is_dropped_by_the_loader(env):
+    mailops.run_scan()
+    mailops.trash_list()
+    acc = accountsmod.get()
+    path = mailops._snap_path(acc.name)
+    data = json.loads(path.read_text())
+    del data["role_index"]["trash"][0]["ts"]       # has folder + uid only
+    gone = data["role_index"]["trash"][0]["uid"]
+    path.write_text(json.dumps(data))
+    accountsmod.reset()
+    acc2 = accountsmod.get()
+    assert mailops.load_snapshot(acc2) is True
+    assert gone not in {m["uid"] for m in mailops.role_mails("trash", acc2)}
+    r = mailops.trash_list(acc=acc2)               # sorts fine, refetches it
+    assert r["total"] == 3
