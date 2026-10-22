@@ -1206,6 +1206,28 @@ def test_copyuid_pointing_below_the_old_highest_trash_uid_stops(monkeypatch):
     assert _uids(fake, "Spam") == []
 
 
+def test_copyuid_naming_a_foreign_mail_above_pre_max_is_not_deleted(
+        monkeypatch):
+    """The range check passes (the named UID is above the old highest Trash
+    UID) but the mail there is a FOREIGN arrival whose Message-ID is not the
+    moved mail's: the Message-ID check alone stops it - nothing permanent,
+    the foreign mail is untouched."""
+    fake = _junk_via(monkeypatch, True)          # Trash holds 8, 9
+    c = _count("junk", uids=[3])
+    _after_move(fake, lambda: fake.mailbox["Trash"].append(
+        make_msg(500, subject="Foreign", msgid="<foreign@x.example>")))
+    orig = fake.response
+    fake.response = lambda key: ((key, [b"1 3 500"]) if key == "COPYUID"
+                                 else orig(key))
+    spy = Spy(fake)
+    res = mailops.purge_mails("junk", c["uids"], c["uv"], **_at(c))
+    assert res["deleted"] == 0 and res["unverified"] == 1
+    assert not [c_ for c_ in spy.calls if c_[:2] == ("uid", "EXPUNGE")]
+    assert 500 in _uids(fake, "Trash")           # the foreign mail survives
+    assert {10, 500} <= set(_uids(fake, "Trash"))  # and the real copy too
+    assert _uids(fake, "Spam") == [4, 5]
+
+
 def test_stopped_after_the_move_returns_the_undo_entry(monkeypatch):
     fake = _junk_via(monkeypatch, False)
     c = _count("junk", everything=True)

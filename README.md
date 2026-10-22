@@ -224,8 +224,9 @@ presets.
 - **Delete permanently (Trash and Junk)** - in the Folders panel, select
   mails or a sender, delete everything received more than N days ago, or
   use "Empty Junk…". The count is read live from the server, the confirm
-  shows it (plus the protected senders and pinned mails that are skipped -
-  they are never deleted) and only exactly those mails are deleted, on the
+  shows it (plus the mails from protected senders and the protected mails
+  that are skipped - they are never deleted; remove the protection first
+  to delete them) and only exactly those mails are deleted, on the
   server, irreversibly. Junk mails go through Trash first. Refused while
   Trash/Junk is ambiguous and not confirmed in Settings. Nothing is ever
   deleted without your click and the confirm.
