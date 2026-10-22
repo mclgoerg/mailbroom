@@ -35,6 +35,7 @@ def _initial_state() -> dict:
         "unsub": {"status": "idle", "progress": "", "error": "", "total": 0,
                   "done": 0, "links": 0, "failed": 0, "skipped": 0},
         "trash_count": None,   # mails currently in Trash (None = unknown)
+        "junk_count": None,    # same for Junk (header chip)
         "notice": None,        # one-shot info for the UI: {key, params}|None
         "scanned_ts": None,    # when the current groups were scanned
         "groups_rev": 1,       # bumped whenever groups/index change - SSE

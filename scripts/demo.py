@@ -276,8 +276,20 @@ PROTON = FakeIMAP({
              "<anna.weber@mailfox.example>:\n> Hi! Hast du am Samstag Zeit "
              "für eine Wanderung?")],
     "Trash": mails('"Old Newsletter" <bye@gone.example>',
-                   ["We miss you!"], 34, unread=0.9),
-    "Spam": [],
+                   ["We miss you!"], 34, unread=0.9)
+    + mails('"Bergsport Huber" <newsletter@bergsport-huber.example>',
+            ["Alte Aktion {n}"], 22, unread=0.2)
+    + mails('"Ticket Shop" <orders@ticketshop.example>',
+            ["Your order {n}", "Cancelled: {n}"], 14, unread=0.1),
+    # Junk: a few invented senders, one of them a false alarm to rescue
+    "Spam": mails('"Prize Desk" <win@prize-desk.example>',
+                  ["You have won {n}", "Claim now"], 6, newest_days=0.5,
+                  span_days=20, unread=0.9)
+    + mails('"Cheap Meds" <offers@pharma-deals.example>',
+            ["Limited offer {n}"], 4, newest_days=1.5, span_days=25,
+            unread=0.9)
+    + mails('"Anna Weber" <anna.weber@mailfox.example>',
+            ["Fwd: Wanderkarte"], 1, newest_days=2, unread=1.0),
     "Archive": [],
     "Drafts": [],
 })

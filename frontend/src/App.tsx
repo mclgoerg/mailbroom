@@ -1,7 +1,7 @@
 import { BarChart3, BookmarkPlus, ChevronDown, ClipboardList,
   Copy, Download, Info, Mail, Moon, Paperclip, Pencil, Plus,
   Power,
-  ScrollText, Search, Settings as SettingsIcon, Sparkles, Star, Sun,
+  ScrollText, Search, Settings as SettingsIcon, ShieldAlert, Sparkles, Star, Sun,
   Trash2, User, Wand2, Wrench, X }
   from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -20,7 +20,7 @@ import { SearchPanel } from "./components/SearchPanel";
 import { SettingsModal } from "./components/SettingsModal";
 import { StatsPanel } from "./components/StatsPanel";
 import { QueryBuilder } from "./components/QueryBuilder";
-import { TrashPanel } from "./components/TrashPanel";
+import { FoldersPanel } from "./components/FoldersPanel";
 import { AccountAvatar, applyTheme, BAR_ICON_BTN, BulkBar, Button, Chip, ChipGroup, ChipSegment,
   choiceDialog, confirmDialog, currentTheme, EmptyState, ensureAiAck, FILTER_ROW, Input, isModalOpen, LINK,
   LINK_ACCENT, Menu, MenuDivider, MenuHeading, MenuItem, Notice, ProgressBar,
@@ -36,7 +36,7 @@ import { SenderFiling } from "./components/SenderFiling";
 import type { FileEntry, SenderAction } from "./components/SenderList";
 import type { AppState, AuthProbe, Config, FilterPreset, Group, Grouping,
   KnowledgeStored,
-  StatusMsg, TrashResp } from "./types";
+  StatusMsg, TrashResp, FolderRole } from "./types";
 
 const GROUPING_LABEL: Record<Grouping, string> = {
   sender: "Sender", smart: "Smart", domain: "Domain", subject: "Subject",
@@ -142,7 +142,8 @@ export default function App() {
   const [dupsOpen, setDupsOpen] = useState(false);
   const [statsOpen, setStatsOpen] = useState(false);
   const [auditOpen, setAuditOpen] = useState(false);
-  const [trashOpen, setTrashOpen] = useState(false);
+  // Folders panel (Junk | Trash): which folder it opens on, null = closed
+  const [foldersOpen, setFoldersOpen] = useState<FolderRole | null>(null);
   const [undoOpen, setUndoOpen] = useState(false);
   const [moveDest, setMoveDest] = useState("");
   // The folder picker must never be a dead end: clearing the selection
@@ -343,7 +344,7 @@ export default function App() {
       notify(t("err.generic", { msg: state.error }), "error");
     if (!prev) return;
     const fresh = staleDel ? []
-      : state.undo.filter((u) => !prev.undo.includes(undoId(u)));
+      : state.undo.filter((u) => !u.quiet && !prev.undo.includes(undoId(u)));
     const newJob = del.seq != null && prev.seq != null && del.seq > prev.seq;
     if (!staleDel && del.status !== "running" && (fresh.length || newJob
         || (del.seq == null && del.status !== prev.d))) {
@@ -649,7 +650,7 @@ export default function App() {
   }, [state?.groups_rev]);
   useEffect(() => { prevGroups.current = groups; });
   const anyModal = (!!detail && !splitPane) || searchOpen || settingsOpen || rulesOpen
-    || attsOpen || dupsOpen || statsOpen || auditOpen || trashOpen;
+    || attsOpen || dupsOpen || statsOpen || auditOpen || !!foldersOpen;
 
   const startScan = async () => {
     setSelected(new Set());
@@ -755,6 +756,16 @@ export default function App() {
     try { await api.undo(index); refresh(); }
     catch (e: any) { fail(e, "err.undo"); }
     setPending("");
+  };
+
+  // Undo of a move the Folders panel made (it toasts by itself): by identity,
+  // after a refresh when the list has not caught up yet.
+  const undoEntry = async (e: { ts: number; count: number; label: string }) => {
+    const find = () => stateRef.current?.undo
+      .findIndex((u) => undoId(u) === undoId(e)) ?? -1;
+    if (find() < 0) await refresh();
+    const i = find();
+    if (i >= 0) undo(i);
   };
 
   // Shared by the profile menu and the Trash panel; resolves whether the
@@ -1404,13 +1415,23 @@ export default function App() {
           Mailbroom
         </h1>
         <span className="ml-auto flex items-center gap-2">
+          {state?.junk_count != null && state.junk_count > 0 && (
+            <Button variant="quiet" size="sm"
+              className="inline-flex items-center gap-1 whitespace-nowrap
+                text-muted hover:text-body"
+              title={t("junk.browse")}
+              aria-label={t("junk.open_label", { n: state.junk_count })}
+              onClick={() => setFoldersOpen("junk")}>
+              <ShieldAlert size={14} /> {state.junk_count}
+            </Button>
+          )}
           {state?.trash_count != null && state.trash_count > 0 && (
             <Button variant="quiet" size="sm"
               className="inline-flex items-center gap-1 whitespace-nowrap
                 text-muted hover:text-body"
               title={t("trash.browse")}
               aria-label={t("trash.open_label", { n: state.trash_count })}
-              onClick={() => setTrashOpen(true)}>
+              onClick={() => setFoldersOpen("trash")}>
               <Trash2 size={14} /> {state.trash_count}
             </Button>
           )}
@@ -1559,6 +1580,10 @@ export default function App() {
               onClick={() => setDupsOpen(true)}>
               <Copy size={16} className="mr-1 inline align-text-bottom" />
               {t("Duplicates")}
+            </MenuItem>
+            <MenuItem onClick={() => setFoldersOpen("junk")}>
+              <ShieldAlert size={16} className="mr-1 inline align-text-bottom" />
+              {t("fp.menu")}
             </MenuItem>
             <MenuItem onClick={() => setStatsOpen(true)}>
               <BarChart3 size={16} className="mr-1 inline align-text-bottom" />
@@ -2014,12 +2039,15 @@ export default function App() {
         <AuditLogPanel rules={state?.rules ?? []}
           onClose={() => setAuditOpen(false)} />
       )}
-      {trashOpen && state && (
-        <TrashPanel
+      {foldersOpen && state && (
+        <FoldersPanel
           state={state}
-          onClose={() => { setTrashOpen(false); refresh(); }}
+          initialRole={foldersOpen}
+          onClose={() => { setFoldersOpen(null); refresh(); }}
           onChanged={refresh}
           onEmptyTrash={emptyTrash}
+          onUndo={undoEntry}
+          onProtect={protectSenders}
         />
       )}
       {dupsOpen && (

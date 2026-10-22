@@ -1119,6 +1119,47 @@ def post_trash_restore(body: TrashRestoreBody,
         raise HTTPException(500, f"{type(exc).__name__}: {exc}")
 
 
+class FolderMoveBody(BaseModel):
+    role: str = "junk"
+    action: str                      # not_junk | trash
+    uids: list[int] = Field(min_length=1)
+    uv: int = 0                      # UIDVALIDITY of the listing the UI saw
+    force: bool = False              # trash protected / pinned mails anyway
+
+
+@app.get("/api/folders_panel")
+def get_folders_panel(role: str = Query("trash"),
+                      account: str | None = Query(None)):
+    """Listing of a managed special folder (junk | trash) through its role
+    index: mails, `senders` (sender grouping), counted uv / max_uid."""
+    if role not in mailops.ROLE_COUNTED:
+        raise HTTPException(400, "bad role")
+    acc = _acc(account)
+    try:
+        return mailops.role_list(role, acc=acc)
+    except RuntimeError as exc:
+        raise HTTPException(409, str(exc))
+    except Exception as exc:
+        raise HTTPException(500, f"{type(exc).__name__}: {exc}")
+
+
+@app.post("/api/folders_panel/move")
+def post_folders_panel_move(body: FolderMoveBody,
+                            account: str | None = Query(None)):
+    """Reversible moves out of a special folder (Junk: Not junk -> Inbox,
+    Move to Trash). Exact UIDs, UIDVALIDITY-checked, undoable."""
+    acc = _acc(account)
+    try:
+        return mailops.role_move(body.role, body.action, body.uids,
+                                 body.uv, body.force, acc)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc))
+    except RuntimeError as exc:
+        raise HTTPException(409, str(exc))
+    except Exception as exc:
+        raise HTTPException(500, f"{type(exc).__name__}: {exc}")
+
+
 class EmptyTrashBody(BaseModel):
     uv: int = 0           # UIDVALIDITY of the Trash the count was read from
     max_uid: int = 0      # highest UID the confirm counted (0 = count was 0)
