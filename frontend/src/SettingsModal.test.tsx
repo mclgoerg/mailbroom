@@ -64,6 +64,7 @@ const render = (ui: ReactElement) =>
   rtlRender(<ToastProvider>{ui}</ToastProvider>);
 import { cancelDialog, expectNoDialog, findDialog, pressDialog }
   from "./dialogTestUtils";
+import { setLang } from "./i18n";
 import type { Config } from "./types";
 
 const acct = {
@@ -104,6 +105,7 @@ const cfg: Config = {
 
 afterEach(() => {
   cleanup();
+  setLang("en");
   testDigestCalls.length = 0;
   testDigestResult = { sent: true, demo: false };
 });
@@ -326,6 +328,28 @@ test("deleting an account names it in a danger dialog; Cancel keeps it",
     expect(saveCalls).toEqual([]);
     fireEvent.click(screen.getByText('Delete account "default"…'));
     await pressDialog("Delete account");
+    await waitFor(() => expect(saveCalls).toEqual(
+      [{ delete_account: "default" }]));
+  });
+
+test("the German delete-account confirm tells the same truth: mail rules stay, purge rules go",
+  async () => {
+    setLang("de");
+    saveCalls.length = 0;
+    renderWithDialogs();
+    fireEvent.click(screen.getByText('Konto "default" löschen…'));
+    const dlg = await findDialog();
+    expect(dlg.textContent).toContain('Konto "default" löschen');
+    expect(dlg.textContent).toContain("Mails auf dem Server bleiben unangetastet.");
+    // ties the German text to the backend (`rules.drop_account`): mail rules
+    // keep the account name but stop running, only the account's Junk /
+    // Trash purge rules are deleted with it
+    expect(dlg.textContent).toContain(
+      "Seine Mail-Regeln behalten den Kontonamen, laufen aber nicht mehr; "
+      + "seine Lösch-Regeln für Spam und Papierkorb werden gelöscht.");
+    // the English wording must not leak into the German dialog
+    expect(dlg.textContent).not.toContain("purge rules");
+    await pressDialog("Konto löschen");
     await waitFor(() => expect(saveCalls).toEqual(
       [{ delete_account: "default" }]));
   });
