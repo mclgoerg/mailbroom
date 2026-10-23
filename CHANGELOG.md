@@ -1,5 +1,34 @@
 # Changelog
 
+## [1.9.0](https://github.com/mclgoerg/mailbroom/compare/v1.8.0...v1.9.0) (2026-10-23)
+
+
+### Features
+
+* delete mails in Trash and Junk permanently ([#139](https://github.com/mclgoerg/mailbroom/issues/139)) ([f5d6829](https://github.com/mclgoerg/mailbroom/commit/f5d682916f81dbd27c7f6ce51fb6ef9893c72bd6))
+* Junk and Trash in one Folders panel ([#138](https://github.com/mclgoerg/mailbroom/issues/138)) ([0e63cfa](https://github.com/mclgoerg/mailbroom/commit/0e63cfad178fe2e57105d0ee103aa9e8aee49638))
+* purge rules for Trash and Junk ([#140](https://github.com/mclgoerg/mailbroom/issues/140)) ([61470f9](https://github.com/mclgoerg/mailbroom/commit/61470f99b5477e03d459ab12d43b1b78c59cf63a))
+* Settings shows special folders by name and lets you choose between look-alikes ([#137](https://github.com/mclgoerg/mailbroom/issues/137)) ([df5bd5c](https://github.com/mclgoerg/mailbroom/commit/df5bd5cf3191e81af0bb8e31049f341abe53d0de))
+
+
+### Bug Fixes
+
+* count a Gmail mail once even when it has several labels ([#134](https://github.com/mclgoerg/mailbroom/issues/134)) ([0991254](https://github.com/mclgoerg/mailbroom/commit/09912544bef2fb26c703e850a0a06d8d006a7ac8))
+* Empty Trash only deletes the mails it counted ([#132](https://github.com/mclgoerg/mailbroom/issues/132)) ([194c828](https://github.com/mclgoerg/mailbroom/commit/194c828b5de0851e42c1731c65894f5172b506d4))
+* focus confirm and prompt dialogs in the same commit that opens them ([#147](https://github.com/mclgoerg/mailbroom/issues/147)) ([8106d54](https://github.com/mclgoerg/mailbroom/commit/8106d54475b422d36768ae9d25f1f53befb5e159))
+* keep INBOX subfolders directly under INBOX in the Settings folder list ([#141](https://github.com/mclgoerg/mailbroom/issues/141)) ([ef038ae](https://github.com/mclgoerg/mailbroom/commit/ef038aefbe02dd23d9b474e8b28a0d24a87a3999))
+* make the segments of the Folders panel toggles equally wide ([#142](https://github.com/mclgoerg/mailbroom/issues/142)) ([fb81f2e](https://github.com/mclgoerg/mailbroom/commit/fb81f2e36ed70b1b1e48592f7fab482e40f7413a))
+* neutralise spreadsheet formulas in CSV exports ([#146](https://github.com/mclgoerg/mailbroom/issues/146)) ([79b23e2](https://github.com/mclgoerg/mailbroom/commit/79b23e2132278caab938df100d4179cb60aac1f0))
+* never scan Gmail's Starred and Important views as extra copies ([#131](https://github.com/mclgoerg/mailbroom/issues/131)) ([47a0ec7](https://github.com/mclgoerg/mailbroom/commit/47a0ec7fa54bccae7ee772baa57e865fd53ad994))
+* recognise more special folders and pick one when two look alike ([#135](https://github.com/mclgoerg/mailbroom/issues/135)) ([4eb55f7](https://github.com/mclgoerg/mailbroom/commit/4eb55f7612d8651cfdba82cddd3e27e5d9cb32ff))
+* show the errors of the folder features in the user's language ([#145](https://github.com/mclgoerg/mailbroom/issues/145)) ([3a39803](https://github.com/mclgoerg/mailbroom/commit/3a39803a0ad9f9c2c4ee74fae7397d06769b1294))
+* show the purge-rule warning in a danger tone ([#143](https://github.com/mclgoerg/mailbroom/issues/143)) ([8b95128](https://github.com/mclgoerg/mailbroom/commit/8b951287be866c27cd48238cfbb960c98a932e4c))
+
+
+### Performance Improvements
+
+* keep an incremental index of Trash instead of refetching it on every open ([#136](https://github.com/mclgoerg/mailbroom/issues/136)) ([7d2d97c](https://github.com/mclgoerg/mailbroom/commit/7d2d97ca717740167498b2748850581ec48f170a))
+
 ## [1.8.0](https://github.com/mclgoerg/mailbroom/compare/v1.7.0...v1.8.0) (2026-10-21)
 
 
