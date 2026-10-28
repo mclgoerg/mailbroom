@@ -6,28 +6,77 @@
 ### Features
 
 * delete mails in Trash and Junk permanently ([#139](https://github.com/mclgoerg/mailbroom/issues/139)) ([f5d6829](https://github.com/mclgoerg/mailbroom/commit/f5d682916f81dbd27c7f6ce51fb6ef9893c72bd6))
+  <!-- release-notes:139 -->
+  - New: delete mails in Trash and Junk permanently from the Folders panel - selected mails, one sender, everything received more than N days ago, or "Empty Junk". The count is read live from the server and shown in a confirm that also lists skipped mails from protected senders and protected mails (they are never deleted; remove the protection first to delete them). Junk mails go through Trash first. Irreversible; refused while Trash/Junk is ambiguous and not confirmed in Settings.
+  - **The "freed" number changes meaning**: it now counts permanent deletes only (Empty Trash, Junk/Trash deletes), in the Statistics panel, the admin usage table and the digest email. Moving mail to Trash no longer counts as freed. "Freed" only counts permanent deletions from this version on; earlier months show no figure. The digest email gains a "Permanently deleted" line.
 * Junk and Trash in one Folders panel ([#138](https://github.com/mclgoerg/mailbroom/issues/138)) ([0e63cfa](https://github.com/mclgoerg/mailbroom/commit/0e63cfad178fe2e57105d0ee103aa9e8aee49638))
+  <!-- release-notes:138 -->
+  - New Folders panel: browse Junk and Trash side by side, grouped by sender, from a Junk count chip in the header or Tools > Junk & Trash.
+  - "Not junk" moves false alarms back to your inbox (undoable) and offers to protect the sender; Junk mails can also be moved to Trash.
+  - Nothing is deleted permanently from Junk.
 * purge rules for Trash and Junk ([#140](https://github.com/mclgoerg/mailbroom/issues/140)) ([61470f9](https://github.com/mclgoerg/mailbroom/commit/61470f99b5477e03d459ab12d43b1b78c59cf63a))
+  <!-- release-notes:140 -->
+  - New, opt-in: purge rules for Junk and Trash (Rules -> "Applies to"). A rule deletes mail older than N days (default 30, weekly) **permanently, on the server**.
+  - Nothing creates one for you; a new rule only reports what it would delete until you run a report and switch it to execute behind a confirm. Editing its folder, filter or age switches it back to report, and so do renaming its account, changing the account's server or login, or the Junk/Trash folder resolving to another folder (also a folder deleted and re-created).
+  - Protected senders and protected mails are never touched; each run is capped (the confirm names the cap). An empty filter means all senders in that folder.
+  - Deleting an account deletes its Junk/Trash purge rules; its ordinary mail rules stay and stop running, as before (the delete confirm says so).
+  - Fix: rules created while another account was shown were saved for, and ran on, the default account. Check the default account's Rules for any that belong elsewhere (existing misfiled rules are not moved).
+  - Upgrade caveat: existing rules are unchanged. If you roll back to an older version, a purge rule is rejected as an unknown action instead of running.
 * Settings shows special folders by name and lets you choose between look-alikes ([#137](https://github.com/mclgoerg/mailbroom/issues/137)) ([df5bd5c](https://github.com/mclgoerg/mailbroom/commit/df5bd5cf3191e81af0bb8e31049f341abe53d0de))
+  <!-- release-notes:137 -->
+  - Settings > Folders now lists special folders (Trash, Junk, Sent, Drafts, Archive, All mail) by their translated names and shows how each was found; subfolders are indented.
+  - If two folders could be your Trash or Junk, you can pick the right one; empty-Trash and other permanent actions use exactly that folder.
+  - A folder that looks like a second Trash/Junk/Sent/Drafts can have its mail moved into the real folder in one step (undoable).
 
 
 ### Bug Fixes
 
 * count a Gmail mail once even when it has several labels ([#134](https://github.com/mclgoerg/mailbroom/issues/134)) ([0991254](https://github.com/mclgoerg/mailbroom/commit/09912544bef2fb26c703e850a0a06d8d006a7ac8))
+  <!-- release-notes:134 -->
+  - Gmail: a mail that carries several labels is now counted once (the INBOX copy is preferred), and the Duplicates panel no longer lists label copies as duplicates.
+  - Counts on Gmail drop to the real number after the next scan; the first scan also adds one cheap request per folder to learn Gmail's message ids.
+  - Other mail providers are unaffected.
 * Empty Trash only deletes the mails it counted ([#132](https://github.com/mclgoerg/mailbroom/issues/132)) ([194c828](https://github.com/mclgoerg/mailbroom/commit/194c828b5de0851e42c1731c65894f5172b506d4))
+  <!-- release-notes:132 -->
+  - Empty Trash now deletes only the mails that were counted in the confirmation; a mail that arrives in Trash meanwhile is kept.
+  - It refuses if the server renumbered the Trash folder, and a failed Empty Trash no longer wipes the undo history (after a successful one, only the undo entries of the deleted mails go).
 * focus confirm and prompt dialogs in the same commit that opens them ([#147](https://github.com/mclgoerg/mailbroom/issues/147)) ([8106d54](https://github.com/mclgoerg/mailbroom/commit/8106d54475b422d36768ae9d25f1f53befb5e159))
 * keep INBOX subfolders directly under INBOX in the Settings folder list ([#141](https://github.com/mclgoerg/mailbroom/issues/141)) ([ef038ae](https://github.com/mclgoerg/mailbroom/commit/ef038aefbe02dd23d9b474e8b28a0d24a87a3999))
+  <!-- release-notes:141 -->
+  - Settings > Folders: folders that live inside INBOX are now listed directly under INBOX (they used to appear under the next folder in the list, e.g. the archive). Only the display changed; which folders are scanned is unchanged.
 * make the segments of the Folders panel toggles equally wide ([#142](https://github.com/mclgoerg/mailbroom/issues/142)) ([fb81f2e](https://github.com/mclgoerg/mailbroom/commit/fb81f2e36ed70b1b1e48592f7fab482e40f7413a))
+  <!-- release-notes:142 -->
+  - Folders panel: the Junk | Trash switch and the By sender | Mails switch now have equally wide segments.
 * neutralise spreadsheet formulas in CSV exports ([#146](https://github.com/mclgoerg/mailbroom/issues/146)) ([79b23e2](https://github.com/mclgoerg/mailbroom/commit/79b23e2132278caab938df100d4179cb60aac1f0))
+  <!-- release-notes:146 -->
+  - CSV exports (audit log and group list) no longer run spreadsheet formulas: a text cell that starts with `=`, `+`, `-`, `@`, a tab or a carriage return now gets a leading apostrophe, so Excel, LibreOffice and Sheets show it as text.
+  - Numbers, dates and ordinary text are unchanged; text that merely starts with one of those characters (for example `+1 555...`, `@handle` or `- Newsletter`) now shows a leading apostrophe in the spreadsheet.
 * never scan Gmail's Starred and Important views as extra copies ([#131](https://github.com/mclgoerg/mailbroom/issues/131)) ([47a0ec7](https://github.com/mclgoerg/mailbroom/commit/47a0ec7fa54bccae7ee772baa57e865fd53ad994))
+  <!-- release-notes:131 -->
+  - Gmail's Starred and Important views are no longer scanned as extra copies of your mail.
+  - Gmail counts drop to the real number after the next scan.
+  - Proton Bridge's Starred folder (also a flagged view) is no longer scanned either; it was already excluded by name, so counts there only change if it had been ticked.
 * recognise more special folders and pick one when two look alike ([#135](https://github.com/mclgoerg/mailbroom/issues/135)) ([4eb55f7](https://github.com/mclgoerg/mailbroom/commit/4eb55f7612d8651cfdba82cddd3e27e5d9cb32ff))
+  <!-- release-notes:135 -->
+  - Folders that look like a second Trash, Junk or Sent (for example a mail client's "Gelöschte Elemente" or "Junk-E-Mail" next to the server's own Trash and Junk) are no longer scanned, so their mail no longer shows up as cleanup candidates. This also applies if you had ticked them in Settings. Counts may drop after the next scan.
+  - Empty Trash is refused while two folders look like Trash and none is confirmed (it says "Trash is ambiguous - choose it in Settings first"); moving mail to Trash keeps using the automatic pick.
+  - Special folders are recognised in more cases (INBOX-prefixed names, more German and Outlook names, Gmail's older attributes); a folder that is now recognised as Trash, Junk, Sent, Drafts or All Mail also stops being scanned.
 * show the errors of the folder features in the user's language ([#145](https://github.com/mclgoerg/mailbroom/issues/145)) ([3a39803](https://github.com/mclgoerg/mailbroom/commit/3a39803a0ad9f9c2c4ee74fae7397d06769b1294))
+  <!-- release-notes:145 -->
+  - The errors of the folder features (Empty Trash, permanent delete, moving mails in the Folders panel, look-alike folders, Undo, Junk / Trash purge rules) now appear in the interface language instead of English - including on a rule's last-run line.
+  - The Undo list and the restore confirmation word "2 mails from Junk" in your language (and "1 mail", not "1 mails").
+  - Nothing changes in what is refused or when.
 * show the purge-rule warning in a danger tone ([#143](https://github.com/mclgoerg/mailbroom/issues/143)) ([8b95128](https://github.com/mclgoerg/mailbroom/commit/8b951287be866c27cd48238cfbb960c98a932e4c))
+  <!-- release-notes:143 -->
+  - Rules: the "deletes mail on the server, permanently" warning for Junk / Trash rules is now shown in red so it cannot be mistaken for a plain hint.
 
 
 ### Performance Improvements
 
 * keep an incremental index of Trash instead of refetching it on every open ([#136](https://github.com/mclgoerg/mailbroom/issues/136)) ([7d2d97c](https://github.com/mclgoerg/mailbroom/commit/7d2d97ca717740167498b2748850581ec48f170a))
+  <!-- release-notes:136 -->
+  - Opening the Trash panel is much faster on big Trash folders: only mail that arrived since the last open is fetched.
+  - The first Trash open after the upgrade fetches the whole folder once.
 
 ## [1.8.0](https://github.com/mclgoerg/mailbroom/compare/v1.7.0...v1.8.0) (2026-10-21)
 
