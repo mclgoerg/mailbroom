@@ -6,6 +6,7 @@ from __future__ import annotations
 import imaplib
 import re
 import sys
+import time
 from pathlib import Path
 
 import pytest
@@ -93,10 +94,20 @@ def code_re(code: str, **params) -> str:
     return re.escape(mailops.coded(code, **params))
 
 
+# The default mail date is "a few days old" relative to the run, computed
+# once so every default mail shares one timestamp. A hardcoded date ages
+# out of the product's windows (30-day retention cutoffs, the engagement
+# recency fade) and turns the suite red on its own. Tests that need the
+# month/year of these mails derive them from DEFAULT_MAIL_TS.
+DEFAULT_MAIL_TS = int(time.time()) - 3 * 86400
+DEFAULT_MAIL_DATE = time.strftime(
+    "%d-%b-%Y %H:%M:%S +0000", time.gmtime(DEFAULT_MAIL_TS))
+
+
 def make_msg(uid, frm='"Shop News" <news@shop.example>',
              subject="Big Sale 42", unsub=None, unsub_post=False,
              msgid=None, size=1000, seen=False,
-             date="26-Sep-2026 12:00:00 +0000", to=None, cc=None,
+             date=DEFAULT_MAIL_DATE, to=None, cc=None,
              atts=None, body=None, irt=None, refs=None):
     return {"uid": uid, "body": body, "irt": irt, "refs": refs, "from": frm, "subject": subject, "unsub": unsub,
             "unsub_post": unsub_post,
