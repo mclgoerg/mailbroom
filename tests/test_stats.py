@@ -7,7 +7,7 @@ from fastapi.testclient import TestClient
 from backend import mailops
 from backend import stats as statsmod
 from backend.main import app
-from conftest import wait_delete_done
+from conftest import DEFAULT_MAIL_TS, wait_delete_done
 
 client = TestClient(app)
 
@@ -55,7 +55,9 @@ def test_stats_endpoint_shape(bridge):
     mailops.run_scan()
     st = client.get("/api/stats").json()
     assert st["mails"] == 5
-    assert any(y["year"] == "2026" for y in st["years"])
+    default_day = time.localtime(DEFAULT_MAIL_TS)     # default fixture mails
+    assert any(y["year"] == time.strftime("%Y", default_day)
+               for y in st["years"])
     assert st["top_domains"][0]["domain"] == "shop.example"   # 30000 bytes
     assert len(st["scans"]) == 1
     assert isinstance(st["actions"], dict)
@@ -66,7 +68,8 @@ def test_stats_endpoint_shape(bridge):
     assert st["senders"] == 3
     assert st["replied_senders"] == 1            # alice (Sent To/Cc)
     assert st["oldest"] == "2025-01-01"          # the Archive DHL mail
-    assert st["months"] and st["months"][-1]["month"] == "2026-09"
+    assert st["months"] and st["months"][-1]["month"] \
+        == time.strftime("%Y-%m", default_day)
     assert st["top_senders"][0]["key"] == "noreply@dhl.example"
     assert st["top_senders"][0]["count"] == 3
     cats = {c["tag"]: c for c in st["categories"]}
