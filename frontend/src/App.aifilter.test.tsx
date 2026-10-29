@@ -186,6 +186,18 @@ test("after consent: send, result, live preview that matches the list's " +
   expect(screen.queryByText(/groups · .* mails$/)).toBeNull();
 });
 
+test("Apply uses the query as edited, not the AI's first answer", async () => {
+  localStorage.setItem("pmc_ai_ack", "1");
+  await mount();
+  const dlg = await sendSentence();
+  const input = await within(dlg).findByDisplayValue(
+    "tag:newsletter unread:>90 age:>1y");
+  fireEvent.change(input, { target: { value: "tag:newsletter age:>2y" } });
+  fireEvent.click(within(dlg).getByRole("button", { name: "Apply" }));
+  expect((screen.getByPlaceholderText("filter groups…") as HTMLInputElement)
+    .value).toBe("tag:newsletter age:>2y");
+});
+
 test("a second send skips the consent once it was given", async () => {
   localStorage.setItem("pmc_ai_ack", "1");
   await mount();

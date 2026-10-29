@@ -170,6 +170,22 @@ PROTON_INBOX = WANDER + (
 )
 
 
+# Newsletters nobody has opened for ages (the "Describe a filter" demo
+# sentence selects them). Own random stream: the senders above, the long tail
+# and everything seeded later keep their exact data.
+_state = random.getstate()
+random.seed(11)
+PROTON_INBOX += (
+    mails('"Old Gazette" <weekly@old-gazette.example>',
+          ["The week in brief", "Reader offers", "Editor's picks"], 26,
+          newest_days=410, span_days=900, unread=1.0, unsub=True)
+    + mails('"Retro Deals" <digest@retro-deals.example>',
+            ["Deals you missed", "Back in stock", "Final reminder"], 12,
+            newest_days=560, span_days=1000, unread=0.97, unsub=True)
+)
+random.setstate(_state)
+
+
 # --- long tail ------------------------------------------------------------
 # Real mailboxes are 80% senders with < 10 mails. Generated from a separate
 # seeded stream, so the hand-written senders above keep their exact data.
