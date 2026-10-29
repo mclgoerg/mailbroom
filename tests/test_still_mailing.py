@@ -129,6 +129,26 @@ def test_aggregates_for_domain_and_subject_rows(monkeypatch):
     assert subj["still_mailing"]["n"] == 2       # own mails only, not Pal's
 
 
+def test_aggregates_for_smart_rows(monkeypatch):
+    other = "deals@shop.example"
+    _scan_state(monkeypatch, [
+        _mail(1, T + 5 * DAY), _mail(2, T + 6 * DAY),
+        _mail(3, T + 6 * DAY, frm=f'"Deals" <{other}>'),
+        _mail(4, T - DAY, frm=f'"Deals" <{other}>'),
+        _mail(5, T + 7 * DAY, frm='"Pal" <pal@friends.example>')])
+    unsubstore.save({other: {"status": "done", "method": "", "detail": "",
+                             "error": "", "ts": T}})
+    smart = mailops.public_state()["groups"]["smart"]
+    flagged = [r["still_mailing"] for r in smart.values()
+               if r["still_mailing"]]
+    assert flagged, "small senders are pooled into Smart rows"
+    # every flagged mail is counted exactly once across the rows, and the
+    # clean sender's mail never is
+    assert sum(f["n"] for f in flagged) == 3
+    assert sum(f["senders"] for f in flagged) == 2
+    assert {a for f in flagged for a in f["addrs"]} == {ADDR, other}
+
+
 def test_trashed_mail_no_longer_counts(monkeypatch):
     fake = _install(monkeypatch, [_mail(1, T + 5 * DAY)])
     unsubstore.save({ADDR: {"status": "done", "method": "", "detail": "",

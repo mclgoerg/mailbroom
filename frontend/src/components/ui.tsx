@@ -255,8 +255,11 @@ export function EngagementMeter({ g }: {
 /** "4 mails since you unsubscribed on 3 Oct" - or, for a row pooling several
  *  senders, how many of them kept mailing. */
 export function stillMailingText(sm: StillMailing): string {
-  const date = fmtDate(new Date(sm.since_ts * 1000).toISOString()
-    .slice(0, 10), new Date(), { lang: getLang() });
+  // The unsubscribe day in the user's own time zone, like every UI date.
+  const d = new Date(sm.since_ts * 1000);
+  const p2 = (n: number) => String(n).padStart(2, "0");
+  const date = fmtDate(`${d.getFullYear()}-${p2(d.getMonth() + 1)}-${p2(
+    d.getDate())}`, new Date(), { lang: getLang() });
   return sm.senders > 1
     ? t("still.text_many", { n: sm.n, senders: sm.senders, date })
     : t("still.text", { n: sm.n, date });

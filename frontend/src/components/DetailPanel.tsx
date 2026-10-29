@@ -448,7 +448,7 @@ export function DetailPanel({ grouping, group, aiEnabled, protectedNow,
                       > group.still_mailing.addrs.length && " …"}
                   </div>
                 )}
-                {onBlock && !blocked
+                {onBlock && !blocked && !protectedNow
                   && shortcutTarget(grouping, group)?.kind === "sender" && (
                   <Button variant="secondary" size="sm" className="mt-2"
                     title={t("block.tip")} onClick={() => onBlock(group)}>
@@ -582,10 +582,18 @@ export function DetailPanel({ grouping, group, aiEnabled, protectedNow,
                 </Select>
                 {canUnsub && !phone && (
                   unsubscribedNow?.status === "done" ? (
+                    group.still_mailing ? (
+                      <span className="inline-flex items-center gap-1
+                        rounded-badge bg-review-bg px-2 py-1 type-meta
+                        text-review-fg">
+                        <TriangleAlert size={14} /> {t("still.badge")}
+                      </span>
+                    ) : (
                     <span className="inline-flex items-center gap-1
                       rounded-badge bg-chip px-2 py-1 type-meta text-chiptext">
                       <Check size={14} /> {t("Unsubscribed")}
                     </span>
+                    )
                   ) : unsubscribedNow?.status === "link" ? (
                     <>
                       <Button variant="secondary" disabled={busy} onClick={() =>
@@ -608,9 +616,15 @@ export function DetailPanel({ grouping, group, aiEnabled, protectedNow,
                   {canUnsub && phone && (
                     unsubscribedNow?.status === "done" ? (
                       <MenuItem disabled>
-                        <Check size={16}
-                          className="mr-1 inline align-text-bottom" />
-                        {t("Unsubscribed")}
+                        {group.still_mailing ? (
+                          <TriangleAlert size={16}
+                            className="mr-1 inline align-text-bottom" />
+                        ) : (
+                          <Check size={16}
+                            className="mr-1 inline align-text-bottom" />
+                        )}
+                        {t(group.still_mailing ? "still.badge"
+                          : "Unsubscribed")}
                       </MenuItem>
                     ) : unsubscribedNow?.status === "link" ? (<>
                       <MenuItem disabled={busy} onClick={() =>

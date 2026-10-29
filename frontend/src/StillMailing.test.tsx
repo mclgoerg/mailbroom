@@ -67,6 +67,13 @@ describe("still-mailing notice", () => {
       "Still mailing after you unsubscribed").closest("[role=status]") as
       HTMLElement).queryByRole("button")).toBeNull();
     cleanup();
+    cleanup();
+    // a protected sender cannot be blocked
+    renderPanel(mkGroup(), { onBlock: vi.fn(), protectedNow: true });
+    const prot = (await screen.findByText(
+      "Still mailing after you unsubscribed")).closest("[role=status]")!;
+    expect(within(prot as HTMLElement).queryByRole("button")).toBeNull();
+    cleanup();
     // a domain row: the senders are listed instead
     renderPanel(mkGroup({ key: "x.example",
       still_mailing: { n: 7, senders: 2, since_ts: SINCE,
@@ -77,6 +84,32 @@ describe("still-mailing notice", () => {
     expect(notice.textContent).toContain("a@x.example, b@x.example");
     expect(notice.textContent).toContain("7 mails from 2 senders");
     expect(within(notice as HTMLElement).queryByRole("button")).toBeNull();
+  });
+
+  it("shows the unsubscribe day in local time, not UTC", async () => {
+    const env = (globalThis as any).process.env;
+    const tz = env.TZ;
+    env.TZ = "Europe/Berlin";
+    try {
+      // 3 Oct 00:30 local (CEST) is still 2 Oct in UTC
+      const ts = new Date(2025, 9, 3, 0, 30).getTime() / 1000;
+      renderPanel(mkGroup({ still_mailing: { n: 2, senders: 1,
+        since_ts: ts, addrs: [] } }));
+      const notice = (await screen.findByText(
+        "Still mailing after you unsubscribed")).closest("[role=status]")!;
+      expect(notice.textContent).toContain("since you unsubscribed on 3 Oct");
+    } finally {
+      if (tz === undefined) delete env.TZ; else env.TZ = tz;
+    }
+  });
+
+  it("the toolbar shows the warning, not a tick, for a done sender that "
+    + "keeps mailing", async () => {
+    renderPanel(mkGroup({ unsub: true, bulk: true }), {
+      unsubscribedNow: { n: 1, of: 1, status: "done", link: "", addr: "" } });
+    await waitFor(() => expect(screen.getByText("Sender")).toBeTruthy());
+    expect(screen.queryByText("Unsubscribed")).toBeNull();
+    expect(screen.getAllByText("Still mailing").length).toBeGreaterThan(0);
   });
 
   it("is absent for a group nobody is still mailing from", async () => {
