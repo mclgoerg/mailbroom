@@ -269,6 +269,13 @@ presets.
   new senders when there are any). A chip narrows the list down to its
   own matches and, on the next tap, selects them; a third tap un-selects
   and clears. Chips never combine - use the filter box for that.
+- **Quick wins** - after a scan, a strip above the Sender list suggests a
+  few cleanups (old newsletters you never open, quiet low-engagement
+  senders, mail from senders you already unsubscribed from, big old
+  attachments, what the AI rated safe) with how much each frees. Review
+  puts the card's filter in the box and selects its matches; Clean up goes
+  straight to the usual Trash confirm (protected senders skipped, Undo
+  afterwards); Not now hides a card until a later scan finds 25 % more.
 - **Filter builder** - the sliders button next to the filter box opens a
   click-together builder (category, AI verdict, age, unread %,
   attachments, flags such as "not yet unsubscribed" or "rarely engaged

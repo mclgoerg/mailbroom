@@ -21,6 +21,8 @@ import { SettingsModal } from "./components/SettingsModal";
 import { StatsPanel } from "./components/StatsPanel";
 import { AiFilterPanel } from "./components/AiFilterPanel";
 import { QueryBuilder } from "./components/QueryBuilder";
+import { QuickWins } from "./components/QuickWins";
+import type { QuickWinCard } from "./quickwins";
 import { FoldersPanel } from "./components/FoldersPanel";
 import { AccountAvatar, applyTheme, BAR_ICON_BTN, BulkBar, Button, Chip, ChipGroup, ChipSegment,
   choiceDialog, confirmDialog, currentTheme, EmptyState, ensureAiAck, FILTER_ROW, Input, isModalOpen, LINK,
@@ -872,6 +874,18 @@ export default function App() {
       setActiveChip(null);
     }
   };
+
+  // Quick-win cards (see quickwins.ts). Review = the chips' second tap:
+  // the card's query in the filter box and its matches selected, so the
+  // list and the BulkBar show exactly what the card counted. Clean up goes
+  // through act(), i.e. the usual trash confirm naming the counts
+  // (protected / pinned handling included) and the Undo toast.
+  const reviewQuickWin = (c: QuickWinCard) => {
+    setFilter(c.def.query);
+    setSelected(new Set(c.keys));
+    setActiveChip(null);
+  };
+  const cleanUpQuickWin = (c: QuickWinCard) => { act(c.keys, "trash"); };
 
   // Saved filter presets: unlike selectPreset() above (which ADDS to the
   // selection), tapping one REPLACES the filter query - they are one-tap
@@ -1759,6 +1773,15 @@ export default function App() {
           </span>
         ))}
       </div>
+      )}
+
+      {/* Quick wins: suggestions on the Sender tab only, and only while
+          the list is otherwise untouched (no filter typed, nothing
+          selected) - Review fills in both, which hides the strip. */}
+      {!flat && mode === "sender" && !!state?.scanned_ts && !filter.trim()
+        && selected.size === 0 && (
+        <QuickWins groups={allGroups} account={account}
+          onReview={reviewQuickWin} onCleanUp={cleanUpQuickWin} />
       )}
 
       {/* Inline preset editor: appears only while editing one (Pencil

@@ -167,6 +167,26 @@ PROTON_INBOX = WANDER + (
             atts=[("IMG_2041.jpg", 4200000), ("IMG_2044.jpg", 3800000)])
     + mails('"Dr. Meier Praxis" <praxis@dr-meier.example>',
             ["Terminbestätigung", "Ihr Laborbefund ist da"], 5, unread=0.1)
+    # Quick wins (F5): senders that have gone quiet, so the strip has cards
+    # - old unread newsletters, a low-engagement sender, an unsubscribed one
+    # still holding mail, and old big attachments.
+    + mails('"Gadget Weekly" <news@gadgetweekly.example>',
+            ["Gadget of the week", "Ten tips for your desk"], 120,
+            newest_days=260, span_days=800, unread=0.99, unsub=True)
+    + mails('"Deal Hunter" <hello@dealhunter.example>',
+            ["Deals you missed", "Flash sale ends tonight"], 80,
+            newest_days=300, span_days=750, unread=0.99, unsub=True)
+    + mails('"Old Forum" <digest@oldforum.example>',
+            ["Your daily digest", "New replies in threads you follow"], 60,
+            newest_days=500, span_days=900, unread=0.97)
+    + mails('"Coupon Club" <offers@couponclub.example>',
+            ["Your coupon is waiting", "Members-only offer"], 40,
+            newest_days=40, span_days=400, unread=0.9, unsub=True)
+    + mails('"Photo Archive" <hello@photoarchive.example>',
+            ["Scans from the family archive", "Your scanned documents"], 12,
+            newest_days=800, span_days=1000, unread=0.5,
+            size=(7000000, 8000000),
+            atts=[("scan-1.pdf", 6000000), ("scan-2.pdf", 6000000)])
 )
 
 
@@ -388,6 +408,10 @@ unsubstore.save({
     "newsletter@bergsport-huber.example": {"status": "failed", "method": "",
         "detail": "", "error": "HTTP 500", "ts": _UN_NOW - 200 * 86400},
 }, "proton")
+
+# The unsubscribe the Coupon Club sender already went through (card 3).
+unsubstore.record("offers@couponclub.example", "done", "one-click",
+                  account="proton")
 
 # Per-mail ratings on the PayBank group -> rating chips.
 paybank = [m for m in PROTON_INBOX if "paybank" in m["from"]]
