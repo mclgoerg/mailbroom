@@ -167,14 +167,15 @@ FILTER_GRAMMAR: tuple[dict, ...] = (
      "example": "unread:>80"},
     {"qualifier": "is",
      "values": ("unsub", "unsubscribed", "not-unsubscribed", "protected",
-                "replied", "noreply-ever", "new"),
+                "replied", "noreply-ever", "new", "still-mailing"),
      "syntax": "is:unsub|unsubscribed|not-unsubscribed|protected|replied"
-               "|noreply-ever|new",
+               "|noreply-ever|new|still-mailing",
      "meaning": "unsub = has an unsubscribe link; unsubscribed = already "
                 "unsubscribed; not-unsubscribed = some sender still could "
                 "be; protected = contains protected senders; replied = the "
                 "user has written to the sender; noreply-ever = never "
-                "written to; new = a recently first-seen sender",
+                "written to; new = a recently first-seen sender; still-mailing = "
+                "keeps mailing after the user unsubscribed",
      "example": "is:unsub"},
     {"qualifier": "has", "values": ("pinned",),
      "syntax": "has:pinned",
