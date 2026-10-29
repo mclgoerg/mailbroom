@@ -19,6 +19,7 @@ vi.mock("./api", () => ({
     state: () => Promise.resolve(state),
     version: () => Promise.resolve({ build: "v1" }),
     group: () => Promise.resolve([]),
+    scan: () => Promise.resolve({ ok: true }),
     protectMany: (...a: unknown[]) => { calls.push("protect"); return protectMany(...a); },
     unsubscribeBulk: (...a: unknown[]) => { calls.push("unsub"); return unsubscribeBulk(...a); },
     deleteGroups: (...a: unknown[]) => { calls.push("trash"); return deleteGroups(...a); },
@@ -296,7 +297,86 @@ test("pinned mails are left out of the counted mails", async () => {
   fireEvent.click(btn(dlg, "Apply"));
   const c = await findDialog();
   expect(c.textContent).toContain("Move 6 mails from 1 group to Trash");
-  expect(c.textContent).toContain("Protected and pinned mails are left alone");
+  expect(c.textContent).toContain("4 protected mails stay untouched");
+});
+
+test("a second finger voids the gesture: no decision on either pointer up", async () => {
+  const dlg = await open();
+  const el = card();
+  fireEvent.pointerDown(el, { clientX: 200, clientY: 300, pointerId: 1, button: 0 });
+  fireEvent.pointerDown(el, { clientX: 320, clientY: 300, pointerId: 2, button: 0 });
+  fireEvent.pointerUp(el, { clientX: 80, clientY: 300, pointerId: 1 });
+  fireEvent.pointerUp(el, { clientX: 150, clientY: 300, pointerId: 2 });
+  await new Promise((r) => setTimeout(r, 50));
+  expect(within(card()).getByText("News A")).toBeTruthy();
+  expect(within(dlg).getByRole("status").textContent).toBe("Nothing decided yet");
+  drag(-120, 0);                       // a fresh single-finger drag works again
+  await waitFor(() => expect(within(dlg).getByRole("status").textContent)
+    .toBe("Trash 1 group · 5000 B"));
+});
+
+test("keys do nothing while the discard prompt is on top", async () => {
+  const dlg = await open();
+  fireEvent.click(btn(dlg, /Trash/));
+  fireEvent.click(btn(dlg, "Close"));
+  await findDialog();
+  key("ArrowLeft"); key("ArrowRight");
+  await cancelDialog();
+  expect(within(dlg).getByRole("status").textContent).toBe("Trash 1 group · 5000 B");
+  expect(within(card()).getByText("Shop B")).toBeTruthy();
+});
+
+test("Back to cards at the end keeps the last decision", async () => {
+  const dlg = await open();
+  for (let i = 0; i < 4; i++) fireEvent.click(btn(dlg, /Keep/));
+  fireEvent.click(btn(dlg, /Trash/));                         // last card
+  await within(dlg).findByRole("button", { name: "Apply" });
+  fireEvent.click(btn(dlg, "Back to cards"));
+  await waitFor(() => expect(within(card()).getByText("Pin E")).toBeTruthy());
+  expect(within(dlg).getByRole("status").textContent).toContain("Trash 1 group");
+});
+
+test("a group protected since the deck was dealt is skipped and said so", async () => {
+  const dlg = await open();
+  fireEvent.click(btn(dlg, /Unsubscribe/));                   // News A
+  fireEvent.click(btn(dlg, /Trash/));                         // Shop B
+  fireEvent.click(btn(dlg, "Done", ));
+  await within(dlg).findByRole("button", { name: "Apply" });
+  state = baseState(FIXTURE.map((x) => x.key === "b@shop.example"
+    ? { ...x, protected: true } : x));
+  fireEvent.click(screen.getAllByRole("button", { name: "Scan" })[0]);
+  await new Promise((r) => setTimeout(r, 100));
+  fireEvent.click(btn(dlg, "Apply"));
+  const c = await findDialog();
+  expect(c.textContent).toContain("1 protected group skipped");
+  expect(c.textContent).not.toContain("to Trash");
+  await pressDialog("Apply");
+  await waitFor(() => expect(unsubscribeBulk).toHaveBeenCalled());
+  expect(deleteGroups).not.toHaveBeenCalled();
+});
+
+test("only pinned mails left: no Move-0 step is offered", async () => {
+  const dlg = await open([grp("p@pin.example", "All Pinned",
+    { count: 4, pinned: 4, size: 400 })]);
+  fireEvent.click(btn(dlg, /Trash/));
+  await within(dlg).findByRole("button", { name: "Apply" });
+  fireEvent.click(btn(dlg, "Apply"));
+  await new Promise((r) => setTimeout(r, 100));
+  expect(screen.queryAllByRole("dialog").filter((d) => d.hasAttribute("aria-labelledby")))
+    .toHaveLength(0);
+  expect(deleteGroups).not.toHaveBeenCalled();
+});
+
+test("a step failing after another ran ends the deck (no resend)", async () => {
+  deleteGroups.mockRejectedValueOnce(new Error("busy"));
+  const dlg = await open();
+  fireEvent.click(btn(dlg, /Unsubscribe/));
+  fireEvent.click(btn(dlg, /Trash/));
+  fireEvent.click(btn(dlg, "Done"));
+  fireEvent.click(btn(dlg, "Apply"));
+  await pressDialog("Apply");
+  await waitFor(() => expect(screen.queryByRole("dialog", { name: "Triage" })).toBeNull());
+  expect(unsubscribeBulk).toHaveBeenCalledOnce();
 });
 
 test("a failing step stops the rest and keeps the deck open", async () => {
@@ -354,9 +434,9 @@ test("German strings", async () => {
   fireEvent.click(await screen.findByRole("menuitem", { name: /Triage/ }));
   const dlg = await screen.findByRole("dialog", { name: "Triage" });
   expect(within(dlg).getByText("Karte 1 von 5")).toBeTruthy();
-  fireEvent.click(btn(dlg, /Löschen/));
+  fireEvent.click(btn(dlg, /Papierkorb/));
   await waitFor(() => expect(within(dlg).getByRole("status").textContent)
-    .toBe("1 Gruppe löschen · 5000 B"));
+    .toBe("1 Gruppe in den Papierkorb · 5000 B"));
   fireEvent.click(btn(dlg, "Fertig"));
   fireEvent.click(btn(dlg, "Anwenden"));
   const c = await findDialog();

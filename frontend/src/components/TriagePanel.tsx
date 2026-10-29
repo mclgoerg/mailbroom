@@ -29,7 +29,12 @@ function Card({ g, grouping, reduced, onCommit }: {
   onCommit: (d: Decision) => void;
 }) {
   const el = useRef<HTMLDivElement>(null);
-  const start = useRef<{ x: number; y: number; at: number } | null>(null);
+  const start = useRef<{ x: number; y: number; at: number; id: number } | null>(null);
+  // Every pointer currently down. A second finger voids the whole gesture
+  // (its coordinates would be compared against the other finger's start)
+  // until all of them are up again.
+  const down_ = useRef(new Set<number>());
+  const voided = useRef(false);
   const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
   const [drag, setDrag] = useState<{ dx: number; dy: number } | null>(null);
   const [leaving, setLeaving] = useState<{ dx: number; dy: number } | null>(null);
@@ -39,17 +44,30 @@ function Card({ g, grouping, reduced, onCommit }: {
   const down = (e: React.PointerEvent) => {
     if (leaving || (e.button ?? 0) !== 0) return;
     if ((e.target as HTMLElement).closest("button, a")) return;
-    start.current = { x: e.clientX, y: e.clientY, at: Date.now() };
+    down_.current.add(e.pointerId);
+    if (down_.current.size > 1) {
+      voided.current = true;
+      start.current = null;
+      setDrag(null);
+      return;
+    }
+    start.current = { x: e.clientX, y: e.clientY, at: Date.now(),
+      id: e.pointerId };
     el.current?.setPointerCapture?.(e.pointerId);
   };
   const move = (e: React.PointerEvent) => {
-    if (!start.current) return;
+    if (!start.current || e.pointerId !== start.current.id) return;
     setDrag({ dx: e.clientX - start.current.x, dy: e.clientY - start.current.y });
+  };
+  const release = (e: React.PointerEvent) => {
+    down_.current.delete(e.pointerId);
+    if (!down_.current.size) voided.current = false;
   };
   const up = (e: React.PointerEvent) => {
     const s = start.current;
+    if (!s || e.pointerId !== s.id || voided.current) { release(e); return; }
     start.current = null;
-    if (!s) return;
+    release(e);
     const dx = e.clientX - s.x, dy = e.clientY - s.y;
     const width = el.current?.offsetWidth || 300;
     const d = dragDecision(dx, dy, width, Date.now() - s.at, allowed);
@@ -61,7 +79,11 @@ function Card({ g, grouping, reduced, onCommit }: {
       : { dx: (d === "trash" ? -1 : 1) * width * 2, dy: 0 });
     timer.current = setTimeout(() => onCommit(d), EXIT_MS);
   };
-  const cancel = () => { start.current = null; setDrag(null); };
+  const cancel = (e: React.PointerEvent) => {
+    start.current = null;
+    setDrag(null);
+    release(e);
+  };
 
   const pos = leaving ?? drag;
   const intent: Exclude<Decision, "protect"> | null = !pos ? null
@@ -193,7 +215,7 @@ export function TriagePanel({ groups, grouping, onApply, onClose }: {
   const decide = (d: Decision) => {
     if (!g || summaryOpen || !can(d, g, grouping)) return;
     setDecisions((m) => ({ ...m, [g.key]: d }));
-    setHistory((h) => [...h, g.key]);
+    setHistory((h) => [...h.filter((k) => k !== g.key), g.key]);
     setIdx(idx + 1);
   };
   const undo = () => {
@@ -204,12 +226,20 @@ export function TriagePanel({ groups, grouping, onApply, onClose }: {
     setIdx(deck.findIndex((x) => x.key === key));
     setReview(false);
   };
+  // Set while the discard prompt is up: it is a dialog on top of this one,
+  // and the arrow keys must not decide cards behind it.
+  const prompting = useRef(false);
   const close = async () => {
-    if (busy) return;
-    if (sum.actions > 0 && !await confirmDialog({
-      title: t("triage.discard_title", { n: sum.actions }),
-      body: t("triage.discard_body"), tone: "danger",
-      confirmLabel: t("triage.discard") })) return;
+    if (busy || prompting.current) return;
+    if (sum.actions > 0) {
+      prompting.current = true;
+      const ok = await confirmDialog({
+        title: t("triage.discard_title", { n: sum.actions }),
+        body: t("triage.discard_body"), tone: "danger",
+        confirmLabel: t("triage.discard") });
+      prompting.current = false;
+      if (!ok) return;
+    }
     onClose();
   };
   const apply = async () => {
@@ -221,7 +251,8 @@ export function TriagePanel({ groups, grouping, onApply, onClose }: {
   // Keys act on the window (the dialog itself holds focus, not a field).
   const handler = useRef<(e: KeyboardEvent) => void>(undefined);
   handler.current = (e) => {
-    if (e.defaultPrevented || summaryOpen || busy || e.ctrlKey || e.metaKey
+    if (e.defaultPrevented || summaryOpen || busy || prompting.current
+        || e.ctrlKey || e.metaKey
         || e.altKey) return;
     const map: Record<string, Decision | "undo"> = {
       ArrowLeft: "trash", ArrowRight: "keep", ArrowUp: "unsub",
@@ -309,7 +340,11 @@ export function TriagePanel({ groups, grouping, onApply, onClose }: {
         {summaryOpen ? (
           <div className="flex justify-end gap-2">
             <Button variant="secondary" disabled={busy}
-              onClick={() => (finished ? undo() : setReview(false))}>
+              onClick={() => {
+                // At the end: reopen the last card, keeping its decision.
+                if (finished) setIdx(deck.length - 1);
+                setReview(false);
+              }}>
               {t("triage.back")}
             </Button>
             <Button disabled={busy || sum.actions === 0} onClick={apply}>

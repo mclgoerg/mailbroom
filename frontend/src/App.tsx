@@ -1153,26 +1153,42 @@ export default function App() {
     const protect = plan.protect.filter((k) => live[k] && !live[k].protected);
     const unsub = unsubKeys(plan.unsub).filter((k) => live[k]
       && !live[k].protected);
+    // Groups the fresh state no longer lets us act on (protected since the
+    // deck was dealt) are skipped - and said so in the confirm.
+    const skipped = plan.trash.length - trash.length;
+    const pins = trash.reduce((n, k) => n + (live[k].pinned ?? 0), 0);
     const mails = trash.reduce(
       (n, k) => n + Math.max(0, live[k].count - (live[k].pinned ?? 0)), 0);
-    if (!trash.length && !unsub.length && !protect.length) return false;
+    // A trash step that would move nothing (everything pinned) is no step.
+    const moves = mails > 0;
+    if (!moves && !unsub.length && !protect.length) {
+      notify(t(trash.length ? "toast.all_pinned" : "toast.all_protected"));
+      return false;
+    }
     const bullets = [
-      ...(trash.length ? [t("triage.c_trash", { n: trash.length, mails })] : []),
+      ...(moves ? [t("triage.c_trash", { n: trash.length, mails })] : []),
       ...(unsub.length ? [t("triage.c_unsub", { n: unsub.length })] : []),
       ...(protect.length ? [t("triage.c_protect", { n: protect.length })] : []),
-      ...(trash.length ? [t("triage.c_skipped"), t("triage.c_undo")] : []),
+      ...(skipped ? [t("confirm.b_protected_groups_skipped", { n: skipped })] : []),
+      ...(pins ? [t("confirm.b_pinned_kept", { n: pins })] : []),
+      ...(moves ? [t("triage.c_undo")] : []),
     ];
     if (!await confirmDialog({ title: t("triage.confirm_title"), bullets,
-      tone: trash.length ? "danger" : "primary",
+      tone: moves ? "danger" : "primary",
       confirmLabel: t("triage.apply_btn") })) return false;
+    // Once a step has run, a later failure still ends the deck (the error
+    // is toasted): a second Apply must not resend what already happened.
+    let ran = false;
     if (protect.length) {
       const entries = protect.map((k) => protectEntry(mode, live[k]));
       if (!await protectSenders(entries)) return false;
+      ran = true;
     }
-    if (unsub.length && !await runUnsubscribe(unsub)) return false;
-    // act() still explains an all-pinned selection instead of moving it.
-    if (trash.length && !await act(trash, "trash", "", null, null, true))
-      return false;
+    if (unsub.length) {
+      if (!await runUnsubscribe(unsub)) return ran;
+      ran = true;
+    }
+    if (moves && !await act(trash, "trash", "", null, null, true)) return ran;
     setSelected(new Set());
     return true;
   };

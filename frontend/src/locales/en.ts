@@ -1604,7 +1604,6 @@ export const EN: Record<string, string> = {
   "triage.c_unsub_one": "Unsubscribe from 1 sender",
   "triage.c_protect": "Add {n} entries to your protected list",
   "triage.c_protect_one": "Add 1 entry to your protected list",
-  "triage.c_skipped": "Protected and pinned mails are left alone",
   "triage.c_undo": "You can undo the trash step afterwards",
   "triage.apply_btn": "Apply",
 };

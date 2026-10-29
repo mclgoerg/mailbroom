@@ -1783,7 +1783,7 @@ export const DE: Record<string, string> = {
   "triage.title": "Triage",
   "triage.progress": "Karte {n} von {total}",
   "triage.summary_title": "Deine Entscheidungen",
-  "triage.trash": "Löschen",
+  "triage.trash": "Papierkorb",
   "triage.keep": "Behalten",
   "triage.unsub": "Abbestellen",
   "triage.protect": "Schützen",
@@ -1794,10 +1794,10 @@ export const DE: Record<string, string> = {
   "triage.protected_label": "Geschützt",
   "triage.protected_kept": "Geschützt - bleibt erhalten",
   "triage.hint":
-    "Nach links wischen = löschen, nach rechts = behalten, nach oben = abbestellen. Die Schaltflächen und die Pfeiltasten funktionieren auch.",
+    "Nach links wischen = Papierkorb, nach rechts = behalten, nach oben = abbestellen. Die Schaltflächen und die Pfeiltasten funktionieren auch.",
   "triage.nothing_yet": "Noch nichts entschieden",
-  "triage.s_trash": "{n} Gruppen löschen · {size}",
-  "triage.s_trash_one": "1 Gruppe löschen · {size}",
+  "triage.s_trash": "{n} Gruppen in den Papierkorb · {size}",
+  "triage.s_trash_one": "1 Gruppe in den Papierkorb · {size}",
   "triage.s_unsub": "{n} abbestellen",
   "triage.s_protect": "{n} schützen",
   "triage.s_trash_mails":
@@ -1826,7 +1826,6 @@ export const DE: Record<string, string> = {
   "triage.c_unsub_one": "1 Absender abbestellen",
   "triage.c_protect": "{n} Einträge zur Schutzliste hinzufügen",
   "triage.c_protect_one": "1 Eintrag zur Schutzliste hinzufügen",
-  "triage.c_skipped": "Geschützte und angeheftete Mails bleiben unberührt",
-  "triage.c_undo": "Das Löschen lässt sich anschließend rückgängig machen",
+  "triage.c_undo": "Das Verschieben in den Papierkorb lässt sich anschließend rückgängig machen",
   "triage.apply_btn": "Anwenden",
 };
