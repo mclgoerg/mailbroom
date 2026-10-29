@@ -143,6 +143,8 @@ export function sieveSnippet(kind: "sender" | "domain", value: string,
  *   from:<addr>         exact sender address (sender grouping only)
  *   domain:<domain>     exact domain (domain grouping only)
  *   anything else       substring match on name / address / key
+ * A new qualifier also goes into FILTER_GRAMMAR (backend/rules.py): the AI
+ * filter writer is taught from it, and a test fails when one is missing.
  */
 
 export interface ParsedFilter {

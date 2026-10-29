@@ -139,6 +139,105 @@ def parse_filter(q: str) -> dict:
     return out
 
 
+# What the filter understands, in one place: the AI filter writer builds its
+# system prompt from it (aifilter.py) and `validate_filter` checks against
+# it. A test keeps it equal to what parse_filter really accepts, so a new
+# qualifier cannot be forgotten here. `values` = the fixed values of the
+# qualifier (None = a free value, checked by `check`).
+FILTER_GRAMMAR: tuple[dict, ...] = (
+    {"qualifier": "tag", "values": None, "check": "tag",
+     "syntax": "tag:<name>",
+     "meaning": "the group carries this tag (prefix match); the accepted "
+                "names are listed separately",
+     "example": "tag:newsletter"},
+    {"qualifier": "ai", "values": ("safe", "review", "keep"),
+     "syntax": "ai:safe|review|keep",
+     "meaning": "the AI verdict of the group",
+     "example": "ai:safe"},
+    {"qualifier": "age", "values": None, "check": "age",
+     "syntax": "age:>N(m|y)",
+     "meaning": "the last mail of the group is older than N months (m) or "
+                "years (y); use it for 'older than' and 'not since'",
+     "example": "age:>1y"},
+    {"qualifier": "unread", "values": None, "check": "unread",
+     "syntax": "unread:>N",
+     "meaning": "more than N percent of the group's mails are unread "
+                "(N = 0-100); 'never read' is about unread:>90",
+     "example": "unread:>80"},
+    {"qualifier": "is",
+     "values": ("unsub", "unsubscribed", "not-unsubscribed", "protected",
+                "replied", "noreply-ever", "new"),
+     "syntax": "is:unsub|unsubscribed|not-unsubscribed|protected|replied"
+               "|noreply-ever|new",
+     "meaning": "unsub = has an unsubscribe link; unsubscribed = already "
+                "unsubscribed; not-unsubscribed = some sender still could "
+                "be; protected = contains protected senders; replied = the "
+                "user has written to the sender; noreply-ever = never "
+                "written to; new = a recently first-seen sender",
+     "example": "is:unsub"},
+    {"qualifier": "has", "values": ("pinned",),
+     "syntax": "has:pinned",
+     "meaning": "the group contains at least one pinned mail",
+     "example": "has:pinned"},
+    {"qualifier": "eng", "values": ("low", "medium", "high"),
+     "syntax": "eng:low|medium|high",
+     "meaning": "how much the user engages with the sender (reads, "
+                "replies)",
+     "example": "eng:low"},
+    {"qualifier": "att", "values": None, "check": "att",
+     "syntax": "att:>N(k|m|g)",
+     "meaning": "the group's attachments add up to more than N kilo-, "
+                "mega- or gigabytes. This is the total of attachments of "
+                "the group, NOT the size of single mails",
+     "example": "att:>10m"},
+    {"qualifier": "from", "values": None, "check": "text",
+     "syntax": "from:<address>",
+     "meaning": "exactly this sender address",
+     "example": "from:news@shop.example"},
+    {"qualifier": "domain", "values": None, "check": "text",
+     "syntax": "domain:<domain>",
+     "meaning": "exactly this sender domain",
+     "example": "domain:shop.example"},
+)
+_GRAMMAR = {g["qualifier"]: g for g in FILTER_GRAMMAR}
+_LOOKS_QUAL_RE = re.compile(r"^[a-z][a-z0-9_-]*:")
+
+
+def _token_ok(kind: str, val: str, tags: "set[str] | frozenset[str] | None"
+              ) -> bool:
+    g = _GRAMMAR.get(kind)
+    if g is None:
+        return False
+    if g["values"] is not None:
+        return val in g["values"]
+    check = g["check"]
+    if check == "age":
+        return bool(_AGE_RE.match(val))
+    if check == "unread":
+        return bool(_UNREAD_RE.match(val)) and int(val.lstrip(">")) <= 100
+    if check == "att":
+        return bool(_ATT_RE.match(val))
+    if check == "tag" and tags is not None:
+        return bool(val) and any(val in tag for tag in tags)
+    return bool(val)
+
+
+def validate_filter(q: str, tags=None) -> list[str]:
+    """The tokens of `q` that look like qualifiers (`word:...`) but are not
+    a known qualifier with a valid value. parse_filter lets those fall
+    through to free text silently - fine for typing, wrong for a query an AI
+    wrote. With `tags` (the accepted tag names) a `tag:` value must also
+    be (a prefix of) one of them. Free words are always valid."""
+    bad = []
+    for tok in (q or "").strip().lower().split():
+        if not _LOOKS_QUAL_RE.match(tok):
+            continue
+        kind, _, val = tok.partition(":")
+        if not _token_ok(kind, val, tags):
+            bad.append(tok)
+    return bad
+
+
 def match_group(g: dict, f: dict, now: float | None = None) -> bool:
     """`g` is a public_state()-shaped group record (has protected/replied)."""
     label = (g.get("label") or "").lower()
