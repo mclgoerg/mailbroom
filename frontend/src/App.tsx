@@ -1,5 +1,5 @@
 import { BarChart3, BookmarkPlus, ChevronDown, ClipboardList,
-  Copy, Download, Info, LayoutGrid, Mail, Moon, Paperclip, Pencil, Plus,
+  Copy, Download, Info, Layers, LayoutGrid, Mail, Moon, Paperclip, Pencil, Plus,
   Power,
   ScrollText, Search, Settings as SettingsIcon, ShieldAlert, Sparkles, Star, Sun,
   Trash2, User, Wand2, Wrench, X }
@@ -21,6 +21,7 @@ import { SettingsModal } from "./components/SettingsModal";
 import { SpaceMapPanel } from "./components/SpaceMapPanel";
 import { StatsPanel } from "./components/StatsPanel";
 import { AiFilterPanel } from "./components/AiFilterPanel";
+import { TriagePanel } from "./components/TriagePanel";
 import { QueryBuilder } from "./components/QueryBuilder";
 import { QuickWins } from "./components/QuickWins";
 import type { QuickWinCard } from "./quickwins";
@@ -36,6 +37,7 @@ import { applyStatus, fmtAgo, fmtSize, fmtUsd, matchGroup, parseFilter,
   parseProgress, retainedMailKeys, shortcutTarget, smartMembers } from "./lib";
 import { filedKindName, isPooled, keptMessage, smartLabel, smartView }
   from "./smart";
+import { protectEntry, type TriagePlan } from "./triage";
 import { SenderFiling } from "./components/SenderFiling";
 import type { FileEntry, SenderAction } from "./components/SenderList";
 import type { AppState, AuthProbe, Config, FilterPreset, Group, Grouping,
@@ -150,6 +152,7 @@ export default function App() {
   const [statsOpen, setStatsOpen] = useState(false);
   const [spaceOpen, setSpaceOpen] = useState(false);
   const [auditOpen, setAuditOpen] = useState(false);
+  const [triageOpen, setTriageOpen] = useState(false);
   // Folders panel (Junk | Trash): which folder it opens on, null = closed
   const [foldersOpen, setFoldersOpen] = useState<FolderRole | null>(null);
   const [undoOpen, setUndoOpen] = useState(false);
@@ -559,6 +562,8 @@ export default function App() {
   const scanning = state?.status === "scanning";
   const aiRunning = state?.ai.status === "running";
   const deleting = state?.delete.status === "running";
+  const triageDisabled = flat || scanning || state?.status !== "done"
+    || !groups.length;
   const attsRunning = state?.atts?.status === "running";
   const unsubRunning = state?.unsub?.status === "running";
   const aiEnabled = !!cfg?.ai.available;
@@ -663,7 +668,7 @@ export default function App() {
   useEffect(() => { prevGroups.current = groups; });
   const anyModal = (!!detail && !splitPane) || searchOpen || settingsOpen || rulesOpen
     || aiFilterOpen || attsOpen || dupsOpen || statsOpen || spaceOpen || auditOpen
-    || !!foldersOpen;
+    || triageOpen || !!foldersOpen;
 
   // Space map "Done": exactly these sender keys become the selection of the
   // Sender tab (filter cleared so none of them is hidden); the bulk bar and
@@ -961,7 +966,8 @@ export default function App() {
       keys: string[], action: string, dest = "",
       keepLatest: number | null = null,
       olderThanDays: number | null = null,
-      noun: "groups" | "senders" = "groups"): Promise<boolean> => {
+      noun: "groups" | "senders" = "groups",
+      confirmed = false): Promise<boolean> => {
     let force = false;
     let effective = keys;
     if (action === "trash") {
@@ -1003,7 +1009,9 @@ export default function App() {
         : "confirm.b_protected_groups_skipped", { n: keys.length - effective.length }));
     }
     if (pins) bullets.push(t("confirm.b_pinned_kept", { n: pins }));
-    if (!force && !await confirmDialog({ title: verb, bullets,
+    // `confirmed`: the caller's own dialog already named these counts
+    // (Triage's one summary confirm) - everything above still applies.
+    if (!force && !confirmed && !await confirmDialog({ title: verb, bullets,
       tone: action === "mark_read" ? "primary" : "danger",
       confirmLabel: t("confirm.btn_n", { verb, n }) }))
       return false;
@@ -1021,9 +1029,10 @@ export default function App() {
 
   const act = async (keys: string[], action: string, dest = "",
       keepLatest: number | null = null,
-      olderThanDays: number | null = null): Promise<boolean> => {
+      olderThanDays: number | null = null,
+      confirmed = false): Promise<boolean> => {
     const ok = await actOn(mode, modeGroups, keys, action, dest, keepLatest,
-      olderThanDays);
+      olderThanDays, "groups", confirmed);
     if (ok) setSelected(new Set());
     return ok;
   };
@@ -1108,6 +1117,11 @@ export default function App() {
       title: t("confirm.unsubscribe", { n: keys.length }),
       body: pooled ? t("confirm.unsub_pooled_skipped", { n: pooled }) : undefined,
       confirmLabel: t("confirm.unsubscribe_btn") })) return;
+    await runUnsubscribe(keys);
+  };
+  // The bulk job itself, after whichever dialog confirmed it. Resolves
+  // whether it was queued without an error.
+  const runUnsubscribe = async (keys: string[]): Promise<boolean> => {
     try {
       const r = await api.unsubscribeBulk(mode, keys);
       const skipped = r.skipped_protected + r.skipped_done + r.capped;
@@ -1121,9 +1135,46 @@ export default function App() {
         if (seenJobs.current) seenJobs.current.u = "running";
       }
       refresh();
+      return true;
     } catch (e: any) {
       fail(e);
+      return false;
     }
+  };
+
+  // Triage: ONE confirm naming every decision, then the existing paths in
+  // order - protect, unsubscribe (bulk job), trash (reversible move with
+  // Undo; protected and pinned mails skipped as everywhere). The first step
+  // that fails stops the rest and leaves the deck open.
+  const applyTriage = async (plan: TriagePlan): Promise<boolean> => {
+    const live = modeGroups;
+    const trash = plan.trash.filter((k) => live[k] && !live[k].protected
+      && !plan.protect.includes(k));
+    const protect = plan.protect.filter((k) => live[k] && !live[k].protected);
+    const unsub = unsubKeys(plan.unsub).filter((k) => live[k]
+      && !live[k].protected);
+    const mails = trash.reduce(
+      (n, k) => n + Math.max(0, live[k].count - (live[k].pinned ?? 0)), 0);
+    if (!trash.length && !unsub.length && !protect.length) return false;
+    const bullets = [
+      ...(trash.length ? [t("triage.c_trash", { n: trash.length, mails })] : []),
+      ...(unsub.length ? [t("triage.c_unsub", { n: unsub.length })] : []),
+      ...(protect.length ? [t("triage.c_protect", { n: protect.length })] : []),
+      ...(trash.length ? [t("triage.c_skipped"), t("triage.c_undo")] : []),
+    ];
+    if (!await confirmDialog({ title: t("triage.confirm_title"), bullets,
+      tone: trash.length ? "danger" : "primary",
+      confirmLabel: t("triage.apply_btn") })) return false;
+    if (protect.length) {
+      const entries = protect.map((k) => protectEntry(mode, live[k]));
+      if (!await protectSenders(entries)) return false;
+    }
+    if (unsub.length && !await runUnsubscribe(unsub)) return false;
+    // act() still explains an all-pinned selection instead of moving it.
+    if (trash.length && !await act(trash, "trash", "", null, null, true))
+      return false;
+    setSelected(new Set());
+    return true;
   };
 
   // Protect / block act on what the row stands for (shortcutTarget): the
@@ -1609,10 +1660,21 @@ export default function App() {
         <div className="ml-auto flex items-center gap-2">
           <Button variant="secondary" size="icon" label={t("Search all mails")}
             onClick={() => setSearchOpen(true)}><Search size={18} /></Button>
+          <Button variant="secondary" className="min-[48rem]:hidden"
+            disabled={triageDisabled} onClick={() => setTriageOpen(true)}>
+            <Layers size={16} aria-hidden className="mr-1 inline
+              align-text-bottom" />
+            {t("triage.menu")}
+          </Button>
           <Menu variant="secondary" trigger={<>
               <Wrench size={16} aria-hidden /> {t("Tools")}
               <ChevronDown size={16} aria-hidden className="text-muted" />
             </>}>
+            <MenuItem disabled={triageDisabled}
+              onClick={() => setTriageOpen(true)} sub={t("triage.menu_sub")}>
+              <Layers size={16} className="mr-1 inline align-text-bottom" />
+              {t("triage.menu")}
+            </MenuItem>
             <MenuItem onClick={() => setRulesOpen(true)}>
               <ClipboardList size={16} className="mr-1 inline align-text-bottom" />
               {t("Rules")}
@@ -2114,6 +2176,10 @@ export default function App() {
         <SpaceMapPanel groups={state.groups.sender}
           onClose={() => setSpaceOpen(false)}
           onDone={selectSenders} />
+      )}
+      {triageOpen && (
+        <TriagePanel groups={groups} grouping={mode} onApply={applyTriage}
+          onClose={() => { setTriageOpen(false); refresh(); }} />
       )}
       {auditOpen && (
         <AuditLogPanel rules={state?.rules ?? []}
