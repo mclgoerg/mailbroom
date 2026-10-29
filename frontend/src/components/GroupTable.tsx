@@ -6,7 +6,7 @@ import { useEffect, useRef, useState, type MouseEvent } from "react";
 import { fmtSize } from "../api";
 import type { Group, Grouping, SmartKind } from "../types";
 import { t } from "../i18n";
-import { AiTag, Avatar, Button, Checkbox, EngagementMeter, PinBadge, RatingChips, ShortDate, StillMailingBadge, Tag, Select, isModalOpen } from "./ui";
+import { AiTag, Avatar, Button, Checkbox, EngagementMeter, PinBadge, RatingChips, ShortDate, StillMailingBadge, Tag, TrackerBadge, Select, isModalOpen } from "./ui";
 
 export type SortKey = "count" | "size" | "label" | "last" | "unreadPct"
   | "engagement";
@@ -294,6 +294,7 @@ function DesktopTable({ slice, baseIdx, selected, focusedKey, openKey, compact, 
                   </Tag>
                 )}
                 <PinBadge n={g.pinned} />
+                <TrackerBadge g={g} />
                 <UnsubBadge g={g} onAck={onAckUnsub} />
                 {blockedKeys?.has(g.key) && (
                   <Tag tone="keep">
@@ -395,6 +396,7 @@ function MobileCards({ slice, baseIdx, selected, focusedKey, onToggle,
                   </Tag>
                 )}
                 <PinBadge n={g.pinned} />
+                <TrackerBadge g={g} />
                 <UnsubBadge g={g} onAck={onAckUnsub} />
                 {blockedKeys?.has(g.key) && (
                   <Tag tone="keep">

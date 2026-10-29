@@ -108,8 +108,8 @@ def make_msg(uid, frm='"Shop News" <news@shop.example>',
              subject="Big Sale 42", unsub=None, unsub_post=False,
              msgid=None, size=1000, seen=False,
              date=DEFAULT_MAIL_DATE, to=None, cc=None,
-             atts=None, body=None, irt=None, refs=None):
-    return {"uid": uid, "body": body, "irt": irt, "refs": refs, "from": frm, "subject": subject, "unsub": unsub,
+             atts=None, body=None, irt=None, refs=None, html=None):
+    return {"uid": uid, "body": body, "html": html, "irt": irt, "refs": refs, "from": frm, "subject": subject, "unsub": unsub,
             "unsub_post": unsub_post,
             "msgid": msgid or f"<m{uid}@shop.example>",
             "size": size, "seen": seen, "date": date, "to": to, "cc": cc,
@@ -260,7 +260,27 @@ class FakeIMAP:
             lines.append(f"List-Unsubscribe: {m['unsub']}")
         if m["unsub_post"]:
             lines.append("List-Unsubscribe-Post: List-Unsubscribe=One-Click")
+        if m.get("html") is not None:
+            # `html` serves an HTML part: alone as text/html, or beside a
+            # `body` text as multipart/alternative.
+            if m.get("body"):
+                lines.append('Content-Type: multipart/alternative; '
+                             'boundary="mbbound"')
+            else:
+                lines.append('Content-Type: text/html; charset=utf-8')
         return ("\r\n".join(lines) + "\r\n\r\n").encode()
+
+    def _payload(self, m) -> bytes:
+        """The message body after the header blob."""
+        text = m.get("body")
+        if m.get("html") is None:
+            return ((text or "Hello mail body") + "\r\n").encode()
+        if not text:
+            return (m["html"] + "\r\n").encode()
+        return (f'--mbbound\r\nContent-Type: text/plain; charset=utf-8\r\n'
+                f'\r\n{text}\r\n--mbbound\r\n'
+                f'Content-Type: text/html; charset=utf-8\r\n\r\n'
+                f'{m["html"]}\r\n--mbbound--\r\n').encode()
 
     def _bodystructure(self, m) -> str:
         text = '("text" "plain" ("charset" "utf-8") NIL NIL "7bit" 100 5)'
@@ -333,9 +353,7 @@ class FakeIMAP:
                 data = []
                 for i, m in enumerate(msgs):
                     if m["uid"] in wanted:
-                        body = self._header_blob(m) + (
-                            (m.get("body") or "Hello mail body") + "\r\n"
-                        ).encode()
+                        body = self._header_blob(m) + self._payload(m)
                         data += [(f"{i+1} (UID {m['uid']} BODY[] "
                                   f"{{{len(body)}}}".encode(), body), b")"]
                 return "OK", data or [None]

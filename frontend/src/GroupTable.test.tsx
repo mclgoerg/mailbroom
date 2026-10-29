@@ -513,3 +513,56 @@ describe("GroupTable focus lands on the row that took the place", () => {
     expect(document.activeElement!.textContent).toBe("Sender 0");
   });
 });
+
+describe("tracker badge", () => {
+  beforeEach(() => setLang("en"));
+  afterEach(cleanup);
+
+  const tracked = (trackers?: Group["trackers"]): Group =>
+    ({ ...mk(0), trackers });
+
+  it("is absent without tracker data or without tracking", () => {
+    for (const g of [tracked(undefined),
+      tracked({ checked: 4, pixel: 0, click: 0, hosts: [] })]) {
+      const { container, unmount } = renderTable({ groups: [g] });
+      expect(container.querySelector('[aria-label^="Tracks"]')).toBeNull();
+      unmount();
+    }
+  });
+
+  it.each([
+    [{ checked: 4, pixel: 2, click: 0, hosts: ["t.example"] }, "Tracks opens"],
+    [{ checked: 4, pixel: 0, click: 1, hosts: ["t.example"] },
+      "Tracks clicks"],
+    [{ checked: 4, pixel: 2, click: 1, hosts: ["t.example"] },
+      "Tracks opens and clicks"],
+  ])("labels what it tracks (%#)", (trackers, label) => {
+    const { container } = renderTable({ groups: [tracked(trackers)] });
+    expect(container.querySelector(`tbody [aria-label="${label}"]`))
+      .not.toBeNull();
+  });
+
+  it("tapping it opens a popover with the share and the hosts, and does "
+    + "not open the row", () => {
+    const onOpen = vi.fn();
+    const { container, getByRole } = renderTable({ onOpen, groups: [tracked({
+      checked: 4, pixel: 3, click: 1, hosts: ["t.example", "u.example"] })] });
+    fireEvent.click(container.querySelector(
+      'tbody [aria-label="Tracks opens and clicks"]')!);
+    const pop = getByRole("dialog");
+    expect(pop.textContent).toContain("3 of 4 checked mails contain a "
+      + "tracking pixel");
+    expect(pop.textContent).toContain("1 of 4 checked mails contain "
+      + "click-tracking links");
+    expect(pop.textContent).toContain("Hosts: t.example, u.example");
+    expect(onOpen).not.toHaveBeenCalled();
+  });
+
+  it("is translated", () => {
+    setLang("de");
+    const { container } = renderTable({ groups: [tracked({
+      checked: 4, pixel: 3, click: 0, hosts: [] })] });
+    expect(container.querySelector('tbody [aria-label="Verfolgt Öffnungen"]'))
+      .not.toBeNull();
+  });
+});

@@ -1,5 +1,5 @@
 import { BarChart3, BookmarkPlus, ChevronDown, ClipboardList,
-  Copy, Download, Info, Layers, LayoutGrid, Mail, Moon, Paperclip, Pencil, Plus,
+  Copy, Download, Eye, Info, Layers, LayoutGrid, Mail, Moon, Paperclip, Pencil, Plus,
   Power,
   ScrollText, Search, Settings as SettingsIcon, ShieldAlert, Sparkles, Star, Sun,
   Trash2, User, Wand2, Wrench, X }
@@ -12,6 +12,7 @@ import { DetailPanel } from "./components/DetailPanel";
 import { Login } from "./components/Login";
 import { AttachmentsPanel } from "./components/AttachmentsPanel";
 import { DuplicatesPanel } from "./components/DuplicatesPanel";
+import { TrackersPanel } from "./components/TrackersPanel";
 import { GroupTable, type SortKey } from "./components/GroupTable";
 import { SortControl } from "./components/SortControl";
 import { RulesModal } from "./components/RulesModal";
@@ -149,6 +150,7 @@ export default function App() {
   const [aiFilterOpen, setAiFilterOpen] = useState(false);
   const [attsOpen, setAttsOpen] = useState(false);
   const [dupsOpen, setDupsOpen] = useState(false);
+  const [trackersOpen, setTrackersOpen] = useState(false);
   const [statsOpen, setStatsOpen] = useState(false);
   const [spaceOpen, setSpaceOpen] = useState(false);
   const [auditOpen, setAuditOpen] = useState(false);
@@ -667,7 +669,7 @@ export default function App() {
   }, [state?.groups_rev]);
   useEffect(() => { prevGroups.current = groups; });
   const anyModal = (!!detail && !splitPane) || searchOpen || settingsOpen || rulesOpen
-    || aiFilterOpen || attsOpen || dupsOpen || statsOpen || spaceOpen || auditOpen
+    || aiFilterOpen || attsOpen || dupsOpen || trackersOpen || statsOpen || spaceOpen || auditOpen
     || triageOpen || !!foldersOpen;
 
   // Space map "Done": exactly these sender keys become the selection of the
@@ -1704,6 +1706,10 @@ export default function App() {
               <Copy size={16} className="mr-1 inline align-text-bottom" />
               {t("Duplicates")}
             </MenuItem>
+            <MenuItem onClick={() => setTrackersOpen(true)}>
+              <Eye size={16} className="mr-1 inline align-text-bottom" />
+              {t("tracker.menu")}
+            </MenuItem>
             <MenuItem onClick={() => setFoldersOpen("junk")}>
               <ShieldAlert size={16} className="mr-1 inline align-text-bottom" />
               {t("fp.menu")}
@@ -2216,6 +2222,20 @@ export default function App() {
         <DuplicatesPanel
           onClose={() => { setDupsOpen(false); refresh(); }}
           onDeleted={refresh}
+        />
+      )}
+      {trackersOpen && (
+        <TrackersPanel
+          account={account}
+          onClose={() => setTrackersOpen(false)}
+          onPickSender={(key) => {
+            // from: is an exact sender address: show the Sender tab.
+            setTrackersOpen(false);
+            setFlat(false); setMode("sender");
+            setSelected(new Set()); setFocusIdx(-1); cancelFollow();
+            setDetail(null); setActiveChip(null);
+            setFilter(`from:${key}`);
+          }}
         />
       )}
       {attsOpen && state && (

@@ -218,6 +218,16 @@ presets.
   via "Sort: engagement", and filters with `eng:low` / `eng:medium` /
   `eng:high` (tiers <=33 / 34-66 / >=67) - usable in rules and saved
   presets, e.g. `eng:low age:>1y`. The score is never sent to the AI.
+- **Tracker report** - Tools -> Trackers shows which senders put tracking
+  pixels or click-tracking links in their mail: the share of checked mails
+  that carry a pixel, the senders that track most and the hosts they use,
+  plus a small eye badge on each row (tap for the breakdown) and the
+  `has:tracker` filter. It is detected locally from the HTML of mails
+  while the local body index is built (generic heuristics, no vendor
+  lists - hosts are read from your own mail); nothing is loaded, sent or
+  given to the AI, and only two flags plus plain tracker domains are kept
+  per mail. Mails indexed before this existed show up under "Check older
+  mails" (a rebuild of the index, with the usual confirm).
 - **One-click unsubscribe** - RFC 8058 one-click POST or unsubscribe mail
   via Bridge SMTP, straight from a group's detail view - or in bulk:
   select any number of groups and unsubscribe from every one of their

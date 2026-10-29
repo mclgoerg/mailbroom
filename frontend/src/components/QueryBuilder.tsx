@@ -153,6 +153,7 @@ export function QueryBuilder({ value, onChange, className = "",
         {flag("is:new", t("qb.is_new"))}
         {flag("is:still-mailing", t("qb.is_still_mailing"))}
         {flag("has:pinned", t("qb.has_pinned"))}
+        {flag("has:tracker", t("qb.has_tracker"))}
         {flag("eng:low", t("qb.eng_low"))}
         {flag("eng:medium", t("qb.eng_medium"))}
         {flag("eng:high", t("qb.eng_high"))}

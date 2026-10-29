@@ -40,6 +40,7 @@ from . import knowledgestore
 from . import smartkinds
 from . import stats as statsmod
 from . import tenants
+from . import trackers
 from . import unsubstore
 from . import verdictstore
 
@@ -1993,6 +1994,7 @@ def public_state(acc=None) -> dict:
     new_addrs = knownsenders.new_since(acc.name, cfg.get(
         "new_sender_window_days", knownsenders.NEW_SENDER_WINDOW_DAYS))
     pinned = pinstore.load_account(acc.name)
+    tmap = trackers.tracker_map(acc)       # {} without a body index
     now = time.time()
     with acc.lock:
         paddrs = _protected_addrs(plist, acc)
@@ -2013,6 +2015,11 @@ def public_state(acc=None) -> dict:
                     "engagement": group_engagement(rec, now),
                     "pinned": sum(len(u) for u in
                                   pinned_uids(rec, acc, pinned).values()),
+                    # tracking flags of the mails the body index has
+                    # checked (absent: none of its mails was)
+                    **({"trackers": tr} if tmap and (
+                        tr := trackers.group_trackers(rec, tmap, acc))
+                       else {}),
                     # a company row's content summary (live: it follows
                     # deletes, unlike the row's placement)
                     **({"purposes": purpose_summary(rec, acc)}
