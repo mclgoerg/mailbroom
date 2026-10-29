@@ -84,8 +84,8 @@ def parse_filter(q: str) -> dict:
            "unread_min": None, "unsub": False, "protected_only": False,
            "replied": None, "att_min": None, "unsubscribed": None,
            "from_addr": None, "domain": None, "new_only": False,
-            "pinned_only": False, "eng": None,
-            "still_mailing": False, "tracker_only": False}
+           "pinned_only": False, "eng": None,
+           "still_mailing": False, "tracker_only": False}
     for tok in (q or "").strip().lower().split():
         m = _QUAL_RE.match(tok)
         if not m:
