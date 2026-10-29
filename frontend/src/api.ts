@@ -4,7 +4,7 @@ import type {
   KnowledgeList, KnowledgeSaved, KnowledgeSrc,
   Config, ConversationResp, DupSet, FilterPreset, FoldersResp, Grouping, IndexInfo, TrackerReport,
   Mail, MessageDetail,
-  LookalikeCount, MailsResp, Rule, RuleRun, SearchResp, SortEstimate, StatsResp, TrashResp,
+  LookalikeCount, MailsResp, Rule, RuleRun, SearchResp, SortEstimate, StatsResp, TrashResp, WrappedResp,
   FolderMoveResp, FolderRole, PurgePreview, PurgeResult, PurgeSelect,
   UndoEntry, UndoIdent, UnsubBulkResult, UnsubResult,
 } from "./types";
@@ -357,6 +357,10 @@ export const api = {
   attachments: () => req<AttMail[]>("/api/attachments"),
   duplicates: () => req<DupSet[]>("/api/duplicates"),
   stats: () => req<StatsResp>("/api/stats"),
+  /** `tz` = the browser's offset in minutes EAST of UTC. */
+  wrapped: (year?: number) =>
+    req<WrappedResp>(`/api/wrapped?tz=${-new Date().getTimezoneOffset()}`
+      + (year === undefined ? "" : `&year=${year}`)),
   audit: (offset = 0, limit = 50) =>
     req<AuditResp>(`/api/audit?offset=${offset}&limit=${limit}`),
   auditExportUrl: () => withAccount("/api/audit/export"),

@@ -40,6 +40,7 @@ os.environ.update(
     REPLIED_PATH=str(DATA / "replied.json"),
     RULES_PATH=str(DATA / "rules.json"),
     STATS_HISTORY_PATH=str(DATA / "stats_history.json"),
+    AUDIT_LOG_PATH=str(DATA / "audit_log.jsonl"),
     SNAPSHOT_DIR=str(DATA),
     SERVER_PATH=str(DATA / "server.json"),
     TENANTS_DIR=str(DATA / "tenants"),
@@ -236,6 +237,15 @@ PROTON_INBOX = WANDER + (
             size=(7000000, 8000000),
             atts=[("scan-1.pdf", 6000000), ("scan-2.pdf", 6000000)])
 )
+
+# A "ghost" sender for Your year in mail: plenty of mail, never opened. The
+# shared random stream is restored so the data after it stays unchanged.
+_rs = random.getstate()
+PROTON_INBOX += mails('"Quiet Deals" <promo@quietdeals.example>',
+                      ["Deal of the day", "Members only: 20% off",
+                       "Your cart misses you"], 36, span_days=500,
+                      unread=1.0, unsub=True)
+random.setstate(_rs)
 
 
 # Newsletters nobody has opened for ages (the "Describe a filter" demo
@@ -469,9 +479,9 @@ verdictstore.save_mails(
      for i, m in enumerate(paybank)})
 
 # A saved rule + cleanup history for the stats panel.
-rules.create_rule({"name": "Sweep old newsletters",
-                   "query": "is:unsub age:>1y", "action": "trash",
-                   "schedule": "weekly", "account": "proton"})
+sweep = rules.create_rule({"name": "Sweep old newsletters",
+                           "query": "is:unsub age:>1y", "action": "trash",
+                           "schedule": "weekly", "account": "proton"})
 history = {"accounts": {"proton": {
     "scans": [{"ts": int(NOW - d * 86400), "mails": m, "size": s,
                "senders": g}
@@ -480,6 +490,10 @@ history = {"accounts": {"proton": {
                                  (7, 933, 247_000_000, 14),
                                  (1, 824, 205_000_000, 13)]],
     "actions": {
+        "2025-11": {"trash": 90, "archive": 8, "move": 0, "mark_read": 0,
+                    "freed": 0},
+        "2026-03": {"trash": 142, "archive": 33, "move": 0, "mark_read": 12,
+                    "freed": 0, "purge": 60, "purged_bytes": 41_000_000},
         time.strftime("%Y-%m", time.gmtime(NOW - 62 * 86400)):
             {"trash": 214, "archive": 40, "move": 0, "mark_read": 120,
              "freed": 61_000_000},
@@ -491,6 +505,20 @@ history = {"accounts": {"proton": {
              "freed": 96_000_000},
     }}}}
 Path(os.environ["STATS_HISTORY_PATH"]).write_text(json.dumps(history))
+# Audit entries (the cleanup card of Your year in mail): unsubscribes and
+# rule runs in 2026 + 2025, one run by a rule that was deleted since.
+_au = [("unsubscribe", 40, 1, "ok", "user"), ("unsubscribe", 120, 1, "ok",
+       "user"), ("unsubscribe", 300, 1, "ok", "user"),
+       ("unsubscribe", 30, 1, "failed", "user"),
+       ("unsubscribe", 420, 1, "ok", "user"),
+       ("rule_execute", 21, 150, "ok", f"rule:{sweep['id']}"),
+       ("rule_execute", 14, 60, "ok", "rule:deleted1")]
+Path(os.environ["AUDIT_LOG_PATH"]).write_text("".join(
+    json.dumps({"ts": int(NOW - d * 86400), "account": "proton",
+                "actor": actor, "action": action, "count": count,
+                "bytes": 0, "label": "", "outcome": outcome,
+                "error": ""}) + "\n"
+    for action, d, count, outcome, actor in _au))
 Path(os.environ["STATS_PATH"]).write_text(json.dumps(
     {"input_tokens": 412_331, "output_tokens": 60_112, "cost": 1.43,
      "runs": 9, "months": {time.strftime("%Y-%m"): 0.38}}))

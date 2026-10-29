@@ -47,6 +47,7 @@ from . import trackers
 from . import unsub
 from . import unsubstore
 from . import verdictstore
+from . import wrapped
 from . import aisort
 from . import aisortstore
 from .mailops import GROUPINGS
@@ -914,6 +915,16 @@ def get_stats(account: str | None = Query(None)):
     return {**mailops.index_stats(acc),
             "scans": history["scans"][-30:],
             "actions": history["actions"]}
+
+
+@app.get("/api/wrapped")
+def get_wrapped(year: int | None = Query(None, ge=1970, le=9999),
+                tz: int = Query(0, ge=-840, le=840),
+                account: str | None = Query(None)):
+    """Your year in mail: aggregates of one account's index for `year`
+    (default: the newest year with mail); `tz` = browser offset in minutes
+    east of UTC. Metadata only - no subjects."""
+    return wrapped.build(_acc(account), year, tz)
 
 
 @app.get("/api/audit")

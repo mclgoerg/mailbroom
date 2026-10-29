@@ -719,3 +719,29 @@ export interface AiFilterResult {
   explanation: string;
   cost: number;
 }
+
+/** GET /api/wrapped: one calendar year of one account, metadata only. */
+export interface WrappedSender {
+  label: string; addr: string; mails: number; bytes: number;
+}
+export interface WrappedResp {
+  year: number;
+  /** The year is still running ("so far"). */
+  partial: boolean;
+  years: number[];
+  received: { mails: number; bytes: number; senders: number; read: number;
+    new_senders: number };
+  top_senders: WrappedSender[];
+  /** 1-12 */
+  loudest_month: { month: number; mails: number } | null;
+  /** 0 = Monday */
+  busiest_weekday: { weekday: number; mails: number } | null;
+  busiest_hour: { hour: number; mails: number } | null;
+  biggest: { label: string; addr: string; bytes: number } | null;
+  ghosts: { count: number; top: WrappedSender[] };
+  cleanup: {
+    trashed: number; archived: number; purged: number; freed_bytes: number;
+    unsubscribes: number; rule_runs: number;
+    top_rule: { name: string; deleted: boolean; mails: number } | null;
+  };
+}

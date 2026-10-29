@@ -69,6 +69,12 @@
 @utility type-caption {
   font-size: 0.6875rem; line-height: 0.875rem; font-weight: 500;
 }
+/* Story-card headline (Your year in mail): the one place type goes past the
+   panel scale. Fluid so a 390 px phone and a desktop both fit. */
+@utility type-display {
+  font-size: clamp(2.75rem, 12vw, 4.5rem); line-height: 1; font-weight: 700;
+  overflow-wrap: anywhere;
+}
 @utility type-section {
   font-size: 0.75rem; line-height: 1rem; font-weight: 600;
   text-transform: uppercase; letter-spacing: var(--tracking-wide);
