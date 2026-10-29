@@ -136,6 +136,7 @@ export function sieveSnippet(kind: "sender" | "domain", value: string,
  *   is:replied          the user has written to this sender before
  *   is:noreply-ever     the user has never written to any of its senders
  *   is:new              sender first seen within the new-sender window
+ *   is:still-mailing    mail kept arriving after a successful unsubscribe
  *   has:pinned          group contains at least one pinned mail
  *   eng:low|medium|high engagement tier (<=33 / 34-66 / >=67)
  *   att:>10m att:>500k  attachment size above N (needs attachment analysis)
@@ -159,6 +160,7 @@ export interface ParsedFilter {
   domain: string | null;
   newOnly: boolean;
   pinnedOnly: boolean;
+  stillMailing: boolean;
   eng: EngagementTier | null;
 }
 
@@ -168,7 +170,8 @@ export function parseFilter(q: string): ParsedFilter {
   const out: ParsedFilter = { text: [], tags: [], ai: null,
     ageMonths: null, unreadMin: null, unsub: false, protectedOnly: false,
     replied: null, attMin: null, unsubscribed: null, fromAddr: null,
-    domain: null, newOnly: false, pinnedOnly: false, eng: null };
+    domain: null, newOnly: false, pinnedOnly: false, stillMailing: false,
+    eng: null };
   for (const tok of q.trim().toLowerCase().split(/\s+/).filter(Boolean)) {
     const m = tok.match(/^(tag|ai|age|unread|is|has|eng|att|from|domain):(.*)$/);
     if (!m) {
@@ -194,6 +197,7 @@ export function parseFilter(q: string): ParsedFilter {
       out.unsubscribed = false;
     }
     else if (kind === "is" && val === "new") out.newOnly = true;
+    else if (kind === "is" && val === "still-mailing") out.stillMailing = true;
     else if (kind === "has" && val === "pinned") out.pinnedOnly = true;
     else if (kind === "eng" && (val === "low" || val === "medium"
         || val === "high")) out.eng = val;
@@ -273,6 +277,7 @@ export function matchGroup(g: Group, f: ParsedFilter, now = Date.now(),
   if (f.unsub && !g.unsub) return false;
   if (f.protectedOnly && !g.protected) return false;
   if (f.newOnly && !g.new) return false;
+  if (f.stillMailing && !g.still_mailing) return false;
   if (f.pinnedOnly && !g.pinned) return false;
   if (f.eng !== null && engagementTier(g.engagement ?? 0) !== f.eng) {
     return false;

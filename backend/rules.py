@@ -84,7 +84,8 @@ def parse_filter(q: str) -> dict:
            "unread_min": None, "unsub": False, "protected_only": False,
            "replied": None, "att_min": None, "unsubscribed": None,
            "from_addr": None, "domain": None, "new_only": False,
-           "pinned_only": False, "eng": None}
+           "pinned_only": False, "eng": None,
+           "still_mailing": False}
     for tok in (q or "").strip().lower().split():
         m = _QUAL_RE.match(tok)
         if not m:
@@ -118,6 +119,8 @@ def parse_filter(q: str) -> dict:
             out["unsubscribed"] = False
         elif kind == "is" and val == "new":
             out["new_only"] = True
+        elif kind == "is" and val == "still-mailing":
+            out["still_mailing"] = True
         elif kind == "eng" and val in ("low", "medium", "high"):
             out["eng"] = val
         elif kind == "has" and val == "pinned":
@@ -157,6 +160,8 @@ def match_group(g: dict, f: dict, now: float | None = None) -> bool:
     if f["protected_only"] and not g.get("protected"):
         return False
     if f["new_only"] and not g.get("new"):
+        return False
+    if f["still_mailing"] and not g.get("still_mailing"):
         return False
     if f["pinned_only"] and not g.get("pinned"):
         return False
@@ -253,6 +258,7 @@ _PURGE_UNSUPPORTED = (
     ("tags", "tag:"), ("ai", "ai:"), ("unsub", "is:unsub"),
     ("protected_only", "is:protected"), ("replied", "is:replied"),
     ("unsubscribed", "is:unsubscribed"), ("new_only", "is:new"),
+    ("still_mailing", "is:still-mailing"),
     ("pinned_only", "has:pinned"), ("eng", "eng:"), ("att_min", "att:"),
     ("domain", "domain:"))
 

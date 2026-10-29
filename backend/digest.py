@@ -32,6 +32,7 @@ from pathlib import Path
 from . import accounts
 from . import auditlog
 from . import config as cfgmod
+from . import mailops
 from . import rules as rulesmod
 from . import smtpout
 from . import tenants
@@ -71,6 +72,7 @@ STRINGS = {
         "Execute if it looks right.",
     "rule_applied": "Rule actions (applied automatically)",
     "freed": "Space freed",
+    "still_mailing": "Senders still mailing after you unsubscribed",
     "unsub_header": "Unsubscribe outcomes",
     "unsub_done": "done",
     "unsub_link": "needs manual confirmation",
@@ -221,12 +223,15 @@ def _aggregate(entries: list[dict],
     return mail_counts, freed, unsub_attempts, unsub_outcomes
 
 
-def _rows(mail_counts: dict[str, int], freed: int) -> list[tuple[str, str]]:
+def _rows(mail_counts: dict[str, int], freed: int,
+          still_mailing: int = 0) -> list[tuple[str, str]]:
     """-> [(label, value)] for every metric that actually happened."""
     rows = [(STRINGS[label], str(mail_counts[action]))
             for action, label in _ACTION_LABELS if mail_counts.get(action)]
     if freed:
         rows.append((STRINGS["freed"], _fmt_bytes(freed)))
+    if still_mailing:
+        rows.append((STRINGS["still_mailing"], str(still_mailing)))
     return rows
 
 
@@ -379,6 +384,9 @@ def compose(account: str, since_ts: int) -> tuple[str, str, str] | None:
         # reference (its rule was deleted meanwhile) - same as no
         # activity at all.
         return None
+    # Only a line on a digest that goes out anyway - it never triggers one.
+    rows += _rows({}, 0, mailops.count_still_mailing(accounts.get(account),
+                                                     account))
     since_str = (time.strftime("%Y-%m-%d %H:%M", time.localtime(since_ts))
                  if since_ts else STRINGS["since_ever"])
     subject = STRINGS["subject"].format(account=account)
@@ -399,7 +407,7 @@ def compose_demo(account: str) -> tuple[str, str, str]:
     freed = 18_400_000
     unsub_attempts = 4
     unsub_outcomes = {"done": 2, "link": 1, "failed": 1}
-    rows = _rows(mail_counts, freed)
+    rows = _rows(mail_counts, freed, 3)
     subject = STRINGS["demo_subject"].format(account=account)
     text = _compose_text(account, STRINGS["demo_since"], rows, mail_counts,
                          unsub_attempts, unsub_outcomes,

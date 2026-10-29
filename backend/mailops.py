@@ -1867,6 +1867,61 @@ def _group_new(rec: dict, new_addrs: set[str], acc) -> bool:
     return False
 
 
+# A sender is "still mailing" once it sends mail that ARRIVED more than this
+# long after a successful unsubscribe (senders get 48 h to honour one).
+STILL_MAILING_GRACE = 2 * 86400
+_STILL_MAILING_ADDRS_CAP = 20
+
+
+def _still_mailing_cutoffs(entries: dict[str, dict]) -> dict[str, int]:
+    """{addr: unsubscribe ts + grace} of the senders recorded "done"
+    (acknowledged-by-hand included). link / failed / pending never count:
+    only a completed unsubscribe makes later mail a broken promise."""
+    return {a: int(e.get("ts") or 0) + STILL_MAILING_GRACE
+            for a, e in entries.items()
+            if e.get("status") == "done" and e.get("ts")}
+
+
+def _group_still_mailing(rec: dict, cutoffs: dict[str, int],
+                         entries: dict[str, dict], acc) -> dict | None:
+    """{n, since_ts, senders, addrs} when mails of this group ARRIVED (the
+    index's INTERNALDATE `ts`, never the sender-controlled Date header)
+    after one of its senders' unsubscribe + grace (lock held); else None.
+    `n` counts this group's own mails; `since_ts` is the earliest
+    unsubscribe time among the offending senders; `addrs` is capped."""
+    if not cutoffs:
+        return None
+    n = 0
+    hit: set[str] = set()
+    for folder, uids in rec["folders"].items():
+        for uid in uids:
+            m = acc.index.get(ikey(folder, uid))
+            if not m:
+                continue
+            cut = cutoffs.get(m["addr"])
+            if cut is not None and m["ts"] and m["ts"] > cut:
+                n += 1
+                hit.add(m["addr"])
+    if not n:
+        return None
+    return {"n": n, "senders": len(hit),
+            "since_ts": min(int(entries[a]["ts"]) for a in hit),
+            "addrs": sorted(hit)[:_STILL_MAILING_ADDRS_CAP]}
+
+
+def count_still_mailing(acc, account: str | None = None) -> int:
+    """How many senders are still mailing after an unsubscribe (the digest
+    line). Takes the lock itself."""
+    entries = unsubstore.load_account(account or acc.name)
+    cutoffs = _still_mailing_cutoffs(entries)
+    if not cutoffs:
+        return 0
+    with acc.lock:
+        return len({m["addr"] for m in acc.index.values()
+                    if m["addr"] in cutoffs and m["ts"]
+                    and m["ts"] > cutoffs[m["addr"]]})
+
+
 def pinned_uids(rec: dict, acc, pinned: set[str]) -> dict[str, set[int]]:
     """{folder: {uid, …}} of the mails in `rec` whose Message-ID is pinned
     (lock held). Pins key off the Message-ID, so a pinned mail is found
@@ -1934,6 +1989,7 @@ def public_state(acc=None) -> dict:
     cfg = cfgmod.load_config()
     plist = cfgmod.normalize_protected(cfg.get("protected"))
     unsub_entries = unsubstore.load_account(acc.name)
+    still_cut = _still_mailing_cutoffs(unsub_entries)
     new_addrs = knownsenders.new_since(acc.name, cfg.get(
         "new_sender_window_days", knownsenders.NEW_SENDER_WINDOW_DAYS))
     pinned = pinstore.load_account(acc.name)
@@ -1948,6 +2004,8 @@ def public_state(acc=None) -> dict:
                     "protected": _group_protected(rec, paddrs, acc),
                     "unsubscribed": _group_unsub(rec, unsub_entries, acc),
                     "new": _group_new(rec, new_addrs, acc),
+                    "still_mailing": _group_still_mailing(
+                        rec, still_cut, unsub_entries, acc),
                     # Recomputed from the CURRENT aggregates: unread/count
                     # move after a scan (mark read, removals) and recency
                     # moves with the clock; the stored value is the

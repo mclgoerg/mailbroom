@@ -166,6 +166,7 @@ export const EN: Record<string, string> = {
   "qb.is_replied": "replied to",
   "qb.is_protected": "protected",
   "qb.is_new": "new senders",
+  "qb.is_still_mailing": "still mailing after unsubscribe",
   "ai.shared_note":
     "No own key - AI runs on the server's shared key "
     + "(your monthly cap: {cap}).",
@@ -403,6 +404,12 @@ export const EN: Record<string, string> = {
     "First seen recently - a signal only, no action was taken "
     + "automatically",
   "chip.new_count": "New ({n})",
+  "chip.still_count": "Still mailing ({n})",
+  "still.badge": "Still mailing",
+  "still.title": "Still mailing after you unsubscribed",
+  "still.text": "{n} mails since you unsubscribed on {date}",
+  "still.text_one": "1 mail since you unsubscribed on {date}",
+  "still.text_many": "{n} mails from {senders} senders since you unsubscribed (first on {date})",
   "protected.help":
     "One entry per line: an address (user@example.com) or a domain "
     + "(@example.com). Protected senders are skipped by bulk deletions and "

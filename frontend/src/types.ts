@@ -75,6 +75,13 @@ export interface GroupUnsub {
   addr: string;
 }
 
+export interface StillMailing {
+  n: number;            // this row's mails delivered after the unsubscribe
+  senders: number;      // distinct senders behind them
+  since_ts: number;     // unix time of the (earliest) unsubscribe
+  addrs: string[];      // those senders, capped
+}
+
 export interface Group {
   key: string;
   label: string;
@@ -95,6 +102,9 @@ export interface Group {
   att_size: number;
   unsubscribed: GroupUnsub | null;
   new: boolean;
+  // Mails that ARRIVED after the sender's unsubscribe + grace (see
+  // backend mailops._group_still_mailing); absent in old snapshots.
+  still_mailing?: StillMailing | null;
   pinned: number;   // mails of this group protected from bulk actions
   engagement: number;   // 0-100, see lib.ts engagementTier()
   // Smart grouping only. The backend ships fields, the UI words them

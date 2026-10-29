@@ -61,6 +61,13 @@ test("new-senders chip emits the is:new DSL token", () => {
   expect(parseFilter(s.get()).newOnly).toBe(true);
 });
 
+test("still-mailing flag emits the is:still-mailing DSL token", () => {
+  const s = setup();
+  fireEvent.click(screen.getByText("still mailing after unsubscribe"));
+  expect(s.get()).toBe("is:still-mailing");
+  expect(parseFilter(s.get()).stillMailing).toBe(true);
+});
+
 test("tokens are never added twice", () => {
   const s = setup("is:unsub");
   fireEvent.click(screen.getByText("with unsubscribe link"));
