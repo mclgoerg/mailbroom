@@ -165,6 +165,22 @@ PROTON_INBOX = WANDER + (
             ["March meetup - RAW files inside", "Contest results 🎉"],
             9, unread=0.1, size=(2000000, 6000000),
             atts=[("IMG_2041.jpg", 4200000), ("IMG_2044.jpg", 3800000)])
+    # one domain with several senders (and one protected address on another
+    # shared domain), so the Space map has something to drill into
+    + mails('"Northwind Shop" <shop@northwind.example>',
+            ["Your order {n} is confirmed", "Autumn collection is here"],
+            60, unread=0.6, size=(40000, 120000))
+    + mails('"Northwind News" <news@northwind.example>',
+            ["Northwind weekly", "Members only: early access"],
+            80, unsub=True, unread=0.9, size=(30000, 90000))
+    + mails('"Northwind Invoices" <invoices@northwind.example>',
+            ["Invoice NW-{n}", "Your receipt NW-{n}"],
+            20, unread=0.3, size=(300000, 700000),
+            atts=[("invoice.pdf", 420000)])
+    + mails('"Mailfox Photos" <photos@mailfox.example>',
+            ["Your album is ready", "New photos from the trip"],
+            14, unread=0.2, size=(800000, 2500000),
+            atts=[("album.zip", 1900000)])
     + mails('"Dr. Meier Praxis" <praxis@dr-meier.example>',
             ["Terminbestätigung", "Ihr Laborbefund ist da"], 5, unread=0.1)
     # Quick wins (F5): senders that have gone quiet, so the strip has cards

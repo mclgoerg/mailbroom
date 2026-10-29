@@ -137,6 +137,13 @@ presets.
 - **Statistics** (Tools → Statistics) - mails-per-year histogram, top
   domains by size, scan history and per-month cleanup tallies ("moved to
   Trash" and, for permanent deletes only, "freed"), persisted across restarts.
+- **Space map** (Tools → Space map) - a treemap of the whole mailbox by
+  size: tiles are domains, tap one to see its senders; tiny ones fold into
+  an "Other" tile. Colour by engagement, age of the last mail or AI
+  verdict. "Select" ticks tiles (protected senders are skipped), and "Done"
+  hands exactly those senders to the Sender list's normal selection for
+  Trash / Archive with the usual confirmation - the map itself never moves
+  mail.
 - **Duplicate finder** - mails with the same Message-ID (e.g. copies
   across folders) or identical sender + subject + size, grouped into sets
   with one click to select everything but the newest copy.
@@ -288,7 +295,7 @@ presets.
   save it as a preset, or start a rule from it (rules still begin in report
   mode). Only your sentence, the filter syntax and your tag names are sent
   to the provider - no mail data - and nothing is selected or changed.
-- **Tools menu** - Rules, Attachments, Duplicates, Statistics, Audit Log,
+- **Tools menu** - Rules, Attachments, Duplicates, Statistics, Space map, Audit Log,
   AI review (once AI is set up) and Export CSV live under one Tools
   button. AI review and CSV export scope to the current selection once
   something is selected; the Tools versions (nothing selected) act on

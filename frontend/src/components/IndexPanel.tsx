@@ -1,11 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "../api";
 import { t } from "../i18n";
-import { fmtSize as fmtSmall } from "../lib";
+import { fmtSizeGb as fmtSize } from "../lib";
 
-/** Like fmtSize, plus GB - volumes and big indexes outgrow 1000 MB. */
-const fmtSize = (b: number): string =>
-  b >= 1073741824 ? `${(b / 1073741824).toFixed(1)} GB` : fmtSmall(b);
 import type { BodySearchMode, IndexEstimate, IndexInfo } from "../types";
 import { Button, confirmDialog, ProgressBar, Spinner } from "./ui";
 
