@@ -65,7 +65,7 @@ sys.modules.setdefault("pytest", types.SimpleNamespace(fixture=_fixture))
 
 from conftest import FakeIMAP, make_msg          # noqa: E402
 from backend import (accounts, knowledgestore, mailops, rules,   # noqa: E402
-                     verdictstore)
+                     unsubstore, verdictstore)
 
 random.seed(7)
 NOW = time.time()
@@ -351,6 +351,27 @@ for key, verdict, reason in [
 ]:
     verdictstore.save("sender", {key: {"verdict": verdict, "reason": reason}},
                       "proton")
+
+# Unsubscribe records for the watchdog: three "done" senders whose mail kept
+# arriving (flagged "Still mailing"), one that went quiet (just a tick), and
+# a confirmation-page ("link") and a failed attempt that must NOT be flagged.
+_UN_NOW = int(NOW)
+unsubstore.save({
+    "news@acme-store.example": {"status": "done", "method": "one-click",
+        "detail": "", "error": "", "ts": _UN_NOW - 40 * 86400},
+    "notify@chirper.example": {"status": "done", "method": "mailto",
+        "detail": "", "error": "", "ts": _UN_NOW - 120 * 86400},
+    "jobs@jobportal.example": {"status": "done",
+        "method": "confirmed by hand", "detail": "", "error": "",
+        "ts": _UN_NOW - 300 * 86400},
+    "digest@techdigest.example": {"status": "done", "method": "one-click",
+        "detail": "", "error": "", "ts": _UN_NOW - 86400},
+    "info@streamly.example": {"status": "link", "method": "",
+        "detail": "https://streamly.example/stop", "error": "",
+        "ts": _UN_NOW - 200 * 86400},
+    "newsletter@bergsport-huber.example": {"status": "failed", "method": "",
+        "detail": "", "error": "HTTP 500", "ts": _UN_NOW - 200 * 86400},
+}, "proton")
 
 # Per-mail ratings on the PayBank group -> rating chips.
 paybank = [m for m in PROTON_INBOX if "paybank" in m["from"]]

@@ -136,6 +136,17 @@ describe("parseFilter", () => {
     expect(other.pinnedOnly).toBe(false);
     expect(other.text).toEqual(["has:other"]);
   });
+  it("is:still-mailing parses like backend/rules.py and filters on the "
+    + "group field", () => {
+    expect(parseFilter("is:still-mailing").stillMailing).toBe(true);
+    expect(parseFilter("is:still-mailing").text).toEqual([]);
+    expect(parseFilter("").stillMailing).toBe(false);
+    const f = parseFilter("is:still-mailing");
+    const sm = { n: 1, senders: 1, since_ts: 1, addrs: [] };
+    expect(matchGroup(g({ still_mailing: sm }), f)).toBe(true);
+    expect(matchGroup(g({ still_mailing: null }), f)).toBe(false);
+    expect(matchGroup(g(), f)).toBe(false);
+  });
   it("recognises from:/domain: (block-sender exact qualifiers)", () => {
     expect(parseFilter("from:noreply@dhl.example").fromAddr)
       .toBe("noreply@dhl.example");

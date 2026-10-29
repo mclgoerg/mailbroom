@@ -1,5 +1,5 @@
 import { ArrowUpDown, Ban, Check, ChevronLeft, MailMinus, MessagesSquare,
-  MoreHorizontal, Pin, PinOff, Shield, Wand2, X }
+  MoreHorizontal, Pin, PinOff, Shield, TriangleAlert, Wand2, X }
   from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { api } from "../api";
@@ -13,8 +13,8 @@ import { MailRows, MessageView } from "./MailList";
 import { SenderList, type FileEntry, type SenderAction } from "./SenderList";
 import { ThreadView } from "./ThreadView";
 import { Button, Chip, confirmDialog, ensureAiAck, Input, LINK, LINK_ACCENT, Loading, Menu,
-  MenuItem, Modal, PanelHeader, PinButton, ProtectButton, Segmented, Select,
-  Spinner, tabPanelProps, useMediaQuery }
+  MenuItem, Modal, Notice, PanelHeader, PinButton, ProtectButton, Segmented,
+  Select, Spinner, stillMailingText, tabPanelProps, useMediaQuery }
   from "./ui";
 
 // Rating filter chips: same green/yellow/red/unrated buckets as the
@@ -433,6 +433,32 @@ export function DetailPanel({ grouping, group, aiEnabled, protectedNow,
       ) : (
         <>
           {filingBox}
+          {/* The unsubscribe did not hold: say how bad, offer the block (a
+              sender row only - blocking a whole domain from a pooled row
+              would be a different, bigger decision). */}
+          {group.still_mailing && (
+            <div className="border-b border-line px-4 py-2">
+              <Notice tone="warn" icon={<TriangleAlert size={16} />}>
+                <div className="font-semibold">{t("still.title")}</div>
+                <div>{stillMailingText(group.still_mailing)}</div>
+                {group.still_mailing.senders > 1 && (
+                  <div className="mt-1 break-words">
+                    {group.still_mailing.addrs.join(", ")}
+                    {group.still_mailing.senders
+                      > group.still_mailing.addrs.length && " …"}
+                  </div>
+                )}
+                {onBlock && !blocked
+                  && shortcutTarget(grouping, group)?.kind === "sender" && (
+                  <Button variant="secondary" size="sm" className="mt-2"
+                    title={t("block.tip")} onClick={() => onBlock(group)}>
+                    <Ban size={14} className="mr-1 inline align-text-bottom" />
+                    {t("block.btn")}
+                  </Button>
+                )}
+              </Notice>
+            </div>
+          )}
           {/* Smart pools: one plain line on why these senders are together,
               what a company's mails are about, and the Senders | Mails
               switch (the senders are the point; the mails stay one tap away). */}

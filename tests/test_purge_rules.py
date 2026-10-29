@@ -232,6 +232,7 @@ def test_unknown_scope_and_unsupported_settings_are_refused():
 @pytest.mark.parametrize("query", [
     "tag:shipping", "ai:safe", "is:unsub", "is:protected", "is:replied",
     "is:noreply-ever", "is:unsubscribed", "is:not-unsubscribed", "is:new",
+    "is:still-mailing",
     "has:pinned", "eng:low", "att:>1k", "age:>1y tag:x"])
 def test_filter_qualifiers_the_role_index_cannot_answer_are_refused(query):
     """A qualifier answered from missing data would widen the match (`eng:low`

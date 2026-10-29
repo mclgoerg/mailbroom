@@ -77,6 +77,12 @@ export const DE: Record<string, string> = {
     "Kürzlich erstmals gesehen - nur ein Hinweis, es wurde automatisch "
     + "nichts unternommen",
   "chip.new_count": "Neu ({n})",
+  "chip.still_count": "Schreibt weiter ({n})",
+  "still.badge": "Schreibt weiter",
+  "still.title": "Schreibt nach dem Abbestellen weiter",
+  "still.text": "{n} Mails, seit du am {date} abbestellt hast",
+  "still.text_one": "1 Mail, seit du am {date} abbestellt hast",
+  "still.text_many": "{n} Mails von {senders} Absendern, seit du abbestellt hast (erste am {date})",
   "confirm.trash_protected":
     "Die Gruppe „{label}“ ist geschützt. Mails trotzdem in den "
     + "Papierkorb verschieben?",
@@ -887,6 +893,7 @@ export const DE: Record<string, string> = {
   "qb.is_replied": "geantwortet",
   "qb.is_protected": "geschützt",
   "qb.is_new": "neue Absender",
+  "qb.is_still_mailing": "schreibt nach dem Abbestellen weiter",
   "ai.shared_note":
     "Kein eigener Schlüssel - KI läuft über den gemeinsamen "
     + "Server-Schlüssel (dein Monatslimit: {cap}).",

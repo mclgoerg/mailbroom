@@ -6,7 +6,7 @@ import { useEffect, useRef, useState, type MouseEvent } from "react";
 import { fmtSize } from "../api";
 import type { Group, Grouping, SmartKind } from "../types";
 import { t } from "../i18n";
-import { AiTag, Avatar, Button, Checkbox, EngagementMeter, PinBadge, RatingChips, ShortDate, Tag, Select, isModalOpen } from "./ui";
+import { AiTag, Avatar, Button, Checkbox, EngagementMeter, PinBadge, RatingChips, ShortDate, StillMailingBadge, Tag, Select, isModalOpen } from "./ui";
 
 export type SortKey = "count" | "size" | "label" | "last" | "unreadPct"
   | "engagement";
@@ -104,6 +104,9 @@ const unreadPct = (g: Group) =>
    it without re-running the whole bulk job. */
 function UnsubBadge({ g, onAck }: { g: Group; onAck: (addr: string) => void }) {
   const u = g.unsubscribed;
+  // A broken promise outranks the "✓ Unsubscribed" it contradicts - and it
+  // shows even on a row with no unsubscribe header of its own.
+  if (g.still_mailing) return <StillMailingBadge sm={g.still_mailing} />;
   if (!u) return null;
   if (u.status === "done") {
     return (

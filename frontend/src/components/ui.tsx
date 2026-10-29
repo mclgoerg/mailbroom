@@ -1,12 +1,14 @@
-import { AlertCircle, Check, CheckCircle2, Info, Pin, Shield, X }
+import { AlertCircle, Check, CheckCircle2, Info, Pin, Shield, TriangleAlert,
+  X }
   from "lucide-react";
+import { createPortal } from "react-dom";
 import { createContext, useCallback, useContext, useEffect, useId,
   useLayoutEffect, useMemo, useRef, useState, type ComponentProps,
   type KeyboardEvent as ReactKeyboardEvent, type ReactNode, type RefObject }
   from "react";
 import { getLang, t } from "../i18n";
 import { engagementTier, fmtDate } from "../lib";
-import type { GroupAi } from "../types";
+import type { GroupAi, StillMailing } from "../types";
 
 /** One-time consent: what metadata the AI features transmit. */
 export async function ensureAiAck(): Promise<boolean> {
@@ -246,6 +248,67 @@ export function EngagementMeter({ g }: {
           <div className="mt-0.5 text-muted">{parts.join(" · ")}</div>
         </div>
       )}
+    </span>
+  );
+}
+
+/** "4 mails since you unsubscribed on 3 Oct" - or, for a row pooling several
+ *  senders, how many of them kept mailing. */
+export function stillMailingText(sm: StillMailing): string {
+  const date = fmtDate(new Date(sm.since_ts * 1000).toISOString()
+    .slice(0, 10), new Date(), { lang: getLang() });
+  return sm.senders > 1
+    ? t("still.text_many", { n: sm.n, senders: sm.senders, date })
+    : t("still.text", { n: sm.n, date });
+}
+
+/** Warning badge for a sender that keeps mailing after a successful
+ *  unsubscribe. A button: a tap (or click) opens a popover with the numbers
+ *  - touch screens have no hover. Rows clip their overflow and sit mid-line,
+ *  so the popover is portalled to <body> and placed against the viewport. */
+export function StillMailingBadge({ sm }: { sm: StillMailing }) {
+  const { open, setOpen, ref, pop } = usePopover();
+  const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
+  const text = stillMailingText(sm);
+  useLayoutEffect(() => {
+    if (!open) { setPos(null); return; }
+    const trig = ref.current?.getBoundingClientRect();
+    const w = pop.current?.offsetWidth ?? 0;
+    if (!trig) return;
+    setPos({ top: trig.bottom + 4,
+      left: Math.max(8, Math.min(trig.left, window.innerWidth - w - 8)) });
+  }, [open, ref, pop]);
+  useEffect(() => {
+    if (!open) return;
+    const close = () => setOpen(false);
+    window.addEventListener("scroll", close, true);
+    window.addEventListener("resize", close);
+    return () => {
+      window.removeEventListener("scroll", close, true);
+      window.removeEventListener("resize", close);
+    };
+  }, [open, setOpen]);
+  return (
+    <span ref={ref} className="relative inline-block">
+      <button type="button" title={text} aria-expanded={open}
+        data-still-mailing
+        onClick={(e) => { e.stopPropagation(); setOpen(!open); }}
+        className="cursor-pointer rounded-badge">
+        <Tag tone="review" className="inline-flex items-center gap-1
+          whitespace-nowrap">
+          <TriangleAlert size={14} aria-hidden /> {t("still.badge")}
+        </Tag>
+      </button>
+      {open && createPortal(
+        <div ref={pop} role="dialog" onClick={(e) => e.stopPropagation()}
+          style={{ position: "fixed", top: pos?.top ?? 0, left: pos?.left ?? 0,
+            visibility: pos ? "visible" : "hidden" }}
+          className="z-(--z-dropdown) w-max max-w-[min(18rem,calc(100vw-1rem))]
+            rounded-card border border-line bg-panel p-3 text-left type-meta
+            shadow-popover">
+          <div className="font-semibold text-body">{t("still.title")}</div>
+          <div className="mt-0.5 text-muted">{text}</div>
+        </div>, document.body)}
     </span>
   );
 }
@@ -989,18 +1052,24 @@ export function useMediaQuery(query: string): boolean {
 /** Dismissible inline notice (replaces the one-off banners). `tone="danger"`
  *  is the same red pair as the error toast (`keep`): a warning about
  *  something irreversible (e.g. deleting mail on the server for good). */
+const NOTICE_TONE = {
+  neutral: "bg-panel2 text-body",
+  danger: "bg-keep-bg text-keep-fg",
+  warn: "bg-review-bg text-review-fg",
+};
+
 export function Notice({ children, icon, onClose, tone = "neutral",
   className = "" }: {
   children: ReactNode; icon?: ReactNode; onClose?: () => void;
-  tone?: "neutral" | "danger";
+  tone?: "neutral" | "danger" | "warn";
   className?: string;
 }) {
   return (
     <div role="status" className={`flex items-start gap-2 rounded-card
-      px-3 py-2 type-meta ${tone === "danger" ? "bg-keep-bg text-keep-fg"
-        : "bg-panel2 text-body"} ${className}`}>
+      px-3 py-2 type-meta ${NOTICE_TONE[tone]} ${className}`}>
       {icon != null && <span className={`mt-0.5 shrink-0 ${tone === "danger"
-        ? "text-keep-fg" : "text-muted"}`}>{icon}</span>}
+        ? "text-keep-fg" : tone === "warn" ? "text-review-fg"
+        : "text-muted"}`}>{icon}</span>}
       <div className="min-w-0 flex-1 py-0.5">{children}</div>
       {onClose && (
         <Button variant="quiet" size="icon" label={t("Dismiss")}

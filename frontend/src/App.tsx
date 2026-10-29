@@ -820,6 +820,7 @@ export default function App() {
     }
     if (preset === "unsub_pending") return "is:unsub is:not-unsubscribed";
     if (preset === "new") return "is:new";
+    if (preset === "still") return "is:still-mailing";
     return "";
   };
 
@@ -1695,6 +1696,15 @@ export default function App() {
             onClick={() => selectPreset("new")}>
             {t("chip.new_count",
               { n: allGroups.filter((g) => g.new).length })}
+          </Chip>
+        )}
+        {/* Unsubscribe watchdog: same rule as the new-senders chip (only
+            with something to show, counted over the full mailbox). */}
+        {allGroups.some((g) => g.still_mailing) && (
+          <Chip className="shrink-0" on={filter === "is:still-mailing"}
+            onClick={() => selectPreset("still")}>
+            {t("chip.still_count",
+              { n: allGroups.filter((g) => g.still_mailing).length })}
           </Chip>
         )}
         {/* Saved filter presets: user-defined, visually distinct (outlined
