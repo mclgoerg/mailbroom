@@ -76,14 +76,20 @@ function usePopover() {
   const [alignRight, setAlignRight] = useState(false);
   const ref = useRef<HTMLSpanElement>(null);
   const pop = useRef<HTMLDivElement>(null);
-  // Opens left-aligned under the trigger; flips if that runs off the screen.
+  // Opens left-aligned under the trigger; flips if that runs off the right
+  // edge, and is nudged back when it would then run off the left one.
   useLayoutEffect(() => {
-    if (!open) { setAlignRight(false); return; }
-    const r = pop.current?.getBoundingClientRect();
-    if (r && r.width > 0 && r.right > window.innerWidth - 8) {
+    const el = pop.current;
+    if (!open || !el) { setAlignRight(false); return; }
+    el.style.transform = "";
+    const r = el.getBoundingClientRect();
+    if (r.width <= 0) return;
+    if (!alignRight && r.right > window.innerWidth - 8) {
       setAlignRight(true);
+    } else if (r.left < 8) {
+      el.style.transform = `translateX(${8 - r.left}px)`;
     }
-  }, [open]);
+  }, [open, alignRight]);
   useEffect(() => {
     if (!open) return;
     const onDoc = (e: Event) => {

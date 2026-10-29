@@ -294,7 +294,6 @@ function DesktopTable({ slice, baseIdx, selected, focusedKey, openKey, compact, 
                   </Tag>
                 )}
                 <PinBadge n={g.pinned} />
-                <TrackerBadge g={g} />
                 <UnsubBadge g={g} onAck={onAckUnsub} />
                 {blockedKeys?.has(g.key) && (
                   <Tag tone="keep">
@@ -311,7 +310,12 @@ function DesktopTable({ slice, baseIdx, selected, focusedKey, openKey, compact, 
               </div>
             </td>
             <td className="px-2 py-2 align-top">
-              <EngagementMeter g={g} />
+              {/* beside the meter, not in the tag cell (overflow-hidden
+                  would clip its popover) */}
+              <div className="flex items-center gap-0.5">
+                <EngagementMeter g={g} />
+                <TrackerBadge g={g} />
+              </div>
             </td>
             <td className="whitespace-nowrap px-2 py-2 text-right align-top
               tabular-nums">
