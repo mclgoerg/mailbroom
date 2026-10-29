@@ -1,5 +1,5 @@
 import { BarChart3, BookmarkPlus, ChevronDown, ClipboardList,
-  Copy, Download, Info, Mail, Moon, Paperclip, Pencil, Plus,
+  Copy, Download, Info, LayoutGrid, Mail, Moon, Paperclip, Pencil, Plus,
   Power,
   ScrollText, Search, Settings as SettingsIcon, ShieldAlert, Sparkles, Star, Sun,
   Trash2, User, Wand2, Wrench, X }
@@ -18,6 +18,7 @@ import { RulesModal } from "./components/RulesModal";
 import { AllMailsView } from "./components/AllMailsView";
 import { SearchPanel } from "./components/SearchPanel";
 import { SettingsModal } from "./components/SettingsModal";
+import { SpaceMapPanel } from "./components/SpaceMapPanel";
 import { StatsPanel } from "./components/StatsPanel";
 import { AiFilterPanel } from "./components/AiFilterPanel";
 import { QueryBuilder } from "./components/QueryBuilder";
@@ -147,6 +148,7 @@ export default function App() {
   const [attsOpen, setAttsOpen] = useState(false);
   const [dupsOpen, setDupsOpen] = useState(false);
   const [statsOpen, setStatsOpen] = useState(false);
+  const [spaceOpen, setSpaceOpen] = useState(false);
   const [auditOpen, setAuditOpen] = useState(false);
   // Folders panel (Junk | Trash): which folder it opens on, null = closed
   const [foldersOpen, setFoldersOpen] = useState<FolderRole | null>(null);
@@ -659,7 +661,24 @@ export default function App() {
   }, [state?.groups_rev]);
   useEffect(() => { prevGroups.current = groups; });
   const anyModal = (!!detail && !splitPane) || searchOpen || settingsOpen || rulesOpen
-    || aiFilterOpen || attsOpen || dupsOpen || statsOpen || auditOpen || !!foldersOpen;
+    || aiFilterOpen || attsOpen || dupsOpen || statsOpen || spaceOpen || auditOpen
+    || !!foldersOpen;
+
+  // Space map "Done": exactly these sender keys become the selection of the
+  // Sender tab (filter cleared so none of them is hidden); the bulk bar and
+  // its confirm dialog take it from there.
+  const selectSenders = (keys: string[]) => {
+    const live = keys.filter((k) => state?.groups.sender?.[k]);
+    setSpaceOpen(false);
+    setFlat(false);
+    setMode("sender");
+    setFilter("");
+    setActiveChip(null);
+    setFocusIdx(-1);
+    cancelFollow();
+    setDetail(null);
+    setSelected(new Set(live));
+  };
 
   const startScan = async () => {
     setSelected(new Set());
@@ -1613,6 +1632,11 @@ export default function App() {
               <BarChart3 size={16} className="mr-1 inline align-text-bottom" />
               {t("Statistics")}
             </MenuItem>
+            <MenuItem disabled={state?.status !== "done"}
+              onClick={() => setSpaceOpen(true)}>
+              <LayoutGrid size={16} className="mr-1 inline align-text-bottom" />
+              {t("space.title")}
+            </MenuItem>
             <MenuItem onClick={() => setAuditOpen(true)}>
               <ScrollText size={16} className="mr-1 inline align-text-bottom" />
               {t("Audit Log")}
@@ -2084,6 +2108,11 @@ export default function App() {
         />
       )}
       {statsOpen && <StatsPanel onClose={() => setStatsOpen(false)} />}
+      {spaceOpen && state && (
+        <SpaceMapPanel groups={state.groups.sender}
+          onClose={() => setSpaceOpen(false)}
+          onDone={selectSenders} />
+      )}
       {auditOpen && (
         <AuditLogPanel rules={state?.rules ?? []}
           onClose={() => setAuditOpen(false)} />
