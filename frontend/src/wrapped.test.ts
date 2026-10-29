@@ -15,7 +15,7 @@ const data: WrappedResp = {
 };
 const str: SummaryStrings = {
   title: "Your year in mail 2026", lead: "You received",
-  unit: "mails in 2026", note: "Based on the mail in my mailbox now",
+  big: "1,234", unit: "mails in 2026", note: "Based on the mail in my mailbox now",
   stats: [{ value: "5", label: "senders" }], topTitle: "Loudest senders",
   topRows: ["40 mails", "30 mails"], footer: "Mailbroom",
 };
@@ -52,4 +52,12 @@ test("the SVG carries translated strings as given (German)", () => {
   const svg = buildSummarySvg(data, de, pal, false);
   expect(svg).toContain("Dein Jahr in Mails 2026");
   expect(svg).toContain("Lauteste Absender");
+});
+
+test("control characters in names never reach the SVG", () => {
+  const d = { ...data, top_senders: [{ ...data.top_senders[0],
+    label: "An\u0000n\u0008 \u001FX" }] };
+  const svg = buildSummarySvg(d, str, pal, true);
+  expect(svg).toContain("Ann X");
+  expect(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/.test(svg)).toBe(false);
 });

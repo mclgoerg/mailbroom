@@ -92,6 +92,8 @@ def compute(mails: list[dict], year: int | None, tz: int, now: int,
 
     out: dict = {
         "year": year, "partial": year == current,
+        "note": "Based on the mail in your mailbox now; mail deleted since "
+                "is not counted as received.",
         "years": sorted(present | {year}),
         "received": {
             "mails": len(mine), "bytes": size,
@@ -131,7 +133,7 @@ def compute(mails: list[dict], year: int | None, tz: int, now: int,
     for e in audit:
         if _local(e["ts"], tz).tm_year != year:
             continue
-        if e["action"] == "unsubscribe" and e["outcome"] != "failed":
+        if e["action"] == "unsubscribe" and e["outcome"] == "done":
             unsubs += 1
         elif e["action"] == "rule_execute" and e["outcome"] == "ok" \
                 and e["count"] > 0:

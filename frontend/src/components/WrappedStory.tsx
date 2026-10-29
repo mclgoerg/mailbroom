@@ -112,6 +112,7 @@ function summaryStrings(d: WrappedResp): SummaryStrings {
   return {
     title: t("wrapped.title_year", { year: d.year }),
     lead: t("wrapped.intro.lead"),
+    big: num(d.received.mails),
     unit: t(d.partial ? "wrapped.intro.unit_partial" : "wrapped.intro.unit",
       { n: d.received.mails, year: d.year }),
     note: t("wrapped.based_on_short"),
@@ -298,7 +299,8 @@ export function WrappedStory({ onClose }: { onClose: () => void }) {
   const back = () => go(idx - 1);
 
   // The intro (year switcher) and the summary (save) wait for the user.
-  const auto = motion && !paused && !!data && idx > 0 && idx < last;
+  const timed = motion && !!data && idx > 0 && idx < last;
+  const auto = timed && !paused;
   useEffect(() => {
     if (!auto) return;
     const id = setInterval(() => setElapsed((e) => e + TICK_MS), TICK_MS);
@@ -364,7 +366,7 @@ export function WrappedStory({ onClose }: { onClose: () => void }) {
             <div key={k} aria-hidden className="h-1 flex-1 overflow-hidden
               rounded-full bg-chip">
               <div className="h-full rounded-full bg-accent"
-                style={{ width: i < idx || (i === idx && !auto) ? "100%"
+                style={{ width: i < idx || (i === idx && !timed) ? "100%"
                   : i === idx ? `${Math.min(100, (100 * elapsed) / CARD_MS)}%`
                   : "0%" }} />
             </div>

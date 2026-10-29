@@ -132,8 +132,9 @@ def test_cleanup_from_stats_and_audit():
                            "purged_bytes": 3000},
                "2026-02": {"trash": 1, "purge": 0},
                "2025-12": {"trash": 99}}
-    audit = [entry("unsubscribe", ts(2026, 2, 1)),
+    audit = [entry("unsubscribe", ts(2026, 2, 1), outcome="done"),
              entry("unsubscribe", ts(2026, 2, 2), outcome="failed"),
+             entry("unsubscribe", ts(2026, 2, 3), outcome="link"),
              entry("unsubscribe", ts(2025, 2, 2)),
              entry("rule_execute", ts(2026, 3, 1), 7, actor="rule:r1"),
              entry("rule_execute", ts(2026, 3, 2), 4, actor="rule:r2"),
@@ -149,6 +150,10 @@ def test_cleanup_from_stats_and_audit():
     assert c["top_rule"] == {"name": "", "deleted": True, "mails": 9}
     c = run([], audit=audit, rules={"r1": "A", "r2": "B"})["cleanup"]
     assert c["top_rule"] == {"name": "B", "deleted": False, "mails": 9}
+
+
+def test_response_carries_the_basis_note():
+    assert "mailbox now" in run([])["note"]
 
 
 def test_response_carries_no_subject():
@@ -193,8 +198,10 @@ def test_endpoint_is_account_scoped_and_metadata_only(monkeypatch):
     _scan("one")
     _scan("two")
     statsmod.record_action("trash", 4, 400, "one")
-    auditlog.record("unsubscribe", account="one", count=1, label="x@a.example")
-    auditlog.record("unsubscribe", account="two", count=1, label="x@b.example")
+    auditlog.record("unsubscribe", account="one", count=1, label="x@a.example",
+                    outcome="done")
+    auditlog.record("unsubscribe", account="two", count=1, label="x@b.example",
+                    outcome="done")
     one = client.get("/api/wrapped?year=2026&account=one").json()
     two = client.get("/api/wrapped?year=2026&account=two").json()
     assert one["received"]["mails"] == 1 and two["received"]["mails"] == 1

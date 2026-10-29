@@ -24,6 +24,7 @@ export interface SummaryPalette {
 export interface SummaryStrings {
   title: string;          // "Your year in mail 2026"
   lead: string;           // "You received"
+  big: string;            // the formatted mail count (UI language)
   unit: string;           // "mails in 2026"
   note: string;           // "Based on the mail in your mailbox now"
   stats: { value: string; label: string }[];
@@ -32,7 +33,10 @@ export interface SummaryStrings {
   footer: string;         // "Made locally with Mailbroom"
 }
 
-const esc = (s: string): string => s.replace(/[&<>"']/g, (c) => (
+// Control characters are not valid XML 1.0 (the image would fail to load).
+// eslint-disable-next-line no-control-regex
+const esc = (s: string): string => s.replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\uFFFE\uFFFF]/g, "")
+  .replace(/[&<>"']/g, (c) => (
   { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]!));
 
 const FONT = "ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif";
@@ -54,7 +58,7 @@ export function buildSummarySvg(
     `<rect width="${SVG_W}" height="${SVG_H}" fill="${pal.bg}"/>`,
     text(90, 200, 44, 600, pal.accent, str.title),
     text(90, 330, 48, 500, pal.muted, str.lead),
-    text(90, 500, 190, 700, pal.body, d.received.mails.toLocaleString()),
+    text(90, 500, 190, 700, pal.body, str.big),
     text(90, 580, 52, 500, pal.muted, str.unit),
   ];
   str.stats.slice(0, 6).forEach((s, i) => {
