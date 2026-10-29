@@ -670,3 +670,12 @@ export interface SortEstimate {
   available: boolean;
   has_instructions: boolean;
 }
+
+/** What the AI wrote for a sentence (POST /api/ai/filter). `query` holds only
+ *  tokens the filter understands; what it could not express is `unsupported`. */
+export interface AiFilterResult {
+  query: string;
+  unsupported: string[];
+  explanation: string;
+  cost: number;
+}

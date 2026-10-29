@@ -14,6 +14,20 @@ const enc = encodeURIComponent;
 beforeEach(() => setLang("en"));
 afterEach(() => { setLang("en"); vi.unstubAllGlobals(); });
 
+describe("the AI filter codes", () => {
+  test.each([
+    ["aifilter_not_configured", "aif.err.not_configured"],
+    ["aifilter_text_empty", "aif.err.text_empty"],
+    ["aifilter_text_too_long", "aif.err.text_too_long"],
+    ["aifilter_budget", "aif.err.budget"],
+  ])("%s is worded in both languages", (code, key) => {
+    expect(errorText(code)).toBe(EN[key]);
+    setLang("de");
+    expect(errorText(code)).toBe(DE[key]);
+    expect(DE[key]).not.toBe(EN[key]);
+  });
+});
+
 describe("parseErrorDetail", () => {
   test("a bare code and a code with params", () => {
     expect(parseErrorDetail("busy_purge")).toEqual({ code: "busy_purge",

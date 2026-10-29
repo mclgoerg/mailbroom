@@ -64,12 +64,14 @@ function RunSummary({ rule }: { rule: Rule }) {
   );
 }
 
-export function RulesModal({ state, onClose, onChanged }: {
+export function RulesModal({ state, onClose, onChanged, initialQuery = "" }: {
   state: AppState;
   onClose: () => void;
   onChanged: () => void;
+  /** Starts the new-rule form with this filter (e.g. one the AI wrote). */
+  initialQuery?: string;
 }) {
-  const [form, setForm] = useState({ ...EMPTY });
+  const [form, setForm] = useState({ ...EMPTY, query: initialQuery });
   const [editId, setEditId] = useState<string | null>(null);
   const [busyId, setBusyId] = useState("");
   const [msg, setMsg] = useState("");

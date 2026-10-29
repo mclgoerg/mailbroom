@@ -1,6 +1,6 @@
 import { t } from "./i18n";
 import type {
-  AdminTenantStats, AiGroupResult, AppState, AttMail, AuditResp, AuthProbe,
+  AdminTenantStats, AiFilterResult, AiGroupResult, AppState, AttMail, AuditResp, AuthProbe,
   KnowledgeList, KnowledgeSaved, KnowledgeSrc,
   Config, ConversationResp, DupSet, FilterPreset, FoldersResp, Grouping, IndexInfo,
   Mail, MessageDetail,
@@ -117,6 +117,11 @@ const ERROR_CODES: Record<string, string> = {
   rule_purge_needs_age: "ferr.rule_purge_needs_age",
   rule_purge_filter: "ferr.rule_purge_filter",
   rule_purge_filter_domain: "ferr.rule_purge_filter_domain",
+  // plain words -> filter (backend/aifilter.py)
+  aifilter_not_configured: "aif.err.not_configured",
+  aifilter_text_empty: "aif.err.text_empty",
+  aifilter_text_too_long: "aif.err.text_too_long",
+  aifilter_budget: "aif.err.budget",
 };
 
 /** The role names a `role=` param stands for (translated). */
@@ -233,6 +238,9 @@ export const api = {
         older_than_days: olderThanDays }),
   protect: (entry: string, on: boolean) =>
     req<{ protected: string[] }>("/api/protect", { entry, on }),
+  // The AI writes a filter query from a sentence (nothing else is sent).
+  aiFilter: (text: string, lang: string) =>
+    req<AiFilterResult>("/api/ai/filter", { text, lang }),
   aiSortEstimate: () => req<SortEstimate>("/api/ai_sort/estimate"),
   aiSort: () => req<{ units: number; senders: number }>("/api/ai_sort", {}),
   aiSortClear: () => req<{ cleared: number }>("/api/ai_sort/clear", {}),

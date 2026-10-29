@@ -274,6 +274,13 @@ presets.
   attachments, flags such as "not yet unsubscribed" or "rarely engaged
   with"); on phones it opens as a bottom sheet. It writes the same
   filter syntax you can type, and the result can be saved as a preset.
+- **Describe a filter** - with an AI provider set up, the sparkles button
+  next to the filter box turns a sentence ("shop newsletters I have not
+  opened in a year") into a filter you can read and edit, with a live
+  preview of how many groups, mails and how much space it matches. Apply it,
+  save it as a preset, or start a rule from it (rules still begin in report
+  mode). Only your sentence, the filter syntax and your tag names are sent
+  to the provider - no mail data - and nothing is selected or changed.
 - **Tools menu** - Rules, Attachments, Duplicates, Statistics, Audit Log,
   AI review (once AI is set up) and Export CSV live under one Tools
   button. AI review and CSV export scope to the current selection once

@@ -64,8 +64,8 @@ def _fixture(*a, **k):
 sys.modules.setdefault("pytest", types.SimpleNamespace(fixture=_fixture))
 
 from conftest import FakeIMAP, make_msg          # noqa: E402
-from backend import (accounts, knowledgestore, mailops, rules,   # noqa: E402
-                     unsubstore, verdictstore)
+from backend import (accounts, aihelper, knowledgestore, mailops,   # noqa: E402
+                     rules, unsubstore, verdictstore)
 
 random.seed(7)
 NOW = time.time()
@@ -168,6 +168,22 @@ PROTON_INBOX = WANDER + (
     + mails('"Dr. Meier Praxis" <praxis@dr-meier.example>',
             ["Terminbestätigung", "Ihr Laborbefund ist da"], 5, unread=0.1)
 )
+
+
+# Newsletters nobody has opened for ages (the "Describe a filter" demo
+# sentence selects them). Own random stream: the senders above, the long tail
+# and everything seeded later keep their exact data.
+_state = random.getstate()
+random.seed(11)
+PROTON_INBOX += (
+    mails('"Old Gazette" <weekly@old-gazette.example>',
+          ["The week in brief", "Reader offers", "Editor's picks"], 26,
+          newest_days=410, span_days=900, unread=1.0, unsub=True)
+    + mails('"Retro Deals" <digest@retro-deals.example>',
+            ["Deals you missed", "Back in stock", "Final reminder"], 12,
+            newest_days=560, span_days=1000, unread=0.97, unsub=True)
+)
+random.setstate(_state)
 
 
 # --- long tail ------------------------------------------------------------
@@ -426,6 +442,65 @@ knowledgestore.modify(lambda entries: entries.update({
         "kind": "jobs", "src": "user", "ts": _NOW - 86400 * 30,
         "note": "left the mailbox"},
 }))
+
+# "Describe a filter" without a provider: a canned stand-in for the AI client
+# that knows three sentences (English + German) and answers everything else
+# with "not expressible". It sees exactly what a real provider would see (the
+# prompt and the sentence), so the panel behaves like the real thing.
+_FILTER_ANSWERS = [
+    (("never read", "nie lese"),
+     {"query": "tag:newsletter unread:>90 age:>1y", "unsupported": [],
+      "explanation": "Newsletters, which you hardly ever open, with no mail "
+                     "for over a year."}),
+    (("shipping", "versand"),
+     {"query": "tag:shipping ai:safe", "unsupported": [],
+      "explanation": "Shipping notifications the AI rated safe to delete."}),
+    (("never answered", "nie geantwortet"),
+     {"query": "att:>5m is:noreply-ever",
+      "unsupported": ["only mails from last week"],
+      "explanation": "Senders with large attachments that you never wrote "
+                     "to."}),
+]
+_FILTER_ANSWERS_DE = {
+    "tag:newsletter unread:>90 age:>1y":
+        "Newsletter, die Sie kaum öffnen, ohne Mail seit über einem Jahr.",
+    "tag:shipping ai:safe":
+        "Versandmeldungen, die die KI als harmlos einstuft.",
+    "att:>5m is:noreply-ever":
+        "Absender mit großen Anhängen, denen Sie nie geschrieben haben.",
+}
+
+
+_real_ai_client = aihelper.ai_client
+
+
+def _demo_ai_client(cfg):
+
+    def create(**kw):
+        ask = json.loads(kw["messages"][0]["content"])
+        if "sentence" not in ask:            # not a filter request
+            return _real_ai_client(cfg).messages.create(**kw)
+        sentence = ask["sentence"].lower()
+        out = {"query": "", "unsupported": [ask["sentence"][:80]],
+               "explanation": "The demo AI only knows three example "
+                              "sentences."}
+        for needles, answer in _FILTER_ANSWERS:
+            if any(n in sentence for n in needles):
+                out = dict(answer)
+                if ask["language"] == "German":
+                    out["explanation"] = _FILTER_ANSWERS_DE[out["query"]]
+                    out["unsupported"] = [u.replace(
+                        "only mails from last week", "nur Mails der letzten Woche")
+                        for u in out["unsupported"]]
+        return types.SimpleNamespace(
+            stop_reason="end_turn",
+            content=[types.SimpleNamespace(type="text",
+                                           text=json.dumps(out))],
+            usage=types.SimpleNamespace(input_tokens=900, output_tokens=80))
+    return types.SimpleNamespace(messages=types.SimpleNamespace(create=create))
+
+
+aihelper.ai_client = _demo_ai_client
 
 # Pre-scan both accounts (incl. attachments) so screenshots are instant.
 for name in ("proton", "icloud"):

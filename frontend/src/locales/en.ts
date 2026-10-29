@@ -326,7 +326,8 @@ export const EN: Record<string, string> = {
     + "the Other row sends, per sender, its name and address, its mail "
     + "count, whether it offers an unsubscribe link and up to three "
     + "recent subject lines - plus your own sorting instructions from "
-    + "Settings.",
+    + "Settings. Describing a filter in words sends only your sentence, "
+    + "the filter syntax and the names of your tags - no mail data.",
   "ai.data_note":
     "Sent to the AI provider: sender names/addresses, counts, sizes, "
     + "dates, read state, tags, subject lines, protected-sender markers "
@@ -1464,4 +1465,39 @@ export const EN: Record<string, string> = {
   "undo.from_junk_one": "1 mail from Junk",
   "undo.from_trash": "{n} mails from Trash",
   "undo.from_trash_one": "1 mail from Trash",
+  // Plain words -> filter (components/AiFilterPanel.tsx)
+  "aif.button": "Describe a filter",
+  "aif.title": "Describe a filter",
+  "aif.sub": "Your AI writes the filter - you check it first",
+  "aif.label": "Describe what you are looking for",
+  "aif.placeholder": "e.g. shop newsletters I have not opened in a year",
+  "aif.disclosure":
+    "Only this sentence and the filter syntax are sent to your AI provider - "
+    + "no mail data.",
+  "aif.chars": "{n} / {max}",
+  "aif.send": "Send",
+  "aif.thinking": "Writing the filter…",
+  "aif.query_label": "Filter (you can edit it)",
+  "aif.preview_label": "Matches right now",
+  "aif.groups": "{n} groups",
+  "aif.groups_one": "1 group",
+  "aif.mails": "{n} mails",
+  "aif.mails_one": "1 mail",
+  "aif.incl_protected": "incl. {n} protected",
+  "aif.no_match": "Nothing matches this filter.",
+  "aif.no_scan": "Scan your mailbox to see how much this matches.",
+  "aif.unsupported": "Not expressible: {items}",
+  "aif.cost": "AI cost: {cost}",
+  "aif.apply": "Apply",
+  "aif.save_preset": "Save as preset",
+  "aif.save_rule": "Save as rule…",
+  "aif.back": "Back",
+  "aif.nothing_selected": "Applying only filters the list - nothing is selected "
+    + "or changed.",
+  "aif.preset_saved": "Preset saved.",
+  "aif.err.not_configured": "Set up an AI provider in Settings first.",
+  "aif.err.text_empty": "Describe what you are looking for first.",
+  "aif.err.text_too_long": "Please keep it under 300 characters.",
+  "aif.err.budget":
+    "The monthly AI budget is used up - raise it in Settings to continue.",
 };

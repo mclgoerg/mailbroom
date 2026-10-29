@@ -11,6 +11,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from backend import accounts as accountsmod
+from backend import aifilter
 from backend import auditlog
 from backend import errortext
 from backend import knowledgestore
@@ -88,7 +89,7 @@ def _locale_keys(name: str) -> set[str]:
 
 def _backend_codes() -> set[str]:
     """Every code any backend module answers with (HTTP `detail`)."""
-    return set(mailops.FOLDER_ERROR_CODES) | {
+    return set(mailops.FOLDER_ERROR_CODES) | aifilter.CODES | {
         v for k, v in vars(knowledgestore).items()
         if k.isupper() and isinstance(v, str) and v.startswith("knowledge_")}
 

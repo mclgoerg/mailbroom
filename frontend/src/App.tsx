@@ -19,6 +19,7 @@ import { AllMailsView } from "./components/AllMailsView";
 import { SearchPanel } from "./components/SearchPanel";
 import { SettingsModal } from "./components/SettingsModal";
 import { StatsPanel } from "./components/StatsPanel";
+import { AiFilterPanel } from "./components/AiFilterPanel";
 import { QueryBuilder } from "./components/QueryBuilder";
 import { FoldersPanel } from "./components/FoldersPanel";
 import { AccountAvatar, applyTheme, BAR_ICON_BTN, BulkBar, Button, Chip, ChipGroup, ChipSegment,
@@ -138,6 +139,9 @@ export default function App() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [rulesOpen, setRulesOpen] = useState(false);
+  // A filter handed to the rules form ("Save as rule" of the AI filter panel).
+  const [rulesSeed, setRulesSeed] = useState("");
+  const [aiFilterOpen, setAiFilterOpen] = useState(false);
   const [attsOpen, setAttsOpen] = useState(false);
   const [dupsOpen, setDupsOpen] = useState(false);
   const [statsOpen, setStatsOpen] = useState(false);
@@ -653,7 +657,7 @@ export default function App() {
   }, [state?.groups_rev]);
   useEffect(() => { prevGroups.current = groups; });
   const anyModal = (!!detail && !splitPane) || searchOpen || settingsOpen || rulesOpen
-    || attsOpen || dupsOpen || statsOpen || auditOpen || !!foldersOpen;
+    || aiFilterOpen || attsOpen || dupsOpen || statsOpen || auditOpen || !!foldersOpen;
 
   const startScan = async () => {
     setSelected(new Set());
@@ -872,18 +876,20 @@ export default function App() {
   // Saved filter presets: unlike selectPreset() above (which ADDS to the
   // selection), tapping one REPLACES the filter query - they are one-tap
   // recall for a named search, not a selection shortcut.
-  const saveFilterPreset = async () => {
+  const saveFilterPreset = async (query = filter): Promise<boolean> => {
     const name = (await promptDialog({
       title: t("saved_filter.name_prompt"), label: t("saved_filter.name_label"),
       confirmLabel: t("Save"),
       validate: (v) => v.trim() ? null : t("saved_filter.name_required"),
     }))?.trim();
-    if (!name) return;
+    if (!name) return false;
     try {
-      await api.createPreset(name, filter);
+      await api.createPreset(name, query);
       refresh();
+      return true;
     } catch (e: any) {
       fail(e);
+      return false;
     }
   };
 
@@ -1642,10 +1648,17 @@ export default function App() {
             )}
           </div>
           <QueryBuilder value={filter} onChange={setFilter} />
+          {aiEnabled && (
+            <Button variant="secondary" size="icon"
+              label={t("aif.button")}
+              onClick={() => setAiFilterOpen(true)}>
+              <Sparkles size={18} />
+            </Button>
+          )}
           <Button variant="secondary" size="icon"
             label={t("saved_filter.save_tip")}
             disabled={!filter.trim()}
-            onClick={saveFilterPreset}>
+            onClick={() => saveFilterPreset()}>
             <BookmarkPlus size={18} />
           </Button>
           <SortControl options={SORT_OPTIONS} value={sortK}
@@ -2076,10 +2089,29 @@ export default function App() {
           onDeleted={refresh}
         />
       )}
+      {aiFilterOpen && (
+        <AiFilterPanel
+          groups={allGroups} members={members}
+          onClose={() => setAiFilterOpen(false)}
+          onApply={(q) => {
+            // Only the list is filtered: nothing is selected or acted on.
+            setFilter(q);
+            setActiveChip(null);
+            setAiFilterOpen(false);
+          }}
+          onSavePreset={async (q) => {
+            if (await saveFilterPreset(q)) notify(t("aif.preset_saved"));
+          }}
+          onSaveRule={(q) => {
+            setAiFilterOpen(false);
+            setRulesSeed(q);
+            setRulesOpen(true);
+          }} />
+      )}
       {rulesOpen && state && (
         <RulesModal
-          state={state}
-          onClose={() => setRulesOpen(false)}
+          state={state} initialQuery={rulesSeed}
+          onClose={() => { setRulesOpen(false); setRulesSeed(""); }}
           onChanged={refresh}
         />
       )}

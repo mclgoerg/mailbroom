@@ -63,7 +63,9 @@ export const DE: Record<string, string> = {
     + "Die KI-Sortierung von „Sonstige“ sendet je Absender Name und "
     + "Adresse, Anzahl, ob ein Abmeldelink angeboten wird und bis zu drei "
     + "aktuelle Betreffzeilen – dazu Ihre eigenen Sortier-Anweisungen aus "
-    + "den Einstellungen.",
+    + "den Einstellungen. Wenn Sie einen Filter in Worten beschreiben, "
+    + "gehen nur Ihr Satz, die Filter-Syntax und die Namen Ihrer Kategorien "
+    + "an die KI – keine Maildaten.",
   "ai.data_note":
     "An den KI-Anbieter gesendet: Absendernamen/-adressen, Anzahl, "
     + "Größen, Daten, Lesestatus, Kategorien, Betreffzeilen, "
@@ -1682,4 +1684,41 @@ export const DE: Record<string, string> = {
   "undo.from_junk_one": "1 Mail aus Spam",
   "undo.from_trash": "{n} Mails aus dem Papierkorb",
   "undo.from_trash_one": "1 Mail aus dem Papierkorb",
+  // Klartext -> Filter (components/AiFilterPanel.tsx)
+  "aif.button": "Filter beschreiben",
+  "aif.title": "Filter beschreiben",
+  "aif.sub": "Ihre KI schreibt den Filter - Sie prüfen ihn vorher",
+  "aif.label": "Beschreiben Sie, wonach Sie suchen",
+  "aif.placeholder":
+    "z. B. Shop-Newsletter, die ich seit einem Jahr nicht geöffnet habe",
+  "aif.disclosure":
+    "Nur dieser Satz und die Filter-Syntax gehen an Ihren KI-Anbieter - "
+    + "keine Maildaten.",
+  "aif.chars": "{n} / {max}",
+  "aif.send": "Senden",
+  "aif.thinking": "Filter wird geschrieben…",
+  "aif.query_label": "Filter (editierbar)",
+  "aif.preview_label": "Trifft aktuell zu auf",
+  "aif.groups": "{n} Gruppen",
+  "aif.groups_one": "1 Gruppe",
+  "aif.mails": "{n} Mails",
+  "aif.mails_one": "1 Mail",
+  "aif.incl_protected": "davon {n} geschützt",
+  "aif.no_match": "Dieser Filter trifft auf nichts zu.",
+  "aif.no_scan": "Scannen Sie Ihr Postfach, um zu sehen, wie viel zutrifft.",
+  "aif.unsupported": "Nicht ausdrückbar: {items}",
+  "aif.cost": "KI-Kosten: {cost}",
+  "aif.apply": "Anwenden",
+  "aif.save_preset": "Als Vorlage speichern",
+  "aif.save_rule": "Als Regel speichern…",
+  "aif.back": "Zurück",
+  "aif.nothing_selected": "Anwenden filtert nur die Liste - es wird nichts "
+    + "ausgewählt oder geändert.",
+  "aif.preset_saved": "Vorlage gespeichert.",
+  "aif.err.not_configured": "Richten Sie zuerst in den Einstellungen einen KI-Anbieter ein.",
+  "aif.err.text_empty": "Beschreiben Sie zuerst, wonach Sie suchen.",
+  "aif.err.text_too_long": "Bitte höchstens 300 Zeichen.",
+  "aif.err.budget":
+    "Das monatliche KI-Budget ist aufgebraucht - erhöhen Sie es in den "
+    + "Einstellungen, um fortzufahren.",
 };

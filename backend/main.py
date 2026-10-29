@@ -22,6 +22,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from . import accounts as accountsmod
+from . import aifilter
 from . import aihelper
 from . import auditlog
 from . import auth as authmod
@@ -696,6 +697,25 @@ def post_ai(body: GroupingBody, account: str | None = Query(None)):
     except RuntimeError as exc:
         raise HTTPException(409, str(exc))
     return {"ok": True}
+
+
+class AiFilterBody(BaseModel):
+    text: str = Field(max_length=2000)        # the real cap (300) is a coded 400
+    lang: str = "en"
+
+
+@app.post("/api/ai/filter")
+def post_ai_filter(body: AiFilterBody, account: str | None = Query(None)):
+    """Write a filter query from a sentence (see aifilter.py): only the
+    sentence, the filter syntax and the tag names go to the AI provider.
+    Changes nothing, needs no scan, logs no text."""
+    _acc(account)
+    try:
+        return aifilter.suggest(body.text, body.lang)
+    except aifilter.FilterError as exc:
+        raise HTTPException(400, exc.code)
+    except Exception as exc:
+        raise HTTPException(500, f"{type(exc).__name__}: {exc}")
 
 
 @app.get("/api/ai_sort/estimate")
