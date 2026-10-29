@@ -43,7 +43,7 @@ PIXEL_MAX_PX = 3              # a tracking pixel is at most this wide AND high
 TOP_HOSTS_PER_GROUP = 3
 
 _CSS_DIM_RE = re.compile(
-    r"(?:^|[;\s{])(width|height)\s*:\s*(\d+(?:\.\d+)?)(?:px)?\s*(?:[;}!]|$)")
+    r"(?:^|[;\s{])(width|height)\s*:\s*(\d+(?:\.\d+)?)(?:px)?\s*(?=[;}!]|$)")
 _CSS_HIDDEN_RE = re.compile(
     r"(?:^|[;\s{])(?:display\s*:\s*none|visibility\s*:\s*hidden"
     r"|opacity\s*:\s*0(?:\.0+)?|max-height\s*:\s*0(?:px)?)\s*(?:[;}!]|$)")
@@ -127,12 +127,16 @@ def _redirect_link(url: str) -> bool:
     segs = [s for s in parts.path.lower().split("/") if s]
     if any(s in _REDIRECT_SEGMENTS for s in segs):
         return True
+    weak_checked = False
     for i, s in enumerate(segs[:-1]):
         if s in _SHORT_REDIRECT_SEGMENTS and _opaque(segs[i + 1]):
             return True
-        if s in _WEAK_REDIRECT_SEGMENTS and _opaque(
-                "/".join(segs[i + 1:]) + "?" + parts.query):
-            return True
+        # Once is enough: what follows a later weak word is a subset of
+        # what follows the first one.
+        if s in _WEAK_REDIRECT_SEGMENTS and not weak_checked:
+            weak_checked = True
+            if _opaque("/".join(segs[i + 1:]) + "?" + parts.query):
+                return True
     return any(v.strip().lower().startswith(("http://", "https://"))
                for _, v in query)
 
@@ -215,29 +219,36 @@ def _sig(path) -> tuple | None:
 
 def tracker_map(acc) -> dict[tuple[str, int, int], tuple[bool, bool, tuple]]:
     """{(folder, uid, uidvalidity): (pixel, click, hosts)} of the mails the
-    body index has checked; {} without a usable index. Cached per index
-    file version, so building state stays cheap."""
+    body index has checked; {} without a usable index."""
+    return tracker_map_sig(acc)[1]
+
+
+def tracker_map_sig(acc) -> tuple[tuple | None, dict]:
+    """(index file signature, tracker_map). The signature is taken BEFORE
+    the rows are read, so a write that lands meanwhile makes the next call
+    re-read instead of serving stale rows under a newer signature. Cached
+    per file version, so building state stays cheap."""
     from . import bodyindex, secretbox
     path = bodyindex._path(acc.name, acc.tenant)
     sig = _sig(path)
     if sig is None or not secretbox.enabled():
         _MAP_CACHE.pop(str(path), None)
         _GROUP_CACHE.pop(str(path), None)
-        return {}
+        return None, {}
     hit = _MAP_CACHE.get(str(path))
     if hit and hit[0] == sig:
-        return hit[1]
+        return sig, hit[1]
     idx, _ = bodyindex.open_index(acc.name, acc.tenant)
     if idx is None:
-        return {}
+        return sig, {}
     try:
         rows = idx.tracker_rows()
     finally:
         idx.close()
     out = {(f, u, uv): (bool(p), bool(c), tuple(h.split(",")) if h else ())
            for f, u, uv, p, c, h in rows}
-    _MAP_CACHE[str(path)] = (_sig(path) or sig, out)
-    return out
+    _MAP_CACHE[str(path)] = (sig, out)
+    return sig, out
 
 
 # (index signature, groups revision, folder UIDVALIDITYs) -> {(grouping,
@@ -250,13 +261,12 @@ class GroupMemo:
     A state call with the same index file, groups revision and folder
     UIDVALIDITYs does no per-mail work."""
 
-    def __init__(self, acc, tmap: dict):
+    def __init__(self, acc, tmap: dict, sig: tuple | None):
         self.acc, self.tmap, self.store = acc, tmap, {}
         if not tmap:
             return
         from . import bodyindex
         path = str(bodyindex._path(acc.name, acc.tenant))
-        sig = _MAP_CACHE.get(path, (None,))[0]
         key = (sig, acc.state["groups_rev"],
                tuple(sorted(acc.folder_uv.items())))
         hit = _GROUP_CACHE.get(path)

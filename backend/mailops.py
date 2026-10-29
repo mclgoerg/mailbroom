@@ -1994,11 +1994,11 @@ def public_state(acc=None) -> dict:
     new_addrs = knownsenders.new_since(acc.name, cfg.get(
         "new_sender_window_days", knownsenders.NEW_SENDER_WINDOW_DAYS))
     pinned = pinstore.load_account(acc.name)
-    tmap = trackers.tracker_map(acc)       # {} without a body index
+    tsig, tmap = trackers.tracker_map_sig(acc)   # {} without a body index
     now = time.time()
     with acc.lock:
         paddrs = _protected_addrs(plist, acc)
-        tmemo = trackers.GroupMemo(acc, tmap)
+        tmemo = trackers.GroupMemo(acc, tmap, tsig)
         out = {k: v for k, v in acc.state.items() if k != "groups"}
         out["account"] = acc.name
         out["groups"] = {

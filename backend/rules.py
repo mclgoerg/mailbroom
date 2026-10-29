@@ -179,15 +179,12 @@ FILTER_GRAMMAR: tuple[dict, ...] = (
                 "written to; new = a recently first-seen sender; still-mailing = "
                 "keeps mailing after the user unsubscribed",
      "example": "is:unsub"},
-    {"qualifier": "has", "values": ("pinned",),
-     "syntax": "has:pinned",
-     "meaning": "the group contains at least one pinned mail",
+    {"qualifier": "has", "values": ("pinned", "tracker"),
+     "syntax": "has:pinned|tracker",
+     "meaning": "pinned = the group contains at least one pinned mail; "
+                "tracker = a checked mail of the group carries a tracking "
+                "pixel or click-tracking links (needs the local body index)",
      "example": "has:pinned"},
-    {"qualifier": "has", "values": ("tracker",),
-     "syntax": "has:tracker",
-     "meaning": "a checked mail of the group carries a tracking pixel or "
-                "click-tracking links (needs the local body index)",
-     "example": "has:tracker"},
     {"qualifier": "eng", "values": ("low", "medium", "high"),
      "syntax": "eng:low|medium|high",
      "meaning": "how much the user engages with the sender (reads, "

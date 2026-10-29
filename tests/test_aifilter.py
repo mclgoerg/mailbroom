@@ -41,7 +41,7 @@ def test_valid_filters_have_no_bad_tokens(q):
     ("age:>1w age:>2y", ["age:>1w"]),
     ("unread:>101", ["unread:>101"]),
     ("is:everything", ["is:everything"]),
-    ("has:tracker", ["has:tracker"]),
+    ("has:other", ["has:other"]),
     ("ai:maybe", ["ai:maybe"]),
     ("eng:huge", ["eng:huge"]),
     ("tag:", ["tag:"]),

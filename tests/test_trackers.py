@@ -46,6 +46,13 @@ PIXEL_CASES = {
                              style="visibility:hidden"),
     "opacity 0": img(src="https://t.tracker.example/a.gif",
                      style="opacity:0"),
+    "1x1 no spaces": img(src="https://t.tracker.example/a.gif",
+                         style="width:1px;height:1px"),
+    "1x1 reversed no spaces": img(src="https://t.tracker.example/a.gif",
+                                  style="height:1px;width:1px;border:0"),
+    "1x1 trailing declarations": img(src="https://t.tracker.example/a.gif",
+                                     style="border:0;width:1px;height:1px;"
+                                           "display:block"),
     "max-height 0": img(src="https://t.tracker.example/a.gif",
                         style="max-height:0"),
     "beacon path": img(src="https://t.tracker.example/open/Ab3dEf9hIj2kLm5nOp.gif",
@@ -183,6 +190,14 @@ def test_long_whitespace_runs_in_attributes_stay_linear(attrs):
     assert time.time() - t0 < 0.5
 
 
+def test_many_weak_redirect_segments_stay_linear():
+    href = "https://shop.example/" + "trk/" * 600 + "x"
+    html = f'<a href="{href}">x</a>' * 400
+    t0 = time.time()
+    trackers.scan_html(html)
+    assert time.time() - t0 < 1.0
+
+
 def test_long_urls_stay_bounded():
     url = "https://t.tracker.example/" + "a1" * 100_000
     t0 = time.time()
@@ -221,8 +236,8 @@ def scanned(bridge):
         m["html"] = None
     by_uid = {m["uid"]: m for m in
               bridge.mailbox["INBOX"] + bridge.mailbox["Archive"]}
-    by_uid[1]["html"] = f"<p>Parcel</p>{PIX}"                # dhl: pixel
-    by_uid[2]["html"] = f"<p>Parcel 2</p>{CLICK}"            # dhl: click
+    by_uid[1]["html"] = f"<p>Parcel</p>{PIX}"                # first sender: pixel
+    by_uid[2]["html"] = f"<p>Parcel 2</p>{CLICK}"            # first sender: click
     by_uid[4]["html"] = CLEAN                                # shop: clean
     by_uid[4]["body"] = "plain text twin"
     # uid 3 (alice) and uid 10 stay plain text
@@ -471,3 +486,12 @@ def test_group_cache_is_replaced_not_accumulated(scanned):
     assert (len(trackers._GROUP_CACHE), len(trackers._MAP_CACHE)) == sizes
     path = str(bodyindex._path(acc().name, acc().tenant))
     assert trackers._GROUP_CACHE[path][0][1] == acc().state["groups_rev"]
+
+
+def test_map_signature_is_the_one_taken_before_the_read(scanned):
+    build()
+    sig, tmap = trackers.tracker_map_sig(acc())
+    path = str(bodyindex._path(acc().name, acc().tenant))
+    assert tmap and trackers._MAP_CACHE[path][0] == sig
+    memo = trackers.GroupMemo(acc(), tmap, sig)
+    assert trackers._GROUP_CACHE[path][0][0] == sig and memo.tmap is tmap
