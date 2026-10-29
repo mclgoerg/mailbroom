@@ -1717,7 +1717,7 @@ export const DE: Record<string, string> = {
   "aif.preset_saved": "Vorlage gespeichert.",
   "aif.err.not_configured": "Richten Sie zuerst in den Einstellungen einen KI-Anbieter ein.",
   "aif.err.text_empty": "Beschreiben Sie zuerst, wonach Sie suchen.",
-  "aif.err.text_too_long": "Bitte fassen Sie sich unter 300 Zeichen.",
+  "aif.err.text_too_long": "Bitte höchstens 300 Zeichen.",
   "aif.err.budget":
     "Das monatliche KI-Budget ist aufgebraucht - erhöhen Sie es in den "
     + "Einstellungen, um fortzufahren.",

@@ -147,8 +147,9 @@ def parse_filter(q: str) -> dict:
 FILTER_GRAMMAR: tuple[dict, ...] = (
     {"qualifier": "tag", "values": None, "check": "tag",
      "syntax": "tag:<name>",
-     "meaning": "the group carries this tag (prefix match); the accepted "
-                "names are listed separately",
+     "meaning": "a tag name contains this text (substring match, one word, no "
+                "spaces; for a multi-word tag use one of its words); the "
+                "accepted names are listed separately",
      "example": "tag:newsletter"},
     {"qualifier": "ai", "values": ("safe", "review", "keep"),
      "syntax": "ai:safe|review|keep",
@@ -200,7 +201,6 @@ FILTER_GRAMMAR: tuple[dict, ...] = (
      "example": "domain:shop.example"},
 )
 _GRAMMAR = {g["qualifier"]: g for g in FILTER_GRAMMAR}
-_LOOKS_QUAL_RE = re.compile(r"^[a-z][a-z0-9_-]*:")
 
 
 def _token_ok(kind: str, val: str, tags: "set[str] | frozenset[str] | None"
@@ -223,14 +223,15 @@ def _token_ok(kind: str, val: str, tags: "set[str] | frozenset[str] | None"
 
 
 def validate_filter(q: str, tags=None) -> list[str]:
-    """The tokens of `q` that look like qualifiers (`word:...`) but are not
-    a known qualifier with a valid value. parse_filter lets those fall
+    """The tokens of `q` that contain a colon (so are meant as a qualifier,
+    however mangled: `-tag:x`, `(tag:x`) but are not a known qualifier with
+    a valid value. parse_filter lets those fall
     through to free text silently - fine for typing, wrong for a query an AI
     wrote. With `tags` (the accepted tag names) a `tag:` value must also
-    be (a prefix of) one of them. Free words are always valid."""
+    be part of (a substring of) one of them. Free words are always valid."""
     bad = []
     for tok in (q or "").strip().lower().split():
-        if not _LOOKS_QUAL_RE.match(tok):
+        if ":" not in tok:
             continue
         kind, _, val = tok.partition(":")
         if not _token_ok(kind, val, tags):

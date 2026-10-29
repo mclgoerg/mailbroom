@@ -457,7 +457,7 @@ _FILTER_ANSWERS = [
       "explanation": "Shipping notifications the AI rated safe to delete."}),
     (("never answered", "nie geantwortet"),
      {"query": "att:>5m is:noreply-ever",
-      "unsupported": ["single mails over 5 MB"],
+      "unsupported": ["only mails from last week"],
       "explanation": "Senders with large attachments that you never wrote "
                      "to."}),
 ]
@@ -490,7 +490,7 @@ def _demo_ai_client(cfg):
                 if ask["language"] == "German":
                     out["explanation"] = _FILTER_ANSWERS_DE[out["query"]]
                     out["unsupported"] = [u.replace(
-                        "single mails over 5 MB", "einzelne Mails über 5 MB")
+                        "only mails from last week", "nur Mails der letzten Woche")
                         for u in out["unsupported"]]
         return types.SimpleNamespace(
             stop_reason="end_turn",

@@ -48,9 +48,23 @@ def test_valid_filters_have_no_bad_tokens(q):
     ("from:", ["from:"]),
     ("att:>big", ["att:>big"]),
     ("sale http://x.example", ["http://x.example"]),   # looks like a qualifier
+    ("-tag:newsletter (tag:shopping) age:>1y",         # mangled qualifiers
+     ["-tag:newsletter", "(tag:shopping)"]),
 ])
 def test_bad_tokens_are_reported(q, bad):
     assert rules.validate_filter(q) == bad
+
+
+def test_a_multi_word_tag_is_matched_by_one_word_of_it():
+    names = {"home office", "shopping"}
+    assert rules.validate_filter("tag:home", names) == []
+    assert rules.validate_filter("tag:office", names) == []
+    f = rules.parse_filter("tag:home")
+    assert rules.match_group({"key": "a@x.example", "tags": ["home office"],
+                              "count": 1}, f)
+    assert "one of its words" in aifilter.grammar_text()
+    assert aifilter.tag_names({"categories": {"home office": ["desk"]}}
+                              ).count("home office") == 1
 
 
 def test_free_text_is_always_valid():
@@ -59,7 +73,7 @@ def test_free_text_is_always_valid():
 
 def test_tag_must_be_a_known_tag_when_names_are_given():
     names = {"newsletter", "shopping", "dev/cloud"}
-    assert rules.validate_filter("tag:news tag:dev", names) == []   # prefix
+    assert rules.validate_filter("tag:news tag:dev", names) == []   # substring
     assert rules.validate_filter("tag:gardening", names) == ["tag:gardening"]
     assert rules.validate_filter("tag:gardening") == []             # no list
 
