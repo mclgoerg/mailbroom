@@ -465,7 +465,7 @@ _FILTER_ANSWERS_DE = {
     "tag:newsletter unread:>90 age:>1y":
         "Newsletter, die Sie kaum öffnen, ohne Mail seit über einem Jahr.",
     "tag:shipping ai:safe":
-        "Versandbenachrichtigungen, die die KI als unbedenklich einstuft.",
+        "Versandmeldungen, die die KI als harmlos einstuft.",
     "att:>5m is:noreply-ever":
         "Absender mit großen Anhängen, denen Sie nie geschrieben haben.",
 }
