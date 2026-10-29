@@ -1555,4 +1555,5 @@ export const EN: Record<string, string> = {
   "space.protected_note": "Protected senders can't be selected here.",
   "space.selected": "{n} senders - {size} selected",
   "space.selected_one": "1 sender - {size} selected",
+  "space.filter_cleared": "Filter cleared to show your selection.",
 };

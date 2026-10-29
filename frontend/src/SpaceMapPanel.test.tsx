@@ -185,3 +185,15 @@ test("German", () => {
   expect(screen.getByText("1 Absender - 200.0 MB ausgewählt")).toBeTruthy();
   expect(screen.getByRole("button", { name: "Fertig" })).toBeTruthy();
 });
+
+test("a sender that vanished on rescan is not handed over", () => {
+  const view = render(<SpaceMapPanel groups={BASE} onDone={onDone}
+    onClose={() => {}} />);
+  fireEvent.click(screen.getByRole("button", { name: "Select" }));
+  fireEvent.click(tile(/^big\.example/));
+  const { ["b@big.example"]: _gone, ...rest } = BASE;
+  view.rerender(<SpaceMapPanel groups={rest} onDone={onDone}
+    onClose={() => {}} />);
+  fireEvent.click(screen.getByRole("button", { name: "Done" }));
+  expect(onDone.mock.calls[0][0]).toEqual(["a@big.example"]);
+});

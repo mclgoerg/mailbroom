@@ -239,6 +239,7 @@ export default function App() {
     setState(null);
     setSelected(new Set());
     setDetail(null);
+    setSpaceOpen(false);
     setFilter("");
     setFocusIdx(-1);
     setAccountState(name);   // effect below reconnects SSE for this account
@@ -669,6 +670,7 @@ export default function App() {
   // its confirm dialog take it from there.
   const selectSenders = (keys: string[]) => {
     const live = keys.filter((k) => state?.groups.sender?.[k]);
+    if (filter.trim() || activeChip) notify(t("space.filter_cleared"));
     setSpaceOpen(false);
     setFlat(false);
     setMode("sender");

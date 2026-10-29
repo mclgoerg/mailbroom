@@ -26,7 +26,7 @@ const VERDICT_KEY: Record<Verdict, string> = {
 const tileClass = (it: MapItem, by: ColorBy): string =>
   by === "ai"
     ? (it.verdict ? VERDICT_CLS[it.verdict] : "bg-chip text-muted")
-    : HEAT[heatOf(it, by)];
+    : HEAT[heatOf(it, by)];   // narrowed: "ai" is handled above
 
 const nameOf = (it: MapItem): string =>
   it.kind === "other" ? t("space.other", { n: it.children.length }) : it.label;

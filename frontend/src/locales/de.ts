@@ -1777,4 +1777,5 @@ export const DE: Record<string, string> = {
   "space.protected_note": "Geschützte Absender lassen sich hier nicht auswählen.",
   "space.selected": "{n} Absender - {size} ausgewählt",
   "space.selected_one": "1 Absender - {size} ausgewählt",
+  "space.filter_cleared": "Filter zurückgesetzt, damit deine Auswahl sichtbar ist.",
 };

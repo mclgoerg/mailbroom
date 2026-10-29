@@ -82,6 +82,30 @@ const mk = (key: string, size: number, count: number, over = {}) => ({
   unsubscribed: null, new: false, pinned: 0, engagement: 50, ...over,
 });
 
+
+const SENDERS = Object.fromEntries([
+  mk("a@big.example", 6e8, 30), mk("b@big.example", 2e8, 12),
+  mk("p@big.example", 1e8, 7, { protected: true }),
+  mk("c@other.example", 9e8, 99),
+].map((g) => [g.key, g]));
+
+const boot = async () => {
+  state = { ...baseState, groups: { ...baseState.groups, sender: SENDERS } };
+  render(<ToastProvider><DialogProvider><App /></DialogProvider></ToastProvider>);
+  await screen.findByPlaceholderText("filter groups…");
+  await waitFor(() => expect(screen.getAllByText("a@big.example").length)
+    .toBeGreaterThan(0), { timeout: 5000 });
+};
+const openMap = async () => {
+  fireEvent.click(screen.getByRole("button", { name: "Tools" }));
+  fireEvent.click(screen.getByRole("menuitem", { name: /^Space map/ }));
+  return screen.findByTestId("space-map");
+};
+const tickDomain = (map: HTMLElement, re: RegExp) => {
+  fireEvent.click(screen.getByRole("button", { name: "Select" }));
+  fireEvent.click(within(map).getByRole("button", { name: re }));
+};
+
 afterEach(() => {
   cleanup();
   deleteGroups.mockClear();
@@ -121,3 +145,52 @@ test("Done: Sender tab, exactly the non-protected senders selected, Trash "
   await expectNoDialog();
   expect(deleteGroups).not.toHaveBeenCalled();
 });
+
+test("Done replaces a selection made in another tab", async () => {
+  await boot();
+  fireEvent.click(screen.getByRole("tab", { name: "Subject" }));
+  fireEvent.click(screen.getByRole("tab", { name: "Sender" }));
+  fireEvent.click(screen.getAllByRole("checkbox")[1]);        // a row ticked first
+  const map = await openMap();
+  tickDomain(map, /^other\.example/);
+  fireEvent.click(screen.getByRole("button", { name: "Done" }));
+  await waitFor(() => expect(screen.getByText("1 group · 99 mails")).toBeTruthy());
+});
+
+test("Done clears an active filter and says so", async () => {
+  await boot();
+  fireEvent.change(screen.getByPlaceholderText("filter groups…"),
+    { target: { value: "big" } });
+  const map = await openMap();
+  tickDomain(map, /^other\.example/);
+  fireEvent.click(screen.getByRole("button", { name: "Done" }));
+  expect(await screen.findByText("Filter cleared to show your selection."))
+    .toBeTruthy();
+  expect((screen.getByPlaceholderText("filter groups…") as HTMLInputElement)
+    .value).toBe("");
+});
+
+test("Done without a filter shows no such notice", async () => {
+  await boot();
+  const map = await openMap();
+  tickDomain(map, /^other\.example/);
+  fireEvent.click(screen.getByRole("button", { name: "Done" }));
+  await waitFor(() => expect(screen.queryByTestId("space-map")).toBeNull());
+  expect(screen.queryByText("Filter cleared to show your selection.")).toBeNull();
+});
+
+test("switching account closes the map (it must not reopen on the other one)",
+  async () => {
+    (cfg.accounts as any).second = { ...(cfg.accounts as any).proton,
+      user: "two@x.example" };
+    try {
+      await boot();
+      await openMap();
+      fireEvent.click(screen.getByRole("button", { name: "Profile & settings" }));
+      fireEvent.click(await screen.findByRole("menuitemradio", { name: /second/ }));
+      await waitFor(() => expect(screen.queryByTestId("space-map")).toBeNull());
+      await waitFor(() => expect(screen.getAllByText("a@big.example").length)
+        .toBeGreaterThan(0), { timeout: 5000 });
+      expect(screen.queryByTestId("space-map")).toBeNull();
+    } finally { delete (cfg.accounts as any).second; }
+  });

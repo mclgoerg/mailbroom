@@ -6,6 +6,10 @@ export const fmtSize = (b: number): string =>
   b >= 1048576 ? `${(b / 1048576).toFixed(1)} MB`
   : b >= 1024 ? `${Math.round(b / 1024)} KB` : `${b} B`;
 
+/** fmtSize plus a GB step (volumes and big mailboxes outgrow 1000 MB). */
+export const fmtSizeGb = (b: number): string =>
+  b >= 1073741824 ? `${(b / 1073741824).toFixed(1)} GB` : fmtSize(b);
+
 /** Short locale date for display: "6 Oct" / "6. Okt." this year, with the
  *  year ("6 Oct 2024") otherwise; `time` appends the wall-clock HH:MM of
  *  the string ("6 Oct, 21:48") when it has one. Takes the leading

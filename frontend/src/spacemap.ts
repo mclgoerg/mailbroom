@@ -2,7 +2,10 @@
  * tail of tiny items merged into an "Other" tile. Pure and client-side;
  * the panel (components/SpaceMapPanel.tsx) renders it. */
 
-import { fmtSize } from "./lib";
+import { engagementTier, fmtSizeGb } from "./lib";
+
+/** Size with a GB step (fmtSize stops at MB). */
+export const fmtBig = fmtSizeGb;
 import type { Group, Verdict } from "./types";
 
 /** Items below this share of their level merge into one "Other" tile. */
@@ -140,18 +143,14 @@ export function toggleItem(it: MapItem, sel: Set<string>): Set<string> {
   return next;
 }
 
-const GIB = 1073741824;
-/** Size with a GB step (fmtSize stops at MB). */
-export const fmtBig = (b: number): string =>
-  b >= GIB ? `${(b / GIB).toFixed(1)} GB` : fmtSize(b);
-
 export type ColorBy = "engagement" | "age" | "ai";
 /** 0 = quiet, 1 = middle, 2 = strong (strong = a cleanup candidate). */
 export type Heat = 0 | 1 | 2;
 
-export function heatOf(it: MapItem, by: ColorBy, now = Date.now()): Heat {
+export function heatOf(it: MapItem, by: Exclude<ColorBy, "ai">,
+                       now = Date.now()): Heat {
   if (by === "engagement") {
-    return it.engagement <= 33 ? 2 : it.engagement >= 67 ? 0 : 1;
+    return { low: 2, medium: 1, high: 0 }[engagementTier(it.engagement)] as Heat;
   }
   const cut = (months: number) => new Date(now - months * 30.44 * 86400e3)
     .toISOString().slice(0, 10);
