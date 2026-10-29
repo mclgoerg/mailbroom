@@ -36,11 +36,14 @@ from . import smartkinds
 MAX_HOSTS = 5                 # tracker hosts kept per mail
 MAX_TAGS = 4000               # <img>/<a> tags looked at per mail
 MAX_HTML = 262_144            # characters of HTML considered per mail
+MAX_STYLE = 1024              # characters of one style attribute considered
+MAX_DIM = 64                  # ... of a width / height attribute
+MAX_URL = 2048                # ... of one src / href
 PIXEL_MAX_PX = 3              # a tracking pixel is at most this wide AND high
 TOP_HOSTS_PER_GROUP = 3
 
 _CSS_DIM_RE = re.compile(
-    r"(?:^|[;\s{])(width|height)\s*:\s*(\d+(?:\.\d+)?)\s*(px)?\s*(?:[;}!]|$)")
+    r"(?:^|[;\s{])(width|height)\s*:\s*(\d+(?:\.\d+)?)(?:px)?\s*(?:[;}!]|$)")
 _CSS_HIDDEN_RE = re.compile(
     r"(?:^|[;\s{])(?:display\s*:\s*none|visibility\s*:\s*hidden"
     r"|opacity\s*:\s*0(?:\.0+)?|max-height\s*:\s*0(?:px)?)\s*(?:[;}!]|$)")
@@ -50,8 +53,11 @@ _OPAQUE_RE = re.compile(r"[A-Za-z0-9_]{16,}")
 _UUID_RE = re.compile(
     r"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}"
     r"-[0-9a-fA-F]{12}")
-_REDIRECT_SEGMENTS = frozenset({
-    "click", "clicks", "redirect", "redir", "trk", "track", "tracking"})
+# A redirect on its own ...
+_REDIRECT_SEGMENTS = frozenset({"click", "clicks", "redirect", "redir"})
+# ... and words that only count next to an opaque id (a plain
+# /orders/track page is not click tracking).
+_WEAK_REDIRECT_SEGMENTS = frozenset({"trk", "track", "tracking"})
 _SHORT_REDIRECT_SEGMENTS = frozenset({"c", "r"})   # /c/<opaque id>
 
 
@@ -62,7 +68,8 @@ class _Enough(Exception):
 def _px(value: str | None) -> float | None:
     """A width / height attribute or CSS value in pixels, or None when it
     is not a plain pixel (or unit-less) number - "100%" is not tiny."""
-    m = re.fullmatch(r"\s*(\d+(?:\.\d+)?)\s*(?:px)?\s*", value or "")
+    m = re.fullmatch(r"(\d+(?:\.\d+)?)(?:px)?", (value or "")[:MAX_DIM]
+                     .strip().lower())
     return float(m.group(1)) if m else None
 
 
@@ -88,7 +95,7 @@ def _opaque(text: str) -> bool:
 
 
 def _tiny_or_hidden(attrs: dict[str, str]) -> bool:
-    style = (attrs.get("style") or "").lower()
+    style = (attrs.get("style") or "")[:MAX_STYLE].lower()
     if _CSS_HIDDEN_RE.search(style):
         return True
     dims = {m.group(1): float(m.group(2))
@@ -123,6 +130,9 @@ def _redirect_link(url: str) -> bool:
     for i, s in enumerate(segs[:-1]):
         if s in _SHORT_REDIRECT_SEGMENTS and _opaque(segs[i + 1]):
             return True
+        if s in _WEAK_REDIRECT_SEGMENTS and _opaque(
+                "/".join(segs[i + 1:]) + "?" + parts.query):
+            return True
     return any(v.strip().lower().startswith(("http://", "https://"))
                for _, v in query)
 
@@ -146,7 +156,7 @@ class _Scanner(HTMLParser):
         self._tags += 1
         if self._tags > MAX_TAGS:
             raise _Enough()
-        a = {k.lower(): (v or "") for k, v in attrs}
+        a = {k.lower(): (v or "")[:MAX_URL] for k, v in attrs}
         if tag == "img":
             src = a.get("src", "")
             if src and _remote(src) and (
@@ -212,6 +222,7 @@ def tracker_map(acc) -> dict[tuple[str, int, int], tuple[bool, bool, tuple]]:
     sig = _sig(path)
     if sig is None or not secretbox.enabled():
         _MAP_CACHE.pop(str(path), None)
+        _GROUP_CACHE.pop(str(path), None)
         return {}
     hit = _MAP_CACHE.get(str(path))
     if hit and hit[0] == sig:
@@ -227,6 +238,40 @@ def tracker_map(acc) -> dict[tuple[str, int, int], tuple[bool, bool, tuple]]:
            for f, u, uv, p, c, h in rows}
     _MAP_CACHE[str(path)] = (_sig(path) or sig, out)
     return out
+
+
+# (index signature, groups revision, folder UIDVALIDITYs) -> {(grouping,
+# key): summary}; one entry per account, replaced when any part changes.
+_GROUP_CACHE: dict[str, tuple[tuple, dict]] = {}
+
+
+class GroupMemo:
+    """Per-group tracker summaries for one public_state build (lock held).
+    A state call with the same index file, groups revision and folder
+    UIDVALIDITYs does no per-mail work."""
+
+    def __init__(self, acc, tmap: dict):
+        self.acc, self.tmap, self.store = acc, tmap, {}
+        if not tmap:
+            return
+        from . import bodyindex
+        path = str(bodyindex._path(acc.name, acc.tenant))
+        sig = _MAP_CACHE.get(path, (None,))[0]
+        key = (sig, acc.state["groups_rev"],
+               tuple(sorted(acc.folder_uv.items())))
+        hit = _GROUP_CACHE.get(path)
+        if hit and hit[0] == key:
+            self.store = hit[1]
+        else:
+            _GROUP_CACHE[path] = (key, self.store)
+
+    def get(self, grouping: str, key: str, rec: dict) -> dict | None:
+        if not self.tmap:
+            return None
+        k = (grouping, key)
+        if k not in self.store:
+            self.store[k] = group_trackers(rec, self.tmap, self.acc)
+        return self.store[k]
 
 
 def group_trackers(rec: dict, tmap: dict, acc) -> dict | None:
@@ -263,35 +308,40 @@ def report(acc, limit: int = 20) -> dict:
            "any": 0, "senders": 0, "top_senders": [], "top_hosts": []}
     if not tmap:
         return out
+    # Totals and host counts come from the index rows themselves (same
+    # base as `docs`); only the per-sender view needs a mail still in the
+    # scan index to know its sender.
+    out["checked"] = len(tmap)
     per: dict[str, dict] = {}
     hosts: dict[str, dict] = {}
     with acc.lock:
-        sender_groups = acc.state["groups"].get("sender", {})
-        for (folder, uid, uv), (pixel, click, hs) in tmap.items():
-            if acc.folder_uv.get(folder, 0) != uv:
-                continue
-            m = acc.index.get(ikey(folder, uid))
-            if not m:
-                continue
-            out["checked"] += 1
-            out["pixel"] += pixel
-            out["click"] += click
-            tracked = pixel or click
-            out["any"] += tracked
-            s = per.setdefault(m["addr"], {
-                "key": m["addr"], "checked": 0, "tracked": 0, "pixel": 0,
-                "click": 0, "hosts": Counter()})
-            s["checked"] += 1
-            s["tracked"] += tracked
-            s["pixel"] += pixel
-            s["click"] += click
-            s["hosts"].update(hs)
-            for h in hs:
-                e = hosts.setdefault(h, {"host": h, "mails": 0,
-                                         "senders": set()})
-                e["mails"] += 1
-                e["senders"].add(m["addr"])
-        labels = {k: g["label"] for k, g in sender_groups.items()}
+        labels = {k: g["label"] for k, g in
+                  acc.state["groups"].get("sender", {}).items()}
+        addr_of = {(f, u): m["addr"] for f, u, uv in tmap
+                   if (m := acc.index.get(ikey(f, u)))
+                   and acc.folder_uv.get(f, 0) == uv}
+    for (folder, uid, uv), (pixel, click, hs) in tmap.items():
+        out["pixel"] += pixel
+        out["click"] += click
+        tracked = pixel or click
+        out["any"] += tracked
+        addr = addr_of.get((folder, uid))
+        for h in hs:
+            e = hosts.setdefault(h, {"host": h, "mails": 0,
+                                     "senders": set()})
+            e["mails"] += 1
+            if addr:
+                e["senders"].add(addr)
+        if addr is None:
+            continue
+        s = per.setdefault(addr, {
+            "key": addr, "checked": 0, "tracked": 0, "pixel": 0,
+            "click": 0, "hosts": Counter()})
+        s["checked"] += 1
+        s["tracked"] += tracked
+        s["pixel"] += pixel
+        s["click"] += click
+        s["hosts"].update(hs)
     tracking = [s for s in per.values() if s["tracked"]]
     out["senders"] = len(tracking)
     tracking.sort(key=lambda s: (-s["tracked"], -s["tracked"] / s["checked"],

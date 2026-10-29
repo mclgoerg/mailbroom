@@ -13,7 +13,6 @@ from backend import accounts as accountsmod
 from backend import bodyindex, trackers
 from backend import config as cfgmod
 from backend import mailops
-from backend import rules as rulesmod
 from backend.main import app
 from conftest import make_msg
 
@@ -103,7 +102,7 @@ def test_size_threshold_is_three_pixels():
     "https://go.mailer.example/redirect?x=1",
     "https://go.mailer.example/c/Ab3dEf9hIj2kLm5nOp7",
     "https://go.mailer.example/landing?url=https%3A%2F%2Fshop.example%2Fsale",
-    "http://go.mailer.example/e/tracking/42",
+    "http://go.mailer.example/e/tracking/Ab3dEf9hIj2kLm5nOp7",
 ])
 def test_redirect_links_are_click_tracking(href):
     r = trackers.scan_html(f'<a href="{href}">Buy</a>')
@@ -117,6 +116,10 @@ def test_redirect_links_are_click_tracking(href):
     "mailto:hello@shop.example",
     "https://shop.example/page?lang=de&ref=newsletter",
     "/relative/click",
+    "https://shop.example/orders/track",
+    "https://shop.example/orders/track?order=1234",
+    "https://shop.example/help/tracking-your-parcel",
+    "https://shop.example/orders/tracking/1234",
 ])
 def test_normal_links_are_not_click_tracking(href):
     r = trackers.scan_html(f'<a href="{href}">Read</a>')
@@ -164,6 +167,27 @@ def test_huge_html_is_bounded():
     many = '<a href="https://shop.example/x">x</a>' * 20_000
     assert trackers.scan_html(many + tail)["pixel"] is False
     assert time.time() - t0 < 5
+
+
+@pytest.mark.parametrize("attrs", [
+    'style="width:1' + " " * 60_000 + 'x"',
+    'style="width:1px' + " " * 60_000 + 'x; height:1' + " " * 60_000 + '"',
+    'style="display:none' + " " * 60_000 + 'x"',
+    'width="1' + " " * 60_000 + 'x" height="1"',
+    'width="1' + " " * 60_000 + '" height="1' + " " * 60_000 + 'x"',
+])
+def test_long_whitespace_runs_in_attributes_stay_linear(attrs):
+    html = f'<img src="https://t.tracker.example/a.gif" {attrs}>'
+    t0 = time.time()
+    trackers.scan_html(html)
+    assert time.time() - t0 < 0.5
+
+
+def test_long_urls_stay_bounded():
+    url = "https://t.tracker.example/" + "a1" * 100_000
+    t0 = time.time()
+    trackers.scan_html(f'<img src="{url}"><a href="{url}">x</a>')
+    assert time.time() - t0 < 0.5
 
 
 def test_scan_message_uses_the_html_part_only():
@@ -383,29 +407,67 @@ def test_api_report_orders_senders_by_tracked_mails(scanned):
                                        "noreply@dhl.example"]
 
 
-# ------------------------------------------------------------ filter parity
+def test_no_ai_payload_carries_tracker_data(scanned):
+    import glob
+    import json
+    import os
+    from backend import aisort
+    # every module that talks to an AI provider (settings aside)
+    base = os.path.dirname(bodyindex.__file__)
+    mods = {p for p in glob.glob(os.path.join(base, "*.py"))
+            if os.path.basename(p) not in ("config.py", "trackers.py")
+            and any(w in open(p).read()
+                    for w in ("ai_call(", "ai_client", "anthropic"))}
+    mods |= set(glob.glob(os.path.join(base, "ai*.py")))
+    assert any(p.endswith("aisort.py") for p in mods)
+    for p in sorted(mods):
+        src = open(p).read().lower()
+        assert "tracker" not in src and "pixel" not in src, p
+    # and the real payload units, with the tracker data present
+    build()
+    assert groups()["noreply@dhl.example"]["trackers"]
+    units = json.dumps(aisort.collect_units(acc())).lower()
+    for needle in ("tracker", "pixel", "mailer.example"):
+        assert needle not in units
 
-def test_has_tracker_filter_parser_and_matching():
-    f = rulesmod.parse_filter("has:tracker")
-    assert f["tracker_only"] is True and f["text"] == []
-    assert rulesmod.parse_filter("")["tracker_only"] is False
-    other = rulesmod.parse_filter("has:other")
-    assert other["tracker_only"] is False and other["text"] == ["has:other"]
-    base = {"key": "a@b", "label": "A", "sub": "", "tags": [], "unread": 0,
-            "count": 3}
-    t = {"checked": 3, "pixel": 1, "click": 0, "hosts": ["t.example"]}
-    assert rulesmod.match_group({**base, "trackers": t}, f)
-    assert rulesmod.match_group(
-        {**base, "trackers": {**t, "pixel": 0, "click": 2}}, f)
-    assert not rulesmod.match_group(
-        {**base, "trackers": {**t, "pixel": 0}}, f)
-    assert not rulesmod.match_group(base, f)            # never checked
-    assert rulesmod.match_group(base, rulesmod.parse_filter(""))
+
+def test_checked_and_docs_share_one_base_after_deletes(scanned):
+    build()
+    with acc().lock:                          # a delete before the next sync
+        for k in [k for k, m in acc().index.items() if m["uid"] == 1]:
+            del acc().index[k]
+    r = trackers.report(acc())
+    assert r["docs"] == 5 and r["checked"] == 5
+    assert r["pixel"] == 1                    # the deleted mail's own row
 
 
-def test_no_ai_payload_mentions_trackers():
-    import inspect
-    from backend import aihelper, aisort
-    for mod in (aihelper, aisort):
-        src = inspect.getsource(mod).lower()
-        assert "tracker" not in src and "pixel" not in src
+def test_second_state_build_does_no_per_mail_work(scanned, monkeypatch):
+    build()
+    calls = []
+    real = trackers.group_trackers
+    monkeypatch.setattr(trackers, "group_trackers",
+                        lambda *a, **k: calls.append(1) or real(*a, **k))
+    first = mailops.public_state(acc())["groups"]
+    n = len(calls)
+    assert n > 0
+    second = mailops.public_state(acc())["groups"]
+    assert len(calls) == n                    # nothing recomputed
+    assert second["sender"]["noreply@dhl.example"]["trackers"] == \
+        first["sender"]["noreply@dhl.example"]["trackers"]
+    with acc().lock:                          # the groups changed
+        acc().state["groups_rev"] += 1
+    mailops.public_state(acc())
+    assert len(calls) > n
+
+
+def test_group_cache_is_replaced_not_accumulated(scanned):
+    build()
+    mailops.public_state(acc())
+    sizes = (len(trackers._GROUP_CACHE), len(trackers._MAP_CACHE))
+    for _ in range(3):
+        with acc().lock:
+            acc().state["groups_rev"] += 1
+        mailops.public_state(acc())
+    assert (len(trackers._GROUP_CACHE), len(trackers._MAP_CACHE)) == sizes
+    path = str(bodyindex._path(acc().name, acc().tenant))
+    assert trackers._GROUP_CACHE[path][0][1] == acc().state["groups_rev"]

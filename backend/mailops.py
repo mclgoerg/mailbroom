@@ -1998,6 +1998,7 @@ def public_state(acc=None) -> dict:
     now = time.time()
     with acc.lock:
         paddrs = _protected_addrs(plist, acc)
+        tmemo = trackers.GroupMemo(acc, tmap)
         out = {k: v for k, v in acc.state.items() if k != "groups"}
         out["account"] = acc.name
         out["groups"] = {
@@ -2017,9 +2018,8 @@ def public_state(acc=None) -> dict:
                                   pinned_uids(rec, acc, pinned).values()),
                     # tracking flags of the mails the body index has
                     # checked (absent: none of its mails was)
-                    **({"trackers": tr} if tmap and (
-                        tr := trackers.group_trackers(rec, tmap, acc))
-                       else {}),
+                    **({"trackers": tr} if (
+                        tr := tmemo.get(g, k, rec)) else {}),
                     # a company row's content summary (live: it follows
                     # deletes, unlike the row's placement)
                     **({"purposes": purpose_summary(rec, acc)}

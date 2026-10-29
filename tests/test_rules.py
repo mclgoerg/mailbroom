@@ -246,3 +246,25 @@ def test_tick_runs_due_rules(bridge):
     ts = saved["last_run"]["ts"]
     rulesmod._tick()                               # not due again
     assert rulesmod.load_rules()[0]["last_run"]["ts"] == ts
+
+
+# has:tracker (F3): mirrors frontend/src/lib.test.ts
+
+def test_has_tracker_filter_parser_and_matching():
+    f = rulesmod.parse_filter("has:tracker")
+    assert f["tracker_only"] is True and f["text"] == []
+    assert rulesmod.parse_filter("")["tracker_only"] is False
+    other = rulesmod.parse_filter("has:other")
+    assert other["tracker_only"] is False and other["text"] == ["has:other"]
+    base = {"key": "a@b", "label": "A", "sub": "", "tags": [], "unread": 0,
+            "count": 3}
+    t = {"checked": 3, "pixel": 1, "click": 0, "hosts": ["t.example"]}
+    assert rulesmod.match_group({**base, "trackers": t}, f)
+    assert rulesmod.match_group(
+        {**base, "trackers": {**t, "pixel": 0, "click": 2}}, f)
+    assert not rulesmod.match_group(
+        {**base, "trackers": {**t, "pixel": 0}}, f)
+    assert not rulesmod.match_group(base, f)            # never checked
+    assert rulesmod.match_group(base, rulesmod.parse_filter(""))
+
+
