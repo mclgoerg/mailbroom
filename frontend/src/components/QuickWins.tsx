@@ -1,4 +1,4 @@
-import { ChevronDown, ChevronRight, Zap } from "lucide-react";
+import { ChevronDown, ChevronRight, X, Zap } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { t } from "../i18n";
 import { fmtSize } from "../lib";
@@ -38,6 +38,13 @@ export function QuickWins({ groups, account, onReview, onCleanUp }: {
     localStorage.setItem(COLLAPSED_KEY, collapsed ? "0" : "1");
     setCollapsed(!collapsed);
   };
+  const moreToggle = cards.length > TOP_CARDS
+    ? (cls: string) => (
+      <Button variant="quiet" size="sm" className={cls}
+        onClick={() => setMore(!more)}>
+        {more ? t("qw.less") : t("qw.more", { n: cards.length - TOP_CARDS })}
+      </Button>)
+    : null;
   const dismiss = (c: QuickWinCard) => {
     const next = { ...dismissed, [c.def.id]: c.mails };
     saveDismissed(account, next);
@@ -62,46 +69,53 @@ export function QuickWins({ groups, account, onReview, onCleanUp }: {
       </div>
       {!collapsed && (
         <>
+          {/* Phones: one compact row - no hint line, dismiss as an icon in the
+              card head, More as the row's last tile - so the strip stays short. */}
           <ul className="mt-2 flex snap-x snap-mandatory gap-2
             overflow-x-auto pb-1 md:grid md:grid-cols-3 md:overflow-visible">
             {shown.map((c) => (
               <li key={c.def.id} data-testid="qw-card"
-                className="flex w-72 shrink-0 snap-start flex-col gap-2
-                  rounded-card border border-line bg-panel2 p-3
-                  md:w-auto">
-                <div className="min-w-0">
-                  <div className="type-body">{t(c.def.titleKey)}</div>
-                  <div className="type-meta text-muted">
-                    {t("qw.card_meta", { mails: c.mails,
-                      size: fmtSize(c.size) })}
+                className="flex w-72 shrink-0 snap-start flex-col gap-1.5
+                  rounded-card border border-line bg-panel2 p-2.5
+                  md:w-auto md:gap-2 md:p-3">
+                <div className="flex items-start gap-1">
+                  <div className="min-w-0 flex-1">
+                    <div className="type-body">{t(c.def.titleKey)}</div>
+                    <div className="type-meta text-muted">
+                      {t("qw.card_meta", { mails: c.mails,
+                        size: fmtSize(c.size) })}
+                      {c.protectedSkipped > 0 && (
+                        <> · {t("qw.protected_skipped",
+                          { n: c.protectedSkipped })}</>
+                      )}
+                    </div>
+                    <div data-testid="qw-hint"
+                      className="hidden type-caption text-faint md:block">
+                      {t(c.def.hintKey)}
+                    </div>
                   </div>
-                  <div className="type-caption text-faint">
-                    {t(c.def.hintKey)}
-                    {c.protectedSkipped > 0 && (
-                      <> · {t("qw.protected_skipped",
-                        { n: c.protectedSkipped })}</>
-                    )}
-                  </div>
+                  <Button variant="quiet" size="icon" label={t("qw.not_now")}
+                    className="-mr-1 -mt-1 shrink-0" onClick={() => dismiss(c)}>
+                    <X size={16} />
+                  </Button>
                 </div>
-                <div className="mt-auto flex flex-wrap items-center gap-2">
+                <div className="mt-auto flex items-center gap-2">
                   <Button variant="secondary" size="sm"
                     onClick={() => onReview(c)}>{t("qw.review")}</Button>
                   <Button size="sm" onClick={() => onCleanUp(c)}>
                     {t("qw.clean_up")}
                   </Button>
-                  <Button variant="quiet" size="sm" onClick={() => dismiss(c)}>
-                    {t("qw.not_now")}
-                  </Button>
                 </div>
               </li>
             ))}
+            {moreToggle && (
+              <li className="flex shrink-0 snap-start items-center md:hidden">
+                {moreToggle("h-full")}
+              </li>
+            )}
           </ul>
-          {cards.length > TOP_CARDS && (
-            <Button variant="quiet" size="sm" className="mt-1"
-              onClick={() => setMore(!more)}>
-              {more ? t("qw.less")
-                : t("qw.more", { n: cards.length - TOP_CARDS })}
-            </Button>
+          {moreToggle && (
+            <div className="mt-1 hidden md:block">{moreToggle("")}</div>
           )}
         </>
       )}

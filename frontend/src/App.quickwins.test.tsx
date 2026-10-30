@@ -2,7 +2,7 @@
 /* Quick wins strip (F5): visibility rules, Review, Clean up (always via the
  * confirm), "Not now" per account, phone layout, German. */
 
-import { cleanup, fireEvent, render, screen, waitFor } from
+import { cleanup, fireEvent, render, screen, waitFor, within } from
   "@testing-library/react";
 import { afterEach, expect, test, vi } from "vitest";
 
@@ -251,7 +251,7 @@ test("only the top 3 cards show; More reveals the rest and the union " +
   await ready0();
   expect(screen.getAllByTestId("qw-card")).toHaveLength(3);
   expect(strip()!.textContent).toContain("free up to 150.0 MB");
-  fireEvent.click(screen.getByRole("button", { name: "2 more" }));
+  fireEvent.click(screen.getAllByRole("button", { name: "2 more" })[0]);
   expect(screen.getAllByTestId("qw-card")).toHaveLength(5);
   expect(strip()!.textContent).toContain("free up to 200.0 MB");
 });
@@ -262,6 +262,35 @@ test("phone layout: the cards sit in a scroll-snap row", async () => {
   const list = screen.getAllByTestId("qw-card")[0].parentElement!;
   expect(list.className).toContain("snap-x");
   expect(list.className).toContain("overflow-x-auto");
+});
+
+test("phone layout is compact: hint only from md up, dismiss is an icon in " +
+  "the card head, More is the scroll row's last tile on phones", async () => {
+  const old = { last: "2020-01-01", count: 20 };
+  const done = { n: 1, of: 1, status: "done" as const, link: "", addr: "" };
+  const ai = { verdict: "delete_safe", reason: "" } as Group["ai"];
+  setup({}, [
+    mk("g1@x.example", { ...old, tags: ["newsletter"], unread: 20,
+      size: 60 * MB }),
+    mk("g2@x.example", { ...old, engagement: 5, size: 50 * MB }),
+    mk("g3@x.example", { ...old, unsubscribed: done, size: 40 * MB }),
+    mk("g4@x.example", { ...old, att_size: 30 * MB, size: 30 * MB }),
+    mk("g5@x.example", { ...old, ai, size: 20 * MB }),
+  ]);
+  await ready0();
+  const card = screen.getAllByTestId("qw-card")[0];
+  const hint = within(card).getByTestId("qw-hint");
+  expect(hint.className).toContain("hidden");
+  expect(hint.className).toContain("md:block");
+  // Not now: an icon button (accessible name kept), no text row of its own.
+  const dismiss = within(card).getByRole("button", { name: "Not now" });
+  expect(dismiss.textContent).toBe("");
+  // Phones: More is the last tile of the scroll row; desktop: below the grid.
+  const [phoneMore, deskMore] = screen.getAllByRole("button", { name: "2 more" });
+  const tile = phoneMore.closest("li")!;
+  expect(tile.parentElement).toBe(card.parentElement);
+  expect(tile.className).toContain("md:hidden");
+  expect(deskMore.parentElement!.className).toContain("hidden md:block");
 });
 
 test("German strings", async () => {
