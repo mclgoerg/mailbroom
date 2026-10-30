@@ -1,5 +1,26 @@
 # Changelog
 
+## [1.10.0](https://github.com/mclgoerg/mailbroom/compare/v1.9.0...v1.10.0) (2026-10-30)
+
+
+### Features
+
+* describe a filter in your own words and let the AI write it ([#156](https://github.com/mclgoerg/mailbroom/issues/156)) ([5832fa9](https://github.com/mclgoerg/mailbroom/commit/5832fa9e289b7f9802616fc0770f532c191b276f))
+* flag senders who keep mailing after you unsubscribed ([#155](https://github.com/mclgoerg/mailbroom/issues/155)) ([81545dc](https://github.com/mclgoerg/mailbroom/commit/81545dc668d497582585042090eb170fd4e455c6))
+* quick-win cleanup suggestions after a scan ([#159](https://github.com/mclgoerg/mailbroom/issues/159)) ([2783e2d](https://github.com/mclgoerg/mailbroom/commit/2783e2d77f13c8644ad46c86c078d9569365a77a))
+* show which senders track your opens and clicks ([#157](https://github.com/mclgoerg/mailbroom/issues/157)) ([4f9eaa0](https://github.com/mclgoerg/mailbroom/commit/4f9eaa0a3a002d704e1950c8d496996db038594d))
+* space map of what fills your mailbox ([#160](https://github.com/mclgoerg/mailbroom/issues/160)) ([988a8c6](https://github.com/mclgoerg/mailbroom/commit/988a8c6921f6786572c544ad10d6419a0f1952cd))
+* swipe through groups to triage them ([#161](https://github.com/mclgoerg/mailbroom/issues/161)) ([17a3586](https://github.com/mclgoerg/mailbroom/commit/17a35861047c5deda843aad26abf1d68f6527e5e))
+* your year in mail, story-style ([#162](https://github.com/mclgoerg/mailbroom/issues/162)) ([42bd6a0](https://github.com/mclgoerg/mailbroom/commit/42bd6a0832bf18fe5a89cbb30c9cd8ecf62420d3))
+
+
+### Bug Fixes
+
+* address the user as du everywhere in German ([#165](https://github.com/mclgoerg/mailbroom/issues/165)) ([536528d](https://github.com/mclgoerg/mailbroom/commit/536528d9c2f7702bb379b0c6b36225f98735b83e))
+* arrow keys in Your year in mail act on the loaded cards right away ([#166](https://github.com/mclgoerg/mailbroom/issues/166)) ([b7c03bd](https://github.com/mclgoerg/mailbroom/commit/b7c03bda7b0534ac8ab5c2e70eb826064268b379))
+* keep Triage in the Tools menu only ([#164](https://github.com/mclgoerg/mailbroom/issues/164)) ([7229a78](https://github.com/mclgoerg/mailbroom/commit/7229a7811d84fb4812a3d56b1a28f372b912e8b6))
+* make the quick-wins strip compact on phones ([#163](https://github.com/mclgoerg/mailbroom/issues/163)) ([4e3fdef](https://github.com/mclgoerg/mailbroom/commit/4e3fdefce282399b73046b0527b94825c290c4d6))
+
 ## [1.9.0](https://github.com/mclgoerg/mailbroom/compare/v1.8.0...v1.9.0) (2026-10-28)
 
 
