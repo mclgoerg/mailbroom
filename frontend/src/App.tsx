@@ -1680,12 +1680,6 @@ export default function App() {
         <div className="ml-auto flex items-center gap-2">
           <Button variant="secondary" size="icon" label={t("Search all mails")}
             onClick={() => setSearchOpen(true)}><Search size={18} /></Button>
-          <Button variant="secondary" className="min-[48rem]:hidden"
-            disabled={triageDisabled} onClick={() => setTriageOpen(true)}>
-            <Layers size={16} aria-hidden className="mr-1 inline
-              align-text-bottom" />
-            {t("triage.menu")}
-          </Button>
           <Menu variant="secondary" trigger={<>
               <Wrench size={16} aria-hidden /> {t("Tools")}
               <ChevronDown size={16} aria-hidden className="text-muted" />

@@ -415,6 +415,18 @@ test("closing without decisions needs no prompt", async () => {
   await waitFor(() => expect(screen.queryByRole("dialog", { name: "Triage" })).toBeNull());
 });
 
+test("Triage lives in the Tools menu only - no loose toolbar button " +
+  "(DESIGN.md toolbar rule; it wrapped the German phone toolbar)", async () => {
+  localStorage.setItem("pmc_account", "proton");
+  state = baseState(FIXTURE);
+  render(<ToastProvider><DialogProvider><App /></DialogProvider></ToastProvider>);
+  await waitFor(() => expect(screen.getAllByText(FIXTURE[0].label).length)
+    .toBeGreaterThan(0));
+  expect(screen.queryByRole("button", { name: /Triage/ })).toBeNull();
+  fireEvent.click(screen.getByRole("button", { name: "Tools" }));
+  expect(await screen.findByRole("menuitem", { name: /Triage/ })).toBeTruthy();
+});
+
 test("the entry is disabled with no groups", async () => {
   localStorage.setItem("pmc_account", "proton");
   state = baseState([]);

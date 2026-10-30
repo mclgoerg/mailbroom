@@ -97,7 +97,7 @@ presets.
   unread percentage, first→last date range (short dates, e.g. "7 Oct"), category tags
   (shipping, finance, shopping, social, travel, newsletters,
   automated…).
-- **Swipe triage** - Tools -> Triage (a button on phones) deals out the
+- **Swipe triage** - Tools -> Triage deals out the
   groups of the current list one card at a time: swipe left to Trash,
   right to Keep, up to Unsubscribe - or use the buttons or the arrow keys.
   Nothing happens while you decide; at the end one confirm names every
