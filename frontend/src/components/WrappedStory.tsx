@@ -1,5 +1,6 @@
 import { ChevronLeft, ChevronRight, Sparkles, X } from "lucide-react";
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState,
+  type ReactNode } from "react";
 import { api, fmtSize, saveBlob } from "../api";
 import { getLang, t } from "../i18n";
 import type { WrappedResp, WrappedSender } from "../types";
@@ -311,7 +312,10 @@ export function WrappedStory({ onClose }: { onClose: () => void }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [elapsed, auto]);
 
-  useEffect(() => {
+  // Layout effect, not a passive one: re-registered in the same commit that
+  // shows the loaded cards, so a key pressed right then never reaches the
+  // loading state's listener (which still sees no cards) - see #147.
+  useLayoutEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       // the year select and text fields keep their own arrow keys
       const el = e.target as HTMLInputElement | null;
