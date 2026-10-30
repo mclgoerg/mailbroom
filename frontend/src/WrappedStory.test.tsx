@@ -3,7 +3,7 @@
  * its reduced-motion opt-out), cards without data skipped, year switch
  * refetches, the saved image masks names unless toggled, German. */
 
-import { act, cleanup, fireEvent, render, screen }
+import { act, cleanup, fireEvent, render, screen, waitFor }
   from "@testing-library/react";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import { WrappedStory, CARD_MS, cardsFor } from "./components/WrappedStory";
@@ -176,6 +176,27 @@ test("Save image: names are masked unless 'Show names' is on", async () => {
   fireEvent.click(screen.getByRole("button", { name: "Save image" }));
   await flush();
   expect(svgToPngBlob.mock.calls[1][0]).toContain("Shop News");
+});
+
+test("an arrow key pressed the moment the cards appear acts on the loaded " +
+  "cards (no stale listener from the loading state)", async () => {
+  // Fire ArrowRight from a MutationObserver as soon as the intro is inserted -
+  // before passive effects run. A listener re-registered only in a passive
+  // effect still sees "0 cards" then and the story stays on card 1 (the cause
+  // of a flaky "German" test on main CI).
+  const seen: string[] = [];
+  const mo = new MutationObserver(() => {
+    if (!seen.length && document.body.textContent?.includes("You received")) {
+      seen.push("intro");
+      fireEvent.keyDown(window, { key: "ArrowRight" });
+    }
+  });
+  mo.observe(document.body, { childList: true, subtree: true,
+    characterData: true });
+  render(<WrappedStory onClose={onClose} />);
+  await waitFor(() => expect(seen).toEqual(["intro"]));
+  mo.disconnect();
+  expect(await screen.findByText("They came from")).toBeTruthy();
 });
 
 test("German", async () => {
