@@ -289,7 +289,7 @@ test("German strings and the language are sent along", async () => {
   expect(within(dlg).getByText(/Nur dieser Satz und die Filter-Syntax/))
     .toBeTruthy();
   fireEvent.change(within(dlg).getByLabelText(
-    "Beschreiben Sie, wonach Sie suchen"), { target: { value: "Satz" } });
+    "Beschreib, wonach du suchst"), { target: { value: "Satz" } });
   fireEvent.click(within(dlg).getByRole("button", { name: "Senden" }));
   await within(dlg).findByDisplayValue("tag:newsletter unread:>90 age:>1y");
   expect(aiFilter).toHaveBeenCalledWith("Satz", "de");

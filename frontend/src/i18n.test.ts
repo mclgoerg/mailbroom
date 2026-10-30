@@ -61,4 +61,13 @@ describe("i18n", () => {
         && p !== "{n}" && p !== "{count}"), k).toEqual([]);
     }
   });
+  it("German addresses the user informally (du), never with Sie / Ihr", () => {
+    // "Sie" here means "it" (the AI) / "they" (the answers) / "it" (the file).
+    const notYou = new Set(["aisort.b_only", "know.keep_b_rules",
+      "know.download_tip"]);
+    const formal = /\b(Sie|Ihnen|Ihre?[nmrs]?)\b/;
+    const hits = Object.entries(DE)
+      .filter(([k, v]) => !notYou.has(k) && formal.test(v)).map(([k]) => k);
+    expect(hits).toEqual([]);
+  });
 });

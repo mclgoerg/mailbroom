@@ -41,7 +41,7 @@ export const DE: Record<string, string> = {
   "confirm.reset_spend": "KI-Kostenzähler zurücksetzen",
   "confirm.reset_spend_body":
     "Die KI-Gesamtkosten ({cost}) und die Kosten dieses Monats ({month}), "
-    + "die auf Ihr Monatsbudget angerechnet werden, beginnen wieder bei null.",
+    + "die auf dein Monatsbudget angerechnet werden, beginnen wieder bei null.",
   "confirm.reset_spend_confirm": "Kosten zurücksetzen",
   "confirm.switch_profile":
     "Zum Kontoprofil „{name}“ wechseln? Danach neu scannen.",
@@ -58,22 +58,22 @@ export const DE: Record<string, string> = {
     + "KI-Anbieter (z. B. Anthropic, OpenAI, Microsoft Foundry oder ein "
     + "lokales Modell): Absendernamen "
     + "und -adressen, Anzahl, Größen, Daten, Lesestatus, Kategorien, "
-    + "Betreffzeilen, Schutz-Markierungen und ob Sie einem Absender je "
-    + "geantwortet haben. Mail-Inhalte und Anhänge werden NIE gesendet. "
+    + "Betreffzeilen, Schutz-Markierungen und ob du einem Absender je "
+    + "geantwortet hast. Mail-Inhalte und Anhänge werden NIE gesendet. "
     + "Die KI-Sortierung von „Sonstige“ sendet je Absender Name und "
     + "Adresse, Anzahl, ob ein Abmeldelink angeboten wird und bis zu drei "
-    + "aktuelle Betreffzeilen – dazu Ihre eigenen Sortier-Anweisungen aus "
-    + "den Einstellungen. Wenn Sie einen Filter in Worten beschreiben, "
-    + "gehen nur Ihr Satz, die Filter-Syntax und die Namen Ihrer Kategorien "
+    + "aktuelle Betreffzeilen – dazu deine eigenen Sortier-Anweisungen aus "
+    + "den Einstellungen. Wenn du einen Filter in Worten beschreibst, "
+    + "gehen nur dein Satz, die Filter-Syntax und die Namen deiner Kategorien "
     + "an die KI – keine Maildaten.",
   "ai.data_note":
     "An den KI-Anbieter gesendet: Absendernamen/-adressen, Anzahl, "
     + "Größen, Daten, Lesestatus, Kategorien, Betreffzeilen, "
-    + "Schutz-Markierungen und ob Sie einem Absender je geantwortet "
-    + "haben - niemals Mail-Inhalte oder Anhänge.",
+    + "Schutz-Markierungen und ob du einem Absender je geantwortet "
+    + "hast - niemals Mail-Inhalte oder Anhänge.",
   "replied": "geantwortet",
   "replied.tip":
-    "Sie haben diesem Absender schon geschrieben (aus Ihrem "
+    "Du hast diesem Absender schon geschrieben (aus deinem "
     + "Gesendet-Ordner ermittelt)",
   "new_sender.tip":
     "Kürzlich erstmals gesehen - nur ein Hinweis, es wurde automatisch "
@@ -430,7 +430,7 @@ export const DE: Record<string, string> = {
   "notice.atts_cancelled": "Anhang-Analyse abgebrochen.",
   "notice.unsub_cancelled": "Abbestellen abgebrochen.",
   "atts.hint":
-    "Finden Sie die Mails, die Ihren Speicher belegen. Die Analyse liest "
+    "Finde die Mails, die deinen Speicher belegen. Die Analyse liest "
     + "nur die Mail-Struktur (keine Inhalte werden geladen).",
   "atts.summary": "{n} Mails mit Anhängen · {size} gesamt",
   "atts.summary_one": "1 Mail mit Anhängen · {size} gesamt",
@@ -580,7 +580,7 @@ export const DE: Record<string, string> = {
   "fp.protect_sender_one": "Absender schützen",
   "fp.junk_empty": "Spam-Ordner ist leer",
   "fp.junk_empty_hint":
-    "Mails, die Ihr Anbieter als Spam einstuft, erscheinen hier - so lassen sich Fehlalarme retten.",
+    "Mails, die dein Anbieter als Spam einstuft, erscheinen hier - so lassen sich Fehlalarme retten.",
   "fp.protected_refused":
     "Einige dieser Mails stammen von geschützten Absendern oder sind angeheftet. Trotzdem in den Papierkorb verschieben?",
   "fp.confirm_protected_title": "Geschützte Mails in den Papierkorb verschieben?",
@@ -660,7 +660,7 @@ export const DE: Record<string, string> = {
   "mails.none": "Keine Mails passen zu diesem Filter.",
   "thread.title": "Konversation",
   "thread.read": "Konversation lesen",
-  "thread.you": "Sie",
+  "thread.you": "Du",
   "thread.n_mails": "{n} Mails",
   "thread.n_mails_one": "1 Mail",
   "thread.expand_all": "Alle aufklappen",
@@ -668,7 +668,7 @@ export const DE: Record<string, string> = {
   "thread.show_quoted": "Zitierten Text anzeigen",
   "thread.hide_quoted": "Zitierten Text ausblenden",
   "thread.note.sent_unavailable":
-    "Ihre eigenen Antworten konnten nicht aus dem Ordner „Gesendet“ geladen "
+    "Deine eigenen Antworten konnten nicht aus dem Ordner „Gesendet“ geladen "
     + "werden - es werden nur die empfangenen Mails angezeigt.",
   "no.matches": "Keine Gruppen passen zu diesem Filter",
   "err.generic": "Fehler: {msg}",
@@ -1025,11 +1025,11 @@ export const DE: Record<string, string> = {
   "search.none":
     "Keine Treffer",
   "search.none_hint":
-    "Versuchen Sie eine andere Schreibweise oder einen kürzeren Suchbegriff.",
+    "Versuch eine andere Schreibweise oder einen kürzeren Suchbegriff.",
   "trash.no_match":
     "Keine passenden Mails",
   "trash.empty_hint":
-    "Gelöschte Mails bleiben hier, bis Sie den Papierkorb leeren.",
+    "Gelöschte Mails bleiben hier, bis du den Papierkorb leerst.",
   "atts.not_analyzed":
     "Noch nicht analysiert",
   "atts.none_hint":
@@ -1039,7 +1039,7 @@ export const DE: Record<string, string> = {
   "audit.empty_hint":
     "Aktionen wie Mails in den Papierkorb verschieben, Regelläufe und Rückgängig erscheinen hier.",
   "search.body_hint":
-    "Die Suche im Mailtext fragt Ihren Mailserver und kann einen "
+    "Die Suche im Mailtext fragt deinen Mailserver und kann einen "
     + "Moment dauern.",
   "search.note.partial":
     "Nicht alle Ordner wurden rechtzeitig durchsucht - die Treffer sind "
@@ -1079,7 +1079,7 @@ export const DE: Record<string, string> = {
   "index.rebuild": "Neu aufbauen",
   "index.delete": "Index löschen",
   "index.confirm_read":
-    "Liest den Text von {n} gescannten Mails dieses Kontos von Ihrem "
+    "Liest den Text von {n} gescannten Mails dieses Kontos von deinem "
     + "Mailserver (je die ersten ~256 KB) und speichert lokal nur "
     + "geschlüsselte Wort-Hashes - keinen lesbaren Text.",
   "index.confirm_disk":
@@ -1093,7 +1093,7 @@ export const DE: Record<string, string> = {
     "Achtung: das passt möglicherweise nicht auf den Datenträger.",
   "index.delete_title": "Den lokalen Index löschen",
   "index.delete_body":
-    "Der Wortindex des Kontos \"{name}\" wird entfernt. Sie können ihn jederzeit "
+    "Der Wortindex des Kontos \"{name}\" wird entfernt. Du kannst ihn jederzeit "
     + "neu aufbauen.",
   "notice.index_cancelled":
     "Indexierung abgebrochen - bereits Indexiertes bleibt erhalten.",
@@ -1111,7 +1111,7 @@ export const DE: Record<string, string> = {
     + "unvollständig.",
   "body_search.disabled": "Aus (nur Betreff und Absender)",
   "body_search.help":
-    "Die Mailtext-Suche läuft bei jeder Anfrage auf Ihrem Mailserver - "
+    "Die Mailtext-Suche läuft bei jeder Anfrage auf deinem Mailserver - "
     + "Mailbroom speichert nichts. Bei entfernten Anbietern kann sie "
     + "langsam sein; Proton Bridge antwortet lokal. Ausschalten, um nur "
     + "nach Betreff und Absender zu suchen.",
@@ -1765,12 +1765,12 @@ export const DE: Record<string, string> = {
   // Klartext -> Filter (components/AiFilterPanel.tsx)
   "aif.button": "Filter beschreiben",
   "aif.title": "Filter beschreiben",
-  "aif.sub": "Ihre KI schreibt den Filter - Sie prüfen ihn vorher",
-  "aif.label": "Beschreiben Sie, wonach Sie suchen",
+  "aif.sub": "Deine KI schreibt den Filter - du prüfst ihn vorher",
+  "aif.label": "Beschreib, wonach du suchst",
   "aif.placeholder":
     "z. B. Shop-Newsletter, die ich seit einem Jahr nicht geöffnet habe",
   "aif.disclosure":
-    "Nur dieser Satz und die Filter-Syntax gehen an Ihren KI-Anbieter - "
+    "Nur dieser Satz und die Filter-Syntax gehen an deinen KI-Anbieter - "
     + "keine Maildaten.",
   "aif.chars": "{n} / {max}",
   "aif.send": "Senden",
@@ -1783,7 +1783,7 @@ export const DE: Record<string, string> = {
   "aif.mails_one": "1 Mail",
   "aif.incl_protected": "davon {n} geschützt",
   "aif.no_match": "Dieser Filter trifft auf nichts zu.",
-  "aif.no_scan": "Scannen Sie Ihr Postfach, um zu sehen, wie viel zutrifft.",
+  "aif.no_scan": "Scanne dein Postfach, um zu sehen, wie viel zutrifft.",
   "aif.unsupported": "Nicht ausdrückbar: {items}",
   "aif.cost": "KI-Kosten: {cost}",
   "aif.apply": "Anwenden",
@@ -1793,11 +1793,11 @@ export const DE: Record<string, string> = {
   "aif.nothing_selected": "Anwenden filtert nur die Liste - es wird nichts "
     + "ausgewählt oder geändert.",
   "aif.preset_saved": "Vorlage gespeichert.",
-  "aif.err.not_configured": "Richten Sie zuerst in den Einstellungen einen KI-Anbieter ein.",
-  "aif.err.text_empty": "Beschreiben Sie zuerst, wonach Sie suchen.",
+  "aif.err.not_configured": "Richte zuerst in den Einstellungen einen KI-Anbieter ein.",
+  "aif.err.text_empty": "Beschreib zuerst, wonach du suchst.",
   "aif.err.text_too_long": "Bitte höchstens 300 Zeichen.",
   "aif.err.budget":
-    "Das monatliche KI-Budget ist aufgebraucht - erhöhen Sie es in den "
+    "Das monatliche KI-Budget ist aufgebraucht - erhöhe es in den "
     + "Einstellungen, um fortzufahren.",
   "space.title": "Speicherkarte",
   "space.total": "{size} in {mails} Mails",
