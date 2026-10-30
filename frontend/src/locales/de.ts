@@ -161,6 +161,62 @@ export const DE: Record<string, string> = {
   "rule.pinned_skipped": "{n} geschützte Mails übersprungen",
   "rule.pinned_skipped_one": "1 geschützte Mail übersprungen",
   "qb.has_pinned": "mit geschützten Mails",
+  "qb.has_tracker": "die Öffnen oder Klicks verfolgen",
+  "tracker.menu": "Tracker",
+  "tracker.title": "Tracker",
+  "tracker.sub": "Wer deine Öffnungen und Klicks verfolgt",
+  "tracker.explainer":
+    "Ein Tracking-Pixel verrät dem Absender, wann und wo du die Mail "
+    + "geöffnet hast. Mailbroom lädt niemals Bilder aus dem Netz nach.",
+  "tracker.headline":
+    "{pct} % der geprüften Mails enthalten ein Tracking-Pixel",
+  "tracker.headline_none":
+    "In den geprüften Mails wurden keine Tracking-Pixel gefunden",
+  "tracker.checked": "{n} von {total} Mails geprüft",
+  "tracker.with_pixel": "mit Tracking-Pixel",
+  "tracker.with_click": "mit Klick-Tracking",
+  "tracker.senders": "Absender mit Tracking",
+  "tracker.top_senders": "Absender mit dem meisten Tracking",
+  "tracker.top_hosts": "Tracking-Hosts",
+  "tracker.sender_meta": "{n} von {of} Mails mit Tracking",
+  "tracker.sender_meta_one": "1 von {of} Mails mit Tracking",
+  "tracker.n_senders": "{n} Absender",
+  "tracker.n_senders_one": "1 Absender",
+  "tracker.tag_pixel": "Öffnen",
+  "tracker.tag_click": "Klicks",
+  "tracker.pick": "Mails von {name} anzeigen",
+  "tracker.nothing_found":
+    "In den {n} geprüften Mails wurde kein Tracking gefunden.",
+  "tracker.scan_first": "Scanne zuerst dein Postfach",
+  "tracker.none_title": "Noch kein Mail-Textindex",
+  "tracker.none_hint":
+    "Tracking wird beim Aufbau des lokalen Textindex erkannt. Es wird "
+    + "nichts zusätzlich abgerufen.",
+  "tracker.enable_local":
+    "Stelle die Mailtext-Suche in den Einstellungen auf \u201elokaler "
+    + "Index\u201c und baue dort den Index auf - das Tracking wird dabei "
+    + "erkannt.",
+  "tracker.build": "Textindex aufbauen",
+  "tracker.unchecked_title": "Noch nicht geprüft",
+  "tracker.unchecked_hint":
+    "Diese Mails wurden indexiert, bevor es die Tracker-Erkennung gab. "
+    + "Prüfe sie, um den Bericht zu sehen.",
+  "tracker.check_older": "Ältere Mails prüfen",
+  "tracker.checking": "Mails werden geprüft\u2026",
+  "tracker.confirm_note":
+    "Sucht außerdem im HTML jeder Mail nach Tracking-Pixeln und "
+    + "Klick-Tracking-Links. Es wird nichts nachgeladen oder irgendwohin "
+    + "gesendet.",
+  "tracker.opens": "Verfolgt Öffnungen",
+  "tracker.clicks": "Verfolgt Klicks",
+  "tracker.both": "Verfolgt Öffnungen und Klicks",
+  "tracker.pop_pixel":
+    "{n} von {of} geprüften Mails enthalten ein Tracking-Pixel",
+  "tracker.pop_click":
+    "{n} von {of} geprüften Mails enthalten Klick-Tracking-Links",
+  "tracker.pop_hosts": "Hosts: {hosts}",
+  "tracker.pop_hint":
+    "Lokal beim Aufbau des Textindex gefunden. Es wurde nichts nachgeladen.",
   "confirm.block_trash_existing":
     "Auch die {n} vorhandenen Mails jetzt in den Papierkorb verschieben?",
   "confirm.block_trash_existing_one":

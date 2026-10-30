@@ -142,6 +142,8 @@ export function sieveSnippet(kind: "sender" | "domain", value: string,
  *   is:new              sender first seen within the new-sender window
  *   is:still-mailing    mail kept arriving after a successful unsubscribe
  *   has:pinned          group contains at least one pinned mail
+ *   has:tracker         a checked mail of the group has a tracking pixel or
+ *                       click-tracking links (needs the body index)
  *   eng:low|medium|high engagement tier (<=33 / 34-66 / >=67)
  *   att:>10m att:>500k  attachment size above N (needs attachment analysis)
  *   from:<addr>         exact sender address (sender grouping only)
@@ -167,6 +169,7 @@ export interface ParsedFilter {
   newOnly: boolean;
   pinnedOnly: boolean;
   stillMailing: boolean;
+  trackerOnly: boolean;
   eng: EngagementTier | null;
 }
 
@@ -177,7 +180,7 @@ export function parseFilter(q: string): ParsedFilter {
     ageMonths: null, unreadMin: null, unsub: false, protectedOnly: false,
     replied: null, attMin: null, unsubscribed: null, fromAddr: null,
     domain: null, newOnly: false, pinnedOnly: false, stillMailing: false,
-    eng: null };
+    trackerOnly: false, eng: null };
   for (const tok of q.trim().toLowerCase().split(/\s+/).filter(Boolean)) {
     const m = tok.match(/^(tag|ai|age|unread|is|has|eng|att|from|domain):(.*)$/);
     if (!m) {
@@ -205,6 +208,7 @@ export function parseFilter(q: string): ParsedFilter {
     else if (kind === "is" && val === "new") out.newOnly = true;
     else if (kind === "is" && val === "still-mailing") out.stillMailing = true;
     else if (kind === "has" && val === "pinned") out.pinnedOnly = true;
+    else if (kind === "has" && val === "tracker") out.trackerOnly = true;
     else if (kind === "eng" && (val === "low" || val === "medium"
         || val === "high")) out.eng = val;
     else if (kind === "att") {
@@ -285,6 +289,8 @@ export function matchGroup(g: Group, f: ParsedFilter, now = Date.now(),
   if (f.newOnly && !g.new) return false;
   if (f.stillMailing && !g.still_mailing) return false;
   if (f.pinnedOnly && !g.pinned) return false;
+  if (f.trackerOnly && !(g.trackers && (g.trackers.pixel > 0
+      || g.trackers.click > 0))) return false;
   if (f.eng !== null && engagementTier(g.engagement ?? 0) !== f.eng) {
     return false;
   }

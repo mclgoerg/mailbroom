@@ -107,6 +107,7 @@ export interface Group {
   still_mailing?: StillMailing | null;
   pinned: number;   // mails of this group protected from bulk actions
   engagement: number;   // 0-100, see lib.ts engagementTier()
+  trackers?: GroupTrackers;   // only when the body index checked its mails
   // Smart grouping only. The backend ships fields, the UI words them
   // (lib.ts smartView): `sub` is empty and `label` is an English fallback
   // for pooled rows.
@@ -119,6 +120,16 @@ export interface Group {
   addr?: string;        // own rows: the sender's address
   domain?: string;      // company rows: the ONE exact domain, else ""
   category?: string;    // category rows: the category name
+}
+
+/** Tracking found in a group's mails while the body index was built
+ *  (backend/trackers.py): how many checked mails carry a pixel / a
+ *  click-tracking link, and the most common tracker hosts. */
+export interface GroupTrackers {
+  checked: number;
+  pixel: number;
+  click: number;
+  hosts: string[];
 }
 
 export interface AiUsage {
@@ -508,6 +519,35 @@ export interface IndexInfo {
   estimate_full: IndexEstimate;   // rebuild
   job: { status: "idle" | "running" | "done" | "error"; progress: string;
          error: string; done: number; total: number };
+}
+
+// GET /api/trackers: the tracker report built from the body index.
+export interface TrackerSender {
+  key: string;
+  label: string;
+  checked: number;
+  tracked: number;   // checked mails with a pixel or click tracking
+  pixel: number;
+  click: number;
+  hosts: string[];
+}
+export interface TrackerHost { host: string; mails: number; senders: number }
+export interface TrackerReport {
+  usable: boolean;
+  reason: "index_missing" | "index_key" | null;
+  docs: number;       // mails in the index
+  checked: number;    // of those, mails with a tracker result
+  pixel: number;
+  click: number;
+  any: number;
+  senders: number;    // senders with at least one tracked mail
+  top_senders: TrackerSender[];
+  top_hosts: TrackerHost[];
+  mode: BodySearchMode;
+  secret_key_set: boolean;
+  scanned: boolean;
+  estimate_full: IndexEstimate;
+  job: IndexInfo["job"];
 }
 
 // Translatable caveat of a mail-text search (key -> `search.note.<key>`).

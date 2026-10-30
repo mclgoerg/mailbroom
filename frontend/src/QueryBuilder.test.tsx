@@ -87,6 +87,13 @@ test("protected-mails chip emits the has:pinned DSL token", () => {
   expect(parseFilter(s.get()).pinnedOnly).toBe(true);
 });
 
+test("tracker chip emits the has:tracker DSL token", () => {
+  const s = setup();
+  fireEvent.click(screen.getByText("that track opens or clicks"));
+  expect(s.get()).toBe("has:tracker");
+  expect(parseFilter(s.get()).trackerOnly).toBe(true);
+});
+
 test.each([
   ["rarely engaged with", "eng:low"],
   ["sometimes engaged with", "eng:medium"],

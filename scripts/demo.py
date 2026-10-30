@@ -46,6 +46,8 @@ os.environ.update(
     SESSION_SECRET_PATH=str(DATA / "session_secret"),
     IMAP_CAFILE="", IMAP_USER="demo@example.com", IMAP_PASSWORD="demo",
     LOG_LEVEL="INFO",
+    # the local body index (Tools -> Trackers) needs a key
+    MAILBROOM_SECRET_KEY="demo-only-secret-key",
 )
 # When run inside the release image, serve ITS built bundle (the repo
 # checkout only has a placeholder static/).
@@ -64,7 +66,7 @@ def _fixture(*a, **k):
 sys.modules.setdefault("pytest", types.SimpleNamespace(fixture=_fixture))
 
 from conftest import FakeIMAP, make_msg          # noqa: E402
-from backend import (accounts, aihelper, knowledgestore, mailops,   # noqa: E402
+from backend import (accounts, aihelper, bodyindex, knowledgestore, mailops,   # noqa: E402
                      rules, unsubstore, verdictstore)
 
 random.seed(7)
@@ -79,9 +81,33 @@ def _date(days_ago: float) -> str:
 _UID = iter(range(1, 100000))
 
 
+def newsletter_html(pixel: str | None = None, click: str | None = None):
+    """HTML bodies for the tracker report: a normal banner and link plus,
+    optionally, an open-tracking pixel and/or a click-tracking redirect link
+    on the given (invented) hosts. No random draws, so the data of the
+    other senders stays exactly as it was."""
+    def build(i: int) -> str:
+        tok = f"d{i:04d}x7k2m9q4w8e6r1t5y"
+        parts = ["<p>Hello from the demo newsletter.</p>",
+                 '<img src="https://cdn.demo.example/banner.jpg" '
+                 'width="600" height="300" alt="">',
+                 '<a href="https://shop.demo.example/offers">See offers</a>']
+        if click:
+            parts.append(f'<a href="https://{click}/click/{tok}">Read on</a>')
+        if pixel:
+            parts.append(f'<img src="https://{pixel}/open/{tok}.gif" '
+                         'width="1" height="1" alt="">')
+        return "\n".join(parts)
+    return build
+
+
+PIXEL_HOST = "px.beacons-demo.example"
+CLICK_HOST = "r.linkhop-demo.example"
+
+
 def mails(frm: str, subjects: list[str], n: int, *, newest_days=1.0,
           span_days=700.0, unread=0.7, size=(9000, 60000), unsub=False,
-          atts=None) -> list[dict]:
+          atts=None, html=None) -> list[dict]:
     out = []
     for i in range(n):
         days = newest_days + (span_days - newest_days) * (i / max(1, n - 1)) \
@@ -96,7 +122,8 @@ def mails(frm: str, subjects: list[str], n: int, *, newest_days=1.0,
             size=random.randint(*size),
             seen=random.random() > unread,
             date=_date(days),
-            atts=atts if (atts and i < 3) else None))
+            atts=atts if (atts and i < 3) else None,
+            html=html(i) if html else None))
     return out
 
 
@@ -126,22 +153,27 @@ PROTON_INBOX = WANDER + (
     mails('"ACME Store" <news@acme-store.example>',
           ["Weekend SALE - up to 70% off ✨", "Your points expire soon",
            "New arrivals for autumn", "Last chance: free shipping"],
-          214, unsub=True)
+          214, unsub=True,
+          html=newsletter_html(PIXEL_HOST, CLICK_HOST))
     + mails('"PaketFix" <noreply@paketfix.example>',
             ["Ihre Sendung {n} ist unterwegs", "Zustellung heute: Paket {n}",
              "Ihr Paket {n} wurde zugestellt"], 96, unread=0.85)
     + mails('"Chirper" <notify@chirper.example>',
             ["You have 3 new followers", "Trending now on Chirper",
-             "@rob mentioned you"], 168, unsub=True, unread=0.9)
+             "@rob mentioned you"], 168, unsub=True, unread=0.9,
+          html=newsletter_html(PIXEL_HOST))
     + mails('"TechDigest" <digest@techdigest.example>',
             ["Issue #{n}: Rust vs. the world", "Weekly: self-hosting corner",
-             "Issue #{n}: the terminal renaissance"], 88, unsub=True)
+             "Issue #{n}: the terminal renaissance"], 88, unsub=True,
+          html=newsletter_html(click=CLICK_HOST))
     + mails('"Streamly" <info@streamly.example>',
             ["New this week on Streamly", "Your watchlist just got better"],
-            64, unsub=True, unread=0.8)
+            64, unsub=True, unread=0.8,
+            html=newsletter_html("track.streamly-demo.example"))
     + mails('"Bergsport Huber" <newsletter@bergsport-huber.example>',
             ["Neu eingetroffen: Tourenski 2026", "Wochenend-Angebote",
-             "Gutschein: 10 € für deine nächste Tour"], 51, unsub=True)
+             "Gutschein: 10 € für deine nächste Tour"], 51, unsub=True,
+          html=newsletter_html())
     + mails('"PayBank" <service@paybank.example>',
             ["Ihr Kontoauszug ist verfügbar", "Sicherheitshinweis zu Ihrem "
              "Konto", "Zahlung über {n},00 € ausgeführt"],
@@ -270,7 +302,7 @@ def long_tail(scale: float = 1.0) -> tuple[list[dict], list[dict]]:
                     "Your {b} login code"], unread=0.8)
     inbox += _tail("news", "{b}.example", w[14:14 + k(28)],
                    ["This week at {b}", "Our autumn picks", "{b} news"],
-                   unsub=True)
+                   unsub=True, html=newsletter_html(PIXEL_HOST))
     # what the mails are about decides the row (not the address): orders,
     # appointments, applications, support - and some that say nothing (Other)
     inbox += _tail("noreply", "{b}-app.example", w[2:2 + k(12)],
@@ -377,7 +409,8 @@ mailops.connect = lambda im, name=None: FAKES[im["host"]]
 Path(os.environ["CONFIG_PATH"]).write_text(json.dumps({
     "accounts": {
         "proton": {"host": "demo-proton", "user": "demo@example.com",
-                   "password": "demo", "preset": "proton", "cafile": ""},
+                   "password": "demo", "preset": "proton", "cafile": "",
+                   "body_search": "local"},
         "icloud": {"host": "demo-icloud", "user": "demo@icloud.example",
                    "password": "demo", "preset": "icloud", "cafile": ""},
     },
@@ -542,11 +575,15 @@ def _demo_ai_client(cfg):
 
 aihelper.ai_client = _demo_ai_client
 
-# Pre-scan both accounts (incl. attachments) so screenshots are instant.
+# Pre-scan both accounts (incl. attachments) so screenshots are instant. The
+# Proton demo also builds its local body index, which is where the tracker
+# report (Tools -> Trackers) comes from; iCloud stays without one (empty state).
 for name in ("proton", "icloud"):
     acc = accounts.get(name)
     mailops.run_scan(acc)
     mailops._run_atts(acc)
+    if name == "proton":
+        bodyindex.sync(acc)
     st = mailops.public_state(acc)
     print(f"[demo] {name}: {len(st['groups']['sender'])} senders, "
           f"{sum(g['count'] for g in st['groups']['sender'].values())} mails")

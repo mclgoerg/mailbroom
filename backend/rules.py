@@ -85,7 +85,7 @@ def parse_filter(q: str) -> dict:
            "replied": None, "att_min": None, "unsubscribed": None,
            "from_addr": None, "domain": None, "new_only": False,
            "pinned_only": False, "eng": None,
-           "still_mailing": False}
+           "still_mailing": False, "tracker_only": False}
     for tok in (q or "").strip().lower().split():
         m = _QUAL_RE.match(tok)
         if not m:
@@ -125,6 +125,8 @@ def parse_filter(q: str) -> dict:
             out["eng"] = val
         elif kind == "has" and val == "pinned":
             out["pinned_only"] = True
+        elif kind == "has" and val == "tracker":
+            out["tracker_only"] = True
         elif kind == "att":
             a = _ATT_RE.match(val)
             if a:
@@ -177,9 +179,11 @@ FILTER_GRAMMAR: tuple[dict, ...] = (
                 "written to; new = a recently first-seen sender; still-mailing = "
                 "keeps mailing after the user unsubscribed",
      "example": "is:unsub"},
-    {"qualifier": "has", "values": ("pinned",),
-     "syntax": "has:pinned",
-     "meaning": "the group contains at least one pinned mail",
+    {"qualifier": "has", "values": ("pinned", "tracker"),
+     "syntax": "has:pinned|tracker",
+     "meaning": "pinned = the group contains at least one pinned mail; "
+                "tracker = a checked mail of the group carries a tracking "
+                "pixel or click-tracking links (needs the local body index)",
      "example": "has:pinned"},
     {"qualifier": "eng", "values": ("low", "medium", "high"),
      "syntax": "eng:low|medium|high",
@@ -266,6 +270,10 @@ def match_group(g: dict, f: dict, now: float | None = None) -> bool:
         return False
     if f["pinned_only"] and not g.get("pinned"):
         return False
+    if f["tracker_only"]:
+        t = g.get("trackers")
+        if not t or not (t["pixel"] or t["click"]):
+            return False
     if f["eng"] is not None and \
             mailops.engagement_tier(g.get("engagement", 0)) != f["eng"]:
         return False

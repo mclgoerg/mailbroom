@@ -2,7 +2,7 @@ import { t } from "./i18n";
 import type {
   AdminTenantStats, AiFilterResult, AiGroupResult, AppState, AttMail, AuditResp, AuthProbe,
   KnowledgeList, KnowledgeSaved, KnowledgeSrc,
-  Config, ConversationResp, DupSet, FilterPreset, FoldersResp, Grouping, IndexInfo,
+  Config, ConversationResp, DupSet, FilterPreset, FoldersResp, Grouping, IndexInfo, TrackerReport,
   Mail, MessageDetail,
   LookalikeCount, MailsResp, Rule, RuleRun, SearchResp, SortEstimate, StatsResp, TrashResp,
   FolderMoveResp, FolderRole, PurgePreview, PurgeResult, PurgeSelect,
@@ -402,6 +402,7 @@ export const api = {
   oauthDisconnect: (account: string) =>
     req<{ ok: boolean }>(
       `/api/oauth/imap/disconnect?account=${encodeURIComponent(account)}`, {}),
+  trackers: () => req<TrackerReport>("/api/trackers"),
   indexInfo: (account: string) =>
     req<IndexInfo>(`/api/index?account=${encodeURIComponent(account)}`),
   indexBuild: (account: string, rebuild = false) =>

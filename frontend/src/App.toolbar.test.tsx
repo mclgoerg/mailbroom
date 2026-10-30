@@ -22,6 +22,15 @@ vi.mock("./api", () => ({
     version: () => Promise.resolve({ build: "v1" }),
     mails: (...a: unknown[]) => mails(...a),
     group: () => Promise.resolve([]),
+    trackers: () => Promise.resolve({
+      usable: true, reason: null, docs: 3, checked: 3, pixel: 2, click: 0,
+      any: 2, senders: 1, top_hosts: [], mode: "local",
+      secret_key_set: true, scanned: true,
+      estimate_full: { mails: 0, bytes: 0, bytes_max: 0, free: 0 },
+      job: { status: "idle", progress: "", error: "", done: 0, total: 0 },
+      top_senders: [{ key: "a@x.example", label: "Acme", checked: 3,
+        tracked: 2, pixel: 2, click: 0, hosts: ["pix.example"] }],
+    }),
   },
   downloadFile: () => Promise.resolve(),
   setAccount: () => {},
@@ -100,11 +109,26 @@ test("the Tools menu lists every tool with a label; no loose tool icons",
     expect(screen.queryByLabelText("More")).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "Tools" }));
     for (const n of ["Rules", "Attachments", "Duplicates", "Statistics",
-      "Audit Log", "AI review", "Export CSV"])
+      "Audit Log", "Trackers", "AI review", "Export CSV"])
       expect(screen.getByRole("menuitem", { name: new RegExp(`^${n}`) }))
         .toBeTruthy();
     expect(screen.getByLabelText("Search all mails")).toBeTruthy();
   });
+
+test("Tools -> Trackers: tapping a sender closes the panel and filters the "
+  + "Sender tab to it", async () => {
+  await open();
+  fireEvent.click(screen.getByRole("tab", { name: "Smart" }));
+  fireEvent.click(screen.getByRole("button", { name: "Tools" }));
+  fireEvent.click(screen.getByRole("menuitem", { name: /^Trackers/ }));
+  fireEvent.click(await screen.findByRole("button",
+    { name: "Show mails from Acme" }));
+  await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+  expect((screen.getByPlaceholderText("filter groups…") as HTMLInputElement)
+    .value).toBe("from:a@x.example");
+  expect(screen.getByRole("tab", { name: "Sender" })
+    .getAttribute("aria-selected")).toBe("true");
+});
 
 test("a Tools entry opens its panel", async () => {
   await open();

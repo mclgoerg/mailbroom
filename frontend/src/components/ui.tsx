@@ -1,5 +1,5 @@
-import { AlertCircle, Check, CheckCircle2, Info, Pin, Shield, TriangleAlert,
-  X }
+import { AlertCircle, Check, CheckCircle2, Eye, Info, MousePointerClick, Pin,
+  Shield, TriangleAlert, X }
   from "lucide-react";
 import { createPortal } from "react-dom";
 import { createContext, useCallback, useContext, useEffect, useId,
@@ -8,7 +8,7 @@ import { createContext, useCallback, useContext, useEffect, useId,
   from "react";
 import { getLang, t } from "../i18n";
 import { engagementTier, fmtDate } from "../lib";
-import type { GroupAi, StillMailing } from "../types";
+import type { GroupAi, GroupTrackers, StillMailing } from "../types";
 
 /** One-time consent: what metadata the AI features transmit. */
 export async function ensureAiAck(): Promise<boolean> {
@@ -76,14 +76,20 @@ function usePopover() {
   const [alignRight, setAlignRight] = useState(false);
   const ref = useRef<HTMLSpanElement>(null);
   const pop = useRef<HTMLDivElement>(null);
-  // Opens left-aligned under the trigger; flips if that runs off the screen.
+  // Opens left-aligned under the trigger; flips if that runs off the right
+  // edge, and is nudged back when it would then run off the left one.
   useLayoutEffect(() => {
-    if (!open) { setAlignRight(false); return; }
-    const r = pop.current?.getBoundingClientRect();
-    if (r && r.width > 0 && r.right > window.innerWidth - 8) {
+    const el = pop.current;
+    if (!open || !el) { setAlignRight(false); return; }
+    el.style.transform = "";
+    const r = el.getBoundingClientRect();
+    if (r.width <= 0) return;
+    if (!alignRight && r.right > window.innerWidth - 8) {
       setAlignRight(true);
+    } else if (r.left < 8) {
+      el.style.transform = `translateX(${8 - r.left}px)`;
     }
-  }, [open]);
+  }, [open, alignRight]);
   useEffect(() => {
     if (!open) return;
     const onDoc = (e: Event) => {
@@ -326,6 +332,47 @@ export function PinBadge({ n }: { n: number }) {
         <Pin size={14} fill="currentColor" /> {n}
       </span>
     </Tag>
+  );
+}
+
+/** Group-row indicator: some of the group's checked mails track opens (a
+ *  pixel) or clicks (redirect links). A button like the engagement meter: a
+ *  tap opens a popover with the share and the tracker hosts - the icon alone
+ *  doesn't say what it means, and touch screens have no hover. */
+export function TrackerBadge({ g }: { g: { trackers?: GroupTrackers } }) {
+  const { open, setOpen, alignRight, ref, pop } = usePopover();
+  const tr = g.trackers;
+  if (!tr || (tr.pixel <= 0 && tr.click <= 0)) return null;
+  const label = t(tr.pixel > 0 && tr.click > 0 ? "tracker.both"
+    : tr.pixel > 0 ? "tracker.opens" : "tracker.clicks");
+  return (
+    <span ref={ref} className="relative inline-block align-middle">
+      <button type="button" title={label} aria-label={label}
+        aria-expanded={open}
+        // Rows are tap targets themselves - this one only explains itself.
+        onClick={(e) => { e.stopPropagation(); setOpen(!open); }}
+        className="inline-flex min-h-6 min-w-6 cursor-pointer items-center
+          justify-center gap-0.5 rounded px-0.5 text-muted hover:bg-chip">
+        {tr.pixel > 0 && <Eye size={14} aria-hidden />}
+        {tr.click > 0 && <MousePointerClick size={14} aria-hidden />}
+      </button>
+      {open && (
+        <div ref={pop} role="dialog" aria-label={label}
+          onClick={(e) => e.stopPropagation()}
+          className={`${POPOVER} ${alignRight ? "right-0" : "left-0"}`}>
+          <div className="font-semibold text-body">{label}</div>
+          <ul className="mt-1 space-y-0.5 text-muted">
+            {tr.pixel > 0 && <li>{t("tracker.pop_pixel",
+              { n: tr.pixel, of: tr.checked })}</li>}
+            {tr.click > 0 && <li>{t("tracker.pop_click",
+              { n: tr.click, of: tr.checked })}</li>}
+            {tr.hosts.length > 0 && <li>{t("tracker.pop_hosts",
+              { hosts: tr.hosts.join(", ") })}</li>}
+          </ul>
+          <div className="mt-1 text-muted">{t("tracker.pop_hint")}</div>
+        </div>
+      )}
+    </span>
   );
 }
 

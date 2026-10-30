@@ -384,6 +384,58 @@ export const EN: Record<string, string> = {
   "rule.pinned_skipped": "{n} protected mails skipped",
   "rule.pinned_skipped_one": "1 protected mail skipped",
   "qb.has_pinned": "with protected mails",
+  "qb.has_tracker": "that track opens or clicks",
+  "tracker.menu": "Trackers",
+  "tracker.title": "Trackers",
+  "tracker.sub": "Who tracks your opens and clicks",
+  "tracker.explainer":
+    "A tracking pixel tells the sender when and where you opened the mail. "
+    + "Mailbroom never loads remote images.",
+  "tracker.headline":
+    "{pct}% of the mails we checked carry a tracking pixel",
+  "tracker.headline_none":
+    "No tracking pixels found in the mails we checked",
+  "tracker.checked": "Checked {n} of {total} mails",
+  "tracker.with_pixel": "with tracking pixel",
+  "tracker.with_click": "with click tracking",
+  "tracker.senders": "senders tracking",
+  "tracker.top_senders": "Senders that track most",
+  "tracker.top_hosts": "Tracking hosts",
+  "tracker.sender_meta": "{n} of {of} mails tracked",
+  "tracker.sender_meta_one": "1 of {of} mails tracked",
+  "tracker.n_senders": "{n} senders",
+  "tracker.n_senders_one": "1 sender",
+  "tracker.tag_pixel": "opens",
+  "tracker.tag_click": "clicks",
+  "tracker.pick": "Show mails from {name}",
+  "tracker.nothing_found": "No tracking found in the {n} checked mails.",
+  "tracker.scan_first": "Scan your mailbox first",
+  "tracker.none_title": "No body index yet",
+  "tracker.none_hint":
+    "Tracking is detected while the local body index is built. Nothing "
+    + "else is fetched.",
+  "tracker.enable_local":
+    "Switch mail-text search to \u201clocal index\u201d in Settings and "
+    + "build the index there - tracking is detected while it is built.",
+  "tracker.build": "Build the body index",
+  "tracker.unchecked_title": "Not checked yet",
+  "tracker.unchecked_hint":
+    "These mails were indexed before tracker detection existed. Check "
+    + "them to see the report.",
+  "tracker.check_older": "Check older mails",
+  "tracker.checking": "Checking mails\u2026",
+  "tracker.confirm_note":
+    "Also looks for tracking pixels and click-tracking links in the HTML "
+    + "of each mail. Nothing is loaded or sent anywhere.",
+  "tracker.opens": "Tracks opens",
+  "tracker.clicks": "Tracks clicks",
+  "tracker.both": "Tracks opens and clicks",
+  "tracker.pop_pixel": "{n} of {of} checked mails contain a tracking pixel",
+  "tracker.pop_click":
+    "{n} of {of} checked mails contain click-tracking links",
+  "tracker.pop_hosts": "Hosts: {hosts}",
+  "tracker.pop_hint":
+    "Found locally while building the body index. Nothing was loaded.",
   "confirm.block_trash_existing":
     "Also move its {n} existing mails to Trash now?",
   "confirm.block_trash_existing_one":

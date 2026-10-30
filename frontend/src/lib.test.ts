@@ -147,6 +147,23 @@ describe("parseFilter", () => {
     expect(matchGroup(g({ still_mailing: null }), f)).toBe(false);
     expect(matchGroup(g(), f)).toBe(false);
   });
+  it("has:tracker parses like backend/rules.py and matches checked groups "
+    + "with a pixel or click-tracking link", () => {
+    const f = parseFilter("has:tracker");
+    expect(f.trackerOnly).toBe(true);
+    expect(f.text).toEqual([]);
+    expect(parseFilter("").trackerOnly).toBe(false);
+    const other = parseFilter("has:other");
+    expect(other.trackerOnly).toBe(false);
+    expect(other.text).toEqual(["has:other"]);
+    const t = { checked: 3, pixel: 1, click: 0, hosts: ["t.example"] };
+    expect(matchGroup(g({ trackers: t }), f)).toBe(true);
+    expect(matchGroup(g({ trackers: { ...t, pixel: 0, click: 2 } }), f))
+      .toBe(true);
+    expect(matchGroup(g({ trackers: { ...t, pixel: 0 } }), f)).toBe(false);
+    expect(matchGroup(g(), f)).toBe(false);            // never checked
+    expect(matchGroup(g(), parseFilter(""))).toBe(true);
+  });
   it("recognises from:/domain: (block-sender exact qualifiers)", () => {
     expect(parseFilter("from:noreply@dhl.example").fromAddr)
       .toBe("noreply@dhl.example");

@@ -43,6 +43,7 @@ from . import rules as rulesmod
 from . import secretbox
 from . import stats as statsmod
 from . import tenants
+from . import trackers
 from . import unsub
 from . import unsubstore
 from . import verdictstore
@@ -567,6 +568,22 @@ def get_index(account: str | None = Query(None)):
     return {"mode": cfgmod.account_imap(acc.name).get("body_search"),
             "secret_key_set": secretbox.enabled(),
             **bodyindex.info(acc), "estimate": bodyindex.estimate(acc),
+            "estimate_full": bodyindex.estimate(acc, rebuild=True),
+            "job": job}
+
+
+@app.get("/api/trackers")
+def get_trackers(account: str | None = Query(None)):
+    """Tracker report from the local body index (backend/trackers.py):
+    coverage, totals, the senders that track most and their hosts, plus
+    what the index panel needs (mode, key, job, estimates)."""
+    acc = _acc(account)
+    with acc.lock:
+        job = dict(acc.state["index"])
+    return {**trackers.report(acc),
+            "mode": cfgmod.account_imap(acc.name).get("body_search"),
+            "secret_key_set": secretbox.enabled(),
+            "scanned": acc.state["status"] == "done",
             "estimate_full": bodyindex.estimate(acc, rebuild=True),
             "job": job}
 

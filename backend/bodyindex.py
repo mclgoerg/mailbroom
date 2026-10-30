@@ -19,6 +19,9 @@ Consequence of hashing: a search matches WHOLE WORDS (case- and accent-
 insensitive, several words are ANDed) - no substring, prefix or phrase
 matching. Per mail at most TEXT_CAP characters of text are considered.
 
+Per mail it also keeps two tracking flags and the plain tracker domains
+found while the message was parsed (backend/trackers.py) - metadata only.
+
 Built by an explicit, cancellable job (Settings -> "Build index"), then kept
 current by every scan (new mails added, vanished ones dropped). Turning the
 mode off, or deleting the account, removes the file.
@@ -42,6 +45,7 @@ from pathlib import Path
 from . import accounts
 from . import secretbox
 from . import tenants
+from . import trackers
 
 log = logging.getLogger("pmc.bodyindex")
 
@@ -122,13 +126,20 @@ class Index:
         return {(f, u, uv): i for i, f, u, uv in self.conn.execute(
             "SELECT id, folder, uid, uv FROM docs")}
 
-    def add(self, folder: str, uid: int, uv: int, ws: set[str]) -> None:
+    def add(self, folder: str, uid: int, uv: int, ws: set[str],
+            tr: dict | None = None) -> None:
         cur = self.conn.execute(
             "INSERT OR IGNORE INTO docs(folder, uid, uv) VALUES(?,?,?)",
             (folder, uid, uv))
         if not cur.rowcount:
             return
         doc = cur.lastrowid
+        if tr is not None:          # same transaction as the doc itself
+            self.conn.execute(
+                "INSERT OR REPLACE INTO trackers(folder, uid, uv, pixel, "
+                "click, hosts) VALUES(?,?,?,?,?,?)",
+                (folder, uid, uv, int(tr["pixel"]), int(tr["click"]),
+                 ",".join(tr["hosts"])))
         self.conn.executemany(
             "INSERT OR IGNORE INTO words(h, d) VALUES(?, ?)",
             [(_hash_word(self.key, w), doc) for w in ws])
@@ -137,8 +148,21 @@ class Index:
         for start in range(0, len(doc_ids), 500):
             chunk = doc_ids[start:start + 500]
             marks = ",".join("?" * len(chunk))
+            self.conn.execute(
+                "DELETE FROM trackers WHERE EXISTS (SELECT 1 FROM docs "
+                "WHERE docs.folder=trackers.folder AND docs.uid=trackers.uid "
+                f"AND docs.uv=trackers.uv AND docs.id IN ({marks}))", chunk)
             self.conn.execute(f"DELETE FROM words WHERE d IN ({marks})", chunk)
             self.conn.execute(f"DELETE FROM docs WHERE id IN ({marks})", chunk)
+
+    def tracker_rows(self) -> list[tuple]:
+        """(folder, uid, uv, pixel, click, hosts) of the checked mails that
+        still have their doc (an older image can drop docs and leave tracker
+        rows behind - those are ignored)."""
+        return self.conn.execute(
+            "SELECT t.folder, t.uid, t.uv, t.pixel, t.click, t.hosts "
+            "FROM trackers t JOIN docs d ON d.folder=t.folder "
+            "AND d.uid=t.uid AND d.uv=t.uv").fetchall()
 
     def query(self, terms: list[str]) -> set[tuple[str, int, int]]:
         """Handles of the mails that contain EVERY word of `terms`."""
@@ -168,6 +192,14 @@ def _init(conn: sqlite3.Connection) -> None:
             h INTEGER NOT NULL, d INTEGER NOT NULL,
             PRIMARY KEY(h, d)) WITHOUT ROWID;
         CREATE INDEX IF NOT EXISTS words_d ON words(d);
+        -- Tracking-report flags per mail (backend/trackers.py). An extra
+        -- table, so the schema VERSION is unchanged: an older image ignores
+        -- it and keeps the index. Rows go with their doc.
+        CREATE TABLE IF NOT EXISTS trackers(
+            folder TEXT NOT NULL, uid INTEGER NOT NULL, uv INTEGER NOT NULL,
+            pixel INTEGER NOT NULL, click INTEGER NOT NULL,
+            hosts TEXT NOT NULL DEFAULT '',
+            PRIMARY KEY(folder, uid, uv)) WITHOUT ROWID;
     """)
 
 
@@ -442,12 +474,17 @@ def _index_folder(acc, idx: Index, conn, folder: str, uv: int,
                 continue
             uid = int(m.group(1))
             seen.add(uid)
+            tr = {"pixel": False, "click": False, "hosts": []}
             try:
-                text = mailops.extract_text(
-                    email.message_from_bytes(item[1]))[:TEXT_CAP]
+                msg = email.message_from_bytes(item[1])
+                try:
+                    tr = trackers.scan_message(msg)
+                except Exception:
+                    pass                  # checked, nothing found
+                text = mailops.extract_text(msg)[:TEXT_CAP]
             except Exception:
                 text = ""                 # unparseable: indexed as empty
-            idx.add(folder, uid, uv, words(text))
+            idx.add(folder, uid, uv, words(text), tr)
         idx.conn.commit()
         done += len(chunk)
         _set(acc, done=done, progress=f"{done}/{total}")
