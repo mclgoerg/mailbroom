@@ -1,9 +1,9 @@
-import { BarChart3 } from "lucide-react";
+import { BarChart3, Sparkles } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
 import { api, fmtSize } from "../api";
 import { t } from "../i18n";
 import type { StatsResp } from "../types";
-import { Loading, Modal, PanelHeader, SectionLabel, Tag } from "./ui";
+import { Button, Loading, Modal, PanelHeader, SectionLabel, Tag } from "./ui";
 
 const month = () => new Date().toISOString().slice(0, 7);
 const pct = (n: number, of: number) => (of ? Math.round((100 * n) / of) : 0);
@@ -47,7 +47,9 @@ function Bars({ rows }: {
 
 /** Mailbox statistics: highlights, volume histograms, categories, top
  *  domains/senders, AI coverage, cleanup progress and scan history. */
-export function StatsPanel({ onClose }: { onClose: () => void }) {
+export function StatsPanel({ onClose, onWrapped }: {
+  onClose: () => void; onWrapped?: () => void;
+}) {
   const [stats, setStats] = useState<StatsResp | null>(null);
   const [error, setError] = useState("");
 
@@ -70,7 +72,13 @@ export function StatsPanel({ onClose }: { onClose: () => void }) {
     <Modal onClose={onClose}>
       <PanelHeader title={<span className="inline-flex items-center gap-2">
         <BarChart3 size={18} /> {t("Statistics")}
-      </span>} onClose={onClose} />
+      </span>} onClose={onClose}
+        actions={onWrapped && (
+          <Button variant="secondary" size="sm" onClick={onWrapped}>
+            <Sparkles size={16} className="mr-1 inline align-text-bottom" />
+            {t("wrapped.menu")}
+          </Button>
+        )} />
       <div className="space-y-6 p-4 type-body sm:p-5">
         {error && <div className="text-danger-fg">{error}</div>}
         {!stats && !error && <Loading />}

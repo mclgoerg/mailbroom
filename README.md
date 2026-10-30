@@ -149,6 +149,15 @@ presets.
   hands exactly those senders to the Sender list's normal selection for
   Trash / Archive with the usual confirmation - the map itself never moves
   mail.
+- **Your year in mail** (Tools → Your year in mail, or from Statistics) -
+  a full-screen story of one calendar year: how many mails you received,
+  your loudest senders, the month that buried you, your busiest weekday
+  and hour, ghost senders (10+ mails, none ever opened), your biggest mail
+  and what you cleaned up (moves, permanent deletes, unsubscribes, rule
+  runs). Tap right/left or use the arrow keys, hold to pause. The last
+  card saves a summary image, generated in your browser with sender names
+  hidden unless you tick "Show names". Based on the mail in the mailbox
+  now; metadata only, nothing is uploaded.
 - **Duplicate finder** - mails with the same Message-ID (e.g. copies
   across folders) or identical sender + subject + size, grouped into sets
   with one click to select everything but the newest copy.
@@ -310,8 +319,9 @@ presets.
   save it as a preset, or start a rule from it (rules still begin in report
   mode). Only your sentence, the filter syntax and your tag names are sent
   to the provider - no mail data - and nothing is selected or changed.
-- **Tools menu** - Rules, Attachments, Duplicates, Statistics, Space map, Audit Log,
-  AI review (once AI is set up) and Export CSV live under one Tools
+- **Tools menu** - Rules, Attachments, Duplicates, Statistics, Space map,
+  Your year in mail, Audit Log, AI review (once AI is set up) and Export CSV
+  live under one Tools
   button. AI review and CSV export scope to the current selection once
   something is selected; the Tools versions (nothing selected) act on
   everything, as before.

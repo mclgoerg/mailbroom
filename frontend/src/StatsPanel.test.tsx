@@ -3,7 +3,7 @@
  * is only shown from the version that added them on; the old move-based
  * `freed` of earlier months is history and never shown as freed space. */
 
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, expect, test, vi } from "vitest";
 import { StatsPanel } from "./components/StatsPanel";
 import { setLang } from "./i18n";
@@ -63,4 +63,17 @@ test("German labels", async () => {
   expect(screen.getByText(
     "diesen Monat endgültig gelöscht: 1 Mail · 20 B frei")).toBeTruthy();
   expect(document.body.textContent).toContain("1 endgültig gelöscht (20 B frei)");
+});
+
+test("the header offers 'Your year in mail' when the host wires it", async () => {
+  actions = {};
+  const onWrapped = vi.fn();
+  render(<StatsPanel onClose={() => {}} onWrapped={onWrapped} />);
+  fireEvent.click(await screen.findByRole("button",
+    { name: "Your year in mail" }));
+  expect(onWrapped).toHaveBeenCalledTimes(1);
+  cleanup();
+  render(<StatsPanel onClose={() => {}} />);
+  await screen.findByText("mails");
+  expect(screen.queryByRole("button", { name: "Your year in mail" })).toBeNull();
 });

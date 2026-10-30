@@ -23,6 +23,7 @@ import { SpaceMapPanel } from "./components/SpaceMapPanel";
 import { StatsPanel } from "./components/StatsPanel";
 import { AiFilterPanel } from "./components/AiFilterPanel";
 import { TriagePanel } from "./components/TriagePanel";
+import { WrappedStory } from "./components/WrappedStory";
 import { QueryBuilder } from "./components/QueryBuilder";
 import { QuickWins } from "./components/QuickWins";
 import type { QuickWinCard } from "./quickwins";
@@ -153,6 +154,7 @@ export default function App() {
   const [trackersOpen, setTrackersOpen] = useState(false);
   const [statsOpen, setStatsOpen] = useState(false);
   const [spaceOpen, setSpaceOpen] = useState(false);
+  const [wrappedOpen, setWrappedOpen] = useState(false);
   const [auditOpen, setAuditOpen] = useState(false);
   const [triageOpen, setTriageOpen] = useState(false);
   // Folders panel (Junk | Trash): which folder it opens on, null = closed
@@ -669,7 +671,7 @@ export default function App() {
   }, [state?.groups_rev]);
   useEffect(() => { prevGroups.current = groups; });
   const anyModal = (!!detail && !splitPane) || searchOpen || settingsOpen || rulesOpen
-    || aiFilterOpen || attsOpen || dupsOpen || trackersOpen || statsOpen || spaceOpen || auditOpen
+    || aiFilterOpen || attsOpen || dupsOpen || trackersOpen || statsOpen || spaceOpen || wrappedOpen || auditOpen
     || triageOpen || !!foldersOpen;
 
   // Space map "Done": exactly these sender keys become the selection of the
@@ -1723,6 +1725,10 @@ export default function App() {
               <LayoutGrid size={16} className="mr-1 inline align-text-bottom" />
               {t("space.title")}
             </MenuItem>
+            <MenuItem onClick={() => setWrappedOpen(true)}>
+              <Sparkles size={16} className="mr-1 inline align-text-bottom" />
+              {t("wrapped.menu")}
+            </MenuItem>
             <MenuItem onClick={() => setAuditOpen(true)}>
               <ScrollText size={16} className="mr-1 inline align-text-bottom" />
               {t("Audit Log")}
@@ -2193,7 +2199,10 @@ export default function App() {
           onDeleted={refresh}
         />
       )}
-      {statsOpen && <StatsPanel onClose={() => setStatsOpen(false)} />}
+      {statsOpen && (
+        <StatsPanel onClose={() => setStatsOpen(false)}
+          onWrapped={() => { setStatsOpen(false); setWrappedOpen(true); }} />
+      )}
       {spaceOpen && state && (
         <SpaceMapPanel groups={state.groups.sender}
           onClose={() => setSpaceOpen(false)}
@@ -2203,6 +2212,7 @@ export default function App() {
         <TriagePanel groups={groups} grouping={mode} onApply={applyTriage}
           onClose={() => { setTriageOpen(false); refresh(); }} />
       )}
+      {wrappedOpen && <WrappedStory onClose={() => setWrappedOpen(false)} />}
       {auditOpen && (
         <AuditLogPanel rules={state?.rules ?? []}
           onClose={() => setAuditOpen(false)} />
