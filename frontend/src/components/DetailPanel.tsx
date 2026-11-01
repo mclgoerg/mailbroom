@@ -104,7 +104,7 @@ export function DetailPanel({ grouping, group, aiEnabled, protectedNow,
   const [sieveAction, setSieveAction] = useState<SieveAction>("fileinto");
   const [sieveFolder, setSieveFolder] = useState("Archive");
   const cancelAi = useRef(false);
-  // Phone: Sort becomes an icon menu and Unsubscribe moves into the "⋯" menu.
+  // Phone: Sort becomes an icon menu (Unsubscribe stays a visible button).
   const phone = useMediaQuery("(width < 40rem)");
 
   // The sender list of a pooled row needs no mails: load them only when the
@@ -580,7 +580,7 @@ export function DetailPanel({ grouping, group, aiEnabled, protectedNow,
                   <option value="older24">{t("Older than 2 years")}</option>
                   <option value="none">{t("Clear selection")}</option>
                 </Select>
-                {canUnsub && !phone && (
+                {canUnsub && (
                   unsubscribedNow?.status === "done" ? (
                     group.still_mailing ? (
                       <span className="inline-flex items-center gap-1
@@ -613,38 +613,6 @@ export function DetailPanel({ grouping, group, aiEnabled, protectedNow,
                   )
                 )}
                 <Menu label={t("menu.more")} trigger={<MoreHorizontal size={18} />}>
-                  {canUnsub && phone && (
-                    unsubscribedNow?.status === "done" ? (
-                      <MenuItem disabled>
-                        {group.still_mailing ? (
-                          <TriangleAlert size={16}
-                            className="mr-1 inline align-text-bottom" />
-                        ) : (
-                          <Check size={16}
-                            className="mr-1 inline align-text-bottom" />
-                        )}
-                        {t(group.still_mailing ? "still.badge"
-                          : "Unsubscribed")}
-                      </MenuItem>
-                    ) : unsubscribedNow?.status === "link" ? (<>
-                      <MenuItem disabled={busy} onClick={() =>
-                        window.open(unsubscribedNow.link, "_blank", "noopener")}>
-                        <MailMinus size={16} className="mr-1 inline align-text-bottom" />
-                        {t("unsub.open_link")}
-                      </MenuItem>
-                      <MenuItem disabled={busy} onClick={ackUnsubscribe}>
-                        <Check size={16}
-                          className="mr-1 inline align-text-bottom" />
-                        {t("unsub.mark_done")}
-                      </MenuItem>
-                    </>) : (
-                      <MenuItem disabled={busy} onClick={unsubscribe}>
-                        <MailMinus size={16} className="mr-1 inline align-text-bottom" />
-                        {unsubscribedNow?.status === "failed"
-                          ? t("unsub.retry") : t("Unsubscribe")}
-                      </MenuItem>
-                    )
-                  )}
                   {/* AI rate mails only lives here while nothing is selected
                       (rate the whole group - secondary/occasional, like the
                       overview's own overflow entry). Once something IS
