@@ -6,20 +6,48 @@
 ### Features
 
 * describe a filter in your own words and let the AI write it ([#156](https://github.com/mclgoerg/mailbroom/issues/156)) ([5832fa9](https://github.com/mclgoerg/mailbroom/commit/5832fa9e289b7f9802616fc0770f532c191b276f))
+  <!-- release-notes:156 -->
+  - Describe a filter in your own words: your AI turns the sentence into the filter syntax, which you can check and edit with a live preview before applying it, saving it as a preset or starting a rule from it.
+  - Only your sentence, the filter syntax and your tag names are sent to the AI provider - no mail data. Needs an AI provider in Settings.
 * flag senders who keep mailing after you unsubscribed ([#155](https://github.com/mclgoerg/mailbroom/issues/155)) ([81545dc](https://github.com/mclgoerg/mailbroom/commit/81545dc668d497582585042090eb170fd4e455c6))
+  <!-- release-notes:155 -->
+  - Senders that keep mailing more than two days after a successful unsubscribe are now flagged "Still mailing", with a chip, the filter `is:still-mailing` and a one-tap block in the detail view.
+  - The activity digest counts them.
 * quick-win cleanup suggestions after a scan ([#159](https://github.com/mclgoerg/mailbroom/issues/159)) ([2783e2d](https://github.com/mclgoerg/mailbroom/commit/2783e2d77f13c8644ad46c86c078d9569365a77a))
+  <!-- release-notes:159 -->
+  After a scan, Mailbroom suggests a few quick cleanups (old newsletters you never open, quiet senders, mail from senders you already unsubscribed from, big old attachments, what the AI rated safe) with how much each frees. Review them in the list or clean up with the usual confirm and Undo; "Not now" hides a card until it grows.
 * show which senders track your opens and clicks ([#157](https://github.com/mclgoerg/mailbroom/issues/157)) ([4f9eaa0](https://github.com/mclgoerg/mailbroom/commit/4f9eaa0a3a002d704e1950c8d496996db038594d))
+  <!-- release-notes:157 -->
+  - See which senders put tracking pixels or click-tracking links in their mail: Tools -> Trackers, a badge on the row, and the filter `has:tracker`.
+  - Detected locally while the body index is built - nothing is loaded or sent. Needs the local body index; mails indexed earlier appear under "Check older mails" (a rebuild with the usual confirm).
 * space map of what fills your mailbox ([#160](https://github.com/mclgoerg/mailbroom/issues/160)) ([988a8c6](https://github.com/mclgoerg/mailbroom/commit/988a8c6921f6786572c544ad10d6419a0f1952cd))
+  <!-- release-notes:160 -->
+  - A new space map (Tools -> Space map) shows what fills your mailbox as tiles sized by storage; tap to drill from domains to senders.
+  - Tick tiles and hand them to the normal selection to clean up with the usual confirmation and undo.
 * swipe through groups to triage them ([#161](https://github.com/mclgoerg/mailbroom/issues/161)) ([17a3586](https://github.com/mclgoerg/mailbroom/commit/17a35861047c5deda843aad26abf1d68f6527e5e))
+  <!-- release-notes:161 -->
+  - New **Triage** view (Tools menu, button on phones): swipe through groups - left Trash, right Keep, up Unsubscribe - and apply all decisions with one confirm at the end.
+  - Buttons, arrow keys and Undo work too; protected senders can never be trashed from it and nothing changes until you confirm.
 * your year in mail, story-style ([#162](https://github.com/mclgoerg/mailbroom/issues/162)) ([42bd6a0](https://github.com/mclgoerg/mailbroom/commit/42bd6a0832bf18fe5a89cbb30c9cd8ecf62420d3))
+  <!-- release-notes:162 -->
+  "Your year in mail" (Tools or Statistics) tells the story of your mailbox year in cards - who wrote most, ghost senders, what you cleaned up - and can save a summary image with sender names hidden.
+  It is based on the mail in your mailbox now; mail you deleted since is not counted as received.
 
 
 ### Bug Fixes
 
 * address the user as du everywhere in German ([#165](https://github.com/mclgoerg/mailbroom/issues/165)) ([536528d](https://github.com/mclgoerg/mailbroom/commit/536528d9c2f7702bb379b0c6b36225f98735b83e))
+  <!-- release-notes:165 -->
+  The German interface now addresses you consistently with "du" (a few hints and the plain-words filter panel still used "Sie").
 * arrow keys in Your year in mail act on the loaded cards right away ([#166](https://github.com/mclgoerg/mailbroom/issues/166)) ([b7c03bd](https://github.com/mclgoerg/mailbroom/commit/b7c03bda7b0534ac8ab5c2e70eb826064268b379))
+  <!-- release-notes:166 -->
+  "Your year in mail": the arrow keys now always move to the next card, even when pressed the moment the story has loaded.
 * keep Triage in the Tools menu only ([#164](https://github.com/mclgoerg/mailbroom/issues/164)) ([7229a78](https://github.com/mclgoerg/mailbroom/commit/7229a7811d84fb4812a3d56b1a28f372b912e8b6))
+  <!-- release-notes:164 -->
+  On phones, Triage now opens from the Tools menu like the other tools; the extra toolbar button is gone, so the toolbar fits on one line again (also in German).
 * make the quick-wins strip compact on phones ([#163](https://github.com/mclgoerg/mailbroom/issues/163)) ([4e3fdef](https://github.com/mclgoerg/mailbroom/commit/4e3fdefce282399b73046b0527b94825c290c4d6))
+  <!-- release-notes:163 -->
+  The quick-wins suggestions take less room on phones: shorter cards, "Not now" is an ✕ in the card's corner, and "more" sits at the end of the swipeable row.
 
 ## [1.9.0](https://github.com/mclgoerg/mailbroom/compare/v1.8.0...v1.9.0) (2026-10-28)
 
