@@ -1198,7 +1198,7 @@ export const DE: Record<string, string> = {
   "confirm.empty_trash_btn": "Endgültig löschen ({n})",
   "confirm.b_mails_from": "{n} Mails von {names}",
   "confirm.b_mails_from_one": "1 Mail von {names}",
-  "confirm.names_more": "{names} und {k} weitere",
+  "confirm.names_more": "{names} und {k} weiteren",
   "confirm.b_undo": "Das lässt sich über die Ergebnismeldung rückgängig machen.",
   "confirm.btn_anyway": "Trotzdem: {verb}",
   "select.named": "{subject} auswählen",
