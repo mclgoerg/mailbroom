@@ -1379,7 +1379,7 @@ def post_test_connection(account: str | None = Query(None)):
     try:
         conn = mailops.connect(im, acc.name)
         try:
-            n = len(mailops.list_folders(conn))
+            n = len(mailops.selectable_folders(conn))
         finally:
             try:
                 conn.logout()
@@ -1399,7 +1399,8 @@ def get_folders(account: str | None = Query(None)):
         conn = mailops.connect(cfgmod.account_imap(acc.name), acc.name)
         try:
             pairs = mailops.list_folders_ex(conn)
-            names = [n for n, _ in pairs]
+            hidden = mailops.unselectable(pairs=pairs)
+            names = [n for n, _ in pairs if n not in hidden]
             found = mailops.resolve_roles(conn, acc, pairs=pairs)
             acc.folder_roles.update(found["roles"])
             roles = found["roles"]
