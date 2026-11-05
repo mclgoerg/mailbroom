@@ -1501,6 +1501,9 @@ export const EN: Record<string, string> = {
     + "Nothing was deleted.",
   "ferr.cannot_open": "Could not open the “{folder}” folder on the server.",
   "ferr.cannot_list": "Could not read the folder's mail list.",
+  "ferr.mailto_unsafe":
+    "The unsubscribe address in this mail is not a single plain address "
+    + "(or its text contains line breaks), so no mail was sent.",
   "ferr.cannot_flag":
     "The server did not accept marking the mails for deletion.",
   "ferr.cannot_expunge": "The server did not remove the marked mails.",

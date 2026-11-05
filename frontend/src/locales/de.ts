@@ -1711,6 +1711,10 @@ export const DE: Record<string, string> = {
   "ferr.cannot_open":
     "Der Ordner „{folder}“ konnte auf dem Server nicht geöffnet werden.",
   "ferr.cannot_list": "Die Mailliste des Ordners konnte nicht gelesen werden.",
+  "ferr.mailto_unsafe":
+    "Die Abmelde-Adresse in dieser Mail ist keine einzelne einfache "
+    + "Adresse (oder ihr Text enthält Zeilenumbrüche), deshalb wurde keine "
+    + "Mail gesendet.",
   "ferr.cannot_flag":
     "Der Server hat das Markieren der Mails zum Löschen nicht "
     + "akzeptiert.",

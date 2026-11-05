@@ -42,6 +42,9 @@ TEXT: dict[str, str | tuple[str, str]] = {
         'Could not open the “{folder}” folder on the server.',
     'cannot_list':
         "Could not read the folder's mail list.",
+    'mailto_unsafe':
+        'The unsubscribe address in this mail is not a single plain address '
+        '(or its text contains line breaks), so no mail was sent.',
     'cannot_flag':
         'The server did not accept marking the mails for deletion.',
     'cannot_expunge':
