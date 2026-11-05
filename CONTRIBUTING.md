@@ -101,7 +101,7 @@ docker run --rm --user "$(id -u):$(id -g)" -e HOME=/tmp -v "$PWD":/app \
   && /tmp/.local/bin/pip-compile -q --generate-hashes --strip-extras --allow-unsafe -o requirements-dev.txt requirements-dev.in"
 ```
 
-Add `--upgrade` to refresh every pin. Dependabot understands the
+The dev file constrains itself to `requirements.txt` (`-c`), so both lockfiles always agree on shared pins (`tests/test_lockfiles.py` enforces it). Add `--upgrade` to refresh every pin. Dependabot understands the
 pip-compile pair and bumps both files.
 
 No IMAP server or network is needed - the backend suite runs against an
