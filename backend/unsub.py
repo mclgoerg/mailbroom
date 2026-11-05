@@ -78,6 +78,7 @@ def _public_ip(raw: str):
     if ip.version == 6 and ip.ipv4_mapped:
         ip = ip.ipv4_mapped
     if (ip.is_loopback or ip.is_private or ip.is_link_local
+            or (ip.version == 6 and ip.is_site_local)
             or ip.is_multicast or ip.is_reserved or ip.is_unspecified
             or not ip.is_global):
         return None
@@ -167,7 +168,10 @@ def unsubscribe_addr(im: dict, addr: str, header: str, one_click: bool,
     {"status": "done"|"link"|"failed", "method", "detail", "error"} so a
     bulk run is not aborted by a single dead endpoint."""
     parts = parse_unsub(header, one_click)
-    host = urllib.parse.urlparse(parts["http"] or "").hostname or "-"
+    try:
+        host = urllib.parse.urlparse(parts["http"] or "").hostname or "-"
+    except ValueError:          # e.g. "https://[::1/u" - fails below, too
+        host = "-"
     log.info("unsubscribe %r: one_click=%s mailto=%s http_host=%s",
              addr, parts["one_click"], bool(parts["mailto"]), host)
     try:

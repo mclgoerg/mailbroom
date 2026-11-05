@@ -30,7 +30,7 @@ def _answer(*ips):
     "127.0.0.1", "::1", "10.1.2.3", "192.168.0.9", "172.16.5.5",
     "169.254.169.254", "100.64.0.1", "224.0.0.1", "240.0.0.1", "0.0.0.0",
     "::", "::ffff:127.0.0.1", "::ffff:10.0.0.1", "::ffff:169.254.169.254",
-    "fe80::1", "fc00::1", "ff02::1"])
+    "fe80::1", "fc00::1", "ff02::1", "fec0::1"])
 def test_non_public_targets_refused(monkeypatch, ip):
     monkeypatch.setattr(unsub.socket, "getaddrinfo", _answer(ip))
     connected = []
@@ -71,6 +71,15 @@ def test_connects_to_the_validated_ip_with_one_lookup(monkeypatch):
         unsub._post_one_click("https://x.example/u")
     assert len(lookups) == 1
     assert connected == [(PUBLIC, 443)]
+
+
+@pytest.mark.parametrize("hdr", ["<https://[::1/u>", "<https://[bad/u>"])
+def test_a_malformed_url_is_a_failed_outcome_not_a_crash(hdr):
+    for one_click in (True, False):
+        res = unsub.unsubscribe_addr({}, "a@x.example", hdr, one_click)
+        assert res["status"] in ("failed", "link")
+    assert unsub.unsubscribe_addr(
+        {}, "a@x.example", hdr, True)["status"] == "failed"
 
 
 def test_http_one_click_is_treated_as_a_link():
@@ -139,6 +148,7 @@ def server(tmp_path, monkeypatch):
         cf, kf = _cert(tmp_path, cert_name)
         srv = HTTPServer(("127.0.0.1", 0), H)
         sctx = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+        sctx.minimum_version = ssl.TLSVersion.TLSv1_2
         sctx.load_cert_chain(cf, kf)
         srv.socket = sctx.wrap_socket(srv.socket, server_side=True)
         threading.Thread(target=srv.serve_forever, daemon=True).start()
