@@ -88,6 +88,10 @@ TEXT: dict[str, str | tuple[str, str]] = {
         'This filter is not available for Junk and Trash rules: {names}',
     'rule_purge_filter_domain':
         'This filter is not available for Junk and Trash rules: {names} (it never matches senders - use plain text such as the domain name).',
+    'no_account':
+        'No mail account is set up yet - open Settings and fill in the sign-in details first.',
+    'cafile_missing':
+        'The certificate file {path} does not exist - clear the CA field in Settings (normal providers need none) or mount the file there.',
 }
 
 ROLE_NAMES = {"trash": "Trash", "junk": "Junk", "archive": "Archive"}
