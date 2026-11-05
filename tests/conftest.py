@@ -37,6 +37,9 @@ def isolate(tmp_path, monkeypatch):
     """Every test gets fresh config paths and empty per-account state
     (the accounts registry is cleared, so mailops' default-account aliases
     resolve to a brand-new AccountState)."""
+    # TestClient sends Host: testserver - not a name the no-login host
+    # check accepts by default.
+    monkeypatch.setenv("MAILBROOM_ALLOWED_HOSTS", "testserver")
     monkeypatch.setattr(cfgmod, "CONFIG_PATH", tmp_path / "config.json")
     monkeypatch.setattr(cfgmod, "STATS_PATH", tmp_path / "stats.json")
     monkeypatch.setattr(cfgmod, "SERVER_PATH", tmp_path / "server.json")

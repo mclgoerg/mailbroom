@@ -16,8 +16,8 @@ import os
 from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.exception_handlers import request_validation_exception_handler
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import (FileResponse, JSONResponse, RedirectResponse,
-                               StreamingResponse)
+from fastapi.responses import (FileResponse, HTMLResponse, JSONResponse,
+                               RedirectResponse, StreamingResponse)
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
@@ -44,6 +44,7 @@ from . import secretbox
 from . import stats as statsmod
 from . import tenants
 from . import trackers
+from . import webguard
 from . import unsub
 from . import unsubstore
 from . import verdictstore
@@ -82,6 +83,14 @@ logging.getLogger("uvicorn.access").addFilter(_RedactKnowledgeKeys())
 from contextlib import asynccontextmanager
 
 
+def _log_accepted_hosts() -> None:
+    """Startup note in no-login mode: the Host names the guard accepts."""
+    if cfgmod.load_server()["auth"]["mode"] == "none":
+        logging.getLogger("pmc.auth").info(
+            "no login set - accepting requests for: %s",
+            webguard.describe_accepted())
+
+
 @asynccontextmanager
 async def _lifespan(app: FastAPI):
     from . import secretbox
@@ -91,6 +100,7 @@ async def _lifespan(app: FastAPI):
             "are stored in plaintext in /data (they would be readable in "
             "volume backups). Generate a key with `openssl rand -base64 32` "
             "and keep it OUT of the backups.")
+    _log_accepted_hosts()
     # Show the last scan of every tenant's accounts right away instead of
     # an empty view (safe: moves re-check UIDVALIDITY; undo works by
     # Message-ID).
@@ -173,6 +183,24 @@ async def _auth(request: Request, call_next):
     if sub:
         return await call_next(request)
     return JSONResponse({"detail": "login required"}, status_code=401)
+
+
+@app.middleware("http")
+async def _cross_site_guard(request: Request, call_next):
+    # Registered after _auth, so it runs before it. The host check never
+    # consults X-Forwarded-Host (a direct client could forge it).
+    path = request.url.path
+    if cfgmod.load_server()["auth"]["mode"] == "none":
+        host = request.headers.get("host", "")
+        if not webguard.host_allowed(host):
+            if path.startswith("/api/"):
+                return JSONResponse(
+                    {"detail": "host_not_allowed",
+                     "host": host[:100]}, status_code=403)
+            return HTMLResponse(webguard.blocked_page(host), status_code=403)
+    if webguard.cross_site_write(request.method, path, request.headers):
+        return JSONResponse({"detail": "cross_site_request"}, status_code=403)
+    return await call_next(request)
 
 
 def _external_base(request: Request) -> str:

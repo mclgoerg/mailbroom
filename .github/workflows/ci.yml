@@ -51,7 +51,7 @@ jobs:
 
       - name: Backend tests
         run: |
-          pip install -r backend/requirements-dev.txt
+          pip install --require-hashes -r backend/requirements-dev.txt
           python -m pytest tests/ -q
 
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7

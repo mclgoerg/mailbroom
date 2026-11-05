@@ -2,7 +2,7 @@
 /* Toolbar: labelled Tools menu, grouping segments, merged Inactive chip,
  * phone sort menu. */
 
-import { cleanup, fireEvent, render, screen, waitFor } from
+import { cleanup, fireEvent, render, screen, waitFor, within } from
   "@testing-library/react";
 import { afterEach, expect, test, vi } from "vitest";
 
@@ -113,6 +113,23 @@ test("the Tools menu lists every tool with a label; no loose tool icons",
       expect(screen.getByRole("menuitem", { name: new RegExp(`^${n}`) }))
         .toBeTruthy();
     expect(screen.getByLabelText("Search all mails")).toBeTruthy();
+  });
+
+test("the Tools menu is grouped: Clean up / Insights / AI & export, in order",
+  async () => {
+    await open();
+    fireEvent.click(screen.getByRole("button", { name: "Tools" }));
+    const names = (g: string) => within(screen.getByRole("group", { name: g }))
+      .getAllByRole("menuitem")
+      .map((i) => i.textContent!.replace(/(Triage|Rules|Duplicates|Attachments|Junk & Trash|Statistics|Space map|Your year in mail|Trackers|Audit Log|AI review|Export CSV).*/, "$1"));
+    expect(within(screen.getByRole("menu")).getAllByRole("group")
+      .map((g) => g.getAttribute("aria-label")))
+      .toEqual(["Clean up", "Insights", "AI & export"]);
+    expect(names("Clean up")).toEqual(["Triage", "Rules", "Duplicates",
+      "Attachments", "Junk & Trash"]);
+    expect(names("Insights")).toEqual(["Statistics", "Space map",
+      "Your year in mail", "Trackers", "Audit Log"]);
+    expect(names("AI & export")).toEqual(["AI review", "Export CSV"]);
   });
 
 test("Tools -> Trackers: tapping a sender closes the panel and filters the "
