@@ -172,7 +172,7 @@ export const DE: Record<string, string> = {
   "tracker.sub": "Wer deine Öffnungen und Klicks verfolgt",
   "tracker.explainer":
     "Ein Tracking-Pixel verrät dem Absender, wann und wo du die Mail "
-    + "geöffnet hast. Mailbroom lädt niemals Bilder aus dem Netz nach.",
+    + "geöffnet hast. Inboxrake lädt niemals Bilder aus dem Netz nach.",
   "tracker.headline":
     "{pct} % der geprüften Mails enthalten ein Tracking-Pixel",
   "tracker.headline_none":
@@ -849,7 +849,7 @@ export const DE: Record<string, string> = {
   "folders.special": "Spezialordner",
   "folders.special_hint":
     "Nicht Teil des Aufr\u00e4um-Scans. Der pro Rolle angezeigte Ordner ist der, "
-    + "in den Mailbroom Mails verschiebt - und der, den dauerhafte Aktionen "
+    + "in den Inboxrake Mails verschiebt - und der, den dauerhafte Aktionen "
     + "verwenden.",
   "folders.none": "Keine Ordner gefunden.",
   "folder.src.flag": "Server-Markierung",
@@ -860,7 +860,7 @@ export const DE: Record<string, string> = {
     "Das Archiv wird weiterhin gescannt - unten ankreuzen.",
   "folder.ambiguous":
     "Mehr als ein Ordner kommt als dein Ordner \u201e{role}\u201c in Frage. "
-    + "Bis du w\u00e4hlst, verwendet Mailbroom \u201e{pick}\u201c f\u00fcr "
+    + "Bis du w\u00e4hlst, verwendet Inboxrake \u201e{pick}\u201c f\u00fcr "
     + "Verschiebungen dorthin und l\u00f6scht nicht endg\u00fcltig und leert ihn "
     + "nicht.",
   "folder.choose": "Noch nicht best\u00e4tigt - ausw\u00e4hlen\u2026",
@@ -920,12 +920,12 @@ export const DE: Record<string, string> = {
   "account.err_dup": 'Ein Konto namens "{name}" gibt es schon.',
   "account.remove_title": "Konto entfernen",
   "account.remove_help":
-    "Entfernt dieses Konto aus Mailbroom. Mails auf dem Server bleiben "
+    "Entfernt dieses Konto aus Inboxrake. Mails auf dem Server bleiben "
     + "unangetastet.",
   "account.delete": 'Konto "{name}" löschen…',
   "account.delete_title": 'Konto "{name}" löschen',
   "account.delete_data":
-    "Mailbroom löscht die Anmeldedaten und Verbindungseinstellungen, "
+    "Inboxrake löscht die Anmeldedaten und Verbindungseinstellungen, "
     + "Scan-Ergebnisse, den lokalen Suchindex, gespeicherte Filter, Pins, "
     + "Abbestell-Einträge, bekannte Absender sowie Digest- und "
     + "Auto-Scan-Einstellungen.",
@@ -935,7 +935,7 @@ export const DE: Record<string, string> = {
   "account.delete_mails": "Mails auf dem Server bleiben unangetastet.",
   "account.delete_confirm": "Konto löschen",
   "menu.accounts": "Konten",
-  "update.available": "Eine neue Version von Mailbroom ist verfügbar.",
+  "update.available": "Eine neue Version von Inboxrake ist verfügbar.",
   "update.reload": "Neu laden",
   "menu.version": "v{version} (Build {id})",
   "scan.age": "gescannt vor {ago}",
@@ -1019,7 +1019,7 @@ export const DE: Record<string, string> = {
   "usage.section": "Nutzerstatistik",
   "usage.help":
     "Nutzung pro Arbeitsbereich - nur Zahlen, KI-Kosten und "
-    + "Speicherplatz. Mailbroom zeigt dir nie Maildaten, Kontonamen "
+    + "Speicherplatz. Inboxrake zeigt dir nie Maildaten, Kontonamen "
     + "oder Absender anderer Nutzer.",
   "usage.user": "Nutzer / Arbeitsbereich",
   "usage.mails": "Mails (letzter Scan)",
@@ -1086,7 +1086,7 @@ export const DE: Record<string, string> = {
   "digest.recipient_placeholder": "eigene Adresse dieses Kontos",
   "digest.time": "Uhrzeit (24h, lokale Zeit des Servers)",
   "digest.help":
-    "Eine Zusammenfassung dessen, was Mailbroom für dieses Konto seit "
+    "Eine Zusammenfassung dessen, was Inboxrake für dieses Konto seit "
     + "der letzten Übersicht getan hat - durchgeführte Aktionen, "
     + "freigewordene Mails/Speicherplatz, Regel-Vorschauen (Treffer von "
     + "Regeln, die noch im Berichtsmodus laufen, also noch nicht "
@@ -1151,11 +1151,11 @@ export const DE: Record<string, string> = {
     "Gedacht für große Postfächer und langsame Anbieter: baut einmal einen "
     + "lokalen Index auf und sucht danach sofort. Er speichert KEINEN lesbaren Mailtext, nur "
     + "geschlüsselte Hashes der Wörter jeder Mail (der Schlüssel stammt aus "
-    + "MAILBROOM_SECRET_KEY). Die Suche findet ganze Wörter (Groß-/Kleinschreibung "
+    + "INBOXRAKE_SECRET_KEY). Die Suche findet ganze Wörter (Groß-/Kleinschreibung "
     + "und Akzente egal, mehrere Wörter müssen alle vorkommen), keine "
     + "Wortteile. Scans halten den Index aktuell; Ausschalten löscht ihn.",
   "index.need_key":
-    "Der lokale Index braucht MAILBROOM_SECRET_KEY auf dem Server.",
+    "Der lokale Index braucht INBOXRAKE_SECRET_KEY auf dem Server.",
   "index.save_first":
     "Erst die Einstellungen speichern, dann hier den Index aufbauen.",
   "index.none": "Noch kein Index aufgebaut.",
@@ -1203,7 +1203,7 @@ export const DE: Record<string, string> = {
   "body_search.disabled": "Aus (nur Betreff und Absender)",
   "body_search.help":
     "Die Mailtext-Suche läuft bei jeder Anfrage auf deinem Mailserver - "
-    + "Mailbroom speichert nichts. Bei entfernten Anbietern kann sie "
+    + "Inboxrake speichert nichts. Bei entfernten Anbietern kann sie "
     + "langsam sein; Proton Bridge antwortet lokal. Ausschalten, um nur "
     + "nach Betreff und Absender zu suchen.",
   "auto_scan.align": "Startminute (0-59)",
@@ -1605,7 +1605,7 @@ export const DE: Record<string, string> = {
   "know.kept_skipped_one":
     "1 Absender blieb, wie er ist: er hat eine eigene Einordnung von dir, oder seine Adresse lässt sich nicht einordnen.",
   "know.kept_none": "Gerade gilt keine KI-Antwort.",
-  "know.box_title": "So ordnet Mailbroom diesen Absender ein",
+  "know.box_title": "So ordnet Inboxrake diesen Absender ein",
   "know.box_now": "Gerade in „{row}“.",
   "know.box_select": "Diesen Absender einordnen unter",
   "know.box_auto": "Automatisch",
@@ -1640,10 +1640,10 @@ export const DE: Record<string, string> = {
   "know.err.full": "Die Liste der eingeordneten Absender ist voll.",
   "know.err.ai_running": "Ein KI-Lauf ist aktiv – versuche es nach dem Ende noch einmal.",
   "know.err.unscanned": "Scanne zuerst jedes Konto.",
-  // Einstellungen > Absender: was Mailbroom über deine Absender weiß.
+  // Einstellungen > Absender: was Inboxrake über deine Absender weiß.
   "tab.senders": "Eingeordnete Absender",
   "tab.senders_short": "Absender",
-  "know.table_title": "Was Mailbroom über deine Absender weiß",
+  "know.table_title": "Was Inboxrake über deine Absender weiß",
   "know.table_help":
     "Wo du Absender und Firmen in Smart eingeordnet hast, und die "
     + "KI-Antworten, die du behalten hast. Das bleibt auf diesem Server und "
@@ -1768,7 +1768,7 @@ export const DE: Record<string, string> = {
     "Der Ordner wurde noch nicht gezählt – lade ihn neu und "
     + "bestätige erneut.",
   "ferr.data_not_writable":
-    "Mailbroom kann nicht in seinen Datenordner schreiben. Gib auf dem "
+    "Inboxrake kann nicht in seinen Datenordner schreiben. Gib auf dem "
     + "Host der Benutzer-ID 1000 den Ordner, der unter /data eingebunden ist "
     + "(chown -R 1000:1000 <Ordner>), oder starte den Container mit --user, "
     + "und starte ihn dann neu.",
@@ -2093,5 +2093,5 @@ export const DE: Record<string, string> = {
   "wrapped.names_hidden": "Absendernamen sind im Bild verborgen.",
   "wrapped.names_shown": "Absendernamen sind im Bild sichtbar.",
   "wrapped.local_only": "Es wird auf diesem Gerät erstellt; nichts wird hochgeladen.",
-  "wrapped.footer": "Mailbroom",
+  "wrapped.footer": "Inboxrake",
 };

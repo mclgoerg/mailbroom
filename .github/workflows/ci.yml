@@ -127,5 +127,5 @@ jobs:
           # fallback for a human manually pushing a tag outside that flow.
           gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1 && exit 0
           gh release create "$GITHUB_REF_NAME" \
-            --title "Mailbroom $GITHUB_REF_NAME" \
+            --title "Inboxrake $GITHUB_REF_NAME" \
             --generate-notes --verify-tag

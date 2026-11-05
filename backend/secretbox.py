@@ -6,7 +6,7 @@ metadata, verdicts, stats) stays plain JSON - the threat model here is
 a leaked VOLUME BACKUP, not a compromised host (root on the box can
 read process memory either way).
 
-The key comes from the MAILBROOM_SECRET_KEY env var (any string works;
+The key comes from the INBOXRAKE_SECRET_KEY env var (any string works;
 generate one with `openssl rand -base64 32`) and is stretched to a
 Fernet key via SHA-256. Values are stored as "enc:v1:<token>"; loading
 is transparent. Without a key everything stays plaintext (one startup
@@ -24,7 +24,7 @@ import os
 log = logging.getLogger("pmc.secrets")
 
 PREFIX = "enc:v1:"
-ENV_VAR = "MAILBROOM_SECRET_KEY"
+ENV_VAR = "INBOXRAKE_SECRET_KEY"
 
 
 def _fernet():
@@ -41,13 +41,13 @@ def enabled() -> bool:
 
 
 def derive_key(purpose: str) -> bytes | None:
-    """A 32-byte key for `purpose`, derived from MAILBROOM_SECRET_KEY (None
+    """A 32-byte key for `purpose`, derived from INBOXRAKE_SECRET_KEY (None
     without it). Different purposes get unrelated keys."""
     key = os.environ.get(ENV_VAR, "").strip()
     if not key:
         return None
     import hmac
-    return hmac.new(key.encode(), f"mailbroom/{purpose}".encode(),
+    return hmac.new(key.encode(), f"inboxrake/{purpose}".encode(),
                     hashlib.sha256).digest()
 
 

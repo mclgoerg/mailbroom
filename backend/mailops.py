@@ -4753,7 +4753,7 @@ def search_body(query: str, limit: int = 500, acc=None,
                 budget: float | None = None) -> dict:
     """Metadata hits plus mails whose BODY contains every term, evaluated
     by the IMAP server in each scanned folder (nothing is stored). Only
-    mails Mailbroom knows (the index) are returned, and a folder whose
+    mails Inboxrake knows (the index) are returned, and a folder whose
     UIDVALIDITY changed since the scan is skipped - never stale UIDs.
     `notes` carries translatable caveats: charset fallback, stale or
     failing folders, and a partial result when the time budget ran out."""

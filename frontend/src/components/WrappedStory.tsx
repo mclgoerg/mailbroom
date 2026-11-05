@@ -351,7 +351,7 @@ export function WrappedStory({ onClose }: { onClose: () => void }) {
     try {
       const svg = buildSummarySvg(data, summaryStrings(data),
         paletteFromTheme(), showNames);
-      saveBlob(`mailbroom-wrapped-${data.year}.png`, await svgToPngBlob(svg));
+      saveBlob(`inboxrake-wrapped-${data.year}.png`, await svgToPngBlob(svg));
     } catch (e) {
       setError(String((e as Error).message ?? e));
     } finally {

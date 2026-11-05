@@ -69,7 +69,7 @@ def test_oidc_mode_flow(monkeypatch):
     assert r.status_code == 400               # issuer/client missing
     r = client.post("/api/config", json={"auth": {
         "mode": "oidc",
-        "oidc": {"issuer": "https://idp.example", "client_id": "mailbroom",
+        "oidc": {"issuer": "https://idp.example", "client_id": "inboxrake",
                  "client_secret": "sst", "allowed": ["Me@Corp.example"]}}})
     assert r.status_code == 200
     masked = r.json()["auth"]["oidc"]
@@ -87,7 +87,7 @@ def test_oidc_mode_flow(monkeypatch):
     assert r.status_code == 307 or r.status_code == 302
     loc = r.headers["location"]
     assert loc.startswith("https://idp.example/authorize?")
-    assert "client_id=mailbroom" in loc and "state=" in loc
+    assert "client_id=inboxrake" in loc and "state=" in loc
     # PKCE: challenge in the authorize URL, verifier in an HttpOnly cookie
     # (providers like Pocket ID reject requests without code_challenge).
     assert "code_challenge_method=S256" in loc

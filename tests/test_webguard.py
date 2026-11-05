@@ -14,7 +14,7 @@ def _get(host, path="/api/auth", **headers):
 
 @pytest.fixture
 def no_extra(monkeypatch):
-    monkeypatch.delenv("MAILBROOM_ALLOWED_HOSTS", raising=False)
+    monkeypatch.delenv("INBOXRAKE_ALLOWED_HOSTS", raising=False)
 
 
 @pytest.mark.parametrize("host", [
@@ -47,11 +47,11 @@ def test_denied_page_is_escaped_html(no_extra):
     assert r.status_code == 403
     assert r.headers["content-type"].startswith("text/html")
     assert "<b>x" not in r.text and "&lt;b&gt;x" in r.text
-    assert "MAILBROOM_ALLOWED_HOSTS=" in r.text
+    assert "INBOXRAKE_ALLOWED_HOSTS=" in r.text
 
 
 def test_env_exact_wildcard_and_star(monkeypatch):
-    monkeypatch.setenv("MAILBROOM_ALLOWED_HOSTS",
+    monkeypatch.setenv("INBOXRAKE_ALLOWED_HOSTS",
                        "nas.lan, *.home.example")
     assert _get("NAS.lan:8765").status_code == 200
     assert _get("a.home.example").status_code == 200
@@ -59,7 +59,7 @@ def test_env_exact_wildcard_and_star(monkeypatch):
     assert _get("home.example").status_code == 403
     assert _get("evilhome.example").status_code == 403
     assert _get("other.lan").status_code == 403
-    monkeypatch.setenv("MAILBROOM_ALLOWED_HOSTS", "*")
+    monkeypatch.setenv("INBOXRAKE_ALLOWED_HOSTS", "*")
     assert _get("anything.example").status_code == 200
 
 
@@ -139,7 +139,7 @@ def test_cross_site_guard_applies_with_a_login(no_extra):
 
 def test_startup_logs_accepted_hosts_only_without_a_login(caplog, monkeypatch):
     from backend import main
-    monkeypatch.setenv("MAILBROOM_ALLOWED_HOSTS", "nas.lan")
+    monkeypatch.setenv("INBOXRAKE_ALLOWED_HOSTS", "nas.lan")
     with caplog.at_level("INFO", logger="pmc.auth"):
         main._log_accepted_hosts()
     assert "nas.lan" in caplog.text and "accepting requests" in caplog.text

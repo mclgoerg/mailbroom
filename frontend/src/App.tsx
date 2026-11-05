@@ -312,7 +312,7 @@ export default function App() {
       if (typeof Notification === "undefined"
           || Notification.permission !== "granted" || !document.hidden) return;
       try {
-        new Notification("Mailbroom", { body, icon: "/icon.svg" });
+        new Notification("Inboxrake", { body, icon: "/icon.svg" });
       } catch { /* not supported */ }
     };
     const p = prevJobs.current;
@@ -1574,7 +1574,7 @@ export default function App() {
       sm:p-5 sm:pb-[calc(var(--bulkbar-h,0px)+1.25rem)]">
       <header className="mb-2 flex items-center gap-3 md:mb-4">
         <h1 className="type-title">
-          Mailbroom
+          Inboxrake
         </h1>
         <span className="ml-auto flex items-center gap-2">
           {state?.junk_count != null && state.junk_count > 0 && (

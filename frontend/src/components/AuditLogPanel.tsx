@@ -25,7 +25,7 @@ const tOr = (prefix: string, key: string): string => {
   return s === full ? key : s;
 };
 
-/** Append-only history of every action Mailbroom took on this mailbox:
+/** Append-only history of every action Inboxrake took on this mailbox:
  *  bulk/rule trash-archive-move-mark_read, rule runs, unsubscribes, undo,
  *  empty-trash. Paged, newest first, CSV export. */
 export function AuditLogPanel({ rules, onClose }: {

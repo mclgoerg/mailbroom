@@ -136,7 +136,7 @@ export function sieveSnippet(kind: "sender" | "domain", value: string,
   const body = action === "discard" ? "    discard;\n    stop;"
     : action === "fileinto" ? `    fileinto "${sieveQ(folder)}";`
     : '    addflag "\\\\Seen";';
-  return `${requires}# mailbroom: ${value}\n`
+  return `${requires}# inboxrake: ${value}\n`
     + `if ${test} {\n${body}\n}`;
 }
 

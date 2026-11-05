@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-/* Settings > Senders: "What Mailbroom knows about your senders" - a
+/* Settings > Senders: "What Inboxrake knows about your senders" - a
  * searchable, sortable list with inline edit, delete (one / several, with
  * Undo), Remove unused (only with every account scanned), keep / forget of
  * AI answers and download / upload of just this knowledge. */
@@ -74,7 +74,7 @@ describe("the list", () => {
   it("shows every entry: who, filed under, source, senders, status", async () => {
     mount();
     await screen.findByText("amy@solo.example");
-    expect(screen.getByText("What Mailbroom knows about your senders")).toBeTruthy();
+    expect(screen.getByText("What Inboxrake knows about your senders")).toBeTruthy();
     const amy = within(rowOf("amy@solo.example"));
     expect(amy.getByText("Orders & deliveries")).toBeTruthy();
     expect(amy.getByText("Filed by you")).toBeTruthy();
@@ -519,7 +519,7 @@ describe("download and upload of just this knowledge", () => {
     fireEvent.click(screen.getByRole("button", { name: "Download" }));
     expect(saveBlob).toHaveBeenCalledTimes(1);
     const [name, blob] = saveBlob.mock.calls[0] as [string, Blob];
-    expect(name).toBe("mailbroom-sender-knowledge.json");
+    expect(name).toBe("inboxrake-sender-knowledge.json");
     const section = JSON.parse(await blob.text());
     expect(section.version).toBe(1);
     expect(Object.keys(section.entries)).toHaveLength(5);
@@ -599,7 +599,7 @@ describe("phone and German", () => {
   it("is German in the German UI", async () => {
     setLang("de");
     mount();
-    expect(await screen.findByText("Was Mailbroom über deine Absender weiß"))
+    expect(await screen.findByText("Was Inboxrake über deine Absender weiß"))
       .toBeTruthy();
     expect(screen.getByRole("button", { name: "Unbenutzte entfernen (1)" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "Alle KI-Antworten behalten" })).toBeTruthy();

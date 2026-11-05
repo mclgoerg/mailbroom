@@ -170,7 +170,7 @@ test("Save image: names are masked unless 'Show names' is on", async () => {
   expect(hidden).not.toContain("news@shop.example");
   expect(hidden).not.toContain("Shop News");
   expect(hidden).toContain("n...@...example");
-  expect(saveBlob).toHaveBeenCalledWith("mailbroom-wrapped-2026.png",
+  expect(saveBlob).toHaveBeenCalledWith("inboxrake-wrapped-2026.png",
     expect.any(Blob));
   fireEvent.click(screen.getByLabelText("Show names"));
   fireEvent.click(screen.getByRole("button", { name: "Save image" }));

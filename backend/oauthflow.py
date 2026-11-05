@@ -7,7 +7,7 @@ there is no universal "Sign in with Google" button - every self-hoster
 registers their own OAuth client (docs/install.md walks through it).
 Microsoft is the exception: a public client (no secret, no redirect URI)
 can use the device-code flow, so the maintainer registers ONE Entra app
-and ships its ID as MAILBROOM_MS_CLIENT_ID; without that env var,
+and ships its ID as INBOXRAKE_MS_CLIENT_ID; without that env var,
 Microsoft falls back to the same bring-your-own auth-code flow as Google.
 """
 
@@ -29,7 +29,7 @@ GOOGLE_AUTH_ENDPOINT = "https://accounts.google.com/o/oauth2/v2/auth"
 GOOGLE_TOKEN_ENDPOINT = "https://oauth2.googleapis.com/token"
 GOOGLE_SCOPE = "https://mail.google.com/"
 
-MS_TENANT = os.environ.get("MAILBROOM_MS_TENANT", "consumers")
+MS_TENANT = os.environ.get("INBOXRAKE_MS_TENANT", "consumers")
 MS_AUTH_ENDPOINT = (
     f"https://login.microsoftonline.com/{MS_TENANT}/oauth2/v2.0/authorize")
 MS_TOKEN_ENDPOINT = (
@@ -38,7 +38,7 @@ MS_DEVICE_ENDPOINT = (
     f"https://login.microsoftonline.com/{MS_TENANT}/oauth2/v2.0/devicecode")
 MS_SCOPE = "offline_access https://outlook.office.com/IMAP.AccessAsUser.All"
 
-MS_SHARED_CLIENT_ID = os.environ.get("MAILBROOM_MS_CLIENT_ID", "")
+MS_SHARED_CLIENT_ID = os.environ.get("INBOXRAKE_MS_CLIENT_ID", "")
 
 
 def has_shared_microsoft_client() -> bool:

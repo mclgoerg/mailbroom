@@ -61,7 +61,7 @@ test("data: headline share, numbers, senders, hosts and the explainer",
     show();
     await screen.findByText("63% of the mails we checked carry a tracking "
       + "pixel");
-    expect(screen.getByText(/Mailbroom never loads remote images/)).toBeTruthy();
+    expect(screen.getByText(/Inboxrake never loads remote images/)).toBeTruthy();
     expect(screen.getByText("Checked 40 of 40 mails")).toBeTruthy();
     expect(screen.getByText("with tracking pixel")).toBeTruthy();
     expect(screen.getByText("Shop News")).toBeTruthy();

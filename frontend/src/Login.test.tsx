@@ -44,8 +44,8 @@ test("wrong password shows the error and stays", async () => {
 
 test("uses the design tokens: title layer, card radius, danger-fg error", async () => {
   render(<Login mode="password" onLogin={() => {}} />);
-  expect(screen.getByText("Mailbroom").className).toContain("type-title");
-  expect(screen.getByText("Mailbroom").parentElement!.className)
+  expect(screen.getByText("Inboxrake").className).toContain("type-title");
+  expect(screen.getByText("Inboxrake").parentElement!.className)
     .toContain("rounded-card");
   fireEvent.change(screen.getByPlaceholderText("Password"),
     { target: { value: "nope" } });

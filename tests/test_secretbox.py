@@ -1,4 +1,4 @@
-"""Secrets encryption at rest (opt-in via MAILBROOM_SECRET_KEY):
+"""Secrets encryption at rest (opt-in via INBOXRAKE_SECRET_KEY):
 sealed fields never hit the disk in plaintext, loading is transparent,
 missing/wrong keys degrade to "re-enter the secret" instead of crashing."""
 

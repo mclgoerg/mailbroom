@@ -17,7 +17,7 @@ const str: SummaryStrings = {
   title: "Your year in mail 2026", lead: "You received",
   big: "1,234", unit: "mails in 2026", note: "Based on the mail in my mailbox now",
   stats: [{ value: "5", label: "senders" }], topTitle: "Loudest senders",
-  topRows: ["40 mails", "30 mails"], footer: "Mailbroom",
+  topRows: ["40 mails", "30 mails"], footer: "Inboxrake",
 };
 const pal = { bg: "#000", panel: "#111", line: "#222", body: "#fff",
   muted: "#aaa", accent: "#c80" };

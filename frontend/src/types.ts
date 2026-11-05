@@ -674,7 +674,7 @@ export interface Config {
   default_account: string;
   oauth_providers: OauthProvider[];
   oauth_ms_device_available: boolean;
-  secret_key_set?: boolean;   // MAILBROOM_SECRET_KEY configured (local index)
+  secret_key_set?: boolean;   // INBOXRAKE_SECRET_KEY configured (local index)
   auth: AuthCfg;
   protected: string[];
   categories: Record<string, string[]>;

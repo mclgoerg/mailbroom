@@ -1,15 +1,15 @@
-# Mailbroom
+# Inboxrake
 
-[![CI](https://github.com/mclgoerg/mailbroom/actions/workflows/ci.yml/badge.svg)](https://github.com/mclgoerg/mailbroom/actions/workflows/ci.yml)
-[![Latest release](https://img.shields.io/github/v/release/mclgoerg/mailbroom)](https://github.com/mclgoerg/mailbroom/releases)
-[![OpenSSF Scorecard](https://api.securityscorecards.dev/projects/github.com/mclgoerg/mailbroom/badge)](https://scorecard.dev/viewer/?uri=github.com/mclgoerg/mailbroom)
+[![CI](https://github.com/mclgoerg/inboxrake/actions/workflows/ci.yml/badge.svg)](https://github.com/mclgoerg/inboxrake/actions/workflows/ci.yml)
+[![Latest release](https://img.shields.io/github/v/release/mclgoerg/inboxrake)](https://github.com/mclgoerg/inboxrake/releases)
+[![OpenSSF Scorecard](https://api.securityscorecards.dev/projects/github.com/mclgoerg/inboxrake/badge)](https://scorecard.dev/viewer/?uri=github.com/mclgoerg/inboxrake)
 [![OpenSSF Best Practices](https://www.bestpractices.dev/projects/14997/badge)](https://www.bestpractices.dev/projects/14997)
-[![License: MIT](https://img.shields.io/github/license/mclgoerg/mailbroom)](LICENSE)
+[![License: MIT](https://img.shields.io/github/license/mclgoerg/inboxrake)](LICENSE)
 
-**Tired of cleaning up your mailbox? Grab the broom.** 🧹
+**Tired of cleaning up your mailbox? Grab the rake.** 🍂
 
-Mailbroom sweeps any IMAP mailbox - built with love for
-[Proton Mail Bridge](https://proton.me/mail/bridge).
+Inboxrake rakes any IMAP mailbox into tidy piles - built with love for
+[Proton Mail Bridge](https://proton.me/mail/bridge). *(Formerly Mailbroom.)*
 
 Declutter a mailbox: scan everything over IMAP, group mails **by
 sender, smart pools, subject, or conversation thread** with counts, sizes, and unread ratios, drill
@@ -45,7 +45,7 @@ headers have the copy-paste commands.
 
 ## Supported providers
 
-Mailbroom speaks plain IMAP: special folders (Trash, Sent, Spam, …) are
+Inboxrake speaks plain IMAP: special folders (Trash, Sent, Spam, …) are
 detected via SPECIAL-USE flags (RFC 6154) with a name fallback, Gmail's
 virtual "All Mail" is excluded automatically (no double counting), and
 servers without the `MOVE` capability get a COPY+EXPUNGE fallback. The
@@ -135,7 +135,7 @@ presets.
   only, never sent to an AI), undoable, and a sender's detail view shows
   how it is filed and why. After an AI sorting run you can keep its answers
   as your own rules too; clearer mail still wins over a kept answer.
-  Settings > Filed senders lists everything Mailbroom knows this way -
+  Settings > Filed senders lists everything Inboxrake knows this way -
   searchable and sortable, editable in place, with delete, "Remove unused",
   and download / upload of just this list.
 - **Attachment explorer** - an on-demand BODYSTRUCTURE pass (structure
@@ -391,13 +391,13 @@ bootstrap - the settings UI can change all of it at runtime.
 Plain `docker run`, if you prefer:
 
 ```bash
-docker build -t mailbroom .
-docker run -d --name mailbroom \
+docker build -t inboxrake .
+docker run -d --name inboxrake \
   -e IMAP_HOST=127.0.0.1 -e IMAP_PORT=1143 \
   -e IMAP_USER=you@proton.me -e IMAP_PASSWORD=bridge-password \
   -e IMAP_CAFILE=/certs/bridge-cert.pem \
-  -v mailbroom_data:/data \
-  -p 127.0.0.1:8765:8765 mailbroom
+  -v inboxrake_data:/data \
+  -p 127.0.0.1:8765:8765 inboxrake
 ```
 
 With Proton Mail Bridge, run this container in the Bridge container's
@@ -431,9 +431,9 @@ in the UI; they persist in `/data`. Env bootstrap for other providers:
 > out, as does Settings → Server → *Sign out all sessions*. Logging out
 > only clears that browser's cookie.
 >
-> Without a login, Mailbroom also refuses requests whose `Host` is not
+> Without a login, Inboxrake also refuses requests whose `Host` is not
 > `localhost` or an IP address (protection against DNS rebinding). To open
-> it under a host name, add `MAILBROOM_ALLOWED_HOSTS=<name>` (comma list,
+> it under a host name, add `INBOXRAKE_ALLOWED_HOSTS=<name>` (comma list,
 > `*.example.org` for subdomains) to the container environment.
 >
 > SSO refuses an identity whose email the provider reports as unverified
@@ -456,7 +456,7 @@ single-workspace.
 
 ### Secrets encryption at rest
 
-Set `MAILBROOM_SECRET_KEY` (e.g. `openssl rand -base64 32`) and every
+Set `INBOXRAKE_SECRET_KEY` (e.g. `openssl rand -base64 32`) and every
 stored secret - IMAP passwords, AI API keys, the OIDC client secret,
 OAuth client secrets and tokens - is encrypted on disk (Fernet/AES).
 That protects **volume backups**:
@@ -468,10 +468,10 @@ reminds you).
 ### Local mail-text search index (opt-in)
 
 Settings -> Mail account -> *Mail text search* -> **Local word index**
-(needs `MAILBROOM_SECRET_KEY`) builds, on a button press, a small SQLite
+(needs `INBOXRAKE_SECRET_KEY`) builds, on a button press, a small SQLite
 index per account next to the scan snapshots. It stores **no readable mail
 text**: for every mail only keyed hashes (HMAC-SHA256 with a key derived
-from `MAILBROOM_SECRET_KEY` plus a random per-index salt) of its distinct
+from `INBOXRAKE_SECRET_KEY` plus a random per-index salt) of its distinct
 words, and the same message handles the scan snapshot holds. A copied
 `/data` therefore reveals no mail content, and an index built under a
 different key is unusable until rebuilt. Searches match **whole words**
@@ -501,7 +501,7 @@ python -m pytest tests/ -q
 
 ## AI disclosure
 
-Mailbroom was built with AI assistance (Anthropic's Claude via
+Inboxrake was built with AI assistance (Anthropic's Claude via
 Claude Code), directed and reviewed by the maintainer, and every feature
 was verified against real mailboxes before release. Independent of how
 the code was written, the safety properties are enforced by tests:

@@ -1,9 +1,9 @@
-"""Demo server: Mailbroom on fully fake, in-memory mailboxes.
+"""Demo server: Inboxrake on fully fake, in-memory mailboxes.
 
 For screenshots and local poking without any real IMAP server:
 
     docker run --rm -p 127.0.0.1:8765:8765 \
-      -v "$PWD":/repo ghcr.io/mclgoerg/mailbroom:latest \
+      -v "$PWD":/repo ghcr.io/mclgoerg/inboxrake:latest \
       python /repo/scripts/demo.py
 
 `--empty` starts a fresh install with no account instead (first-run wizard;
@@ -32,7 +32,7 @@ sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / "tests"))
 
 # Isolated storage - set BEFORE importing the backend (paths bind at import).
-DATA = Path(tempfile.mkdtemp(prefix="mailbroom-demo-"))
+DATA = Path(tempfile.mkdtemp(prefix="inboxrake-demo-"))
 os.environ.update(
     CONFIG_PATH=str(DATA / "config.json"),
     STATS_PATH=str(DATA / "ai_usage.json"),
@@ -51,7 +51,7 @@ os.environ.update(
     IMAP_CAFILE="", IMAP_USER="demo@example.com", IMAP_PASSWORD="demo",
     LOG_LEVEL="INFO",
     # the local body index (Tools -> Trackers) needs a key
-    MAILBROOM_SECRET_KEY="demo-only-secret-key",
+    INBOXRAKE_SECRET_KEY="demo-only-secret-key",
 )
 # When run inside the release image, serve ITS built bundle (the repo
 # checkout only has a placeholder static/).

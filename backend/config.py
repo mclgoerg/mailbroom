@@ -94,7 +94,7 @@ ENV_IMAP = {
     # Global mail search may also look INSIDE message bodies: "server"
     # asks the IMAP server (UID SEARCH BODY - nothing is stored locally),
     # "local" uses an opt-in keyed word index (backend/bodyindex.py; needs
-    # MAILBROOM_SECRET_KEY), "disabled" keeps search metadata-only.
+    # INBOXRAKE_SECRET_KEY), "disabled" keeps search metadata-only.
     "body_search": "server",
     # Smart grouping: a sender with at least this many mails keeps its own
     # row, the rest is pooled (mailops.build_smart). Range 2-50.
@@ -114,7 +114,7 @@ NEUTRAL_IMAP = {
     # Global mail search may also look INSIDE message bodies: "server"
     # asks the IMAP server (UID SEARCH BODY - nothing is stored locally),
     # "local" uses an opt-in keyed word index (backend/bodyindex.py; needs
-    # MAILBROOM_SECRET_KEY), "disabled" keeps search metadata-only.
+    # INBOXRAKE_SECRET_KEY), "disabled" keeps search metadata-only.
     "body_search": "server",
     # Smart grouping: a sender with at least this many mails keeps its own
     # row, the rest is pooled (mailops.build_smart). Range 2-50.
@@ -232,7 +232,7 @@ def load_server() -> dict:
 
 def _write_server(server: dict) -> None:
     """Persist server.json with its secret fields sealed (no-op copies
-    when MAILBROOM_SECRET_KEY is unset)."""
+    when INBOXRAKE_SECRET_KEY is unset)."""
     out = json.loads(json.dumps(server))
     out["auth"]["oidc"]["client_secret"] = secretbox.seal(
         out["auth"]["oidc"].get("client_secret"))
@@ -539,7 +539,7 @@ def _write(path: Path, obj) -> None:
 def _write_tenant_config(cfg: dict) -> None:
     """Persist the tenant's config file - WITHOUT the merged-in
     server-level auth section (that lives in server.json), and with the
-    secret fields sealed when MAILBROOM_SECRET_KEY is set."""
+    secret fields sealed when INBOXRAKE_SECRET_KEY is set."""
     out = json.loads(json.dumps(
         {k: v for k, v in cfg.items() if k != "auth"}))
     for block in out.get("accounts", {}).values():
@@ -662,9 +662,9 @@ def _apply_imap(block: dict, imap_in: dict) -> None:
     if imap_in.get("body_search") in BODY_SEARCH_MODES:
         if imap_in["body_search"] == "local" and not secretbox.enabled():
             # The local index stores keyed word hashes; the key comes from
-            # MAILBROOM_SECRET_KEY (see backend/bodyindex.py).
+            # INBOXRAKE_SECRET_KEY (see backend/bodyindex.py).
             raise ValueError("the local search index needs "
-                             "MAILBROOM_SECRET_KEY to be set")
+                             "INBOXRAKE_SECRET_KEY to be set")
         block["body_search"] = imap_in["body_search"]
     if "smart_min" in imap_in:
         block["smart_min"] = clamp_smart_min(imap_in["smart_min"])

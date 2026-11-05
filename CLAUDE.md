@@ -1,4 +1,4 @@
-# Mailbroom - instructions for AI agents
+# Inboxrake - instructions for AI agents
 
 Read [CONTRIBUTING.md](CONTRIBUTING.md) first - it is the source of
 truth for how changes land here (workflow, tests, ground rules).

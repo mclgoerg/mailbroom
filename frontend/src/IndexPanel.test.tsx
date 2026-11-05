@@ -55,10 +55,10 @@ const renderPanel = (over: Partial<Parameters<typeof IndexPanel>[0]> = {}) =>
   render(<DialogProvider><IndexPanel account="proton" savedMode="local"
     secretKeySet {...over} /></DialogProvider>);
 
-test("without MAILBROOM_SECRET_KEY it only explains and never calls the API",
+test("without INBOXRAKE_SECRET_KEY it only explains and never calls the API",
   () => {
     renderPanel({ secretKeySet: false });
-    expect(screen.getByText(/needs MAILBROOM_SECRET_KEY/)).toBeTruthy();
+    expect(screen.getByText(/needs INBOXRAKE_SECRET_KEY/)).toBeTruthy();
     expect(indexInfo).not.toHaveBeenCalled();
   });
 

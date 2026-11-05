@@ -7,7 +7,7 @@ import type { KnowledgeEntry, KnowledgeList, KnowledgeStored } from "../types";
 import { Button, Checkbox, confirmDialog, EmptyState, Input, Loading,
   SectionLabel, Select, Tag, useMediaQuery, useToast } from "./ui";
 
-/* "What Mailbroom knows about your senders" (Settings > Senders): everything
+/* "What Inboxrake knows about your senders" (Settings > Senders): everything
  * the user filed in Smart - by sender address or company - and the AI answers
  * they kept. A searchable, sortable list (a table, cards on a phone) with
  * inline edit, delete (also several at once), "Remove unused", keep / forget
@@ -204,7 +204,7 @@ export function KnowledgeSettings({ aiAnswers, onChanged }: {
     const section = { version: 1, entries: Object.fromEntries(
       entries.map((e) => [e.key, { kind: e.kind, src: e.src, ts: e.ts,
         note: e.note }])) };
-    saveBlob("mailbroom-sender-knowledge.json",
+    saveBlob("inboxrake-sender-knowledge.json",
       new Blob([JSON.stringify(section, null, 1)],
         { type: "application/json" }));
   };

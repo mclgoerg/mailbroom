@@ -1,4 +1,4 @@
-"""Append-only, per-tenant audit log of every action Mailbroom performs on
+"""Append-only, per-tenant audit log of every action Inboxrake performs on
 a mailbox: trash/archive/move/mark_read (incl. rule-triggered), rule runs,
 unsubscribes, undo, empty-trash and permanent deletes (`purge`: role and
 counts only).

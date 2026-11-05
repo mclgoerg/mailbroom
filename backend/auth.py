@@ -46,7 +46,7 @@ def _secret() -> bytes:
         raw = None
     if raw is not None:
         if raw.startswith(secretbox.PREFIX.encode()):
-            # Sealed with MAILBROOM_SECRET_KEY. A missing/changed key
+            # Sealed with INBOXRAKE_SECRET_KEY. A missing/changed key
             # yields "" -> fall through and generate a fresh secret
             # (all sessions drop; users just sign in again).
             opened = secretbox.unseal(raw.decode())
@@ -64,7 +64,7 @@ def _secret() -> bytes:
 
 
 def _persist_secret(secret: bytes) -> None:
-    """Store the session signing secret, sealed when MAILBROOM_SECRET_KEY
+    """Store the session signing secret, sealed when INBOXRAKE_SECRET_KEY
     is set - a volume backup must not allow forging session cookies."""
     from . import secretbox
     data = secretbox.seal(

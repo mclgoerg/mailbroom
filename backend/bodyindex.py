@@ -8,11 +8,11 @@ instant and works for any provider.
 What is stored (per account, SQLite, next to the scan snapshots):
   * NO readable mail text. For every mail only keyed hashes of its distinct
     words: HMAC-SHA256(key, word) cut to 64 bits, where the key derives from
-    MAILBROOM_SECRET_KEY (plus a random per-index salt). Without that key a
+    INBOXRAKE_SECRET_KEY (plus a random per-index salt). Without that key a
     leaked volume backup shows document handles and opaque numbers only.
   * Document handles (folder, uid, UIDVALIDITY) - the same handles the scan
     snapshot already holds.
-The index therefore requires MAILBROOM_SECRET_KEY, and an index built under
+The index therefore requires INBOXRAKE_SECRET_KEY, and an index built under
 another key is unusable (it reports as such and must be rebuilt).
 
 Consequence of hashing: a search matches WHOLE WORDS (case- and accent-
@@ -206,7 +206,7 @@ def _init(conn: sqlite3.Connection) -> None:
 def open_index(name: str, tenant=None, create: bool = False
                ) -> tuple[Index | None, str | None]:
     """(index, None) or (None, reason): MISSING when there is no usable
-    file, KEY_CHANGED when it was built under another MAILBROOM_SECRET_KEY
+    file, KEY_CHANGED when it was built under another INBOXRAKE_SECRET_KEY
     (or the key is gone)."""
     path = _path(name, tenant)
     if not path.exists() and not create:
@@ -331,7 +331,7 @@ def start_build(acc, rebuild: bool = False) -> None:
     that is already there is only topped up unless `rebuild`)."""
     from . import mailops
     if not secretbox.enabled():
-        raise ValueError("the local index needs MAILBROOM_SECRET_KEY")
+        raise ValueError("the local index needs INBOXRAKE_SECRET_KEY")
     with acc.lock:
         if acc.state["status"] != "done":
             raise RuntimeError("No completed scan")

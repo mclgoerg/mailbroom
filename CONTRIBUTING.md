@@ -1,6 +1,6 @@
-# Contributing to Mailbroom
+# Contributing to Inboxrake
 
-Thanks for helping! Mailbroom deals with people's mailboxes, so the bar
+Thanks for helping! Inboxrake deals with people's mailboxes, so the bar
 for changes is: **safe by default, tested, and translated.**
 
 ## Workflow
@@ -132,7 +132,7 @@ in-memory fake IMAP server (`tests/conftest.py`).
 
 ## Privacy
 
-Mailbroom is public, and the people who build it run it on their own
+Inboxrake is public, and the people who build it run it on their own
 mailboxes. Nothing from a real mailbox may end up here: code, tests,
 fixtures, the demo, docs, commit messages, branch names, PR titles,
 descriptions and comments use **invented `.example` data and generic words
