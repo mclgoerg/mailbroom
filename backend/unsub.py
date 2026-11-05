@@ -129,7 +129,7 @@ def unsubscribe_addr(im: dict, addr: str, header: str, one_click: bool,
         log.warning("unsubscribe %r failed: %s: %s", addr,
                     type(exc).__name__, exc)
         return {"status": "failed", "method": "", "detail": "",
-                "error": f"{type(exc).__name__}: {exc}"}
+                "error": mailops.error_text(exc)}
     return {"status": "failed", "method": "", "detail": "",
             "error": "could not parse the List-Unsubscribe header"}
 
