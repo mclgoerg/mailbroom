@@ -717,9 +717,15 @@ export const DE: Record<string, string> = {
   "preset.hint.imap_toggle":
     "IMAP muss zuerst in den Mail-Einstellungen des Anbieters aktiviert "
     + "werden; bei Zwei-Faktor-Authentifizierung App-Passwort verwenden.",
-  "preset.hint.oauth_gmail":
-    "Gmail verbindet hier nur per OAuth (unten) - eigenen, kostenlosen "
-    + "Google-OAuth-Client registrieren, siehe Installationsanleitung.",
+  "preset.hint.gmail":
+    "App-Passwort oder OAuth - unten auswählen.",
+  "signin.label": "Anmeldeart",
+  "signin.password": "App-Passwort",
+  "signin.oauth": "OAuth",
+  "signin.gmail_apppw_help":
+    "App-Passwort anlegen unter myaccount.google.com/apppasswords "
+    + "(die Bestätigung in zwei Schritten muss aktiv sein) - nicht dein "
+    + "normales Google-Passwort.",
   "preset.hint.oauth_outlook_device":
     "Outlook verbindet hier nur per OAuth (unten) - keine Einrichtung "
     + "nötig, siehe Installationsanleitung.",

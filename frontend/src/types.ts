@@ -583,6 +583,9 @@ export interface ImapAccount {
   password_set: boolean;
   cafile: string;
   preset: Preset;
+  /** How the account signs in; absent from older backends (derive it with
+   *  `accountAuth`). */
+  auth?: AuthMethod;
   oauth: ImapOauth | null;
   digest: DigestSettings;
   auto_scan: AutoScanSettings;
@@ -590,6 +593,7 @@ export interface ImapAccount {
   smart_min?: number;             // Smart: own row from N mails (default 10)
 }
 
+export type AuthMethod = "password" | "oauth";
 export type OauthProvider = "google" | "microsoft";
 
 // Never carries a token - just enough to render connect status and let

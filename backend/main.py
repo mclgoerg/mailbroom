@@ -398,7 +398,8 @@ def get_oauth_imap_callback(request: Request, code: str = Query(""),
     except Exception as exc:
         raise HTTPException(502, f"token exchange failed: {exc}")
     cfgmod.save_oauth(account, {"provider": provider, "client_id": client_id,
-                                "client_secret": client_secret, **tokens})
+                                "client_secret": client_secret, **tokens},
+                      use=True)
     logging.getLogger("pmc.oauth").info(
         "IMAP OAuth connected: account=%r provider=%s", account, provider)
     resp = RedirectResponse("/")
@@ -430,7 +431,7 @@ def post_oauth_imap_device_poll(account: str = Query(...),
     result = oauthflow.device_poll(device_code)
     if result["status"] == "complete":
         cfgmod.save_oauth(account, {k: v for k, v in result.items()
-                                    if k != "status"})
+                                    if k != "status"}, use=True)
         logging.getLogger("pmc.oauth").info(
             "IMAP OAuth connected: account=%r provider=microsoft (device "
             "code)", account)
@@ -1373,8 +1374,8 @@ def post_test_connection(account: str | None = Query(None)):
     """Onboarding helper: can we reach and log into the IMAP server?"""
     acc = _acc(account)
     im = cfgmod.account_imap(acc.name)
-    if not im["password"]:
-        raise HTTPException(400, "no password configured")
+    if not cfgmod.has_credentials(im):
+        raise HTTPException(400, "no credentials configured")
     try:
         conn = mailops.connect(im, acc.name)
         try:
