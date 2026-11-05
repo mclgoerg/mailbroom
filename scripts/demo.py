@@ -6,6 +6,9 @@ For screenshots and local poking without any real IMAP server:
       -v "$PWD":/repo ghcr.io/mclgoerg/mailbroom:latest \
       python /repo/scripts/demo.py
 
+`--empty` starts a fresh install with no account instead (first-run wizard;
+any host works, the password "demo" signs in).
+
 Two demo accounts ("proton", "icloud") with plausible senders, seeded AI
 verdicts/ratings and statistics, plus a long tail of small senders so the
 Smart tab has something to pool. Everything lives in a temp dir; nothing
@@ -69,6 +72,39 @@ sys.modules.setdefault("pytest", types.SimpleNamespace(fixture=_fixture))
 from conftest import FakeIMAP, make_msg          # noqa: E402
 from backend import (accounts, aihelper, bodyindex, knowledgestore, mailops,   # noqa: E402
                      rules, unsubstore, verdictstore)
+
+
+
+def _run_empty() -> None:
+    """`--empty`: a fresh install with NO account set up (for the first-run
+    wizard). Any host is accepted; the password "demo" signs in, anything
+    else is refused like a real server would, and the one mailbox behind it
+    is small."""
+    import imaplib
+    import uvicorn
+    from backend.main import app
+    inbox = [make_msg(i, frm=f'"Shop {i % 4}" <news{i % 4}@shop.example>',
+                      subject=f"Offer {i}") for i in range(1, 25)]
+    box = FakeIMAP({"INBOX": inbox, "Sent": [], "Trash": [], "Drafts": []})
+
+    def connect(im, name=None):
+        if not im.get("host") or not im.get("user") or not im.get("password"):
+            raise RuntimeError(mailops.coded(mailops.NO_ACCOUNT))
+        if im["password"] != "demo":
+            raise imaplib.IMAP4.error("[AUTHENTICATIONFAILED] Invalid "
+                                      "credentials")
+        return box
+    mailops.connect = connect
+    uvicorn.run(app, host="0.0.0.0", port=int(os.environ.get("DEMO_PORT", "8765")), log_level="warning")
+
+
+if "--empty" in sys.argv:
+    os.environ.update(IMAP_USER="", IMAP_PASSWORD="")
+    from backend import config as _cfg
+    _cfg.ENV_IMAP["user"] = _cfg.ENV_IMAP["password"] = ""
+    _cfg.DEFAULT_CONFIG["accounts"]["default"].update(user="", password="")
+    _run_empty()
+    raise SystemExit(0)
 
 random.seed(7)
 NOW = time.time()
@@ -638,4 +674,4 @@ for name in ("proton", "icloud"):
 if __name__ == "__main__":
     import uvicorn
     from backend.main import app
-    uvicorn.run(app, host="0.0.0.0", port=8765, log_level="warning")
+    uvicorn.run(app, host="0.0.0.0", port=int(os.environ.get("DEMO_PORT", "8765")), log_level="warning")

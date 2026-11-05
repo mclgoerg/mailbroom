@@ -806,14 +806,68 @@ export const EN: Record<string, string> = {
   "status.filter_none": "0 of {n} groups match",
   "status.filter_none_one": "0 of 1 group matches",
   "status.no_mails": "No mails found in the scanned folders.",
-  "onboard.title": "Welcome - three steps to a tidy mailbox",
-  "onboard.step_bridge":
-    "Pick your mail provider (Gmail, iCloud, Fastmail, … - or Proton "
-    + "via Proton Mail Bridge; see the README for provider notes and "
-    + "the Bridge Docker setup).",
-  "onboard.step_creds":
-    "Choose the provider preset and enter host, user and password "
-    + "(most providers need an app password) in",
+  "wizard.title": "Set up your mailbox",
+  "wizard.step": "Step {n} of {m}",
+  "wizard.later": "Set up later",
+  "wizard.cancel": "Cancel",
+  "wizard.back": "Back",
+  "wizard.next": "Next",
+  "wizard.skip": "Skip",
+  "wizard.s_provider": "Provider",
+  "wizard.s_signin": "Sign in",
+  "wizard.s_folders": "Folders",
+  "wizard.s_protect": "Protection",
+  "wizard.s_scan": "First scan",
+  "wizard.provider_help":
+    "Where does your mail live? Pick your provider - you can add more "
+    + "accounts later.",
+  "wizard.custom_help":
+    "Any mail server that speaks IMAP - enter its host, port and security "
+    + "below.",
+  "wizard.working": "Working…",
+  "wizard.scan_title_done": "Scan finished",
+  "preset.custom": "Custom (any IMAP server)",
+  "wizard.email": "Email address",
+  "wizard.new_name": "New account",
+  "wizard.pw_bridge": "Bridge password",
+  "wizard.pw_app": "App password",
+  "wizard.pw_plain": "Password",
+  "wizard.advanced": "Advanced connection settings",
+  "wizard.proton_cert":
+    "Proton Bridge uses a self-signed certificate: export it from Bridge "
+    + "(cert export), make it available inside this container and enter "
+    + "its path under the advanced settings (usually "
+    + "/certs/bridge-cert.pem).",
+  "wizard.test": "Test connection",
+  "wizard.testing": "Testing the connection…",
+  "wizard.test_ok": "Connected - {n} folders found.",
+  "wizard.oauth_needed": "Connect your account first, then test the connection.",
+  "wizard.folders_help":
+    "The ticked folders are scanned. The defaults skip Trash, Spam, Sent "
+    + "and Drafts.",
+  "wizard.protect_title": "Protect this page with a password",
+  "wizard.protect_help":
+    "Anyone who can open this page can read and delete your mail. Set a "
+    + "password now (recommended); you can change or remove it later in "
+    + "Settings.",
+  "wizard.pw_new": "New password",
+  "wizard.pw_repeat": "Repeat the password",
+  "wizard.pw_short": "Use at least 8 characters.",
+  "wizard.pw_mismatch": "The two passwords differ.",
+  "wizard.pw_set": "Set password",
+  "wizard.scan_title": "Reading your mailbox",
+  "wizard.scan_running": "Scanning… {progress}",
+  "wizard.scan_done": "All done - your mailbox is ready.",
+  "wizard.scan_failed": "The scan did not work",
+  "wizard.scan_again": "Try again",
+  "wizard.scan_bg": "Continue in the background",
+  "wizard.finish": "Show my mailbox",
+  "wizard.ai_note": "AI helpers are optional - you can set them up in Settings.",
+  "wizard.setup_text":
+    "Connect your mail account in a few steps: provider, sign-in, "
+    + "folders, then a first scan.",
+  "wizard.setup_btn": "Set up your mailbox",
+  "onboard.ready": "Ready for the first scan",
   "onboard.step_scan":
     "Hit Scan - nothing is ever deleted without your confirmation, and "
     + "deletions go to Trash first.",
@@ -1550,6 +1604,17 @@ export const EN: Record<string, string> = {
   "ferr.cafile_missing":
     "The certificate file {path} does not exist - clear the CA field in "
     + "Settings (normal providers need none) or mount the file there.",
+  "ferr.auth_failed":
+    "The server refused the sign-in - check the email address and the password (many providers need an app password).",
+  "ferr.host_unreachable":
+    "Could not reach {host} - check the host name, the port and your network.",
+  "ferr.tls_failed":
+    "The secure connection failed - check the security setting, the port and the certificate.",
+  "ferr.connect_failed":
+    "Could not connect to the server - check the settings and try again.",
+  "ferr.scan_failed":
+    "The scan failed unexpectedly - try again; if it keeps failing, check "
+    + "the server log.",
   "undo.from_junk": "{n} mails from Junk",
   "undo.from_junk_one": "1 mail from Junk",
   "undo.from_trash": "{n} mails from Trash",

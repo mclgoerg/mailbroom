@@ -684,14 +684,71 @@ export const DE: Record<string, string> = {
   "status.filter_none": "0 von {n} Gruppen passen",
   "status.filter_none_one": "0 von 1 Gruppe passt",
   "status.no_mails": "In den gescannten Ordnern wurden keine Mails gefunden.",
-  "onboard.title": "Willkommen - in drei Schritten zum sauberen Postfach",
-  "onboard.step_bridge":
-    "Mail-Anbieter wählen (Gmail, iCloud, Fastmail, … - oder Proton über "
-    + "die Proton Mail Bridge; Hinweise pro Anbieter und das "
-    + "Bridge-Docker-Setup stehen im README).",
-  "onboard.step_creds":
-    "Anbieter-Preset wählen und Host, Benutzer und Passwort eintragen "
-    + "(die meisten Anbieter brauchen ein App-Passwort) unter",
+  "wizard.title": "Postfach einrichten",
+  "wizard.step": "Schritt {n} von {m}",
+  "wizard.later": "Später einrichten",
+  "wizard.cancel": "Abbrechen",
+  "wizard.back": "Zurück",
+  "wizard.next": "Weiter",
+  "wizard.skip": "Überspringen",
+  "wizard.s_provider": "Anbieter",
+  "wizard.s_signin": "Anmelden",
+  "wizard.s_folders": "Ordner",
+  "wizard.s_protect": "Schutz",
+  "wizard.s_scan": "Erster Scan",
+  "wizard.provider_help":
+    "Wo liegt deine Post? Wähle deinen Anbieter – weitere Konten kannst "
+    + "du später hinzufügen.",
+  "wizard.custom_help":
+    "Jeder Mailserver, der IMAP spricht – trage unten Host, Port und "
+    + "Sicherheit ein.",
+  "wizard.working": "Einen Moment…",
+  "wizard.scan_title_done": "Scan abgeschlossen",
+  "preset.custom": "Eigener Server (beliebiges IMAP)",
+  "wizard.email": "E-Mail-Adresse",
+  "wizard.new_name": "Neues Konto",
+  "wizard.pw_bridge": "Bridge-Passwort",
+  "wizard.pw_app": "App-Passwort",
+  "wizard.pw_plain": "Passwort",
+  "wizard.advanced": "Erweiterte Verbindungseinstellungen",
+  "wizard.proton_cert":
+    "Proton Bridge nutzt ein selbst signiertes Zertifikat: exportiere es "
+    + "aus der Bridge (cert export), stelle es in diesem Container bereit "
+    + "und trage den Pfad unter den erweiterten Einstellungen ein "
+    + "(meist /certs/bridge-cert.pem).",
+  "wizard.test": "Verbindung testen",
+  "wizard.testing": "Verbindung wird getestet…",
+  "wizard.test_ok": "Verbunden – {n} Ordner gefunden.",
+  "wizard.oauth_needed":
+    "Verbinde zuerst dein Konto und teste dann die Verbindung.",
+  "wizard.folders_help":
+    "Die angehakten Ordner werden gescannt. Papierkorb, Spam, Gesendet "
+    + "und Entwürfe werden standardmäßig ausgelassen.",
+  "wizard.protect_title": "Diese Seite mit einem Passwort schützen",
+  "wizard.protect_help":
+    "Wer diese Seite öffnen kann, kann deine Mails lesen und löschen. "
+    + "Lege jetzt ein Passwort fest (empfohlen); du kannst es später in "
+    + "den Einstellungen ändern oder entfernen.",
+  "wizard.pw_new": "Neues Passwort",
+  "wizard.pw_repeat": "Passwort wiederholen",
+  "wizard.pw_short": "Nimm mindestens 8 Zeichen.",
+  "wizard.pw_mismatch": "Die beiden Passwörter unterscheiden sich.",
+  "wizard.pw_set": "Passwort setzen",
+  "wizard.scan_title": "Dein Postfach wird gelesen",
+  "wizard.scan_running": "Scan läuft… {progress}",
+  "wizard.scan_done": "Fertig – dein Postfach ist bereit.",
+  "wizard.scan_failed": "Der Scan hat nicht geklappt",
+  "wizard.scan_again": "Nochmal versuchen",
+  "wizard.scan_bg": "Im Hintergrund weitermachen",
+  "wizard.finish": "Mein Postfach anzeigen",
+  "wizard.ai_note":
+    "KI-Helfer sind optional – du kannst sie in den Einstellungen "
+    + "einrichten.",
+  "wizard.setup_text":
+    "Verbinde dein Mailkonto in wenigen Schritten: Anbieter, Anmeldung, "
+    + "Ordner, dann ein erster Scan.",
+  "wizard.setup_btn": "Postfach einrichten",
+  "onboard.ready": "Bereit für den ersten Scan",
   "onboard.step_scan":
     "Auf Scannen klicken - gelöscht wird nur nach Bestätigung, und "
     + "Löschungen landen zuerst im Papierkorb.",
@@ -1776,6 +1833,17 @@ export const DE: Record<string, string> = {
     "Die Zertifikatsdatei {path} existiert nicht – leere in den "
     + "Einstellungen das CA-Feld (normale Anbieter brauchen keins) oder "
     + "binde die Datei dort ein.",
+  "ferr.auth_failed":
+    "Der Server hat die Anmeldung abgelehnt – prüfe E-Mail-Adresse und Passwort (viele Anbieter verlangen ein App-Passwort).",
+  "ferr.host_unreachable":
+    "{host} ist nicht erreichbar – prüfe Hostnamen, Port und deine Netzwerkverbindung.",
+  "ferr.tls_failed":
+    "Die sichere Verbindung ist fehlgeschlagen – prüfe Sicherheitsoption, Port und Zertifikat.",
+  "ferr.connect_failed":
+    "Verbindung zum Server nicht möglich – prüfe die Einstellungen und versuche es erneut.",
+  "ferr.scan_failed":
+    "Der Scan ist unerwartet fehlgeschlagen – versuche es erneut; wenn es "
+    + "weiter scheitert, sieh im Server-Log nach.",
   "undo.from_junk": "{n} Mails aus Spam",
   "undo.from_junk_one": "1 Mail aus Spam",
   "undo.from_trash": "{n} Mails aus dem Papierkorb",

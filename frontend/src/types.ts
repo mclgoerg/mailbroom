@@ -668,6 +668,9 @@ export interface SharedAiCfg {
 
 export interface Config {
   accounts: Record<string, ImapAccount>;
+  /** No account has host, user and credentials yet (first run); absent
+   *  from older backends. */
+  setup_needed?: boolean;
   default_account: string;
   oauth_providers: OauthProvider[];
   oauth_ms_device_available: boolean;

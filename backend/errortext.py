@@ -92,6 +92,16 @@ TEXT: dict[str, str | tuple[str, str]] = {
         'No mail account is set up yet - open Settings and fill in the sign-in details first.',
     'cafile_missing':
         'The certificate file {path} does not exist - clear the CA field in Settings (normal providers need none) or mount the file there.',
+    'auth_failed':
+        'The server refused the sign-in - check the email address and the password (many providers need an app password).',
+    'host_unreachable':
+        'Could not reach {host} - check the host name, the port and your network.',
+    'tls_failed':
+        'The secure connection failed - check the security setting, the port and the certificate.',
+    'connect_failed':
+        'Could not connect to the server - check the settings and try again.',
+    'scan_failed':
+        'The scan failed unexpectedly - try again; if it keeps failing, check the server log.',
 }
 
 ROLE_NAMES = {"trash": "Trash", "junk": "Junk", "archive": "Archive"}

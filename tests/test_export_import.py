@@ -103,4 +103,6 @@ def test_test_connection_failure(monkeypatch):
         raise ConnectionRefusedError("nobody home")
     monkeypatch.setattr(mailops, "connect", boom)
     r = client.post("/api/test_connection", json={})
-    assert r.status_code == 502 and "nobody home" in r.json()["detail"]
+    assert r.status_code == 502
+    assert r.json()["detail"] == "host_unreachable:host=127.0.0.1"
+    assert "nobody home" not in r.text

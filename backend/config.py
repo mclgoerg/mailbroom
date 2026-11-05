@@ -551,6 +551,14 @@ def has_credentials(im: dict) -> bool:
     return bool(im.get("password"))
 
 
+def setup_needed(cfg: dict) -> bool:
+    """True while no account has a host, a user and something to sign in
+    with - a fresh install (its one `default` account is empty) or a new
+    tenant. Drives the first-run wizard."""
+    return not any(b.get("host") and b.get("user") and has_credentials(b)
+                   for b in cfg["accounts"].values())
+
+
 def _apply_imap(block: dict, imap_in: dict) -> None:
     """Fold a partial imap update into one account's block (in place)."""
     if isinstance(imap_in.get("role_overrides"), dict):
@@ -871,6 +879,7 @@ def masked_config(cfg: dict) -> dict:
                 "oauth": _mask_oauth(b.get("oauth"))}
             for n, b in cfg["accounts"].items()},
         "default_account": next(iter(cfg["accounts"])),
+        "setup_needed": setup_needed(cfg),
         "oauth_providers": list(oauthflow.PROVIDERS),
         "secret_key_set": secretbox.enabled(),
         "oauth_ms_device_available": oauthflow.has_shared_microsoft_client(),

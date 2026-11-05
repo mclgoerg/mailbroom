@@ -49,7 +49,7 @@ function nest(items: FolderInfo[]):
 }
 
 export function FolderSettings({ account, data, included, setIncluded,
-  wildcards, setWildcards, reload }: {
+  wildcards, setWildcards, reload, simple = false }: {
   /** The account being edited (not necessarily the active one): every
    *  call below is pinned to it. */
   account: string;
@@ -60,6 +60,9 @@ export function FolderSettings({ account, data, included, setIncluded,
   setWildcards: (next: string[]) => void;
   /** Re-read the folder list (after a choice or a move). */
   reload: () => void;
+  /** The wizard's view: just the folders to scan - no exclusion-rule chips,
+   *  no special-folder block (the rules themselves are kept as they are). */
+  simple?: boolean;
 }) {
   const toast = useToast();
   const [busy, setBusy] = useState(false);
@@ -162,7 +165,7 @@ export function FolderSettings({ account, data, included, setIncluded,
           <span className="type-meta text-muted">{t("folders.none")}</span>
         )}
       </div>
-      {wildcards.length > 0 && (
+      {!simple && wildcards.length > 0 && (
         <div className="mt-2 flex flex-wrap items-center gap-1.5
           border-t border-line pt-2 type-meta text-muted">
           {t("Excluded by rule:")}
@@ -180,7 +183,7 @@ export function FolderSettings({ account, data, included, setIncluded,
         </div>
       )}
 
-      {(roles.length > 0 || views.length > 0) && (
+      {!simple && (roles.length > 0 || views.length > 0) && (
         <div className="mt-3 border-t border-line pt-3">
           <SectionLabel>{t("folders.special")}</SectionLabel>
           <p className="mt-0.5 type-meta text-muted">
