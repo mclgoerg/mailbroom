@@ -217,6 +217,6 @@ def test_unsubscribe_dispatch(bridge, monkeypatch):
 
 def test_ssrf_guard(monkeypatch):
     monkeypatch.setattr(unsub.socket, "getaddrinfo",
-                        lambda host, port: [(2, 1, 6, "", ("10.0.0.5", 0))])
+                        lambda *a, **k: [(2, 1, 6, "", ("10.0.0.5", 0))])
     with pytest.raises(RuntimeError, match="non-public"):
-        unsub._assert_public_host("https://internal.example/u")
+        unsub._post_one_click("https://internal.example/u")

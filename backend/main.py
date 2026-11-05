@@ -78,7 +78,26 @@ class _RedactKnowledgeKeys(logging.Filter):
         return True
 
 
+class _DropHealthcheck(logging.Filter):
+    """The Docker HEALTHCHECK probes GET /api/auth from inside the
+    container every minute; that access line is noise. Only the access
+    log is filtered, and only for loopback clients."""
+
+    PATH = "/api/auth"
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        args = record.args
+        # uvicorn: (client, method, path, http version, status)
+        if isinstance(args, tuple) and len(args) >= 3 \
+                and args[1] == "GET" and args[2] == self.PATH \
+                and isinstance(args[0], str) \
+                and args[0].rsplit(":", 1)[0] in ("127.0.0.1", "::1"):
+            return False
+        return True
+
+
 logging.getLogger("uvicorn.access").addFilter(_RedactKnowledgeKeys())
+logging.getLogger("uvicorn.access").addFilter(_DropHealthcheck())
 
 from contextlib import asynccontextmanager
 
@@ -114,8 +133,18 @@ async def _lifespan(app: FastAPI):
     autoscanmod.start_scheduler()
     yield
 
-app = FastAPI(title="mailbroom", docs_url=None, redoc_url=None,
-              lifespan=_lifespan)
+def _app_version() -> str:
+    """The release version (version.txt at the repo / image root)."""
+    try:
+        v = (Path(__file__).resolve().parent.parent
+             / "version.txt").read_text().strip()
+    except OSError:
+        return "0.0.0-dev"
+    return v or "0.0.0-dev"
+
+
+app = FastAPI(title="mailbroom", version=_app_version(),
+              docs_url=None, redoc_url=None, lifespan=_lifespan)
 
 
 @app.exception_handler(RequestValidationError)
@@ -1407,7 +1436,7 @@ def post_test_connection(account: str | None = Query(None)):
     try:
         conn = mailops.connect(im, acc.name)
         try:
-            n = len(mailops.list_folders(conn))
+            n = len(mailops.selectable_folders(conn))
         finally:
             try:
                 conn.logout()
@@ -1427,7 +1456,8 @@ def get_folders(account: str | None = Query(None)):
         conn = mailops.connect(cfgmod.account_imap(acc.name), acc.name)
         try:
             pairs = mailops.list_folders_ex(conn)
-            names = [n for n, _ in pairs]
+            hidden = mailops.unselectable(pairs=pairs)
+            names = [n for n, _ in pairs if n not in hidden]
             found = mailops.resolve_roles(conn, acc, pairs=pairs)
             acc.folder_roles.update(found["roles"])
             roles = found["roles"]
@@ -1772,6 +1802,10 @@ if STATIC_DIR.is_dir():
 
     @app.get("/{path:path}", include_in_schema=False)
     def spa(path: str):
+        # An unknown API path must be a real 404, not the HTML shell with
+        # a 200 - clients and probes would otherwise take it for success.
+        if path == "api" or path.startswith("api/"):
+            raise HTTPException(404, "not found")
         # Containment check: `path` is percent-decoded and may contain ../ or
         # be absolute (pathlib discards the left side then) - never serve
         # anything that resolves outside the static dir. CodeQL's
