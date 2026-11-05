@@ -57,6 +57,9 @@ def test_the_first_api_call_answers_with_the_coded_error(unwritable, monkeypatch
     r = client.get("/api/auth")
     assert r.status_code == 503
     assert r.json() == {"detail": mailops.DATA_NOT_WRITABLE}
+    # the security-header middleware stays outermost: its headers are on
+    # this answer too
+    assert r.headers["x-frame-options"] == "DENY"
 
 
 def test_a_permission_error_with_a_writable_folder_stays_a_failure(monkeypatch):
