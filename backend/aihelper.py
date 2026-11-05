@@ -315,6 +315,12 @@ def _run_ai(grouping: str, acc=None, keys: set[str] | None = None,
                                 verdict = "review"
                             rec["ai"] = {"verdict": verdict,
                                          "reason": v["reason"][:160]}
+                            if grouping == "sender":
+                                # A one-sender Smart row shows its verdict.
+                                own = STATE["groups"].get("smart", {}).get(
+                                    f"s:{rec['key']}")
+                                if own is not None and own.get("ai") is None:
+                                    own["ai"] = dict(rec["ai"])
                             stored = dict(rec["ai"])
                             if "fp" in rec:        # pooled row: see verdictstore
                                 stored["fp"] = rec["fp"]

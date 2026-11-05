@@ -113,7 +113,12 @@ def apply_to_groups(groups: dict, account: str | None = None) -> int:
     Pooled rows (smart grouping) carry a fingerprint `fp` of their member
     senders, stored next to the verdict: a verdict made on different
     members is dropped - a bucket must never inherit a rating given to
-    other senders."""
+    other senders.
+
+    A Smart row that stands for exactly ONE sender (`s:<addr>`, no `fp`)
+    is that sender: without a verdict of its own it shows the sender's
+    verdict from the Sender grouping (live groups first, then the cache).
+    Pooled rows never borrow."""
     data = load_account(account)
     applied = 0
     stale: dict[str, list[str]] = {}
@@ -121,6 +126,11 @@ def apply_to_groups(groups: dict, account: str | None = None) -> int:
         cached = data.get(grouping) or {}
         for key, rec in recs.items():
             v = cached.get(key)
+            if not v and grouping == "smart" and key.startswith("s:") \
+                    and rec.get("fp") is None and rec.get("ai") is None:
+                addr = key[2:]
+                live = (groups.get("sender") or {}).get(addr) or {}
+                v = live.get("ai") or (data.get("sender") or {}).get(addr)
             if not v:
                 continue
             if rec.get("fp") is not None and v.get("fp") != rec["fp"]:

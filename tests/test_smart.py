@@ -961,6 +961,42 @@ def test_fingerprint_unit_apply_to_groups():
     assert verdictstore.apply_to_groups({"sender": {"a@b.c": plain}}) == 1
 
 
+def test_a_one_sender_smart_row_shows_the_sender_verdict(tail, monkeypatch):
+    cfgmod.update_config({"ai": {"api_key": "k"}})
+    _fake_ai(monkeypatch, [], verdict="review")
+    assert smart_state()["s:big@bigshop.example"]["ai"] is None
+    aihelper._run_ai("sender", keys={"big@bigshop.example"})
+    own = mailops.STATE["groups"]["smart"]["s:big@bigshop.example"]
+    assert own["ai"]["verdict"] == "review"           # live, no rescan
+    # nothing was stored for the Smart row itself; a rescan still shows it
+    assert "s:big@bigshop.example" not in \
+        verdictstore.load_account("default").get("smart", {})
+    mailops.run_scan()
+    assert smart_state()["s:big@bigshop.example"]["ai"]["verdict"] == "review"
+    # pooled rows never borrow from the senders inside them
+    assert all(r["ai"] is None for k, r in smart_state().items()
+               if not k.startswith("s:"))
+
+
+def test_unit_smart_own_rows_borrow_pools_do_not():
+    verdictstore.save("sender", {"a@b.example": {"verdict": "keep",
+                                                 "reason": "r"}})
+    own = {"key": "s:a@b.example", "ai": None}
+    pool = {"key": "k:a@b.example", "ai": None, "fp": "aaaa"}
+    fp_row = {"key": "s:a@b.example", "ai": None, "fp": "aaaa"}
+    mine = {"key": "s:c@d.example", "ai": {"verdict": "review", "reason": "x"}}
+    verdictstore.save("sender", {"c@d.example": {"verdict": "keep",
+                                                 "reason": "r"}})
+    assert verdictstore.apply_to_groups(
+        {"smart": {"s:a@b.example": own, "k:a@b.example": pool,
+                   "s:c@d.example": mine}}) == 1
+    assert verdictstore.apply_to_groups(
+        {"smart": {"s:a@b.example": fp_row}}) == 0     # a pooled row
+    assert own["ai"] == {"verdict": "keep", "reason": "r"}
+    assert pool["ai"] is None and fp_row["ai"] is None
+    assert mine["ai"]["verdict"] == "review"          # an own verdict wins
+
+
 def test_threshold_change_keeps_verdicts_of_unchanged_pools(tail, monkeypatch):
     cfgmod.update_config({"ai": {"api_key": "k"}})
     _fake_ai(monkeypatch, [])
