@@ -1043,6 +1043,10 @@ def test_unit_smart_own_rows_borrow_pools_do_not():
     assert own["ai"] == {"verdict": "keep", "reason": "r"}
     assert pool["ai"] is None and fp_row["ai"] is None
     assert mine["ai"]["verdict"] == "review"          # an own verdict wins
+    # a borrowed verdict whose sender has none (any more) is cleared
+    stale = {"key": "s:e@f.example", "ai": {"verdict": "keep", "reason": "x"}}
+    verdictstore.apply_to_groups({"smart": {"s:e@f.example": stale}})
+    assert stale["ai"] is None
 
 
 def test_threshold_change_keeps_verdicts_of_unchanged_pools(tail, monkeypatch):
