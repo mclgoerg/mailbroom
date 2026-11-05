@@ -102,6 +102,13 @@ logging.getLogger("uvicorn.access").addFilter(_DropHealthcheck())
 from contextlib import asynccontextmanager
 
 
+def _sync_session_epoch() -> None:
+    """Login settings changed in the environment while we were down (a
+    rotated AUTH_PASSWORD, a new OIDC_ALLOWED, ...): end old sessions."""
+    authmod.sync_epoch(cfgmod.auth_fingerprint(
+        cfgmod.load_server()["auth"]))
+
+
 def _log_accepted_hosts() -> None:
     """Startup note in no-login mode: the Host names the guard accepts."""
     if cfgmod.load_server()["auth"]["mode"] == "none":
@@ -136,6 +143,8 @@ async def _lifespan(app: FastAPI):
             "are stored in plaintext in /data (they would be readable in "
             "volume backups). Generate a key with `openssl rand -base64 32` "
             "and keep it OUT of the backups.")
+    authmod.sync_epoch(cfgmod.auth_fingerprint(
+        cfgmod.load_server()["auth"]))
     _log_accepted_hosts()
     _warn_open_oidc()
     # Show the last scan of every tenant's accounts right away instead of
@@ -1764,12 +1773,12 @@ def get_config():
 
 
 def _keep_caller_signed_in(request: Request, response: Response,
-                           old_sub: str | None, epoch_before: str) -> None:
-    """After a sign-out of everyone (new epoch) the person who did it keeps
-    their own browser signed in: a fresh cookie for the identity that fits
-    the CURRENT mode (a password session has no identity in SSO mode)."""
-    if authmod.current_epoch() == epoch_before:
-        return
+                           old_sub: str | None) -> None:
+    """After THIS request signed everyone out (new epoch) the person who did
+    it keeps their own browser signed in: a fresh cookie for the identity
+    that fits the CURRENT mode (a password session has no identity in SSO
+    mode). Never called for a request that merely overlapped someone else's
+    change."""
     mode = cfgmod.load_server()["auth"]["mode"]
     if mode == "password":
         sub = "password"
@@ -1786,16 +1795,16 @@ def post_sign_out_all(request: Request, response: Response):
     caller's own browser gets a fresh one)."""
     if not cfgmod.is_admin():
         raise HTTPException(403, "admin only")
-    old_sub, before = _session_sub(request), authmod.current_epoch()
+    old_sub = _session_sub(request)
     authmod.renew_epoch()
     logging.getLogger("pmc.auth").info("all sessions signed out")
-    _keep_caller_signed_in(request, response, old_sub, before)
+    _keep_caller_signed_in(request, response, old_sub)
     return {"ok": True}
 
 
 @app.post("/api/config")
 def post_config(body: dict, request: Request, response: Response):
-    old_sub, epoch_before = _session_sub(request), authmod.current_epoch()
+    old_sub = _session_sub(request)
     if body.get("reset_ai_stats"):
         cfgmod.reset_stats()
     if body.get("clear_ai_verdicts"):
@@ -1852,7 +1861,8 @@ def post_config(body: dict, request: Request, response: Response):
     # Own-row threshold or protected list changed -> smart rows re-derive
     # (no-op otherwise, so unrelated saves never reshuffle the list).
     mailops.rebuild_smart_all()
-    _keep_caller_signed_in(request, response, old_sub, epoch_before)
+    if cfgmod.sessions_renewed():
+        _keep_caller_signed_in(request, response, old_sub)
     return cfgmod.masked_config(cfg)
 
 

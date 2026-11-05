@@ -125,14 +125,102 @@ def test_sign_out_all():
     assert other.get("/api/state").status_code == 401
 
 
-def test_sign_out_all_is_admin_only_and_locked_without_a_session(monkeypatch):
-    _password_mode()
+def test_sign_out_all_is_admin_only_and_locked_without_a_session():
+    cfgmod.update_config({"auth": {"mode": "oidc", "admin": "me@corp.example",
+                                   "oidc": {**OIDC, "allowed": [
+                                       "me@corp.example",
+                                       "user@corp.example"]}}})
     assert TestClient(app).post("/api/auth/sign_out_all").status_code == 401
+    admin = authmod.make_session("me@corp.example")
+    user = authmod.make_session("user@corp.example")
+    r = _cookie_client(user).post("/api/auth/sign_out_all")
+    assert r.status_code == 403                        # a real tenant, not admin
+    assert _ok(admin) and _ok(user)
+    assert _cookie_client(admin).post("/api/auth/sign_out_all").status_code \
+        == 200
+    assert not _ok(user)
+
+
+def test_only_the_request_that_caused_the_renewal_gets_a_cookie(monkeypatch):
+    """A signed-in user's harmless save that overlaps someone else's
+    password change must not be handed a fresh cookie."""
+    _password_mode()
     a = _login()
-    other = _login()
-    monkeypatch.setattr(cfgmod, "is_admin", lambda: False)
-    assert a.post("/api/auth/sign_out_all").status_code == 403
-    assert other.get("/api/state").status_code == 200
+    real = cfgmod.update_config
+
+    def overlapping(body):
+        authmod.renew_epoch()                          # someone else, meanwhile
+        return real(body)
+
+    monkeypatch.setattr(cfgmod, "update_config", overlapping)
+    r = a.post("/api/config", json={"smart_min": 3})
+    assert r.status_code == 200
+    assert "set-cookie" not in r.headers
+    assert a.get("/api/state").status_code == 401
+
+
+def test_oidc_issuer_and_client_changes_sign_everyone_out():
+    cfgmod.update_config({"auth": {"mode": "oidc", "admin": "me@corp.example",
+                                   "oidc": OIDC}})
+    tok = authmod.make_session("me@corp.example")
+    cfgmod.update_config({"auth": {"oidc": {"issuer": "https://idp2.example"}}})
+    assert not _ok(tok)
+    tok = authmod.make_session("me@corp.example")
+    cfgmod.update_config({"auth": {"oidc": {"client_id": "other"}}})
+    assert not _ok(tok)
+
+
+def _env_login(monkeypatch, password):
+    monkeypatch.setenv("AUTH_MODE", "password")
+    monkeypatch.setenv("AUTH_PASSWORD", password)
+    monkeypatch.setattr(cfgmod, "_ENV_AUTH_CACHE", None)
+
+
+def test_rotating_the_env_password_ends_old_sessions_at_startup(monkeypatch):
+    from backend import main
+    _env_login(monkeypatch, "first")
+    main._sync_session_epoch()                         # first start: records
+    c = _login("first")
+    assert c.get("/api/state").status_code == 200
+    # restart with the same settings: sessions survive (stable env hash)
+    monkeypatch.setattr(cfgmod, "_ENV_AUTH_CACHE", None)
+    main._sync_session_epoch()
+    assert c.get("/api/state").status_code == 200
+    # .env edited + restart
+    _env_login(monkeypatch, "second")
+    main._sync_session_epoch()
+    assert c.get("/api/state").status_code == 401
+    assert _login("second").get("/api/state").status_code == 200
+
+
+def test_env_allow_list_change_ends_old_sessions_at_startup(monkeypatch):
+    from backend import main
+    monkeypatch.setenv("AUTH_MODE", "oidc")
+    monkeypatch.setenv("OIDC_ISSUER", "https://idp.example")
+    monkeypatch.setenv("OIDC_CLIENT_ID", "app")
+    monkeypatch.setenv("OIDC_CLIENT_SECRET", "sst")
+    monkeypatch.setenv("OIDC_ADMIN", "me@corp.example")
+    monkeypatch.setenv("OIDC_ALLOWED", "me@corp.example,b@corp.example")
+    monkeypatch.setattr(cfgmod, "_ENV_AUTH_CACHE", None)
+    main._sync_session_epoch()
+    tok = authmod.make_session("b@corp.example")
+    assert _ok(tok)
+    monkeypatch.setenv("OIDC_ALLOWED", "me@corp.example")
+    monkeypatch.setattr(cfgmod, "_ENV_AUTH_CACHE", None)
+    main._sync_session_epoch()
+    assert not _ok(tok)
+
+
+@pytest.mark.parametrize("content", [b"\xff\xfe\x00bad", b"abc.def", b"short",
+                                     b"", b"G" * 16])
+def test_a_damaged_epoch_file_is_replaced_not_a_500(content):
+    _password_mode()
+    authmod._epoch_path().write_bytes(content)
+    c = TestClient(app, raise_server_exceptions=True)
+    assert c.post("/api/login", json={"password": "s3cret"}).status_code == 200
+    assert c.get("/api/state").status_code == 200
+    assert len(authmod._epoch_path().read_text()) == 16
+    assert c.post("/api/config", json={"smart_min": 3}).status_code == 200
 
 
 def test_logout_is_stateless():

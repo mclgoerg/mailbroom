@@ -15,6 +15,7 @@ import hmac
 import json
 import logging
 import os
+import re
 import secrets
 import time
 import urllib.parse
@@ -78,8 +79,8 @@ def _persist_secret(secret: bytes) -> None:
 
 # ------------------------------------------------------------ passwords
 
-def hash_password(password: str) -> str:
-    salt = secrets.token_bytes(16)
+def hash_password(password: str, salt: bytes | None = None) -> str:
+    salt = salt or secrets.token_bytes(16)
     dk = hashlib.scrypt(password.encode(), salt=salt,
                         n=2 ** 14, r=8, p=1, dklen=32)
     return f"scrypt${salt.hex()}${dk.hex()}"
@@ -121,15 +122,18 @@ def _new_epoch() -> str:
     return secrets.token_hex(8)
 
 
+_EPOCH_RE = re.compile(r"[0-9a-f]{16}\Z")
+
+
 def current_epoch() -> str:
     path = _epoch_path()
     try:
         value = path.read_text().strip()
-    except OSError:
-        value = ""
-    if value:
-        return value
-    return renew_epoch() if path not in _epoch_mem else _epoch_mem[path]
+    except OSError:                        # missing (or never writable)
+        return _epoch_mem[path] if path in _epoch_mem else renew_epoch()
+    except ValueError:                     # not text: garbage
+        return renew_epoch()
+    return value if _EPOCH_RE.match(value) else renew_epoch()
 
 
 def renew_epoch() -> str:
@@ -145,6 +149,30 @@ def renew_epoch() -> str:
         log.exception("could not persist the session epoch - sign-out "
                       "of all sessions will not survive a restart")
     return value
+
+
+def sync_epoch(fingerprint: str) -> bool:
+    """Renew the epoch when the effective login settings differ from the
+    ones the stored fingerprint was taken from (a password rotated in the
+    environment, a changed allow-list, ...). The first call only records
+    the fingerprint. True when the epoch was renewed."""
+    path = _epoch_path().with_name("session_auth_fp")
+    try:
+        stored = path.read_text().strip()
+    except (OSError, ValueError):
+        stored = ""
+    if stored == fingerprint:
+        return False
+    renewed = bool(stored)
+    if renewed:
+        renew_epoch()
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(fingerprint)
+        path.chmod(0o600)
+    except OSError:
+        log.exception("could not persist the login fingerprint")
+    return renewed
 
 
 def make_session(sub: str, now: float | None = None,
