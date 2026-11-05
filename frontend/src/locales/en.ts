@@ -91,6 +91,15 @@ export const EN: Record<string, string> = {
   "login.oidc_allowed_help":
     "Empty list = every account your identity provider signs in may use "
     + "the app. With entries, only those emails/subjects get in.",
+  "login.oidc_open_warn":
+    "The allowed-users list is empty: anyone with an account at your "
+    + "identity provider can sign in and gets their own workspace.",
+  "login.oidc_noadmin_warn":
+    "No admin is set: the first identity to sign in becomes the admin and "
+    + "owns the server settings.",
+  "login.err.email_unverified":
+    "Sign-in refused: your identity provider has not verified this email "
+    + "address.",
   "login.submit": "Sign in",
   "login.sso": "Sign in with SSO",
   "login.logout": "Logout",

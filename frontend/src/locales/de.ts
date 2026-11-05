@@ -904,6 +904,16 @@ export const DE: Record<string, string> = {
     "Leere Liste = jedes Konto, das der Identity Provider anmeldet, darf "
     + "die App nutzen. Mit Einträgen kommen nur diese E-Mails/Subjects "
     + "hinein.",
+  "login.oidc_open_warn":
+    "Die Liste erlaubter Nutzer ist leer: Jeder mit einem Konto bei deinem "
+    + "Identity Provider kann sich anmelden und bekommt einen eigenen "
+    + "Arbeitsbereich.",
+  "login.oidc_noadmin_warn":
+    "Es ist kein Admin gesetzt: Die erste Identität, die sich anmeldet, "
+    + "wird Admin und verwaltet die Server-Einstellungen.",
+  "login.err.email_unverified":
+    "Anmeldung abgelehnt: Dein Identity Provider hat diese E-Mail-Adresse "
+    + "nicht bestätigt.",
   "login.submit": "Anmelden",
   "login.sso": "Mit SSO anmelden",
   "login.logout": "Abmelden",

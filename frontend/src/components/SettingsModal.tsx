@@ -1,5 +1,5 @@
-import { Check, RefreshCw, Settings as SettingsIcon, Shield, Star, X }
-  from "lucide-react";
+import { Check, RefreshCw, Settings as SettingsIcon, Shield, Star,
+  TriangleAlert, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { api, downloadFile, fmtUsd } from "../api";
 import { getLang, setLang, t, type Lang } from "../i18n";
@@ -11,7 +11,7 @@ import { FolderSettings } from "./FolderSettings";
 import { IndexPanel } from "./IndexPanel";
 import { KnowledgeSettings } from "./KnowledgeSettings";
 import { Button, Checkbox, confirmDialog, Field, Input, LINK_ACCENT, Loading,
-  Modal, PanelHeader, promptDialog, SectionLabel, Segmented, Select, Spinner,
+  Modal, Notice, PanelHeader, promptDialog, SectionLabel, Segmented, Select, Spinner,
   Tag, tabPanelProps, TextArea, useMediaQuery } from "./ui";
 
 /* Provider presets only PREFILL the connection fields - everything stays
@@ -1058,6 +1058,14 @@ export function SettingsModal({ cfg, account, onClose, onSaved,
                 <p className="mt-1 type-meta text-muted">
                   {t("login.oidc_allowed_help")}
                 </p>
+                {(!f.oidcAllowed.trim() || !f.oidcAdmin.trim()) && (
+                  <Notice tone="warn" className="mt-2"
+                    icon={<TriangleAlert size={16} />}>
+                    {[!f.oidcAllowed.trim() && t("login.oidc_open_warn"),
+                      !f.oidcAdmin.trim() && t("login.oidc_noadmin_warn"),
+                    ].filter(Boolean).join(" ")}
+                  </Notice>
+                )}
               </div>
             </>
           )}

@@ -197,3 +197,63 @@ def test_env_bootstrap_password_mode(monkeypatch):
         monkeypatch.delenv("AUTH_MODE")
         monkeypatch.delenv("AUTH_PASSWORD")
         importlib.reload(cfg2)
+
+
+def test_unverified_email_is_refused():
+    ok = {"email": "a@b.c", "sub": "u1"}
+    assert authmod.allowed_subject({**ok, "email_verified": True}, []) == "a@b.c"
+    assert authmod.allowed_subject(ok, []) == "a@b.c"          # claim missing
+    assert authmod.allowed_subject({**ok, "email_verified": False}, []) is None
+    assert authmod.allowed_subject({**ok, "email_verified": "false"}, []) is None
+    assert authmod.allowed_subject({**ok, "email_verified": "FALSE"}, []) is None
+    assert authmod.allowed_subject({**ok, "email_verified": "true"}, []) == "a@b.c"
+    # the allow-list still decides for verified identities
+    assert authmod.allowed_subject({**ok, "email_verified": True},
+                                   ["a@b.c"]) == "a@b.c"
+    assert authmod.allowed_subject({**ok, "email_verified": True},
+                                   ["x@y.z"]) is None
+
+
+def test_oidc_callback_unverified_email_lands_on_login_page(monkeypatch):
+    import urllib.parse
+    r = client.post("/api/config", json={"auth": {
+        "mode": "oidc", "admin": "me@corp.example",
+        "oidc": {"issuer": "https://idp.example", "client_id": "mailbroom",
+                 "client_secret": "sst", "allowed": []}}})
+    assert r.status_code == 200
+    monkeypatch.setattr(authmod, "discovery", lambda issuer: {
+        "authorization_endpoint": "https://idp.example/authorize",
+        "token_endpoint": "https://idp.example/token",
+        "userinfo_endpoint": "https://idp.example/userinfo"})
+    c = TestClient(app)
+    loc = c.get("/api/oidc/login", follow_redirects=False).headers["location"]
+    q = urllib.parse.quote(loc.split("state=")[1].split("&")[0])
+    monkeypatch.setattr(authmod, "exchange_code",
+                        lambda cfg, redirect, code, verifier="":
+                        {"email": "me@corp.example", "sub": "u1",
+                         "email_verified": False})
+    r = c.get(f"/api/oidc/callback?code=abc&state={q}", follow_redirects=False)
+    assert r.status_code in (302, 307)
+    assert r.headers["location"] == "/?login_error=email_unverified"
+    assert "pmc_session" not in r.cookies
+    assert c.get("/api/state").status_code == 401
+
+
+def test_startup_warns_about_open_oidc(caplog):
+    from backend import main
+    client.post("/api/config", json={"auth": {
+        "mode": "oidc",
+        "oidc": {"issuer": "https://idp.example", "client_id": "mailbroom",
+                 "client_secret": "sst", "allowed": []}}})
+    with caplog.at_level("WARNING", logger="pmc.auth"):
+        main._warn_open_oidc()
+    text = caplog.text
+    assert "allow-list is empty" in text and "no SSO admin" in text
+    caplog.clear()
+    server = cfgmod.load_server()
+    server["auth"]["admin"] = "me@corp.example"
+    server["auth"]["oidc"]["allowed"] = ["me@corp.example"]
+    cfgmod.save_server(server)
+    with caplog.at_level("WARNING", logger="pmc.auth"):
+        main._warn_open_oidc()
+    assert caplog.text == ""
