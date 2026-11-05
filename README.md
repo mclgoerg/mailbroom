@@ -427,8 +427,9 @@ in the UI; they persist in `/data`. Env bootstrap for other providers:
 > Remember that Docker published ports bypass ufw.
 >
 > Changing the password, the login method, the allowed users, the admin or
-> the identity provider (also via `.env` + restart) signs every browser out (as does Settings → Server → *Sign out all
-> sessions*). Logging out only clears that browser's cookie.
+> the identity provider (also via `.env` + restart) signs every browser
+> out, as does Settings → Server → *Sign out all sessions*. Logging out
+> only clears that browser's cookie.
 >
 > Without a login, Mailbroom also refuses requests whose `Host` is not
 > `localhost` or an IP address (protection against DNS rebinding). To open

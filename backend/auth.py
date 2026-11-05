@@ -175,6 +175,11 @@ def sync_epoch(fingerprint: str) -> bool:
     return renewed
 
 
+def keyed_digest(data: bytes) -> str:
+    """HMAC of `data` under the session secret (domain-separated)."""
+    return hmac.new(_secret(), b"login-fp:" + data, hashlib.sha256).hexdigest()
+
+
 def make_session(sub: str, now: float | None = None,
                  epoch: str | None = None) -> str:
     exp = int((now or time.time()) + SESSION_MAX_AGE)

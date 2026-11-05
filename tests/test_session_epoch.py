@@ -182,7 +182,7 @@ def test_rotating_the_env_password_ends_old_sessions_at_startup(monkeypatch):
     main._sync_session_epoch()                         # first start: records
     c = _login("first")
     assert c.get("/api/state").status_code == 200
-    # restart with the same settings: sessions survive (stable env hash)
+    # restart with the same settings: sessions survive
     monkeypatch.setattr(cfgmod, "_ENV_AUTH_CACHE", None)
     main._sync_session_epoch()
     assert c.get("/api/state").status_code == 200
@@ -229,3 +229,36 @@ def test_logout_is_stateless():
     other = _login()
     assert a.post("/api/logout").status_code == 200
     assert other.get("/api/state").status_code == 200
+
+
+def test_two_installs_with_the_same_env_password_store_different_data(
+        monkeypatch, tmp_path):
+    """No deterministic password hash and no offline-checkable fingerprint
+    is ever persisted."""
+    import json
+    from backend import main
+    _env_login(monkeypatch, "hunter2")
+    out = []
+    for name in ("one", "two"):
+        d = tmp_path / name
+        d.mkdir()
+        monkeypatch.setattr(cfgmod, "SERVER_PATH", d / "server.json")
+        monkeypatch.setattr(authmod, "SESSION_SECRET_PATH", d / "secret")
+        monkeypatch.setattr(authmod, "_secret_cache", None)
+        monkeypatch.setattr(cfgmod, "_ENV_AUTH_CACHE", None)
+        cfgmod.save_server(cfgmod.load_server())   # any server-settings save
+        main._sync_session_epoch()
+        out.append((json.loads((d / "server.json").read_text())
+                    ["auth"]["password_hash"],
+                    (d / "session_auth_fp").read_text()))
+    assert out[0][0] != out[1][0]
+    assert out[0][1] != out[1][1]
+
+
+def test_the_fingerprint_needs_the_session_secret(monkeypatch):
+    _password_mode()
+    acfg = cfgmod.load_server()["auth"]
+    fp = cfgmod.auth_fingerprint(acfg)
+    assert fp == cfgmod.auth_fingerprint(acfg)
+    monkeypatch.setattr(authmod, "_secret_cache", b"another secret" * 3)
+    assert cfgmod.auth_fingerprint(acfg) != fp
