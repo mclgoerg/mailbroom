@@ -1763,3 +1763,21 @@ if STATIC_DIR.is_dir():
         # showing a stale shell (and stale hashed bundle) indefinitely.
         return FileResponse(_STATIC_ROOT / "index.html",
                              headers={"Cache-Control": "no-cache"})
+
+
+_SECURITY_HEADERS = {
+    "X-Frame-Options": "DENY",
+    "Content-Security-Policy": "frame-ancestors 'none'",
+    "X-Content-Type-Options": "nosniff",
+    "Referrer-Policy": "same-origin",
+}
+
+
+# Registered last = outermost, so it also covers the 401/403 answers other
+# middleware return without calling the app.
+@app.middleware("http")
+async def _security_headers(request: Request, call_next):
+    resp = await call_next(request)
+    for name, value in _SECURITY_HEADERS.items():
+        resp.headers[name] = value
+    return resp
