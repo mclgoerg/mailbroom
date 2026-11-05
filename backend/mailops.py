@@ -150,8 +150,11 @@ CONNECT_FAILED = "connect_failed"
 SCAN_FAILED = "scan_failed"
 # the data folder (/data) cannot be written - see data_dir_problem()
 DATA_NOT_WRITABLE = "data_not_writable"
+# a move without MOVE/UIDPLUS found mail another client had flagged \Deleted
+# in the source folder: not purged; folder= the destination (copies remain)
+MOVE_FOREIGN_DELETED = "move_foreign_deleted"
 FOLDER_ERROR_CODES = frozenset({
-    MAILTO_UNSAFE,
+    MAILTO_UNSAFE, MOVE_FOREIGN_DELETED,
     NO_MESSAGE_ID, PINNED_MAILS, PROTECTED_MAILS, ALL_PINNED,
     ROLE_NOT_CANDIDATE, ROLE_AMBIGUOUS, NOT_LOOKALIKE, MOVE_UNSAFE,
     BUSY_ACTION,
@@ -930,10 +933,51 @@ def _uid_move(conn, uidstr: str, dest: str) -> bool:
         return False
     conn.uid("STORE", uidstr, "+FLAGS", r"(\Deleted)")
     try:
-        conn.uid("EXPUNGE", uidstr)          # UIDPLUS: only our UIDs
+        status, _ = conn.uid("EXPUNGE", uidstr)  # UIDPLUS: only our UIDs
     except Exception:
-        conn.expunge()   # last resort: purges every \Deleted in the folder
-    return True
+        status = "NO"
+    if status == "OK":
+        return True
+    # No UID EXPUNGE: a plain EXPUNGE removes EVERY \Deleted mail in the
+    # folder, including mail another client only flagged. Only do it when
+    # nothing but our own UIDs carries the flag.
+    if _only_ours_deleted(conn, uidstr):
+        conn.expunge()
+        return True
+    conn.uid("STORE", uidstr, "-FLAGS", r"(\Deleted)")      # un-flag ours
+    # The copies already made in `dest` cannot be told apart from mail that
+    # was there before (no COPYUID without UIDPLUS): they stay, and the
+    # error says so.
+    raise RuntimeError(coded(MOVE_FOREIGN_DELETED,
+                             folder=decode_mutf7(dest)))
+
+
+def _uid_numbers(uidstr: str) -> set[int] | None:
+    """The UIDs of a plain "1,2,5:7" set; None for anything else ("*")."""
+    out: set[int] = set()
+    try:
+        for part in uidstr.split(","):
+            lo, _, hi = part.partition(":")
+            out.update(range(int(lo), int(hi or lo) + 1))
+    except ValueError:
+        return None
+    return out
+
+
+def _only_ours_deleted(conn, uidstr: str) -> bool:
+    """Whether SEARCH DELETED finds no UID besides `uidstr`'s. Any doubt
+    (search failed, unparseable set) counts as "no"."""
+    ours = _uid_numbers(uidstr)
+    if ours is None:
+        return False
+    try:
+        status, data = conn.uid("SEARCH", None, "DELETED")
+        if status != "OK":
+            return False
+        flagged = {int(u) for u in (data[0] or b"").split()}
+    except Exception:
+        return False
+    return flagged <= ours
 
 
 def decode_mutf7(name: str) -> str:

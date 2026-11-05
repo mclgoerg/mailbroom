@@ -1788,6 +1788,11 @@ export const DE: Record<string, string> = {
     "Die Abmelde-Adresse in dieser Mail ist keine einzelne einfache "
     + "Adresse (oder ihr Text enthält Zeilenumbrüche), deshalb wurde keine "
     + "Mail gesendet.",
+  "ferr.move_foreign_deleted":
+    "Abgebrochen: Ein anderes Mailprogramm hat Mails in diesem Ordner zum "
+    + "Löschen markiert, und dieser Server kann nicht nur unsere entfernen. "
+    + "Im Ordner wurde nichts gelöscht, aber Kopien der Mails können jetzt "
+    + "auch in „{folder}“ liegen.",
   "ferr.cannot_flag":
     "Der Server hat das Markieren der Mails zum Löschen nicht "
     + "akzeptiert.",
