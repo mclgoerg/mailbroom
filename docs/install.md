@@ -17,6 +17,10 @@ Everything set via env can also be configured later in the settings UI
   port on localhost behind a reverse proxy with auth, or enable the
   built-in password/SSO login (Settings -> Server -> Login, or `AUTH_MODE` env).
   Never publish port 8765 straight to the internet without one of these.
+  Without a login, Mailbroom only answers to `localhost` and IP
+  addresses (DNS-rebinding protection); to open it under a host name,
+  add `MAILBROOM_ALLOWED_HOSTS=<name>` to the container environment
+  (comma list, `*.example.org` for subdomains).
 - **Secrets encryption:** set `MAILBROOM_SECRET_KEY` (generate with
   `openssl rand -base64 32`) so IMAP passwords and API keys are
   encrypted inside `/data` - protects volume backups.
@@ -64,7 +68,8 @@ ever plan to recreate the container.)
    [`deploy/docker-compose.yml`](../deploy/docker-compose.yml).
 3. Put your variables in the project's `.env` (copy from
    [`deploy/.env.example`](../deploy/.env.example)).
-4. Build & run, then open `http://<nas-ip>:8765`.
+4. Build & run, then open `http://<nas-ip>:8765` (an IP address works
+   as is; for a host name see "Login" above).
 
 On older DSM (Docker package): download the image
 `ghcr.io/mclgoerg/mailbroom` in Registry, then create a container with
@@ -82,7 +87,8 @@ No Community Applications template yet - add it manually:
 5. Add Variables for your IMAP provider (`IMAP_HOST`, `IMAP_PORT`,
    `IMAP_USER`, `IMAP_PASSWORD`, `IMAP_CAFILE=` empty for normal
    providers) plus `MAILBROOM_SECRET_KEY`.
-6. Apply, then open `http://<unraid-ip>:<port>`.
+6. Apply, then open `http://<unraid-ip>:<port>` (a host name needs the
+   "Login" note above).
 
 ## TrueNAS SCALE (24.10+)
 
