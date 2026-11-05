@@ -6,7 +6,9 @@ Three cases:
 - plain https URI                               -> hand the link to the UI
 
 The HTTPS POST is guarded against SSRF: mails could carry URLs pointing at
-private/internal addresses, so targets must resolve to public IPs.
+private/internal addresses, so the host is resolved once, every address must
+be public, the connection goes to that validated IP, and redirects are never
+followed.
 
 A whole selection of groups can be unsubscribed at once: that runs as a
 background job (one sender at a time - these are outbound requests to
@@ -18,14 +20,15 @@ is already handled after a rescan or a restart.
 from __future__ import annotations
 
 import email.header
+import http.client
 import ipaddress
 import logging
 import re
 import socket
+import ssl
 import threading
 import time
 import urllib.parse
-import urllib.request
 
 from . import accounts
 from . import auditlog
@@ -67,31 +70,87 @@ def parse_unsub(header: str, one_click: bool) -> dict:
     return {"mailto": mailto, "http": http, "one_click": one_click}
 
 
-def _assert_public_host(url: str) -> None:
-    host = urllib.parse.urlparse(url).hostname or ""
+def _public_ip(raw: str):
+    """The address as ipaddress object if it is a public unicast address,
+    else None. IPv4-mapped IPv6 is judged by the IPv4 address inside; the
+    list is explicit because `is_global` alone lets multicast through."""
+    ip = ipaddress.ip_address(raw.split("%", 1)[0])
+    if ip.version == 6 and ip.ipv4_mapped:
+        ip = ip.ipv4_mapped
+    if (ip.is_loopback or ip.is_private or ip.is_link_local
+            or (ip.version == 6 and ip.is_site_local)
+            or ip.is_multicast or ip.is_reserved or ip.is_unspecified
+            or not ip.is_global):
+        return None
+    return ip
+
+
+def _resolve_public(host: str, port: int) -> list[str]:
+    """Resolve ONCE and return the addresses to connect to; every one of
+    them must be public, so no answer of a mixed record can win."""
     if not host:
         raise RuntimeError("unsubscribe URL has no host")
     try:
-        infos = socket.getaddrinfo(host, None)
+        infos = socket.getaddrinfo(host, port, type=socket.SOCK_STREAM)
     except OSError as exc:
         raise RuntimeError(f"cannot resolve {host!r}: {exc}")
+    addrs: list[str] = []
     for info in infos:
-        ip = ipaddress.ip_address(info[4][0])
-        if not ip.is_global:
+        raw = info[4][0]
+        if _public_ip(raw) is None:
             raise RuntimeError(
-                f"unsubscribe URL resolves to a non-public address ({ip})")
+                f"unsubscribe URL resolves to a non-public address ({raw})")
+        if raw not in addrs:
+            addrs.append(raw)
+    if not addrs:
+        raise RuntimeError(f"cannot resolve {host!r}")
+    return addrs
+
+
+def _ssl_context() -> ssl.SSLContext:
+    return ssl.create_default_context()     # verifies chain + host name
+
+
+class _PinnedHTTPSConnection(http.client.HTTPSConnection):
+    """HTTPS to an address we already validated: no second DNS lookup, TLS
+    (SNI + certificate check) still against the original host name."""
+
+    def __init__(self, host: str, port: int, ip: str, timeout: float):
+        super().__init__(host, port, timeout=timeout, context=_ssl_context())
+        self._ip = ip
+
+    def connect(self):
+        sock = socket.create_connection((self._ip, self.port), self.timeout)
+        self.sock = self._context.wrap_socket(sock, server_hostname=self.host)
 
 
 def _post_one_click(url: str) -> None:
-    _assert_public_host(url)
-    req = urllib.request.Request(
-        url, data=b"List-Unsubscribe=One-Click",
-        headers={"Content-Type": "application/x-www-form-urlencoded",
-                 "User-Agent": "mailbroom"},
-        method="POST")
-    with urllib.request.urlopen(req, timeout=20) as res:
-        if res.status >= 400:
-            raise RuntimeError(f"unsubscribe endpoint returned {res.status}")
+    parts = urllib.parse.urlparse(url)
+    if parts.scheme.lower() != "https":
+        raise RuntimeError("one-click unsubscribe needs an https URL")
+    host, port = parts.hostname or "", parts.port or 443
+    last: Exception | None = None
+    for ip in _resolve_public(host, port):
+        conn = _PinnedHTTPSConnection(host, port, ip, 20)
+        try:
+            conn.request(
+                "POST", (parts.path or "/")
+                + (f"?{parts.query}" if parts.query else ""),
+                body=b"List-Unsubscribe=One-Click",
+                headers={"Content-Type": "application/x-www-form-urlencoded",
+                         "User-Agent": "mailbroom"})
+            status = conn.getresponse().status
+        except (OSError, http.client.HTTPException) as exc:
+            last = exc          # try the next validated address
+            continue
+        finally:
+            conn.close()
+        # Redirects are never followed: a 3xx means the sender's server took
+        # the request, and where it points is not ours to chase.
+        if status >= 400:
+            raise RuntimeError(f"unsubscribe endpoint returned {status}")
+        return
+    raise last or RuntimeError(f"cannot connect to {host!r}")
 
 
 def _send_mailto(im: dict, uri: str, account_name: str | None = None) -> None:
@@ -109,11 +168,16 @@ def unsubscribe_addr(im: dict, addr: str, header: str, one_click: bool,
     {"status": "done"|"link"|"failed", "method", "detail", "error"} so a
     bulk run is not aborted by a single dead endpoint."""
     parts = parse_unsub(header, one_click)
-    host = urllib.parse.urlparse(parts["http"] or "").hostname or "-"
+    try:
+        host = urllib.parse.urlparse(parts["http"] or "").hostname or "-"
+    except ValueError:          # e.g. "https://[::1/u" - fails below, too
+        host = "-"
     log.info("unsubscribe %r: one_click=%s mailto=%s http_host=%s",
              addr, parts["one_click"], bool(parts["mailto"]), host)
     try:
-        if parts["http"] and parts["one_click"]:
+        # RFC 8058: one-click is https only; an http URL is a plain link.
+        if (parts["http"] and parts["one_click"]
+                and parts["http"].lower().startswith("https://")):
             _post_one_click(parts["http"])
             return {"status": "done", "method": "one-click POST",
                     "detail": parts["http"], "error": ""}

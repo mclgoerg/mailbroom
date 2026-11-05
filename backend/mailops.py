@@ -674,6 +674,25 @@ def virtual_views(conn=None, pairs=None) -> set[str]:
             or decode_mutf7(name).lower() in _VIEW_NAMES}
 
 
+# Parent-only folders (Gmail's "[Gmail]"): the server lists them but SELECT
+# fails. RFC 3501 \\Noselect; RFC 5258 \\NonExistent implies it.
+_UNSELECTABLE_FLAGS = {"\\noselect", "\\nonexistent"}
+
+
+def unselectable(conn=None, pairs=None) -> set[str]:
+    """Raw names of folders that can't hold mail. Never offered, scanned,
+    a role or a move target; their children are unaffected."""
+    pairs = list_folders_ex(conn) if pairs is None else pairs
+    return {name for name, flags in pairs if flags & _UNSELECTABLE_FLAGS}
+
+
+def selectable_folders(conn) -> list[str]:
+    """list_folders without the unselectable ones."""
+    pairs = list_folders_ex(conn)
+    bad = unselectable(pairs=pairs)
+    return [name for name, _ in pairs if name not in bad]
+
+
 _PREFIX_RE = {}
 
 
@@ -721,12 +740,13 @@ def resolve_roles(conn, acc=None, pairs=None) -> dict:
       choices     {role: [raw, ...]} - the tied folders Settings offers
                   (also after the user confirmed one), `counts` their mail
                   counts (STATUS, only fetched for those)
-    A flag always beats a name; Gmail's virtual views are never a role.
+    A flag always beats a name; Gmail's virtual views and unselectable
+    (parent-only) folders are never a role.
     An override naming anything but a candidate of its role is ignored."""
     acc = acc or accounts.get()
     pairs = list_folders_ex(conn) if pairs is None else pairs
     delims = getattr(pairs, "delims", {})
-    views = virtual_views(pairs=pairs)
+    views = virtual_views(pairs=pairs) | unselectable(pairs=pairs)
     flagged: dict[str, list[str]] = {}
     named: dict[str, tuple[list[str], list[str]]] = {}  # whole, prefixed
     for name, flags in pairs:
@@ -2073,6 +2093,7 @@ def run_scan(acc=None) -> None:
             role_excluded |= {n for n, r in found["looks_like"].items()
                               if r in EXCLUDED_ROLES}
             role_excluded |= virtual_views(pairs=pairs)
+            role_excluded |= unselectable(pairs=pairs)
             folders = [f for f, _ in pairs
                        if f not in role_excluded
                        and not (excluded(f, rules)
@@ -2298,7 +2319,7 @@ def _resolve_dest(conn, action: str, dest: str, acc=None) -> str:
         if not name:
             raise RuntimeError(coded(ROLE_MISSING, role=action))
         return name
-    if dest not in list_folders(conn):
+    if dest not in selectable_folders(conn):
         raise RuntimeError(coded(UNKNOWN_TARGET, folder=decode_mutf7(dest)))
     return dest
 
@@ -3418,7 +3439,7 @@ def role_move(role: str, action: str, uids: list[int], uv: int = 0,
         if not src:
             raise RuntimeError(coded(ROLE_MISSING, role=role))
         if action == "not_junk":
-            inbox = next((f for f in list_folders(conn)
+            inbox = next((f for f in selectable_folders(conn)
                           if f.upper() == "INBOX"), None)
             if not inbox:
                 raise RuntimeError(INBOX_MISSING)
@@ -3503,7 +3524,7 @@ def trash_restore(uids: list[int], dest: str, uv: int = 0,
     trash = ""
     conn = connect(cfgmod.account_imap(acc.name), acc.name)
     try:
-        folders = list_folders(conn)
+        folders = selectable_folders(conn)
         trash = folder_roles(conn, acc).get("trash")
         if not trash:
             raise RuntimeError(coded(ROLE_MISSING, role="trash"))

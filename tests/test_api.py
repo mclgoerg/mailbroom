@@ -58,6 +58,18 @@ def test_spa_fallback_is_contained():
         assert b"placeholder index" in r.content, path
 
 
+def test_unknown_api_paths_answer_404_json():
+    for path in ["/api/nope", "/api/state/extra/nope", "/api/", "/api"]:
+        r = client.get(path)
+        assert r.status_code == 404, path
+        assert r.headers["content-type"].startswith("application/json")
+        assert r.json() == {"detail": "not found"}
+    # Real endpoints and SPA routes that merely start with "api" still work.
+    assert client.get("/api/version").status_code == 200
+    r = client.get("/apiary")
+    assert r.status_code == 200 and b"placeholder index" in r.content
+
+
 def test_spa_index_is_never_cached():
     # index.html references the current build's hashed /assets bundle - it
     # must always be revalidated, or an installed PWA can keep showing a

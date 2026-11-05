@@ -163,6 +163,9 @@ export const DE: Record<string, string> = {
   "qb.has_pinned": "mit geschützten Mails",
   "qb.has_tracker": "die Öffnen oder Klicks verfolgen",
   "tracker.menu": "Tracker",
+  "tools.group_cleanup": "Aufräumen",
+  "tools.group_insights": "Einblicke",
+  "tools.group_ai": "KI & Export",
   "tracker.title": "Tracker",
   "tracker.sub": "Wer deine Öffnungen und Klicks verfolgt",
   "tracker.explainer":
