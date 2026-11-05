@@ -14,6 +14,7 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 
 from . import config as cfgmod
+from . import mailops
 
 # One plain address: no whitespace, quotes, brackets, list separators or
 # second "@" - whatever a mailto: path decodes to must not become several
@@ -42,7 +43,7 @@ def check_plain_mail(to_addr: str, subject: str, text_body: str) -> None:
 
 
 def _connect(im: dict) -> smtplib.SMTP:
-    ctx = ssl.create_default_context(cafile=im["cafile"] or None)
+    ctx = mailops.tls_context(im)
     host = im.get("smtp_host") or im["host"]     # providers often split them
     port = int(im.get("smtp_port") or 1025)
     security = im.get("smtp_security") or "auto"

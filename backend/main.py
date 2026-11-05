@@ -1432,7 +1432,7 @@ def post_test_connection(account: str | None = Query(None)):
     acc = _acc(account)
     im = cfgmod.account_imap(acc.name)
     if not cfgmod.has_credentials(im):
-        raise HTTPException(400, "no credentials configured")
+        raise HTTPException(400, mailops.coded(mailops.NO_ACCOUNT))
     try:
         conn = mailops.connect(im, acc.name)
         try:
@@ -1443,7 +1443,7 @@ def post_test_connection(account: str | None = Query(None)):
             except Exception:
                 pass
     except Exception as exc:
-        raise HTTPException(502, f"{type(exc).__name__}: {exc}")
+        raise HTTPException(502, mailops.error_text(exc))
     return {"ok": True, "folders": n}
 
 
@@ -1468,7 +1468,7 @@ def get_folders(account: str | None = Query(None)):
             except Exception:
                 pass
     except Exception as exc:
-        raise HTTPException(500, f"{type(exc).__name__}: {exc}")
+        raise HTTPException(500, mailops.error_text(exc))
     rules = cfgmod.account_imap(acc.name).get("excluded_folders") or []
     # a folder can hold several roles (flagged \All and \Archive): report
     # the first in a fixed order, excluded if any of them is excluded

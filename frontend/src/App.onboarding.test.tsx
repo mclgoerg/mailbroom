@@ -10,7 +10,9 @@ import { afterEach, expect, test, vi } from "vitest";
 let state: any;
 let cfg: Config;
 
-vi.mock("./api", () => ({
+vi.mock("./api", async (orig) => ({
+  // the real errorText: the coded error must reach the toast translated
+  errorText: (await orig<typeof import("./api")>()).errorText,
   api: {
     authProbe: () => Promise.resolve({ mode: "none", authed: true }),
     getConfig: () => Promise.resolve(cfg),
@@ -120,4 +122,16 @@ test("the stored method decides: auth=oauth with only a password set (and " +
     cleanup();
     await open({ ...oauthOnly, auth: "password" });
     await waitFor(() => expect(scanBtn().disabled).toBe(true));
+  });
+
+test("a failed first scan keeps the welcome card and words the coded error",
+  async () => {
+    localStorage.setItem("pmc_account", "proton");
+    cfg = mkCfg({ password_set: true });
+    state = { ...baseState, status: "error", error: "no_account" };
+    render(<ToastProvider><DialogProvider><App /></DialogProvider></ToastProvider>);
+    await screen.findByText(/three steps to a tidy mailbox/);
+    expect(await screen.findByText(/No mail account is set up yet/))
+      .toBeTruthy();
+    expect(screen.queryByText(/no_account/)).toBeNull();
   });

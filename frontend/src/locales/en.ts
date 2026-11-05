@@ -1544,6 +1544,12 @@ export const EN: Record<string, string> = {
   "ferr.rule_purge_filter_domain":
     "This filter is not available for Junk and Trash rules: {names} (it "
     + "never matches senders - use plain text such as the domain name).",
+  "ferr.no_account":
+    "No mail account is set up yet - open Settings and fill in the "
+    + "sign-in details first.",
+  "ferr.cafile_missing":
+    "The certificate file {path} does not exist - clear the CA field in "
+    + "Settings (normal providers need none) or mount the file there.",
   "undo.from_junk": "{n} mails from Junk",
   "undo.from_junk_one": "1 mail from Junk",
   "undo.from_trash": "{n} mails from Trash",

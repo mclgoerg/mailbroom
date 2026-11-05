@@ -358,7 +358,7 @@ export default function App() {
       seq: staleDel || del.status === "running"
         ? (prev ? prev.seq : (del.seq ?? 0) - 1) : del.seq };
     if (state.status === "error" && prev?.scan !== "error")
-      notify(t("err.generic", { msg: state.error }), "error");
+      notify(t("err.generic", { msg: errorText(state.error) }), "error");
     if (!prev) return;
     // A look-alike folder's move is toasted by Settings itself (with its own
     // Undo), so it is not announced a second time here.
@@ -2089,7 +2089,8 @@ export default function App() {
       )}
 
       {/* First-run onboarding: no credentials or no scan yet. */}
-      {cfg && state?.status === "idle" && allGroups.length === 0
+      {cfg && (state?.status === "idle" || state?.status === "error")
+        && allGroups.length === 0
         && !scanning && (
         <div className="mx-auto my-10 max-w-md rounded-card border border-line
           bg-panel p-4 type-body sm:p-5">
