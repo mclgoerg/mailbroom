@@ -1781,6 +1781,7 @@ export const DE: Record<string, string> = {
   "aif.disclosure":
     "Nur dieser Satz und die Filter-Syntax gehen an deinen KI-Anbieter - "
     + "keine Maildaten.",
+  "aif.hint": "Mit Strg+Enter (\u2318+Enter am Mac) absenden.",
   "aif.chars": "{n} / {max}",
   "aif.send": "Senden",
   "aif.thinking": "Filter wird geschrieben…",
