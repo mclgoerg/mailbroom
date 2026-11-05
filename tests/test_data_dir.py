@@ -65,3 +65,20 @@ def test_a_permission_error_with_a_writable_folder_stays_a_failure(monkeypatch):
     monkeypatch.setattr(cfgmod, "load_server", boom)
     with pytest.raises(PermissionError):
         client.get("/api/auth")
+
+
+def test_saving_settings_into_an_unwritable_folder_is_coded(unwritable, monkeypatch):
+    def boom(*a, **k):
+        raise PermissionError(13, "Permission denied", "/data/server.tmp")
+    monkeypatch.setattr(cfgmod, "update_config", boom)
+    r = client.post("/api/config", json={"theme": "dark"})
+    assert r.status_code == 503
+    assert r.json() == {"detail": mailops.DATA_NOT_WRITABLE}
+
+
+def test_the_not_admin_refusal_stays_a_403(monkeypatch):
+    def boom(*a, **k):
+        raise PermissionError("only the admin can change server settings")
+    monkeypatch.setattr(cfgmod, "update_config", boom)
+    r = client.post("/api/config", json={"theme": "dark"})
+    assert r.status_code == 403

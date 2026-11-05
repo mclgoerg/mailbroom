@@ -1798,6 +1798,8 @@ def post_config(body: dict):
     try:
         cfg = cfgmod.update_config(body)
     except PermissionError as exc:
+        if exc.errno is not None:       # the OS refused a write, not "not admin"
+            raise                       # -> _data_dir_guard words it
         raise HTTPException(403, str(exc))
     except ValueError as exc:
         raise HTTPException(400, str(exc))
