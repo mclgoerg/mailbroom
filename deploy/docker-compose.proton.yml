@@ -1,4 +1,11 @@
-# Mailbroom + Proton Mail Bridge (paid Proton plan required).
+# Mailbroom + Proton Mail Bridge (paid Proton plan required: Bridge does
+# not work with free accounts).
+#
+# Mailbroom ships NO Bridge image. Before the first start, set BRIDGE_IMAGE
+# in .env to an image you built yourself from Proton's open-source Bridge,
+# or to a community image (check that it is still maintained and that you
+# trust its author - Mailbroom does not endorse a specific one). Running
+# Bridge in Docker is a community setup; Proton does not support it.
 #
 # One-time interactive Bridge setup:
 #   docker compose -f docker-compose.proton.yml run --rm -it protonbridge init
@@ -11,10 +18,8 @@
 
 services:
   protonbridge:
-    # No official image: build one from Proton's source, e.g.
-    # https://github.com/mk1337/protonmail-bridge-docker-arm64 (ARM64)
-    # or shenxn/protonmail-bridge (x86_64, verify it is maintained).
-    image: protonmail-bridge:local
+    # No official image - see the header of this file.
+    image: ${BRIDGE_IMAGE:?set BRIDGE_IMAGE in .env - see the header of this file}
     container_name: protonbridge
     restart: unless-stopped
     volumes:
