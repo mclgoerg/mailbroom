@@ -140,6 +140,19 @@ test("custom preset keeps the current fields", () => {
   expect(presetSelect().value).toBe("custom");
 });
 
+test("switching Proton -> Custom drops Proton's CA path; Custom keeps its own",
+  () => {
+    render(<SettingsModal cfg={cfg} account="default" onClose={() => {}}
+      onSaved={() => {}} onAccountsChanged={() => {}} />);
+    const ca = () => (screen.getByLabelText(/CA file/) as HTMLInputElement);
+    expect(ca().value).toBe("/certs/bridge-cert.pem");
+    fireEvent.change(presetSelect(), { target: { value: "custom" } });
+    expect(ca().value).toBe("");
+    fireEvent.change(ca(), { target: { value: "/my/ca.pem" } });
+    fireEvent.change(presetSelect(), { target: { value: "custom" } });
+    expect(ca().value).toBe("/my/ca.pem");
+  });
+
 test("prefilled fields stay editable", () => {
   render(<SettingsModal cfg={cfg} account="default" onClose={() => {}}
     onSaved={() => {}} onAccountsChanged={() => {}} />);

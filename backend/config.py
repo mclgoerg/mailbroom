@@ -47,6 +47,19 @@ def stats_path() -> Path:
 DEFAULT_EXCLUDED = ["Trash", "Spam", "Sent", "Drafts", "All Mail",
                     "Starred", "Labels", "Labels/*"]
 
+BRIDGE_CAFILE = "/certs/bridge-cert.pem"
+
+
+def _default_cafile() -> str:
+    """`IMAP_CAFILE` when set (even empty); else Proton Bridge's usual
+    certificate path only if that file is really there - a fresh install
+    without it must not fail every connection on a missing CA file."""
+    env = os.environ.get("IMAP_CAFILE")
+    if env is not None:
+        return env
+    return BRIDGE_CAFILE if os.path.isfile(BRIDGE_CAFILE) else ""
+
+
 # Env-based bootstrap values - used for the FIRST account only (classic
 # single-account Docker setups pass Bridge creds via env).
 ENV_IMAP = {
@@ -58,7 +71,7 @@ ENV_IMAP = {
     "smtp_security": os.environ.get("SMTP_SECURITY", "auto"),
     "user": os.environ.get("IMAP_USER", ""),
     "password": os.environ.get("IMAP_PASSWORD", ""),
-    "cafile": os.environ.get("IMAP_CAFILE", "/certs/bridge-cert.pem"),
+    "cafile": _default_cafile(),
     # Which provider preset filled the fields (UI prefill + Proton-only
     # features like Sieve export). Existing configs default to proton.
     "preset": "proton",

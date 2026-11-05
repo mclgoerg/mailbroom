@@ -239,6 +239,37 @@ test("the disclosure line and the 300-character cap are on the form", async () =
     HTMLButtonElement).disabled).toBe(true);          // empty sentence
 });
 
+test("Ctrl+Enter and Cmd+Enter send the sentence; plain Enter only adds a " +
+  "line; the form says so", async () => {
+  localStorage.setItem("pmc_ai_ack", "1");
+  await mount();
+  const dlg = await openPanel();
+  expect(within(dlg).getByText(/Ctrl\+Enter/)).toBeTruthy();
+  const ta = within(dlg).getByLabelText(
+    "Describe what you are looking for") as HTMLTextAreaElement;
+  fireEvent.keyDown(ta, { key: "Enter", ctrlKey: true });   // still empty
+  expect(aiFilter).not.toHaveBeenCalled();
+  fireEvent.change(ta, { target: { value: "newsletters I never read" } });
+  expect(fireEvent.keyDown(ta, { key: "Enter" })).toBe(true);   // not claimed
+  expect(aiFilter).not.toHaveBeenCalled();
+  // the shortcut is claimed, so the browser adds no newline
+  expect(fireEvent.keyDown(ta, { key: "Enter", ctrlKey: true })).toBe(false);
+  await waitFor(() => expect(aiFilter).toHaveBeenCalledTimes(1));
+  expect(aiFilter).toHaveBeenCalledWith("newsletters I never read", "en");
+  await within(dlg).findByDisplayValue("tag:newsletter unread:>90 age:>1y");
+  fireEvent.click(within(dlg).getByRole("button", { name: "Back" }));
+  fireEvent.keyDown(within(dlg).getByLabelText(
+    "Describe what you are looking for"), { key: "Enter", metaKey: true });
+  await waitFor(() => expect(aiFilter).toHaveBeenCalledTimes(2));
+});
+
+test("the shortcut hint is German in German", async () => {
+  setLang("de");
+  await mount();
+  fireEvent.click(screen.getByLabelText("Filter beschreiben"));
+  expect(await screen.findByText(/Strg\+Enter/)).toBeTruthy();
+});
+
 test("a coded backend error is shown in the user's words", async () => {
   localStorage.setItem("pmc_ai_ack", "1");
   aiFilter.mockRejectedValue(new Error("The monthly AI budget is used up."));

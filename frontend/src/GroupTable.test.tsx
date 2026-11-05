@@ -451,6 +451,57 @@ describe("GroupTable avatars and phone cards", () => {
 });
 
 
+describe("GroupTable status badges vs category tags", () => {
+  beforeEach(() => setLang("en"));
+  afterEach(cleanup);
+  const g = { ...mk(0), new: true, replied: true, tags: ["newsletter", "shopping"],
+    ai: { verdict: "review", reason: "r" } as Group["ai"] };
+
+  it("the column is headed Status & tags (German: Status & Tags)", () => {
+    const { container } = renderTable({ groups: [g] });
+    expect(container.querySelector("thead")!.textContent)
+      .toContain("Status & tags");
+    cleanup(); setLang("de");
+    const de = renderTable({ groups: [g] });
+    expect(de.container.querySelector("thead")!.textContent)
+      .toContain("Status & Tags");
+  });
+
+  const tagEls = (el: Element) => [...el.querySelectorAll("span.rounded-badge")]
+    .filter((e) => ["newsletter", "shopping"].includes(e.textContent!));
+
+  it("table: categories come after the state badges, in the outlined style", () => {
+    const { container } = renderTable({ groups: [g] });
+    const cell = container.querySelector("tbody tr td:nth-child(4)")!;
+    const all = [...cell.querySelectorAll("span.rounded-badge")];
+    const tags = tagEls(cell);
+    expect(tags).toHaveLength(2);
+    for (const tg of tags) {
+      expect(tg.className).toContain("border-line");
+      expect(tg.className).not.toContain("bg-");        // not a filled badge
+    }
+    const states = all.filter((e) => !tags.includes(e));
+    expect(states.length).toBeGreaterThan(0);
+    for (const st of states) {
+      expect(st.className).toContain("bg-");
+      expect(st.compareDocumentPosition(tags[0])
+        & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    }
+  });
+
+  it("phone card: categories last, after state badges and the AI verdict", () => {
+    const { container } = renderTable({ groups: [g] });
+    const card = container.querySelector(".md\\:hidden")!;
+    const tags = tagEls(card);
+    expect(tags).toHaveLength(2);
+    const ai = [...card.querySelectorAll("span.rounded-badge")]
+      .find((e) => e.textContent === "review")!;
+    expect(ai.compareDocumentPosition(tags[0])
+      & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(tags[0].className).toContain("border-line");
+  });
+});
+
 describe("localizedSub", () => {
   afterEach(() => setLang("en"));
   it("translates the backend's thread / subject summaries, leaves addresses alone", () => {

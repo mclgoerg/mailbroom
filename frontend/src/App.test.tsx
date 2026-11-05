@@ -361,7 +361,7 @@ test("the detail panel's Trash button confirms, trashes the whole group " +
   await openDetail();
   fireEvent.click(screen.getByRole("button", { name: "Trash all 3" }));
   const dlg = await findDialog();
-  expect(dlg.textContent).toContain("3 mails in 1 group");
+  expect(dlg.textContent).toContain("3 mails from DHL Paket");
   await pressDialog("Move to Trash (3)");
   await waitFor(() => expect(deleteGroups).toHaveBeenCalledWith(
     "sender", [groupFixture.key], "trash", "", false, null, null));
@@ -555,6 +555,26 @@ const selectAll = async () => {
 const mixed = () => renderAiScope({
   [groupFixture.key]: { ...groupFixture, ai: ratedAi },
   [second.key]: second });
+
+test("the trash confirm names the groups and points to Undo", async () => {
+  await mixed();
+  await selectAll();
+  fireEvent.click(screen.getByText(/^Trash \d+$/));
+  const dlg = (await findDialog()).textContent!;
+  expect(dlg).toContain("mails from DHL Paket, Shop News");
+  expect(dlg).toContain("You can undo this from the result message.");
+  await pressDialog(/^Move to Trash/);
+});
+
+test("mark as read is no move: its confirm has no undo line", async () => {
+  await mixed();
+  await selectAll();
+  fireEvent.change(screen.getByDisplayValue("Action…"),
+    { target: { value: "mark_read" } });
+  const dlg = (await findDialog()).textContent!;
+  expect(dlg).toContain("mails from DHL Paket, Shop News");
+  expect(dlg).not.toContain("undo");
+});
 
 test("the Action menu has no separate re-rate entry", async () => {
   await mixed();
