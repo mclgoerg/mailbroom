@@ -22,6 +22,7 @@ vi.mock("./api", () => ({
   downloadFile: () => Promise.resolve(),
   setAccount: () => {},
   withAccount: (p: string) => p,
+  noticeParams: (p: Record<string, unknown>) => p,
   fmtSize: (b: number) => `${b} B`,
   fmtUsd: (c: number) => `$${c}`,
   mailKey: (m: { folder: string; uid: number }) => `${m.folder} ${m.uid}`,
@@ -227,7 +228,7 @@ test("collapsing is remembered", async () => {
   await ready();
   fireEvent.click(screen.getByRole("button", { name: "Hide quick wins" }));
   expect(screen.queryAllByTestId("qw-card")).toHaveLength(0);
-  expect(localStorage.getItem("pmc_qw_collapsed")).toBe("1");
+  expect(localStorage.getItem("pmc_qw_collapsed:proton")).toBe("1");
   cleanup();
   setup();
   await ready();
@@ -301,4 +302,55 @@ test("German strings", async () => {
   expect(screen.getAllByRole("button", { name: "Aufräumen" })).toHaveLength(2);
   expect(screen.getAllByRole("button", { name: "Nicht jetzt" })).toHaveLength(2);
   expect(screen.getAllByRole("button", { name: "Ansehen" })).toHaveLength(2);
+});
+
+test("collapsed state is per account; the old global key is only a fallback",
+  async () => {
+    localStorage.removeItem("pmc_qw_collapsed:proton");
+    localStorage.setItem("pmc_qw_collapsed:other", "1");
+    localStorage.removeItem("pmc_qw_collapsed");
+    setup();                                           // account: proton
+    await ready();
+    expect(screen.getAllByTestId("qw-card")).toHaveLength(2);  // other's choice
+    cleanup();
+    localStorage.setItem("pmc_qw_collapsed", "1");     // pre-per-account value
+    setup();
+    await ready();
+    expect(screen.queryAllByTestId("qw-card")).toHaveLength(0);
+    cleanup();
+    localStorage.setItem("pmc_qw_collapsed:proton", "0");   // own entry wins
+    setup();
+    await ready();
+    expect(screen.getAllByTestId("qw-card")).toHaveLength(2);
+    localStorage.removeItem("pmc_qw_collapsed");
+    localStorage.removeItem("pmc_qw_collapsed:proton");
+    localStorage.removeItem("pmc_qw_collapsed:other");
+  });
+
+test("the cached-verdicts notice is a muted status-line suffix, not a banner",
+  async () => {
+    localStorage.removeItem("pmc_qw_collapsed:proton");
+    localStorage.removeItem("pmc_qw_collapsed");
+    setup({ notice: { key: "cached_verdicts", params: { n: 12 } } });
+    await ready();
+    const suffix = screen.getByTestId("cached-verdicts");
+    expect(suffix.textContent).toContain("12 cached AI verdicts");
+    expect(suffix.getAttribute("title")).toBe(
+      "12 cached AI verdicts applied (AI review only evaluates new groups).");
+    expect(suffix.parentElement!.textContent).toContain("groups");
+    expect(screen.queryByText(/verdicts applied/)).toBeNull();   // no banner
+    cleanup();
+    setup({ notice: { key: "scan_cancelled", params: {} } });
+    await ready();
+    expect(screen.getByText("Scan cancelled.")).toBeTruthy();    // others stay
+    expect(screen.queryByTestId("cached-verdicts")).toBeNull();
+  });
+
+test("the chip row scrolls on one line on phones and wraps from md", async () => {
+  setup();
+  await ready();
+  const row = screen.getByTestId("chip-row");
+  expect(row.className).toContain("overflow-x-auto");
+  expect(row.className).not.toMatch(/(^|\s)flex-wrap/);   // wrap only via md:
+  expect(row.className).toContain("md:flex-wrap");
 });

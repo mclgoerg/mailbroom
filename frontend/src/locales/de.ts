@@ -4,6 +4,7 @@
 export const DE: Record<string, string> = {
   "notice.scan_cancelled": "Scan abgebrochen.",
   "notice.action_cancelled": "Aktion abgebrochen.",
+  "status.cached_verdicts": "{n} KI-Bewertungen aus dem Cache",
   "notice.cached_verdicts":
     "{n} zwischengespeicherte KI-Bewertungen übernommen (die KI-Prüfung bewertet nur neue Gruppen).",
   "notice.restored":

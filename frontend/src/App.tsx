@@ -1414,7 +1414,23 @@ export default function App() {
   const statusLine = () => {
     if (!state) return <Spinner />;
     const running = job ?? (pending ? { label: pending, progress: "" } : null);
-    if (!running) return summary();
+    if (!running) {
+      // The "N cached AI verdicts applied" notice lives here as a muted
+      // suffix (full sentence as tooltip) instead of a banner of its own.
+      const n = state.notice?.key === "cached_verdicts"
+        ? Number(state.notice.params.n) : 0;
+      return (
+        <>
+          {summary()}
+          {n > 0 && (
+            <span data-testid="cached-verdicts" className="text-faint"
+              title={t("notice.cached_verdicts", { n })}>
+              {" · "}{t("status.cached_verdicts", { n })}
+            </span>
+          )}
+        </>
+      );
+    }
     return (
       <span className="inline-flex items-center gap-1.5">
         {job?.icon}
@@ -1808,7 +1824,8 @@ export default function App() {
           selection-dependent chrome here (that lives in the bottom bar,
           which only renders once something is selected). */}
       {!flat && (
-      <div className="mb-2 flex flex-wrap items-center gap-2">
+      <div className="mb-2 flex items-center gap-2 overflow-x-auto pb-1
+        md:flex-wrap md:overflow-visible md:pb-0" data-testid="chip-row">
         {PRESET_CHIPS.slice(0, 1).map((p) => (
           <Chip key={p.key} className="shrink-0"
             on={filter === presetFilterQuery(p.key)}
@@ -2069,7 +2086,7 @@ export default function App() {
           </span>
         )}
       </div>
-      {state?.notice && (
+      {state?.notice && state.notice.key !== "cached_verdicts" && (
         <Notice className="mb-2" icon={<Info size={14} />}
           onClose={dismissNotice}>
           {t(`notice.${state.notice.key}`, noticeParams(state.notice.params))}
