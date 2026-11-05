@@ -825,7 +825,7 @@ test("new account + gmail preset starts on App password: Password " +
       .toBe("true");
     expect(appPw()).toBeTruthy();
     expect(screen.queryByText(/Connect your Gmail account/)).toBeNull();
-    expect(screen.getByText(/myaccount.google.com\/apppasswords/))
+    expect(screen.getByText(/Create an app password at/))
       .toBeTruthy();
     await clickSave();
     expect(lastSave().auth).toBe("password");
