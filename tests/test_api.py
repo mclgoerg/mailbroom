@@ -197,3 +197,12 @@ def test_healthcheck_access_lines_are_dropped_only():
     assert kept("192.0.2.7:5555", "GET", "/api/auth")
     assert kept("127.0.0.1:41234", "GET", "/api/state")
     assert kept("127.0.0.1:41234", "POST", "/api/auth")
+
+
+def test_openapi_version_is_the_release_version():
+    from pathlib import Path
+    from backend.main import app
+    want = (Path(__file__).resolve().parent.parent
+            / "version.txt").read_text().strip()
+    assert want and app.version == want
+    assert app.openapi()["info"]["version"] == want
