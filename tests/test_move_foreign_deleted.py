@@ -72,3 +72,71 @@ def test_a_failed_search_counts_as_foreign(monkeypatch):
     ("1,2,5:7", {1, 2, 5, 6, 7}), ("4", {4}), ("1:*", None), ("x", None)])
 def test_uid_set_parsing(text, expected):
     assert mailops._uid_numbers(text) == expected
+
+
+# --------------------------------------------- Undo / restore from Trash
+
+def _deleted_then_foreign_flag(monkeypatch):
+    """Our delete works (nothing foreign flagged in INBOX); afterwards another
+    client flags a mail of its own in Trash."""
+    fake = FakeIMAP({
+        "INBOX": [make_msg(1, frm="a@x.example"),
+                  make_msg(2, frm="a@x.example")],
+        "Trash": [make_msg(90, frm="old@x.example")],
+    }, move=False, uidplus=False)
+    monkeypatch.setattr(mailops, "connect", lambda cfg, name=None: fake)
+    mailops.run_scan()
+    mailops.delete_groups("sender", ["a@x.example"])
+    assert wait_delete_done()["moved"] == 2
+    fake.mailbox["Trash"][0]["deleted"] = True        # theirs
+    return fake
+
+
+def _flag_theirs_after_first_move(fake, monkeypatch):
+    """Another client flags its own Trash mail while our job is running:
+    the first chunk moves fine, the second one is refused."""
+    monkeypatch.setattr(mailops, "MOVE_CHUNK", 1)
+    real = fake.uid
+    state = {"copies": 0}
+
+    def uid(cmd, *args):
+        if cmd == "COPY":
+            state["copies"] += 1
+            if state["copies"] == 2:
+                fake.mailbox["Trash"][0]["deleted"] = True
+        return real(cmd, *args)
+    monkeypatch.setattr(fake, "uid", uid)
+
+
+def test_a_refused_undo_keeps_its_undo_entry(monkeypatch):
+    fake = _deleted_then_foreign_flag(monkeypatch)
+    fake.mailbox["Trash"][0]["deleted"] = False
+    assert len(mailops.STATE["undo"]) == 1
+    _flag_theirs_after_first_move(fake, monkeypatch)
+    before = mailops.STATE["trash_count"]
+    with pytest.raises(RuntimeError) as exc:
+        mailops.undo_last()
+    assert str(exc.value) == "move_foreign_deleted:folder=Trash"
+    assert len(mailops.STATE["undo"]) == 1           # can be tried again
+    # one mail is back; the refused one was copied but its original stays
+    trash = {m["uid"]: m for m in fake.mailbox["Trash"]}
+    assert set(trash) == {2, 90} and not trash[2].get("deleted")
+    assert trash[90]["deleted"] is True                       # theirs stays
+    if before is not None:                            # bookkeeping still ran
+        assert mailops.STATE["trash_count"] == before - 1
+    # the other program expunges; the retry restores the rest
+    fake.mailbox["Trash"] = [m for m in fake.mailbox["Trash"]
+                             if m["uid"] != 90]
+
+
+def test_a_refused_trash_restore_still_runs_its_bookkeeping(monkeypatch):
+    fake = _deleted_then_foreign_flag(monkeypatch)
+    fake.mailbox["Trash"][0]["deleted"] = False
+    mailops.STATE["trash_count"] = 3
+    uids = [m["uid"] for m in fake.mailbox["Trash"] if m["uid"] != 90]
+    _flag_theirs_after_first_move(fake, monkeypatch)
+    with pytest.raises(RuntimeError) as exc:
+        mailops.trash_restore(uids, "INBOX")
+    assert str(exc.value) == "move_foreign_deleted:folder=Trash"
+    assert mailops.STATE["trash_count"] == 2          # the one that moved
+    assert 90 in {m["uid"] for m in fake.mailbox["Trash"]}
