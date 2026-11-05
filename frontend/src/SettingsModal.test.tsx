@@ -127,9 +127,9 @@ test("gmail preset prefills IMAP + SMTP fields", () => {
   // Bridge cert must not leak into a non-Proton account
   expect((screen.getByLabelText(/CA file/) as HTMLInputElement).value)
     .toBe("");
-  // Gmail connects via OAuth only - no password field, OAuth-only hint
-  expect(screen.getByText(/connects via OAuth only/)).toBeTruthy();
-  expect(screen.queryByLabelText("Password")).toBeNull();
+  // A new Gmail account starts on App password (see the sign-in tests).
+  expect(screen.getByText(/App password or OAuth - choose below/))
+    .toBeTruthy();
 });
 
 test("custom preset keeps the current fields", () => {
@@ -792,4 +792,160 @@ test("the backup text says the file lists sender addresses", () => {
   fireEvent.click(screen.getByRole("tab", { name: "General" }));
   expect(screen.getByText(/The file lists sender addresses - keep it private\./))
     .toBeTruthy();
+});
+
+// ---------------------------------------------------- Gmail sign-in method
+
+const signinTab = (name: string) =>
+  screen.getByRole("tab", { name }) as HTMLElement;
+// The tabpanel is labelled by its tab, so the label text matches both.
+const appPw = () => screen.getAllByLabelText("App password")
+  .find((el) => el.tagName === "INPUT") as HTMLInputElement;
+const lastSave = () => saveCalls[saveCalls.length - 1].imap;
+const clickSave = async () => {
+  fireEvent.click(screen.getByRole("button", { name: "Save" }));
+  await waitFor(() => expect(saveCalls.length).toBeGreaterThan(0));
+};
+const oauthAcct = (over: object = {}) => ({
+  ...acct, host: "imap.gmail.com", preset: "gmail" as const,
+  user: "me@gmail.example", password_set: true,
+  oauth: { provider: "google" as const, client_id: "cid",
+    client_secret_set: true, connected: true }, ...over });
+const gmailCfg = (a: object): Config =>
+  ({ ...cfg, accounts: { ...cfg.accounts, default: a as any } });
+
+test("new account + gmail preset starts on App password: Password " +
+  "field, no OAuth card, Save sends auth=password and no oauth block",
+  async () => {
+    saveCalls.length = 0;
+    render(<SettingsModal cfg={cfg} account="default" onClose={() => {}}
+      onSaved={() => {}} onAccountsChanged={() => {}} />);
+    fireEvent.change(presetSelect(), { target: { value: "gmail" } });
+    expect(signinTab("App password").getAttribute("aria-selected"))
+      .toBe("true");
+    expect(appPw()).toBeTruthy();
+    expect(screen.queryByText(/Connect your Gmail account/)).toBeNull();
+    expect(screen.getByText(/myaccount.google.com\/apppasswords/))
+      .toBeTruthy();
+    await clickSave();
+    expect(lastSave().auth).toBe("password");
+    expect(lastSave().oauth).toBeUndefined();
+  });
+
+test("switching to OAuth shows the OAuth card instead of the Password " +
+  "field; Save sends auth=oauth + oauth.provider google", async () => {
+  saveCalls.length = 0;
+  render(<SettingsModal cfg={cfg} account="default" onClose={() => {}}
+    onSaved={() => {}} onAccountsChanged={() => {}} />);
+  fireEvent.change(presetSelect(), { target: { value: "gmail" } });
+  fireEvent.click(signinTab("OAuth"));
+  expect(screen.getByText(/Connect your Gmail account/)).toBeTruthy();
+  expect(screen.queryByText(/Create an app password/)).toBeNull();
+  expect(screen.queryByLabelText("Password")).toBeNull();
+  await clickSave();
+  expect(lastSave().auth).toBe("oauth");
+  expect(lastSave().oauth.provider).toBe("google");
+});
+
+test("a saved gmail account opens on the stored method - even when OAuth " +
+  "is still connected but the method is App password", () => {
+  const { unmount } = render(<SettingsModal
+    cfg={gmailCfg(oauthAcct({ auth: "oauth" }))} account="default"
+    onClose={() => {}} onSaved={() => {}} onAccountsChanged={() => {}} />);
+  expect(signinTab("OAuth").getAttribute("aria-selected")).toBe("true");
+  expect(screen.getByText("Connected")).toBeTruthy();
+  unmount();
+  render(<SettingsModal cfg={gmailCfg(oauthAcct({ auth: "password" }))}
+    account="default" onClose={() => {}} onSaved={() => {}}
+    onAccountsChanged={() => {}} />);
+  expect(signinTab("App password").getAttribute("aria-selected"))
+    .toBe("true");
+  expect(screen.queryByText("Connected")).toBeNull();
+});
+
+test("an older backend (no auth field) derives the method from the " +
+  "connected token", () => {
+  render(<SettingsModal cfg={gmailCfg(oauthAcct())} account="default"
+    onClose={() => {}} onSaved={() => {}} onAccountsChanged={() => {}} />);
+  expect(signinTab("OAuth").getAttribute("aria-selected")).toBe("true");
+});
+
+test("switching back and forth then Save never sends disconnect and keeps " +
+  "the client id", async () => {
+  saveCalls.length = 0;
+  oauthDisconnectCalls.length = 0;
+  render(<SettingsModal cfg={gmailCfg(oauthAcct({ auth: "oauth" }))}
+    account="default" onClose={() => {}} onSaved={() => {}}
+    onAccountsChanged={() => {}} />);
+  fireEvent.click(signinTab("App password"));
+  fireEvent.click(signinTab("OAuth"));
+  fireEvent.click(signinTab("App password"));
+  await clickSave();
+  expect(JSON.stringify(saveCalls[0])).not.toContain("disconnect");
+  expect(lastSave().auth).toBe("password");
+  expect(lastSave().oauth).toBeUndefined();
+  saveCalls.length = 0;
+  fireEvent.click(signinTab("OAuth"));
+  await clickSave();
+  expect(JSON.stringify(saveCalls[0])).not.toContain("disconnect");
+  expect(lastSave().auth).toBe("oauth");
+  expect(lastSave().oauth.client_id).toBe("cid");
+  expect(oauthDisconnectCalls).toEqual([]);
+});
+
+test("whitespace is stripped from a Gmail app password", async () => {
+  saveCalls.length = 0;
+  render(<SettingsModal cfg={cfg} account="default" onClose={() => {}}
+    onSaved={() => {}} onAccountsChanged={() => {}} />);
+  fireEvent.change(presetSelect(), { target: { value: "gmail" } });
+  fireEvent.change(appPw(), { target: { value: "abcd efgh\u00a0ijkl  mnop" } });
+  await clickSave();
+  expect(lastSave().password).toBe("abcdefghijklmnop");
+});
+
+test("other presets keep the password exactly as typed", async () => {
+  saveCalls.length = 0;
+  render(<SettingsModal cfg={cfg} account="default" onClose={() => {}}
+    onSaved={() => {}} onAccountsChanged={() => {}} />);
+  fireEvent.change(presetSelect(), { target: { value: "icloud" } });
+  fireEvent.change(screen.getByLabelText("Password"),
+    { target: { value: "ab cd" } });
+  await clickSave();
+  expect(lastSave().password).toBe("ab cd");
+});
+
+test("connected gmail account -> iCloud preset: Save sends " +
+  "auth=password and no oauth block (fix A)", async () => {
+  saveCalls.length = 0;
+  render(<SettingsModal cfg={gmailCfg(oauthAcct({ auth: "oauth" }))}
+    account="default" onClose={() => {}} onSaved={() => {}}
+    onAccountsChanged={() => {}} />);
+  fireEvent.change(presetSelect(), { target: { value: "icloud" } });
+  expect(screen.queryByRole("tab", { name: "OAuth" })).toBeNull();
+  expect(screen.getByLabelText("Password")).toBeTruthy();
+  await clickSave();
+  expect(lastSave().auth).toBe("password");
+  expect(lastSave().oauth).toBeUndefined();
+});
+
+test("outlook preset: OAuth card, no switch, no Password field, " +
+  "auth=oauth", async () => {
+  saveCalls.length = 0;
+  render(<SettingsModal cfg={cfg} account="default" onClose={() => {}}
+    onSaved={() => {}} onAccountsChanged={() => {}} />);
+  fireEvent.change(presetSelect(), { target: { value: "outlook" } });
+  expect(screen.queryByRole("tab", { name: "OAuth" })).toBeNull();
+  expect(screen.queryByLabelText("Password")).toBeNull();
+  expect(screen.getByText(/Connect your Outlook account/)).toBeTruthy();
+  await clickSave();
+  expect(lastSave().auth).toBe("oauth");
+});
+
+test("German: the sign-in switch is translated", () => {
+  setLang("de");
+  render(<SettingsModal cfg={gmailCfg(oauthAcct({ auth: "password" }))}
+    account="default" onClose={() => {}} onSaved={() => {}}
+    onAccountsChanged={() => {}} />);
+  expect(screen.getByRole("tab", { name: "App-Passwort" })).toBeTruthy();
+  expect(screen.getByText("Anmeldeart", { selector: "div" })).toBeTruthy();
 });

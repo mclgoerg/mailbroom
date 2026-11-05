@@ -1,6 +1,19 @@
 /* Pure helpers - kept dependency-free so they are unit-testable. */
 
-import type { Grouping, Group } from "./types";
+import type { AuthMethod, Grouping, Group, ImapAccount } from "./types";
+
+/** How an account signs in. Older backends send no `auth`: they used
+ *  OAuth exactly when a refresh token was stored. */
+export const accountAuth = (
+  im: Pick<ImapAccount, "oauth"> & { auth?: AuthMethod },
+): AuthMethod => im.auth ?? (im.oauth?.connected ? "oauth" : "password");
+
+/** Is there something to sign in with under the account's method? */
+export const hasCredentials = (
+  im: (Pick<ImapAccount, "oauth"> & { auth?: AuthMethod;
+    password_set?: boolean }) | null | undefined,
+): boolean => !!im && (accountAuth(im) === "oauth"
+  ? !!im.oauth?.connected : !!im.password_set);
 
 export const fmtSize = (b: number): string =>
   b >= 1048576 ? `${(b / 1048576).toFixed(1)} MB`
