@@ -78,7 +78,26 @@ class _RedactKnowledgeKeys(logging.Filter):
         return True
 
 
+class _DropHealthcheck(logging.Filter):
+    """The Docker HEALTHCHECK probes GET /api/auth from inside the
+    container every minute; that access line is noise. Only the access
+    log is filtered, and only for loopback clients."""
+
+    PATH = "/api/auth"
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        args = record.args
+        # uvicorn: (client, method, path, http version, status)
+        if isinstance(args, tuple) and len(args) >= 3 \
+                and args[1] == "GET" and args[2] == self.PATH \
+                and isinstance(args[0], str) \
+                and args[0].rsplit(":", 1)[0] in ("127.0.0.1", "::1"):
+            return False
+        return True
+
+
 logging.getLogger("uvicorn.access").addFilter(_RedactKnowledgeKeys())
+logging.getLogger("uvicorn.access").addFilter(_DropHealthcheck())
 
 from contextlib import asynccontextmanager
 

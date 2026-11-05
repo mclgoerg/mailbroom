@@ -172,3 +172,28 @@ def test_post_ai_threads_keys_through_to_start_group_review(bridge, monkeypatch)
 
     client.post("/api/ai", json={"grouping": "sender"})
     assert captured["keys"] is None   # omitted -> every unrated group
+
+
+def _access_record(client_addr, method, path):
+    import logging
+    return logging.LogRecord(
+        "uvicorn.access", logging.INFO, __file__, 0,
+        '%s - "%s %s HTTP/%s" %d',
+        (client_addr, method, path, "1.1", 200), None)
+
+
+def test_healthcheck_access_lines_are_dropped_only():
+    import logging
+    log = logging.getLogger("uvicorn.access")
+
+    def kept(*a):
+        return all(f.filter(_access_record(*a)) for f in log.filters)
+
+    # The container's own probe is silent ...
+    assert not kept("127.0.0.1:41234", "GET", "/api/auth")
+    assert not kept("::1:41234", "GET", "/api/auth")
+    # ... but the same path from a real client, other paths and other
+    # methods are still logged.
+    assert kept("192.0.2.7:5555", "GET", "/api/auth")
+    assert kept("127.0.0.1:41234", "GET", "/api/state")
+    assert kept("127.0.0.1:41234", "POST", "/api/auth")
