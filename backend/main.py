@@ -110,6 +110,23 @@ def _log_accepted_hosts() -> None:
             webguard.describe_accepted())
 
 
+def _warn_open_oidc() -> None:
+    """Startup warning: SSO with an empty allow-list admits every account
+    at the identity provider."""
+    auth_cfg = cfgmod.load_server()["auth"]
+    if auth_cfg["mode"] != "oidc":
+        return
+    log = logging.getLogger("pmc.auth")
+    if not (auth_cfg.get("oidc", {}).get("allowed") or []):
+        log.warning(
+            "SSO allow-list is empty - anyone with an account at the "
+            "identity provider can sign in and gets their own workspace")
+    if not (auth_cfg.get("admin") or "").strip():
+        log.warning(
+            "no SSO admin is set - the first identity to sign in becomes "
+            "the admin (set OIDC_ADMIN or enter it in Settings -> Server)")
+
+
 @asynccontextmanager
 async def _lifespan(app: FastAPI):
     from . import secretbox
@@ -120,6 +137,7 @@ async def _lifespan(app: FastAPI):
             "volume backups). Generate a key with `openssl rand -base64 32` "
             "and keep it OUT of the backups.")
     _log_accepted_hosts()
+    _warn_open_oidc()
     # Show the last scan of every tenant's accounts right away instead of
     # an empty view (safe: moves re-check UIDVALIDITY; undo works by
     # Message-ID).
@@ -362,6 +380,14 @@ def get_oidc_callback(request: Request, code: str = Query(""),
                                        verifier)
     except Exception as exc:
         raise HTTPException(502, f"token exchange failed: {exc}")
+    if authmod.email_unverified(claims):
+        logging.getLogger("pmc.auth").warning(
+            "OIDC login refused for %r (email not verified by the IdP)",
+            claims.get("email") or claims.get("sub"))
+        # a top-level navigation: land on the login page, which words it
+        resp = RedirectResponse("/?login_error=email_unverified")
+        resp.delete_cookie(_PKCE_COOKIE)
+        return resp
     sub = authmod.allowed_subject(claims,
                                   cfg["auth"]["oidc"].get("allowed") or [])
     if not sub:

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { api } from "../api";
 import { t } from "../i18n";
 import type { AuthMode } from "../types";
@@ -10,8 +10,18 @@ export function Login({ mode, onLogin }: {
   onLogin: () => void;
 }) {
   const [password, setPassword] = useState("");
-  const [error, setError] = useState("");
+  const [error, setError] = useState(() => {
+    // The SSO callback sends refusals here as ?login_error=<code>.
+    const code = new URLSearchParams(window.location.search).get("login_error");
+    return code === "email_unverified" ? t("login.err.email_unverified") : "";
+  });
   const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).has("login_error")) {
+      window.history.replaceState(null, "", window.location.pathname);
+    }
+  }, []);
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
