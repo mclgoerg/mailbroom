@@ -136,7 +136,10 @@ RULE_PURGE_KEEP_LATEST = "rule_purge_keep_latest"
 RULE_PURGE_NEEDS_AGE = "rule_purge_needs_age"
 RULE_PURGE_FILTER = "rule_purge_filter"                  # names=
 RULE_PURGE_FILTER_DOMAIN = "rule_purge_filter_domain"    # names=
+# a List-Unsubscribe mailto: that would not be one plain mail to one address
+MAILTO_UNSAFE = "mailto_unsafe"
 FOLDER_ERROR_CODES = frozenset({
+    MAILTO_UNSAFE,
     NO_MESSAGE_ID, PINNED_MAILS, PROTECTED_MAILS, ALL_PINNED,
     ROLE_NOT_CANDIDATE, ROLE_AMBIGUOUS, NOT_LOOKALIKE, MOVE_UNSAFE,
     BUSY_ACTION,
