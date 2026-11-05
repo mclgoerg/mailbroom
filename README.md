@@ -426,6 +426,10 @@ in the UI; they persist in `/data`. Env bootstrap for other providers:
 > `AUTH_PASSWORD`, `OIDC_*` - see `deploy/.env.example`).
 > Remember that Docker published ports bypass ufw.
 >
+> Changing the password, the login method, the allowed users or the admin
+> signs every browser out (as does Settings → Server → *Sign out all
+> sessions*). Logging out only clears that browser's cookie.
+>
 > Without a login, Mailbroom also refuses requests whose `Host` is not
 > `localhost` or an IP address (protection against DNS rebinding). To open
 > it under a host name, add `MAILBROOM_ALLOWED_HOSTS=<name>` (comma list,

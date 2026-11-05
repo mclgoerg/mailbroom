@@ -13,7 +13,7 @@ from typing import Literal
 import logging
 import os
 
-from fastapi import FastAPI, HTTPException, Query, Request
+from fastapi import FastAPI, HTTPException, Query, Request, Response
 from fastapi.exception_handlers import request_validation_exception_handler
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import (FileResponse, HTMLResponse, JSONResponse,
@@ -1763,8 +1763,39 @@ def get_config():
     return cfgmod.masked_config(cfgmod.load_config())
 
 
+def _keep_caller_signed_in(request: Request, response: Response,
+                           old_sub: str | None, epoch_before: str) -> None:
+    """After a sign-out of everyone (new epoch) the person who did it keeps
+    their own browser signed in: a fresh cookie for the identity that fits
+    the CURRENT mode (a password session has no identity in SSO mode)."""
+    if authmod.current_epoch() == epoch_before:
+        return
+    mode = cfgmod.load_server()["auth"]["mode"]
+    if mode == "password":
+        sub = "password"
+    elif mode == "oidc" and old_sub and old_sub != "password":
+        sub = old_sub
+    else:
+        return
+    _set_session(response, request, sub)
+
+
+@app.post("/api/auth/sign_out_all")
+def post_sign_out_all(request: Request, response: Response):
+    """Admin only: every session cookie issued so far stops working (the
+    caller's own browser gets a fresh one)."""
+    if not cfgmod.is_admin():
+        raise HTTPException(403, "admin only")
+    old_sub, before = _session_sub(request), authmod.current_epoch()
+    authmod.renew_epoch()
+    logging.getLogger("pmc.auth").info("all sessions signed out")
+    _keep_caller_signed_in(request, response, old_sub, before)
+    return {"ok": True}
+
+
 @app.post("/api/config")
-def post_config(body: dict):
+def post_config(body: dict, request: Request, response: Response):
+    old_sub, epoch_before = _session_sub(request), authmod.current_epoch()
     if body.get("reset_ai_stats"):
         cfgmod.reset_stats()
     if body.get("clear_ai_verdicts"):
@@ -1821,6 +1852,7 @@ def post_config(body: dict):
     # Own-row threshold or protected list changed -> smart rows re-derive
     # (no-op otherwise, so unrelated saves never reshuffle the list).
     mailops.rebuild_smart_all()
+    _keep_caller_signed_in(request, response, old_sub, epoch_before)
     return cfgmod.masked_config(cfg)
 
 

@@ -101,6 +101,16 @@ export const EN: Record<string, string> = {
   "login.err.email_unverified":
     "Sign-in refused: your identity provider has not verified this email "
     + "address.",
+  "login.sign_out_all": "Sign out all sessions…",
+  "login.sign_out_all_help":
+    "Changing the password, the login method, the allowed users or the "
+    + "admin does this automatically.",
+  "login.signed_out_all": "All other sessions were signed out.",
+  "confirm.sign_out_all": "Sign out all sessions",
+  "confirm.sign_out_all_body":
+    "Every browser and device that is signed in must sign in again. This "
+    + "browser stays signed in.",
+  "confirm.sign_out_all_confirm": "Sign out all",
   "login.submit": "Sign in",
   "login.sso": "Sign in with SSO",
   "login.logout": "Logout",

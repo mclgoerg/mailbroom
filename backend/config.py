@@ -773,9 +773,12 @@ def update_config(body: dict) -> dict:
             raise PermissionError(
                 "only the admin can change server settings")
         server = load_server() if (auth_in or shared_in) else None
+        renew_sessions = False
         if auth_in:
             from . import auth as authmod
             acfg = server["auth"]
+            before = (acfg["mode"], acfg.get("admin"),
+                      tuple(acfg["oidc"].get("allowed") or []))
             if auth_in.get("password"):
                 acfg["password_hash"] = authmod.hash_password(
                     str(auth_in["password"]))
@@ -802,6 +805,11 @@ def update_config(body: dict) -> dict:
                     raise ValueError("OIDC needs issuer, client ID and "
                                      "client secret")
                 acfg["mode"] = mode
+            # Anything that decides who may be signed in ends every
+            # existing session (applied below, once the write succeeds).
+            renew_sessions = bool(auth_in.get("password")) or before != (
+                acfg["mode"], acfg.get("admin"),
+                tuple(acfg["oidc"].get("allowed") or []))
         if shared_in:
             scfg = server["shared_ai"]
             if "enabled" in shared_in:
@@ -822,6 +830,8 @@ def update_config(body: dict) -> dict:
         if server is not None:
             _write_server(server)
             cfg["auth"] = server["auth"]
+            if auth_in and renew_sessions:
+                authmod.renew_epoch()
         ai_in = body.get("ai") or {}
         if ai_in.get("provider") in AI_PROVIDERS:
             cfg["ai"]["provider"] = ai_in["provider"]
