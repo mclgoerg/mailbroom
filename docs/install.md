@@ -105,10 +105,30 @@ names as `.env.example`), deploy.
 Nothing special to do - the image is multi-arch (amd64 + arm64). A
 64-bit OS is required (Raspberry Pi OS 64-bit, Pi 4/5).
 
+## Gmail app password
+
+The simple path, and the default for a new Gmail account. In Mailbroom,
+choose the **Gmail** preset, leave the sign-in method on **App
+password**, enter your address as the user and the app password below.
+
+1. Create it at <https://myaccount.google.com/apppasswords>. Google
+   only offers app passwords on accounts with 2-Step Verification
+   turned on; the option is missing if 2-Step Verification is set up
+   only for security keys, if the account has Advanced Protection, or
+   for work/school accounts where the administrator blocks it (see
+   Google's help page "Sign in with app passwords").
+2. Google shows it as four groups of four letters. Paste it as shown -
+   Mailbroom removes the spaces.
+3. Changing your Google Account password revokes your app passwords;
+   create a new one then.
+
+If an app password is not available to you, use OAuth instead (below).
+Switching between the two in Settings keeps both credentials.
+
 ## Gmail OAuth setup
 
-Mailbroom connects to Gmail via OAuth only (no app-password option in
-the settings UI). Google requires every OAuth client to be registered
+The alternative sign-in method for Gmail (choose **OAuth** next to
+*Sign-in method*). Google requires every OAuth client to be registered
 by whoever uses it - there is no shared "Sign in with Google" option,
 because the restricted mail scope needs per-app Google verification.
 

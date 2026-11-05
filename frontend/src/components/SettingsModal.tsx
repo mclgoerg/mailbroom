@@ -3,8 +3,8 @@ import { Check, RefreshCw, Settings as SettingsIcon, Shield, Star, X }
 import { useEffect, useRef, useState } from "react";
 import { api, downloadFile, fmtUsd } from "../api";
 import { getLang, setLang, t, type Lang } from "../i18n";
-import { fmtAgo, fmtSize } from "../lib";
-import type { AdminTenantStats, AuthMode, AutoScanUnit, BodySearchMode, Config,
+import { accountAuth, fmtAgo, fmtSize } from "../lib";
+import type { AdminTenantStats, AuthMethod, AuthMode, AutoScanUnit, BodySearchMode, Config,
   DigestSchedule, FoldersResp, OauthProvider, Preset, Security,
   SmtpSecurity } from "../types";
 import { FolderSettings } from "./FolderSettings";
@@ -27,7 +27,7 @@ const PRESETS: Record<Exclude<Preset, "custom">, {
     cafile: "/certs/bridge-cert.pem", hint: "preset.hint.proton" },
   gmail: { host: "imap.gmail.com", port: 993, security: "ssl",
     smtpHost: "smtp.gmail.com", smtpPort: 465, smtpSecurity: "ssl",
-    cafile: "", hint: "preset.hint.oauth_gmail" },
+    cafile: "", hint: "preset.hint.gmail" },
   outlook: { host: "outlook.office365.com", port: 993, security: "ssl",
     smtpHost: "smtp.office365.com", smtpPort: 587, smtpSecurity: "starttls",
     // Unused: presetHint below computes this dynamically (depends on
@@ -90,6 +90,7 @@ export function SettingsModal({ cfg, account, onClose, onSaved,
       cafile: im.cafile ?? "",
       user: im.user,
       password: "",
+      auth: accountAuth(im),
       oauthProvider: (im.oauth?.provider ?? "") as "" | OauthProvider,
       oauthClientId: im.oauth?.client_id ?? "",
       oauthClientSecret: "",
@@ -214,18 +215,28 @@ export function SettingsModal({ cfg, account, onClose, onSaved,
       | HTMLTextAreaElement>) =>
       setF({ ...f, [k]: e.target.value });
 
-  const PRESET_OAUTH: Partial<Record<Preset, OauthProvider>> =
-    { gmail: "google", outlook: "microsoft" };
+  // Which sign-in method a preset starts on: Gmail keeps the saved choice
+  // if the account already was Gmail, else App password (the default);
+  // Outlook is OAuth-only; custom keeps the saved choice; every other
+  // preset has no OAuth at all (so a leftover token block is not used).
+  const presetAuth = (p: Preset): AuthMethod => {
+    const saved = imapOf(cfg, editAcct);
+    return p === "outlook" ? "oauth"
+      : p === "gmail" ? (saved.preset === "gmail" ? accountAuth(saved)
+        : "password")
+      : p === "custom" ? accountAuth(saved)
+      : "password";
+  };
   const applyPreset = (p: Preset) => {
     if (p === "custom") {
-      setF({ ...f, preset: p, oauthProvider: "" });
+      setF({ ...f, preset: p, auth: presetAuth(p) });
       return;
     }
     const pre = PRESETS[p];
     setF({ ...f, preset: p, host: pre.host, port: String(pre.port),
       security: pre.security, smtpHost: pre.smtpHost,
       smtpPort: String(pre.smtpPort), smtpSecurity: pre.smtpSecurity,
-      cafile: pre.cafile, oauthProvider: PRESET_OAUTH[p] ?? "" });
+      cafile: pre.cafile, auth: presetAuth(p) });
   };
   const presetHint = f.preset === "custom" ? ""
     // Outlook's hint depends on whether this server has a shared
@@ -235,13 +246,17 @@ export function SettingsModal({ cfg, account, onClose, onSaved,
         : "preset.hint.oauth_outlook_byo")
       : PRESETS[f.preset].hint;
   // The provider preset already says which mail service this is, so it
-  // also decides the OAuth provider - no need to ask again. Only a
-  // preset outside gmail/outlook falls back to whatever the account's
-  // saved oauth block already has (a leftover from a custom setup).
+  // also decides the OAuth provider - no need to ask again. Only when the
+  // account signs in via OAuth: gmail -> google, outlook -> microsoft,
+  // custom -> whatever its saved oauth block has; others never.
   const oauthProvider: "" | OauthProvider =
-    f.preset === "gmail" ? "google"
-    : f.preset === "outlook" ? "microsoft"
-    : f.oauthProvider;
+    f.preset === "outlook" ? "microsoft"
+    : f.auth !== "oauth" ? ""
+    : f.preset === "gmail" ? "google"
+    : f.preset === "custom" ? f.oauthProvider
+    : "";
+  // The method actually in force: OAuth only where a provider exists.
+  const auth: AuthMethod = oauthProvider ? "oauth" : "password";
 
   const excludedList = (): string[] | undefined => {
     if (!folders) return undefined;   // picker never loaded: keep old config
@@ -269,7 +284,11 @@ export function SettingsModal({ cfg, account, onClose, onSaved,
             align_minute: +f.autoScanAlign || 0 },
           body_search: f.bodySearch,
           smart_min: Math.min(50, Math.max(2, Math.round(+f.smartMin) || 10)),
-          ...(f.password ? { password: f.password } : {}),
+          auth,
+          // Google shows an app password as 4 groups of 4 letters; it
+          // never contains a space.
+          ...(f.password ? { password: f.preset === "gmail"
+            ? f.password.replace(/\s+/g, "") : f.password } : {}),
           ...(oauthProvider ? { oauth: { provider: oauthProvider,
             client_id: f.oauthClientId,
             ...(f.oauthClientSecret
@@ -527,6 +546,92 @@ export function SettingsModal({ cfg, account, onClose, onSaved,
   ];
   const importInput = useRef<HTMLInputElement>(null);
 
+  const passwordField = (
+    <Field label={f.preset === "gmail" ? t("signin.password")
+      : t("Password")}>
+      <Input className="w-full" type="password" value={f.password}
+        placeholder={imapOf(cfg, editAcct).password_set
+          ? t("(unchanged)") : t("required")}
+        onChange={set("password")} />
+    </Field>
+  );
+  const oauthCard = !oauthProvider ? null : (
+    <div className="rounded-card border border-line bg-panel2 p-3">
+      <SectionLabel>
+        {t("oauth.title", { provider: oauthProvider === "google"
+          ? "Gmail" : "Outlook" })}
+      </SectionLabel>
+
+      {oauthProvider === "google" && (
+        <p className="my-2 type-meta text-muted">{t("oauth.google_help")}</p>
+      )}
+      {oauthProvider === "microsoft" && cfg.oauth_ms_device_available && (
+        <p className="my-2 type-meta text-muted">{t("oauth.ms_device_help")}</p>
+      )}
+      {oauthProvider === "microsoft" && !cfg.oauth_ms_device_available && (
+        <p className="my-2 type-meta text-muted">{t("oauth.ms_byo_help")}</p>
+      )}
+
+      {!(oauthProvider === "microsoft"
+        && cfg.oauth_ms_device_available) && (
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+          <Field label={t("oauth.client_id")}>
+            <Input className="w-full" value={f.oauthClientId}
+              onChange={set("oauthClientId")} />
+          </Field>
+          <Field label={t("oauth.client_secret")}>
+            <Input className="w-full" type="password"
+              value={f.oauthClientSecret}
+              placeholder={f.oauthClientSecretSet
+                ? t("(unchanged)") : t("required")}
+              onChange={set("oauthClientSecret")} />
+          </Field>
+        </div>
+      )}
+
+      <div className="mt-3 flex flex-wrap items-center gap-2">
+        {f.oauthConnected ? (<>
+          <span className="inline-flex items-center gap-1.5 type-body
+            text-safe-fg">
+            <Check size={16} /> {t("oauth.connected")}
+          </span>
+          <Button variant="secondary" onClick={disconnectOauth}>
+            {t("oauth.disconnect")}
+          </Button>
+        </>) : oauthProvider === "microsoft"
+          && cfg.oauth_ms_device_available ? (
+          <Button onClick={startDeviceConnect}>
+            {t("oauth.connect_device")}
+          </Button>
+        ) : (
+          <Button onClick={connectOauth} disabled={!f.oauthClientId}>
+            {t("oauth.connect")}
+          </Button>
+        )}
+      </div>
+
+      {deviceInfo && (
+        <div className="mt-2 rounded-card border border-line bg-panel p-3
+          type-body">
+          <p>{t("oauth.device_instructions")}</p>
+          <p className="mt-1">
+            <a href={deviceInfo.verificationUri} target="_blank"
+              rel="noreferrer" className={LINK_ACCENT}>
+              {deviceInfo.verificationUri}
+            </a>
+          </p>
+          {/* tracking-widest: a code the user types, so keep its letters apart. */}
+          <p className="mt-1 font-mono type-heading tracking-widest">
+            {deviceInfo.userCode}
+          </p>
+        </div>
+      )}
+      {oauthMsg && (
+        <p className="mt-2 type-meta text-muted">{oauthMsg}</p>
+      )}
+    </div>
+  );
+
   return (
     // full = fixed-height sheet: switching tabs must not resize or
     // re-center the modal (only the content area scrolls; header, tab
@@ -624,14 +729,26 @@ export function SettingsModal({ cfg, account, onClose, onSaved,
         <Field label={t("User")}>
           <Input className="w-full" value={f.user} onChange={set("user")} />
         </Field>
-        {!oauthProvider && (
-        <Field label={t("Password")}>
-          <Input className="w-full" type="password" value={f.password}
-            placeholder={imapOf(cfg, editAcct).password_set
-              ? t("(unchanged)") : t("required")}
-            onChange={set("password")} />
-        </Field>
+        {f.preset === "gmail" && (
+        <div className="sm:col-span-2">
+          <div className="mb-1 type-meta text-muted">{t("signin.label")}</div>
+          <Segmented fill idPrefix="signin" label={t("signin.label")}
+            value={auth}
+            onChange={(v) => setF({ ...f, auth: v })}
+            options={[
+              { value: "password", label: t("signin.password") },
+              { value: "oauth", label: t("signin.oauth") }]} />
+          <div {...tabPanelProps("signin", auth)} className="mt-3">
+            {auth === "password" ? (<>
+              {passwordField}
+              <p className="mt-1 type-meta text-muted">
+                {t("signin.gmail_apppw_help")}
+              </p>
+            </>) : oauthCard}
+          </div>
+        </div>
         )}
+        {f.preset !== "gmail" && auth === "password" && passwordField}
         <Field label={t("smtp.host")}>
           <Input className="w-full" value={f.smtpHost}
             placeholder={t("smtp.host_placeholder")}
@@ -662,82 +779,8 @@ export function SettingsModal({ cfg, account, onClose, onSaved,
           </Field>
         </div>
 
-        {oauthProvider && (
-        <div className="sm:col-span-2 rounded-card border border-line
-          bg-panel2 p-3">
-          <SectionLabel>
-            {t("oauth.title", { provider: oauthProvider === "google"
-              ? "Gmail" : "Outlook" })}
-          </SectionLabel>
-
-          {oauthProvider === "google" && (
-            <p className="my-2 type-meta text-muted">{t("oauth.google_help")}</p>
-          )}
-          {oauthProvider === "microsoft" && cfg.oauth_ms_device_available && (
-            <p className="my-2 type-meta text-muted">{t("oauth.ms_device_help")}</p>
-          )}
-          {oauthProvider === "microsoft" && !cfg.oauth_ms_device_available && (
-            <p className="my-2 type-meta text-muted">{t("oauth.ms_byo_help")}</p>
-          )}
-
-          {!(oauthProvider === "microsoft"
-            && cfg.oauth_ms_device_available) && (
-            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-              <Field label={t("oauth.client_id")}>
-                <Input className="w-full" value={f.oauthClientId}
-                  onChange={set("oauthClientId")} />
-              </Field>
-              <Field label={t("oauth.client_secret")}>
-                <Input className="w-full" type="password"
-                  value={f.oauthClientSecret}
-                  placeholder={f.oauthClientSecretSet
-                    ? t("(unchanged)") : t("required")}
-                  onChange={set("oauthClientSecret")} />
-              </Field>
-            </div>
-          )}
-
-          <div className="mt-3 flex flex-wrap items-center gap-2">
-            {f.oauthConnected ? (<>
-              <span className="inline-flex items-center gap-1.5 type-body
-                text-safe-fg">
-                <Check size={16} /> {t("oauth.connected")}
-              </span>
-              <Button variant="secondary" onClick={disconnectOauth}>
-                {t("oauth.disconnect")}
-              </Button>
-            </>) : oauthProvider === "microsoft"
-              && cfg.oauth_ms_device_available ? (
-              <Button onClick={startDeviceConnect}>
-                {t("oauth.connect_device")}
-              </Button>
-            ) : (
-              <Button onClick={connectOauth} disabled={!f.oauthClientId}>
-                {t("oauth.connect")}
-              </Button>
-            )}
-          </div>
-
-          {deviceInfo && (
-            <div className="mt-2 rounded-card border border-line bg-panel p-3
-              type-body">
-              <p>{t("oauth.device_instructions")}</p>
-              <p className="mt-1">
-                <a href={deviceInfo.verificationUri} target="_blank"
-                  rel="noreferrer" className={LINK_ACCENT}>
-                  {deviceInfo.verificationUri}
-                </a>
-              </p>
-              {/* tracking-widest: a code the user types, so keep its letters apart. */}
-              <p className="mt-1 font-mono type-heading tracking-widest">
-                {deviceInfo.userCode}
-              </p>
-            </div>
-          )}
-          {oauthMsg && (
-            <p className="mt-2 type-meta text-muted">{oauthMsg}</p>
-          )}
-        </div>
+        {f.preset !== "gmail" && oauthCard && (
+          <div className="sm:col-span-2">{oauthCard}</div>
         )}
 
         <div className="sm:col-span-2">

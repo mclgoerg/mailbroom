@@ -35,7 +35,8 @@ import { AccountAvatar, applyTheme, BAR_ICON_BTN, BulkBar, Button, Chip, ChipGro
   type ToastVariant } from "./components/ui";
 import { t } from "./i18n";
 import { usePaneHeight, useSplitPane } from "./splitPane";
-import { applyStatus, fmtAgo, fmtSize, fmtUsd, matchGroup, parseFilter,
+import { applyStatus, fmtAgo, fmtSize, fmtUsd, hasCredentials, matchGroup,
+  parseFilter,
   parseProgress, retainedMailKeys, shortcutTarget, smartMembers } from "./lib";
 import { filedKindName, isPooled, keptMessage, smartLabel, smartView }
   from "./smart";
@@ -2098,7 +2099,7 @@ export default function App() {
             <li>{t("onboard.step_scan")}</li>
           </ol>
           <div className="mt-4 flex items-center gap-3">
-            {acct?.password_set && (
+            {hasCredentials(acct) && (
               <Button variant="secondary" onClick={async () => {
                 setPending(t("onboard.testing"));
                 try {
@@ -2111,7 +2112,7 @@ export default function App() {
                 setPending("");
               }}>{t("onboard.test")}</Button>
             )}
-            <Button onClick={startScan} disabled={!acct?.password_set}>
+            <Button onClick={startScan} disabled={!hasCredentials(acct)}>
               {t("Scan")}
             </Button>
           </div>
