@@ -1753,6 +1753,11 @@ export const DE: Record<string, string> = {
   "ferr.count_required":
     "Der Ordner wurde noch nicht gezählt – lade ihn neu und "
     + "bestätige erneut.",
+  "ferr.data_not_writable":
+    "Mailbroom kann nicht in seinen Datenordner schreiben. Gib auf dem "
+    + "Host der Benutzer-ID 1000 den Ordner, der unter /data eingebunden ist "
+    + "(chown -R 1000:1000 <Ordner>), oder starte den Container mit --user, "
+    + "und starte ihn dann neu.",
   "ferr.role_missing":
     "Auf dem Server wurde kein Ordner für „{folder}“ gefunden.",
   "ferr.inbox_missing": "Auf dem Server wurde kein Posteingang gefunden.",
