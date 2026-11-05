@@ -133,8 +133,18 @@ async def _lifespan(app: FastAPI):
     autoscanmod.start_scheduler()
     yield
 
-app = FastAPI(title="mailbroom", docs_url=None, redoc_url=None,
-              lifespan=_lifespan)
+def _app_version() -> str:
+    """The release version (version.txt at the repo / image root)."""
+    try:
+        v = (Path(__file__).resolve().parent.parent
+             / "version.txt").read_text().strip()
+    except OSError:
+        return "0.0.0-dev"
+    return v or "0.0.0-dev"
+
+
+app = FastAPI(title="mailbroom", version=_app_version(),
+              docs_url=None, redoc_url=None, lifespan=_lifespan)
 
 
 @app.exception_handler(RequestValidationError)
