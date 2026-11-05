@@ -21,6 +21,7 @@ RUN pip install --no-cache-dir --require-hashes -r requirements.txt \
     && mkdir -p /data && chown app:app /data
 COPY backend/ ./backend/
 COPY LICENSE ./LICENSE
+COPY version.txt ./version.txt
 COPY --from=web /web/dist ./static/
 # COPY preserves host file modes, which may not be world-readable.
 RUN chmod -R a+rX /app

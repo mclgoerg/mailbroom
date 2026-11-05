@@ -480,8 +480,10 @@ test("trashing ticked senders acts on exactly those addresses", async () => {
   expect(screen.queryByRole("button", { name: /^Trash all/ })).toBeNull();
   fireEvent.click(screen.getByRole("button", { name: "Trash selected (1)" }));
   const dlg = await findDialog();
-  expect(within(dlg).getByText("3 mails from 1 sender will be affected"))
+  expect(within(dlg).getByText("3 mails from promo@lone.example"))
     .toBeTruthy();
+  expect(within(dlg).getByText(
+    "You can undo this from the result message.")).toBeTruthy();
   await pressDialog("Move to Trash (3)");
   await waitFor(() => expect(deleteGroups).toHaveBeenCalledWith(
     "sender", ["promo@lone.example"], "trash", "", false, null, null));
@@ -566,8 +568,9 @@ test("a pool of hundreds of senders at N=2: search, tick all matches, act on "
     fireEvent.click(screen.getByRole("button", { name: `Select all ${hits} shown` }));
     fireEvent.click(screen.getByRole("button", { name: `Trash selected (${hits})` }));
     const dlg = await findDialog();
-    expect(within(dlg).getByText(`${hits * 3} mails from ${hits} senders will be affected`))
-      .toBeTruthy();
+    // names the first three senders, then counts the rest
+    expect(dlg.textContent).toMatch(
+      new RegExp(`${hits * 3} mails from .+, .+, .+ and ${hits - 3} more`));
     await pressDialog(`Move to Trash (${hits * 3})`);
     await waitFor(() => expect(deleteGroups).toHaveBeenCalled());
     const [grouping, keys] = deleteGroups.mock.calls[0];
