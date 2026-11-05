@@ -1773,6 +1773,10 @@ if STATIC_DIR.is_dir():
 
     @app.get("/{path:path}", include_in_schema=False)
     def spa(path: str):
+        # An unknown API path must be a real 404, not the HTML shell with
+        # a 200 - clients and probes would otherwise take it for success.
+        if path == "api" or path.startswith("api/"):
+            raise HTTPException(404, "not found")
         # Containment check: `path` is percent-decoded and may contain ../ or
         # be absolute (pathlib discards the left side then) - never serve
         # anything that resolves outside the static dir. CodeQL's
