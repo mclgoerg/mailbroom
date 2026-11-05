@@ -14,9 +14,11 @@ import hashlib
 import hmac
 import json
 import logging
+import math
 import os
 import re
 import secrets
+import threading
 import time
 import urllib.parse
 import urllib.request
@@ -204,6 +206,50 @@ def verify_session(token: str, now: float | None = None) -> str | None:
         return base64.urlsafe_b64decode(sub64 + pad).decode()
     except (ValueError, TypeError):
         return None
+
+
+class LoginThrottle:
+    """Failed password logins per peer address: after `limit` failures
+    within `window` seconds the peer is refused until the oldest one ages
+    out; a success clears the peer. In memory only (a restart forgives)."""
+
+    def __init__(self, limit: int = 5, window: float = 15 * 60,
+                 clock=time.time):
+        self.limit, self.window, self.clock = limit, window, clock
+        self._fails: dict[str, list[float]] = {}
+        self._lock = threading.Lock()
+
+    def _recent(self, peer: str) -> list[float]:
+        cutoff = self.clock() - self.window
+        recent = [t for t in self._fails.get(peer, []) if t > cutoff]
+        if recent:
+            self._fails[peer] = recent
+        else:
+            self._fails.pop(peer, None)
+        return recent
+
+    def retry_after(self, peer: str) -> int:
+        """Seconds until `peer` may try again; 0 when it may now."""
+        with self._lock:
+            recent = self._recent(peer)
+            if len(recent) < self.limit:
+                return 0
+            return max(1, math.ceil(recent[0] + self.window - self.clock()))
+
+    def failed(self, peer: str) -> None:
+        with self._lock:
+            if len(self._fails) > 1000:            # bound the table
+                for other in list(self._fails):
+                    self._recent(other)
+            self._recent(peer)
+            self._fails.setdefault(peer, []).append(self.clock())
+
+    def succeeded(self, peer: str) -> None:
+        with self._lock:
+            self._fails.pop(peer, None)
+
+
+login_throttle = LoginThrottle()
 
 
 def make_state(now: float | None = None) -> str:

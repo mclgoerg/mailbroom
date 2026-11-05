@@ -982,6 +982,10 @@ export const DE: Record<string, string> = {
     "Jeder Browser und jedes Gerät, das angemeldet ist, muss sich neu "
     + "anmelden. Dieser Browser bleibt angemeldet.",
   "confirm.sign_out_all_confirm": "Alle abmelden",
+  "ferr.login_throttled":
+    "Zu viele fehlgeschlagene Versuche. Versuche es in {n} Minuten erneut.",
+  "ferr.login_throttled_one":
+    "Zu viele fehlgeschlagene Versuche. Versuche es in 1 Minute erneut.",
   "login.submit": "Anmelden",
   "login.sso": "Mit SSO anmelden",
   "login.logout": "Abmelden",

@@ -19,6 +19,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import (FileResponse, HTMLResponse, JSONResponse,
                                RedirectResponse, StreamingResponse)
 from fastapi.staticfiles import StaticFiles
+from starlette.concurrency import run_in_threadpool
 from pydantic import BaseModel, Field
 
 from . import accounts as accountsmod
@@ -346,13 +347,23 @@ async def post_login(body: LoginBody, request: Request):
     cfg = cfgmod.load_config()
     if cfg["auth"]["mode"] != "password":
         raise HTTPException(400, "password login is not enabled")
-    if not authmod.verify_password(body.password,
-                                   cfg["auth"]["password_hash"]):
+    peer = request.client.host if request.client else "?"
+    wait = authmod.login_throttle.retry_after(peer)
+    if wait:
+        # No hash check at all: even the right password waits its turn.
         logging.getLogger("pmc.auth").warning(
-            "failed login from %s", request.client.host
-            if request.client else "?")
+            "login from %s throttled for another %ds", peer, wait)
+        raise HTTPException(
+            429, mailops.coded(mailops.LOGIN_THROTTLED, n=-(-wait // 60)),
+            headers={"Retry-After": str(wait)})
+    # scrypt takes ~100 ms of CPU: keep it off the event loop.
+    if not await run_in_threadpool(authmod.verify_password, body.password,
+                                   cfg["auth"]["password_hash"]):
+        authmod.login_throttle.failed(peer)
+        logging.getLogger("pmc.auth").warning("failed login from %s", peer)
         await asyncio.sleep(0.5)          # soften brute force
         raise HTTPException(401, "wrong password")
+    authmod.login_throttle.succeeded(peer)
     resp = JSONResponse({"ok": True})
     _set_session(resp, request, "password")
     logging.getLogger("pmc.auth").info("password login ok")

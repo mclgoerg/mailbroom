@@ -323,3 +323,13 @@ describe("the unsubscribe codes", () => {
       .toBe("RuntimeError: endpoint down");
   });
 });
+
+describe("the login throttle code", () => {
+  test("names the minutes in both languages", () => {
+    expect(errorText("login_throttled:n=7"))
+      .toBe("Too many failed attempts. Try again in 7 minutes.");
+    expect(errorText("login_throttled:n=1")).toContain("in 1 minute.");
+    setLang("de");
+    expect(errorText("login_throttled:n=7")).toContain("7 Minuten");
+  });
+});
