@@ -71,7 +71,7 @@ Release would show. To give users the real story:
 
 ```bash
 # backend (Python 3.15)
-pip install -r backend/requirements-dev.txt
+pip install --require-hashes -r backend/requirements-dev.txt
 python -m pytest tests/ -q
 
 # frontend (Node 26)
@@ -80,10 +80,29 @@ npm test          # tsc --noEmit + vitest
 
 # or exactly like CI, via Docker:
 docker run --rm -v "$PWD":/app -w /app python:3.15-slim \
-  sh -c "pip install -q -r backend/requirements-dev.txt && python -m pytest tests/ -q"
+  sh -c "pip install -q --require-hashes -r backend/requirements-dev.txt && python -m pytest tests/ -q"
 docker run --rm -v "$PWD/frontend":/app -w /app node:26-alpine \
   sh -c "npm ci --no-audit --no-fund && npm test"
 ```
+
+### Backend dependencies
+
+`backend/requirements.in` / `requirements-dev.in` hold the minimums we
+choose; `requirements.txt` / `requirements-dev.txt` are the pinned,
+hash-checked lockfiles that CI and the Docker build install
+(`--require-hashes`). Don't edit the `.txt` files by hand. After changing
+a `.in` file, re-compile with the image's Python (pip-tools is a dev-only
+tool, never shipped):
+
+```bash
+docker run --rm --user "$(id -u):$(id -g)" -e HOME=/tmp -v "$PWD":/app \
+  -w /app/backend python:3.15-slim sh -c "pip install -q --user pip-tools \
+  && /tmp/.local/bin/pip-compile -q --generate-hashes --strip-extras --allow-unsafe -o requirements.txt requirements.in \
+  && /tmp/.local/bin/pip-compile -q --generate-hashes --strip-extras --allow-unsafe -o requirements-dev.txt requirements-dev.in"
+```
+
+Add `--upgrade` to refresh every pin. Dependabot understands the
+pip-compile pair and bumps both files.
 
 No IMAP server or network is needed - the backend suite runs against an
 in-memory fake IMAP server (`tests/conftest.py`).
