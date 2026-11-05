@@ -398,7 +398,7 @@ export default function App() {
         startToast.current.unsub = undefined;
       }
       if (unsub.status === "error")
-        notify(t("err.unsub", { msg: unsub.error }), "error");
+        notify(t("err.unsub", { msg: errorText(unsub.error) }), "error");
       else if (unsub.status === "done" && unsub.total > 0)
         notify(t("unsub.done", { done: unsub.done, links: unsub.links,
           failed: unsub.failed }), "success");

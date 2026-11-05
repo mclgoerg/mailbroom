@@ -298,3 +298,28 @@ describe("EN / DE parity of the new texts", () => {
     }
   });
 });
+
+describe("the unsubscribe codes", () => {
+  test.each([
+    "mailto_unsafe", "unsub_blocked", "unsub_tls", "unsub_unreachable",
+    "unsub_timeout", "unsub_bad_url", "unsub_no_method", "unsub_mail_failed",
+    "unsub_pooled", "unsub_unknown_group", "unsub_failed",
+  ])("%s is worded in both languages", (code) => {
+    const key = `ferr.${code}`;
+    expect(errorText(code)).toBe(EN[key]);
+    setLang("de");
+    expect(errorText(code)).toBe(DE[key]);
+    expect(DE[key]).not.toBe(EN[key]);
+  });
+
+  test("the HTTP status is part of the text", () => {
+    expect(errorText("unsub_http:status=503")).toContain("503");
+    setLang("de");
+    expect(errorText("unsub_http:status=503")).toContain("503");
+  });
+
+  test("a stored free-text outcome from an older version still shows", () => {
+    expect(errorText("RuntimeError: endpoint down"))
+      .toBe("RuntimeError: endpoint down");
+  });
+});

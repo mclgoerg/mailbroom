@@ -24,6 +24,7 @@ import http.client
 import ipaddress
 import logging
 import re
+import smtplib
 import socket
 import ssl
 import threading
@@ -89,21 +90,20 @@ def _resolve_public(host: str, port: int) -> list[str]:
     """Resolve ONCE and return the addresses to connect to; every one of
     them must be public, so no answer of a mixed record can win."""
     if not host:
-        raise RuntimeError("unsubscribe URL has no host")
+        raise RuntimeError(mailops.coded(mailops.UNSUB_BAD_URL))
     try:
         infos = socket.getaddrinfo(host, port, type=socket.SOCK_STREAM)
     except OSError as exc:
-        raise RuntimeError(f"cannot resolve {host!r}: {exc}")
+        raise RuntimeError(mailops.coded(mailops.UNSUB_UNREACHABLE))
     addrs: list[str] = []
     for info in infos:
         raw = info[4][0]
         if _public_ip(raw) is None:
-            raise RuntimeError(
-                f"unsubscribe URL resolves to a non-public address ({raw})")
+            raise RuntimeError(mailops.coded(mailops.UNSUB_BLOCKED))
         if raw not in addrs:
             addrs.append(raw)
     if not addrs:
-        raise RuntimeError(f"cannot resolve {host!r}")
+        raise RuntimeError(mailops.coded(mailops.UNSUB_UNREACHABLE))
     return addrs
 
 
@@ -127,7 +127,7 @@ class _PinnedHTTPSConnection(http.client.HTTPSConnection):
 def _post_one_click(url: str) -> None:
     parts = urllib.parse.urlparse(url)
     if parts.scheme.lower() != "https":
-        raise RuntimeError("one-click unsubscribe needs an https URL")
+        raise RuntimeError(mailops.coded(mailops.UNSUB_BAD_URL))
     host, port = parts.hostname or "", parts.port or 443
     last: Exception | None = None
     for ip in _resolve_public(host, port):
@@ -148,9 +148,10 @@ def _post_one_click(url: str) -> None:
         # Redirects are never followed: a 3xx means the sender's server took
         # the request, and where it points is not ours to chase.
         if status >= 400:
-            raise RuntimeError(f"unsubscribe endpoint returned {status}")
+            raise RuntimeError(
+                mailops.coded(mailops.UNSUB_HTTP, status=status))
         return
-    raise last or RuntimeError(f"cannot connect to {host!r}")
+    raise last or RuntimeError(mailops.coded(mailops.UNSUB_UNREACHABLE))
 
 
 def _send_mailto(im: dict, uri: str, account_name: str | None = None) -> None:
@@ -160,6 +161,26 @@ def _send_mailto(im: dict, uri: str, account_name: str | None = None) -> None:
     subject = params.get("subject", "unsubscribe")
     body = params.get("body", "unsubscribe")
     smtpout.send(im, to_addr, subject, body, account_name=account_name)
+
+
+def classify(exc: Exception, mail: bool = False) -> str:
+    """The coded failure of an unsubscribe attempt. Never carries raw
+    exception text (the UI words the code; details go to the log). `mail`
+    = the attempt was an unsubscribe mail, not an HTTPS POST."""
+    if mailops.is_coded(str(exc)):
+        return str(exc)
+    if isinstance(exc, smtplib.SMTPException) or (
+            mail and isinstance(exc, (OSError, RuntimeError))):
+        return mailops.UNSUB_MAIL_FAILED
+    if isinstance(exc, ssl.SSLError):
+        return mailops.UNSUB_TLS
+    if isinstance(exc, (TimeoutError, socket.timeout)):
+        return mailops.UNSUB_TIMEOUT
+    if isinstance(exc, (OSError, http.client.HTTPException)):
+        return mailops.UNSUB_UNREACHABLE
+    if isinstance(exc, ValueError):          # e.g. "https://[::1/u"
+        return mailops.UNSUB_BAD_URL
+    return mailops.UNSUB_FAILED
 
 
 def unsubscribe_addr(im: dict, addr: str, header: str, one_click: bool,
@@ -174,6 +195,7 @@ def unsubscribe_addr(im: dict, addr: str, header: str, one_click: bool,
         host = "-"
     log.info("unsubscribe %r: one_click=%s mailto=%s http_host=%s",
              addr, parts["one_click"], bool(parts["mailto"]), host)
+    mailing = False
     try:
         # RFC 8058: one-click is https only; an http URL is a plain link.
         if (parts["http"] and parts["one_click"]
@@ -182,6 +204,7 @@ def unsubscribe_addr(im: dict, addr: str, header: str, one_click: bool,
             return {"status": "done", "method": "one-click POST",
                     "detail": parts["http"], "error": ""}
         if parts["mailto"]:
+            mailing = True
             _send_mailto(im, parts["mailto"], account_name)
             return {"status": "done", "method": "unsubscribe mail sent",
                     "detail": parts["mailto"], "error": ""}
@@ -193,9 +216,9 @@ def unsubscribe_addr(im: dict, addr: str, header: str, one_click: bool,
         log.warning("unsubscribe %r failed: %s: %s", addr,
                     type(exc).__name__, exc)
         return {"status": "failed", "method": "", "detail": "",
-                "error": mailops.error_text(exc)}
+                "error": classify(exc, mail=mailing)}
     return {"status": "failed", "method": "", "detail": "",
-            "error": "could not parse the List-Unsubscribe header"}
+            "error": mailops.UNSUB_NO_METHOD}
 
 
 def unsubscribe(grouping: str, key: str, acc=None) -> dict:
@@ -207,10 +230,9 @@ def unsubscribe(grouping: str, key: str, acc=None) -> dict:
     with acc.lock:
         rec = acc.state["groups"][grouping].get(key)
         if not rec:
-            raise RuntimeError("unknown group")
+            raise RuntimeError(mailops.coded(mailops.UNSUB_UNKNOWN_GROUP))
         if _pooled(grouping, rec):
-            raise RuntimeError("a pooled row has no single sender to "
-                               "unsubscribe from - open one of its senders")
+            raise RuntimeError(mailops.coded(mailops.UNSUB_POOLED))
         newest = None
         for m in mails:  # newest first
             idx = acc.index.get(mailops.ikey(m["folder"], m["uid"]))
@@ -218,7 +240,7 @@ def unsubscribe(grouping: str, key: str, acc=None) -> dict:
                 newest = dict(idx)
                 break
     if not newest:
-        raise RuntimeError("no List-Unsubscribe header in this group")
+        raise RuntimeError(mailops.coded(mailops.UNSUB_NO_METHOD))
 
     res = unsubscribe_addr(cfgmod.account_imap(acc.name), newest["addr"],
                            newest["unsub"], newest["unsub_post"], acc.name)
@@ -328,7 +350,7 @@ def _run_bulk(acc, items: list) -> None:
     except Exception as exc:        # config gone, mailbox unreadable, …
         log.exception("[%s] bulk unsubscribe aborted", acc.name)
         with acc.lock:
-            acc.state["unsub"]["error"] = f"{type(exc).__name__}: {exc}"
+            acc.state["unsub"]["error"] = classify(exc)
     with acc.lock:
         st = acc.state["unsub"]
         st["status"] = "error" if st["error"] else "done"

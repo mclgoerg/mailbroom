@@ -129,6 +129,18 @@ const ERROR_CODES: Record<string, string> = {
   scan_failed: "ferr.scan_failed",
   // a move on a server without MOVE/UIDPLUS refused (backend/mailops.py)
   move_foreign_deleted: "ferr.move_foreign_deleted",
+  // the other unsubscribe failures (backend/unsub.py classify)
+  unsub_blocked: "ferr.unsub_blocked",
+  unsub_http: "ferr.unsub_http",
+  unsub_tls: "ferr.unsub_tls",
+  unsub_unreachable: "ferr.unsub_unreachable",
+  unsub_timeout: "ferr.unsub_timeout",
+  unsub_bad_url: "ferr.unsub_bad_url",
+  unsub_no_method: "ferr.unsub_no_method",
+  unsub_mail_failed: "ferr.unsub_mail_failed",
+  unsub_pooled: "ferr.unsub_pooled",
+  unsub_unknown_group: "ferr.unsub_unknown_group",
+  unsub_failed: "ferr.unsub_failed",
   // plain words -> filter (backend/aifilter.py)
   aifilter_not_configured: "aif.err.not_configured",
   aifilter_text_empty: "aif.err.text_empty",

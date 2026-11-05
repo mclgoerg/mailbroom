@@ -36,7 +36,7 @@ def test_non_public_targets_refused(monkeypatch, ip):
     connected = []
     monkeypatch.setattr(unsub.socket, "create_connection",
                         lambda *a, **k: connected.append(a))
-    with pytest.raises(RuntimeError, match="non-public"):
+    with pytest.raises(RuntimeError, match="unsub_blocked"):
         unsub._post_one_click("https://x.example/u")
     assert not connected
 
@@ -47,7 +47,7 @@ def test_one_private_answer_among_public_ones_refuses(monkeypatch):
     connected = []
     monkeypatch.setattr(unsub.socket, "create_connection",
                         lambda *a, **k: connected.append(a))
-    with pytest.raises(RuntimeError, match="non-public"):
+    with pytest.raises(RuntimeError, match="unsub_blocked"):
         unsub._post_one_click("https://x.example/u")
     assert not connected
 
@@ -196,7 +196,7 @@ def test_certificate_must_match_the_host_name(server):
 
 
 def test_plain_http_url_refused_for_post():
-    with pytest.raises(RuntimeError, match="https"):
+    with pytest.raises(RuntimeError, match="unsub_bad_url"):
         unsub._post_one_click("http://x.example/u")
 
 

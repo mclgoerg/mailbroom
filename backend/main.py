@@ -966,7 +966,14 @@ def post_unsubscribe(body: AiGroupBody, account: str | None = Query(None)):
     try:
         return unsub.unsubscribe(body.grouping, body.key, acc)
     except Exception as exc:
-        raise HTTPException(500, f"{type(exc).__name__}: {exc}")
+        # a failed unsubscribe is a handled outcome: the code is the detail
+        # (the UI words it); never raw exception text
+        code = unsub.classify(exc)
+        if code == mailops.UNSUB_FAILED:
+            logging.getLogger("pmc.unsub").exception(
+                "unsubscribe failed unexpectedly")
+            raise HTTPException(500, code)
+        raise HTTPException(400, code)
 
 
 @app.post("/api/unsubscribe_bulk")
