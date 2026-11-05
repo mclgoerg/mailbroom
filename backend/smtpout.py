@@ -56,8 +56,10 @@ def send(im: dict, to_addr: str, subject: str, text_body: str,
                f"\r\n{text_body}\r\n").encode()
     smtp = _connect(im)
     try:
-        oauth = im.get("oauth")
-        if oauth and oauth.get("refresh_token"):
+        if cfgmod.auth_method(im) == "oauth":
+            oauth = im.get("oauth") or {}
+            if not oauth.get("refresh_token"):
+                raise RuntimeError(cfgmod.OAUTH_NOT_CONNECTED)
             from . import oauthflow
             fresh = oauthflow.ensure_fresh(oauth)
             if fresh is not oauth and account_name:

@@ -273,6 +273,14 @@ IMAP_SECURITY = ("ssl", "starttls")
 SMTP_SECURITY = ("auto", "ssl", "starttls")
 PRESETS = ("proton", "gmail", "outlook", "icloud", "fastmail", "gmx",
            "mailbox", "yahoo", "custom")
+# How an account signs in. Stored per account as `auth`; absent/invalid
+# means "derived" (see auth_method) so older configs behave as before.
+AUTH_METHODS = ("password", "oauth")
+# Presets whose provider has no OAuth here (password / app password only)
+# and the one that has nothing but OAuth. gmail and custom take either.
+PASSWORD_ONLY_PRESETS = ("proton", "icloud", "fastmail", "gmx", "mailbox",
+                         "yahoo")
+OAUTH_ONLY_PRESETS = ("outlook",)
 DIGEST_SCHEDULES = ("off", "daily", "weekly")
 BODY_SEARCH_MODES = ("disabled", "server", "local")
 
@@ -407,6 +415,14 @@ def _load_accounts(saved: dict, env_first: bool = True) -> dict[str, dict]:
     return out
 
 
+# Every secret field of the tenant config. Sealing at rest (secretbox) AND
+# the settings backup export/import derive from these, so a new secret
+# field only has to be listed once (tests/test_backup_secrets.py checks).
+ACCOUNT_SECRET_FIELDS = ("password",)
+OAUTH_SECRET_FIELDS = ("client_secret", "refresh_token", "access_token")
+AI_SECRET_FIELDS = ("api_key",)
+
+
 def load_config() -> dict:
     """The CURRENT TENANT's config (plus the server-level auth section,
     merged in for the middleware and login endpoints). Env bootstrap
@@ -432,16 +448,34 @@ def load_config() -> dict:
     except (OSError, json.JSONDecodeError):
         pass
     for block in cfg["accounts"].values():
-        block["password"] = secretbox.unseal(block.get("password"))
+        for key in ACCOUNT_SECRET_FIELDS:
+            block[key] = secretbox.unseal(block.get(key))
         if isinstance(block.get("oauth"), dict):
             oauth = dict(block["oauth"])
-            for key in ("client_secret", "refresh_token", "access_token"):
+            for key in OAUTH_SECRET_FIELDS:
                 if oauth.get(key):
                     oauth[key] = secretbox.unseal(oauth[key])
             block["oauth"] = oauth
-    cfg["ai"]["api_key"] = secretbox.unseal(cfg["ai"].get("api_key"))
+    for key in AI_SECRET_FIELDS:
+        cfg["ai"][key] = secretbox.unseal(cfg["ai"].get(key))
     cfg["auth"] = load_server()["auth"]
     return cfg
+
+
+def strip_account_secrets(block: dict) -> dict:
+    """Copy of an account block without any secret (password, OAuth
+    tokens and client secret) - what a settings backup may contain. The
+    non-secret OAuth facts (provider, client id) stay so the UI can say
+    "reconnect"."""
+    out = {k: v for k, v in block.items() if k not in ACCOUNT_SECRET_FIELDS}
+    if isinstance(out.get("oauth"), dict):
+        out["oauth"] = {k: v for k, v in out["oauth"].items()
+                        if k not in OAUTH_SECRET_FIELDS}
+    return out
+
+
+def strip_ai_secrets(ai: dict) -> dict:
+    return {k: v for k, v in ai.items() if k not in AI_SECRET_FIELDS}
 
 
 def account_imap(name: str) -> dict:
@@ -467,18 +501,41 @@ def _write_tenant_config(cfg: dict) -> None:
     out = json.loads(json.dumps(
         {k: v for k, v in cfg.items() if k != "auth"}))
     for block in out.get("accounts", {}).values():
-        block["password"] = secretbox.seal(block.get("password"))
+        for key in ACCOUNT_SECRET_FIELDS:
+            block[key] = secretbox.seal(block.get(key))
         if isinstance(block.get("oauth"), dict):
             oauth = block["oauth"]
-            for key in ("client_secret", "refresh_token", "access_token"):
+            for key in OAUTH_SECRET_FIELDS:
                 if oauth.get(key):
                     oauth[key] = secretbox.seal(oauth[key])
-    out["ai"]["api_key"] = secretbox.seal(out["ai"].get("api_key"))
+    for key in AI_SECRET_FIELDS:
+        out["ai"][key] = secretbox.seal(out["ai"].get(key))
     _write(config_path(), out)
 
 
 # Roles a confirmed folder choice (`role_overrides`) can be saved for.
 SPECIAL_ROLES = ("trash", "junk", "sent", "drafts", "archive", "all")
+
+
+def auth_method(im: dict) -> str:
+    """The sign-in method of one account's imap block: the stored `auth`
+    if valid, else derived - "oauth" iff a refresh token is stored (what
+    every pre-`auth` config did), else "password"."""
+    if im.get("auth") in AUTH_METHODS:
+        return im["auth"]
+    return "oauth" if (im.get("oauth") or {}).get("refresh_token") \
+        else "password"
+
+
+OAUTH_NOT_CONNECTED = ("OAuth is not connected for this account - connect it "
+                       "in Settings or switch to an app password")
+
+
+def has_credentials(im: dict) -> bool:
+    """Is there something to sign in with under the account's method?"""
+    if auth_method(im) == "oauth":
+        return bool((im.get("oauth") or {}).get("refresh_token"))
+    return bool(im.get("password"))
 
 
 def _apply_imap(block: dict, imap_in: dict) -> None:
@@ -527,6 +584,15 @@ def _apply_imap(block: dict, imap_in: dict) -> None:
                 oauth["client_secret"] = str(oauth_in["client_secret"])
             if oauth.get("provider"):
                 block["oauth"] = oauth
+    if imap_in.get("auth") in AUTH_METHODS:
+        block["auth"] = imap_in["auth"]
+    if "auth" in imap_in or "preset" in imap_in:
+        # The preset decides which methods exist. Nothing is deleted: a
+        # token block of a password-only preset just stays unused.
+        if block.get("preset") in PASSWORD_ONLY_PRESETS:
+            block["auth"] = "password"
+        elif block.get("preset") in OAUTH_ONLY_PRESETS:
+            block["auth"] = "oauth"
     if isinstance(imap_in.get("digest"), dict):
         d = imap_in["digest"]
         digest = dict(block.get("digest")
@@ -578,16 +644,20 @@ def _apply_imap(block: dict, imap_in: dict) -> None:
         block["auto_scan"] = auto_scan
 
 
-def save_oauth(account: str, oauth: dict) -> None:
+def save_oauth(account: str, oauth: dict, *,
+               use: bool = False) -> None:
     """Persist a connected/refreshed oauth token block for one account -
     called from the /api/oauth/imap/* endpoints and by mailops.connect()
-    after a silent token refresh."""
+    after a silent token refresh. `use=True` (a fresh connect) also makes
+    OAuth the account's sign-in method; a silent refresh never does."""
     with _LOCK:
         cfg = load_config()
         if account not in cfg["accounts"]:
             return
         existing = cfg["accounts"][account].get("oauth") or {}
         cfg["accounts"][account]["oauth"] = {**existing, **oauth}
+        if use:
+            cfg["accounts"][account]["auth"] = "oauth"
         _write_tenant_config(cfg)
 
 
@@ -784,6 +854,7 @@ def masked_config(cfg: dict) -> dict:
     out = {
         "accounts": {
             n: {**b, "password": "", "password_set": bool(b["password"]),
+                "auth": auth_method(b),
                 "oauth": _mask_oauth(b.get("oauth"))}
             for n, b in cfg["accounts"].items()},
         "default_account": next(iter(cfg["accounts"])),
