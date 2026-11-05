@@ -10,7 +10,7 @@ import { afterEach, expect, test, vi } from "vitest";
 import {
   isModalOpen, AccountAvatar, BulkBar, Button, Checkbox, Chip, ChipGroup, ChipSegment,
   ConfirmDialog, DIALOG_ARM_MS, choiceDialog, DialogProvider, PromptDialog, EmptyState, MailRow, Menu, MenuDivider,
-  MenuHeading, MenuItem, Modal, Notice, ProgressBar, Segmented, ToastProvider,
+  MenuGroup, MenuHeading, MenuItem, Modal, Notice, ProgressBar, Segmented, ToastProvider,
   confirmDialog,
   LINK, RatingChips, Tag, ensureAiAck, promptDialog, ProtectButton, useToast,
 } from "./components/ui";
@@ -927,6 +927,22 @@ test("Segmented: roving tabindex, arrows move focus only, Enter activates",
     expect(onChange).not.toHaveBeenCalled();              // manual activation
     fireEvent.click(tab("C"));
     expect(onChange).toHaveBeenCalledWith("c");
+  });
+
+test("MenuGroup: labelled group, caption is not a menuitem, arrows skip it",
+  () => {
+    render(<Menu label="More" trigger={<>⋯</>}>
+      <MenuGroup label="First"><MenuItem>One</MenuItem></MenuGroup>
+      <MenuGroup label="Second"><MenuItem>Two</MenuItem></MenuGroup></Menu>);
+    fireEvent.click(screen.getByLabelText("More"));
+    expect(screen.getAllByRole("group").map((g) => g.getAttribute("aria-label")))
+      .toEqual(["First", "Second"]);
+    expect(screen.getAllByRole("menuitem").map((i) => i.textContent))
+      .toEqual(["One", "Two"]);                      // captions are no items
+    const one = screen.getByRole("menuitem", { name: "One" });
+    expect(document.activeElement).toBe(one);
+    fireEvent.keyDown(one, { key: "ArrowDown" });
+    expect(document.activeElement).toBe(screen.getByRole("menuitem", { name: "Two" }));
   });
 
 test("Menu: roles, focus on open, arrow keys, Esc / Tab return focus", () => {

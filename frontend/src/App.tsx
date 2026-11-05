@@ -30,12 +30,13 @@ import type { QuickWinCard } from "./quickwins";
 import { FoldersPanel } from "./components/FoldersPanel";
 import { AccountAvatar, applyTheme, BAR_ICON_BTN, BulkBar, Button, Chip, ChipGroup, ChipSegment,
   choiceDialog, confirmDialog, currentTheme, EmptyState, ensureAiAck, FILTER_ROW, Input, isModalOpen, LINK,
-  LINK_ACCENT, Menu, MenuDivider, MenuHeading, MenuItem, Notice, ProgressBar,
+  LINK_ACCENT, Menu, MenuDivider, MenuGroup, MenuHeading, MenuItem, Notice, ProgressBar,
   promptDialog, Segmented, Select, Spinner, useToast,
   type ToastVariant } from "./components/ui";
 import { t } from "./i18n";
 import { usePaneHeight, useSplitPane } from "./splitPane";
-import { applyStatus, fmtAgo, fmtSize, fmtUsd, matchGroup, parseFilter,
+import { applyStatus, fmtAgo, fmtSize, fmtUsd, hasCredentials, matchGroup,
+  parseFilter,
   parseProgress, retainedMailKeys, shortcutTarget, smartMembers } from "./lib";
 import { filedKindName, isPooled, keptMessage, smartLabel, smartView }
   from "./smart";
@@ -1003,16 +1004,20 @@ export default function App() {
       return false;
     }
     const verb = actionVerb(action) + (dest ? ` → ${dest}` : "");
-    const bullets = [effective.length === 1
-      ? t(noun === "senders" ? "confirm.b_mails_one_sender"
-        : "confirm.b_mails_one_group", { n })
-      : t(noun === "senders" ? "confirm.b_mails_senders"
-        : "confirm.b_mails_groups", { n, k: effective.length })];
+    // Name what is moved: the group(s), up to three, then "and N more".
+    const labels = effective.map((k) => all[k]?.label ?? k);
+    const names = labels.length > 3
+      ? t("confirm.names_more", { names: labels.slice(0, 3).join(", "),
+        k: labels.length - 3 })
+      : labels.join(", ");
+    const bullets = [t("confirm.b_mails_from", { n, names })];
     if (effective.length !== keys.length) {
       bullets.push(t(noun === "senders" ? "confirm.b_protected_senders_skipped"
         : "confirm.b_protected_groups_skipped", { n: keys.length - effective.length }));
     }
     if (pins) bullets.push(t("confirm.b_pinned_kept", { n: pins }));
+    // Moves are reversible from the result message; mark-as-read is not a move.
+    if (action !== "mark_read") bullets.push(t("confirm.b_undo"));
     // `confirmed`: the caller's own dialog already named these counts
     // (Triage's one summary confirm) - everything above still applies.
     if (!force && !confirmed && !await confirmDialog({ title: verb, bullets,
@@ -1538,7 +1543,9 @@ export default function App() {
               title={t("junk.browse")}
               aria-label={t("junk.open_label", { n: state.junk_count })}
               onClick={() => setFoldersOpen("junk")}>
-              <ShieldAlert size={14} /> {state.junk_count}
+              <ShieldAlert size={14} />
+              <span className="hidden md:inline">{t("role.junk")}</span>
+              {state.junk_count}
             </Button>
           )}
           {state?.trash_count != null && state.trash_count > 0 && (
@@ -1548,7 +1555,9 @@ export default function App() {
               title={t("trash.browse")}
               aria-label={t("trash.open_label", { n: state.trash_count })}
               onClick={() => setFoldersOpen("trash")}>
-              <Trash2 size={14} /> {state.trash_count}
+              <Trash2 size={14} />
+              <span className="hidden md:inline">{t("role.trash")}</span>
+              {state.trash_count}
             </Button>
           )}
           {/* Profile menu: account switcher (when >1 account), identity,
@@ -1684,62 +1693,67 @@ export default function App() {
               <Wrench size={16} aria-hidden /> {t("Tools")}
               <ChevronDown size={16} aria-hidden className="text-muted" />
             </>}>
-            <MenuItem disabled={triageDisabled}
-              onClick={() => setTriageOpen(true)} sub={t("triage.menu_sub")}>
-              <Layers size={16} className="mr-1 inline align-text-bottom" />
-              {t("triage.menu")}
-            </MenuItem>
-            <MenuItem onClick={() => setRulesOpen(true)}>
-              <ClipboardList size={16} className="mr-1 inline align-text-bottom" />
-              {t("Rules")}
-            </MenuItem>
-            <MenuItem onClick={() => setAttsOpen(true)}>
-              <Paperclip size={16} className="mr-1 inline align-text-bottom" />
-              {t("Attachments")}
-            </MenuItem>
-            <MenuItem disabled={state?.status !== "done"}
-              onClick={() => setDupsOpen(true)}>
-              <Copy size={16} className="mr-1 inline align-text-bottom" />
-              {t("Duplicates")}
-            </MenuItem>
-            <MenuItem onClick={() => setTrackersOpen(true)}>
-              <Eye size={16} className="mr-1 inline align-text-bottom" />
-              {t("tracker.menu")}
-            </MenuItem>
-            <MenuItem onClick={() => setFoldersOpen("junk")}>
-              <ShieldAlert size={16} className="mr-1 inline align-text-bottom" />
-              {t("fp.menu")}
-            </MenuItem>
-            <MenuItem onClick={() => setStatsOpen(true)}>
-              <BarChart3 size={16} className="mr-1 inline align-text-bottom" />
-              {t("Statistics")}
-            </MenuItem>
-            <MenuItem disabled={state?.status !== "done"}
-              onClick={() => setSpaceOpen(true)}>
-              <LayoutGrid size={16} className="mr-1 inline align-text-bottom" />
-              {t("space.title")}
-            </MenuItem>
-            <MenuItem onClick={() => setWrappedOpen(true)}>
-              <Sparkles size={16} className="mr-1 inline align-text-bottom" />
-              {t("wrapped.menu")}
-            </MenuItem>
-            <MenuItem onClick={() => setAuditOpen(true)}>
-              <ScrollText size={16} className="mr-1 inline align-text-bottom" />
-              {t("Audit Log")}
-            </MenuItem>
-            <MenuDivider />
-            {aiEnabled && (
-              <MenuItem onClick={() => reviewWithAi()}
-                disabled={scanning || aiRunning || state?.status !== "done"}>
-                <Wand2 size={16} className="mr-1 inline align-text-bottom" />
-                {t("AI review")}
+            <MenuGroup label={t("tools.group_cleanup")}>
+              <MenuItem disabled={triageDisabled}
+                onClick={() => setTriageOpen(true)} sub={t("triage.menu_sub")}>
+                <Layers size={16} className="mr-1 inline align-text-bottom" />
+                {t("triage.menu")}
               </MenuItem>
-            )}
-            <MenuItem onClick={() => downloadFile(api.exportUrl(mode))}
-              sub={t("export.csv_tip")}>
-              <Download size={16} className="mr-1 inline align-text-bottom" />
-              {t("export.csv")}
-            </MenuItem>
+              <MenuItem onClick={() => setRulesOpen(true)}>
+                <ClipboardList size={16} className="mr-1 inline align-text-bottom" />
+                {t("Rules")}
+              </MenuItem>
+              <MenuItem disabled={state?.status !== "done"}
+                onClick={() => setDupsOpen(true)}>
+                <Copy size={16} className="mr-1 inline align-text-bottom" />
+                {t("Duplicates")}
+              </MenuItem>
+              <MenuItem onClick={() => setAttsOpen(true)}>
+                <Paperclip size={16} className="mr-1 inline align-text-bottom" />
+                {t("Attachments")}
+              </MenuItem>
+              <MenuItem onClick={() => setFoldersOpen("junk")}>
+                <ShieldAlert size={16} className="mr-1 inline align-text-bottom" />
+                {t("fp.menu")}
+              </MenuItem>
+            </MenuGroup>
+            <MenuGroup label={t("tools.group_insights")}>
+              <MenuItem onClick={() => setStatsOpen(true)}>
+                <BarChart3 size={16} className="mr-1 inline align-text-bottom" />
+                {t("Statistics")}
+              </MenuItem>
+              <MenuItem disabled={state?.status !== "done"}
+                onClick={() => setSpaceOpen(true)}>
+                <LayoutGrid size={16} className="mr-1 inline align-text-bottom" />
+                {t("space.title")}
+              </MenuItem>
+              <MenuItem onClick={() => setWrappedOpen(true)}>
+                <Sparkles size={16} className="mr-1 inline align-text-bottom" />
+                {t("wrapped.menu")}
+              </MenuItem>
+              <MenuItem onClick={() => setTrackersOpen(true)}>
+                <Eye size={16} className="mr-1 inline align-text-bottom" />
+                {t("tracker.menu")}
+              </MenuItem>
+              <MenuItem onClick={() => setAuditOpen(true)}>
+                <ScrollText size={16} className="mr-1 inline align-text-bottom" />
+                {t("Audit Log")}
+              </MenuItem>
+            </MenuGroup>
+            <MenuGroup label={t("tools.group_ai")}>
+              {aiEnabled && (
+                <MenuItem onClick={() => reviewWithAi()}
+                  disabled={scanning || aiRunning || state?.status !== "done"}>
+                  <Wand2 size={16} className="mr-1 inline align-text-bottom" />
+                  {t("AI review")}
+                </MenuItem>
+              )}
+              <MenuItem onClick={() => downloadFile(api.exportUrl(mode))}
+                sub={t("export.csv_tip")}>
+                <Download size={16} className="mr-1 inline align-text-bottom" />
+                {t("export.csv")}
+              </MenuItem>
+            </MenuGroup>
           </Menu>
         </div>
       </div>
@@ -2094,7 +2108,7 @@ export default function App() {
             <li>{t("onboard.step_scan")}</li>
           </ol>
           <div className="mt-4 flex items-center gap-3">
-            {acct?.password_set && (
+            {hasCredentials(acct) && (
               <Button variant="secondary" onClick={async () => {
                 setPending(t("onboard.testing"));
                 try {
@@ -2107,7 +2121,7 @@ export default function App() {
                 setPending("");
               }}>{t("onboard.test")}</Button>
             )}
-            <Button onClick={startScan} disabled={!acct?.password_set}>
+            <Button onClick={startScan} disabled={!hasCredentials(acct)}>
               {t("Scan")}
             </Button>
           </div>

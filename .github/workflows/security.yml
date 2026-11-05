@@ -20,9 +20,13 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           fetch-depth: 0            # gitleaks walks every commit
+      # Pinned by digest (v8.30.1) so a moved tag cannot change what runs
+      # here. To bump: `docker pull zricethezav/gitleaks:latest`, copy its
+      # digest below and the version above. Dependabot does not read
+      # `docker run` lines in workflows.
       - name: gitleaks (full history)
         run: |
-          docker run --rm -v "$PWD:/repo" zricethezav/gitleaks:latest \
+          docker run --rm -v "$PWD:/repo" zricethezav/gitleaks@sha256:c00b6bd0aeb3071cbcb79009cb16a60dd9e0a7c60e2be9ab65d25e6bc8abbb7f \
             git /repo --no-banner --redact -v
 
   dependencies:
@@ -31,8 +35,8 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7
         with:
-          python-version: "3.14"
-      - name: pip-audit (what a fresh install would get)
+          python-version: "3.15"
+      - name: pip-audit (the locked versions the image and CI install)
         run: |
           pip install -q pip-audit
           pip-audit -r backend/requirements.txt \

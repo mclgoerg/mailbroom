@@ -163,6 +163,9 @@ export const DE: Record<string, string> = {
   "qb.has_pinned": "mit geschützten Mails",
   "qb.has_tracker": "die Öffnen oder Klicks verfolgen",
   "tracker.menu": "Tracker",
+  "tools.group_cleanup": "Aufräumen",
+  "tools.group_insights": "Einblicke",
+  "tools.group_ai": "KI & Export",
   "tracker.title": "Tracker",
   "tracker.sub": "Wer deine Öffnungen und Klicks verfolgt",
   "tracker.explainer":
@@ -717,9 +720,15 @@ export const DE: Record<string, string> = {
   "preset.hint.imap_toggle":
     "IMAP muss zuerst in den Mail-Einstellungen des Anbieters aktiviert "
     + "werden; bei Zwei-Faktor-Authentifizierung App-Passwort verwenden.",
-  "preset.hint.oauth_gmail":
-    "Gmail verbindet hier nur per OAuth (unten) - eigenen, kostenlosen "
-    + "Google-OAuth-Client registrieren, siehe Installationsanleitung.",
+  "preset.hint.gmail":
+    "App-Passwort oder OAuth - unten auswählen.",
+  "signin.label": "Anmeldeart",
+  "signin.password": "App-Passwort",
+  "signin.oauth": "OAuth",
+  "signin.gmail_apppw_help":
+    "App-Passwort anlegen unter myaccount.google.com/apppasswords "
+    + "(die Bestätigung in zwei Schritten muss aktiv sein) - nicht dein "
+    + "normales Google-Passwort.",
   "preset.hint.oauth_outlook_device":
     "Outlook verbindet hier nur per OAuth (unten) - keine Einrichtung "
     + "nötig, siehe Installationsanleitung.",
@@ -1187,12 +1196,12 @@ export const DE: Record<string, string> = {
     "Die 1 Mail im Papierkorb wird endgültig gelöscht. Das lässt sich nicht "
     + "rückgängig machen.",
   "confirm.empty_trash_btn": "Endgültig löschen ({n})",
+  "confirm.b_mails_from": "{n} Mails von {names}",
+  "confirm.b_mails_from_one": "1 Mail von {names}",
+  "confirm.names_more": "{names} und {k} weiteren",
+  "confirm.b_undo": "Das lässt sich über die Ergebnismeldung rückgängig machen.",
   "confirm.btn_anyway": "Trotzdem: {verb}",
-  "confirm.b_mails_groups": "{n} Mails aus {k} Gruppen sind betroffen",
-  "confirm.b_mails_groups_one": "1 Mail aus {k} Gruppen ist betroffen",
   "select.named": "{subject} auswählen",
-  "confirm.b_mails_one_group": "{n} Mails in 1 Gruppe sind betroffen",
-  "confirm.b_mails_one_group_one": "1 Mail in 1 Gruppe ist betroffen",
   "bar.groups": "{n} Gruppen",
   "bar.groups_one": "1 Gruppe",
   "bar.selected_one_mail": "1 Gruppe · 1 Mail",
@@ -1462,8 +1471,6 @@ export const DE: Record<string, string> = {
   "senders.back": "Zurück zu den Absendern",
   "senders.protected_toast":
     "{n} Absender geschützt \u2013 ihre Mails liegen unter \u201eGeschützte Absender\u201c.",
-  "confirm.b_mails_senders": "{n} Mails von {k} Absendern sind betroffen",
-  "confirm.b_mails_one_sender": "{n} Mails von 1 Absender sind betroffen",
   "confirm.b_protected_senders_skipped": "{n} geschützte Absender übersprungen",
   "smart.title": "Smart-Gruppierung",
   "smart.min_label": "Eigene Zeile ab N Mails",
@@ -1704,6 +1711,10 @@ export const DE: Record<string, string> = {
   "ferr.cannot_open":
     "Der Ordner „{folder}“ konnte auf dem Server nicht geöffnet werden.",
   "ferr.cannot_list": "Die Mailliste des Ordners konnte nicht gelesen werden.",
+  "ferr.mailto_unsafe":
+    "Die Abmelde-Adresse in dieser Mail ist keine einzelne einfache "
+    + "Adresse (oder ihr Text enthält Zeilenumbrüche), deshalb wurde keine "
+    + "Mail gesendet.",
   "ferr.cannot_flag":
     "Der Server hat das Markieren der Mails zum Löschen nicht "
     + "akzeptiert.",
@@ -1772,6 +1783,7 @@ export const DE: Record<string, string> = {
   "aif.disclosure":
     "Nur dieser Satz und die Filter-Syntax gehen an deinen KI-Anbieter - "
     + "keine Maildaten.",
+  "aif.hint": "Mit Strg+Enter (\u2318+Enter am Mac) absenden.",
   "aif.chars": "{n} / {max}",
   "aif.send": "Senden",
   "aif.thinking": "Filter wird geschrieben…",

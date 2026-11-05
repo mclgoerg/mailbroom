@@ -386,6 +386,9 @@ export const EN: Record<string, string> = {
   "qb.has_pinned": "with protected mails",
   "qb.has_tracker": "that track opens or clicks",
   "tracker.menu": "Trackers",
+  "tools.group_cleanup": "Clean up",
+  "tools.group_insights": "Insights",
+  "tools.group_ai": "AI & export",
   "tracker.title": "Trackers",
   "tracker.sub": "Who tracks your opens and clicks",
   "tracker.explainer":
@@ -839,9 +842,15 @@ export const EN: Record<string, string> = {
   "preset.hint.imap_toggle":
     "IMAP must be enabled first in the provider's mail settings; then "
     + "use an app password if two-factor auth is on.",
-  "preset.hint.oauth_gmail":
-    "Gmail connects via OAuth only here (below) - register your own "
-    + "free Google OAuth client, see the install guide.",
+  "preset.hint.gmail":
+    "App password or OAuth - choose below.",
+  "signin.label": "Sign-in method",
+  "signin.password": "App password",
+  "signin.oauth": "OAuth",
+  "signin.gmail_apppw_help":
+    "Create an app password at myaccount.google.com/apppasswords "
+    + "(2-Step Verification must be on) - not your normal Google "
+    + "password.",
   "preset.hint.oauth_outlook_device":
     "Outlook connects via OAuth only here (below) - no setup needed, "
     + "see the install guide.",
@@ -1000,12 +1009,12 @@ export const EN: Record<string, string> = {
   "confirm.empty_trash_body_one":
     "The 1 mail in Trash will be permanently deleted. This cannot be undone.",
   "confirm.empty_trash_btn": "Delete permanently ({n})",
+  "confirm.b_mails_from": "{n} mails from {names}",
+  "confirm.b_mails_from_one": "1 mail from {names}",
+  "confirm.names_more": "{names} and {k} more",
+  "confirm.b_undo": "You can undo this from the result message.",
   "confirm.btn_anyway": "{verb} anyway",
-  "confirm.b_mails_groups": "{n} mails from {k} groups will be affected",
-  "confirm.b_mails_groups_one": "1 mail from {k} groups will be affected",
   "select.named": "Select {subject}",
-  "confirm.b_mails_one_group": "{n} mails in 1 group will be affected",
-  "confirm.b_mails_one_group_one": "1 mail in 1 group will be affected",
   "bar.groups": "{n} groups",
   "bar.groups_one": "1 group",
   "bar.selected_one_mail": "1 group · 1 mail",
@@ -1264,8 +1273,6 @@ export const EN: Record<string, string> = {
   "senders.back": "Back to the senders",
   "senders.protected_toast":
     "{n} senders protected \u2013 their mails moved to \u201cProtected senders\u201d.",
-  "confirm.b_mails_senders": "{n} mails from {k} senders will be affected",
-  "confirm.b_mails_one_sender": "{n} mails from 1 sender will be affected",
   "confirm.b_protected_senders_skipped": "{n} protected senders skipped",
   "smart.title": "Smart grouping",
   "smart.min_label": "Own row from N mails",
@@ -1494,6 +1501,9 @@ export const EN: Record<string, string> = {
     + "Nothing was deleted.",
   "ferr.cannot_open": "Could not open the “{folder}” folder on the server.",
   "ferr.cannot_list": "Could not read the folder's mail list.",
+  "ferr.mailto_unsafe":
+    "The unsubscribe address in this mail is not a single plain address "
+    + "(or its text contains line breaks), so no mail was sent.",
   "ferr.cannot_flag":
     "The server did not accept marking the mails for deletion.",
   "ferr.cannot_expunge": "The server did not remove the marked mails.",
@@ -1547,6 +1557,7 @@ export const EN: Record<string, string> = {
   "aif.disclosure":
     "Only this sentence and the filter syntax are sent to your AI provider - "
     + "no mail data.",
+  "aif.hint": "Press Ctrl+Enter (\u2318+Enter on a Mac) to send.",
   "aif.chars": "{n} / {max}",
   "aif.send": "Send",
   "aif.thinking": "Writing the filter…",

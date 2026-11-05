@@ -50,14 +50,15 @@ detected via SPECIAL-USE flags (RFC 6154) with a name fallback, Gmail's
 virtual "All Mail" is excluded automatically (no double counting), and
 servers without the `MOVE` capability get a COPY+EXPUNGE fallback. The
 settings dialog has a preset for each provider below that prefills
-host/port/security - you only add a user + password, except Gmail and
-Outlook which connect via OAuth instead (see below the table):
+host/port/security - you only add a user + password, except Outlook
+which connects via OAuth only (and Gmail, where OAuth is an option -
+see below the table):
 
 | Preset | IMAP host | SMTP host (unsubscribe) | Auth notes |
 |---|---|---|---|
 | **Proton Mail Bridge** | `127.0.0.1:1143` SSL | `127.0.0.1:1025` | Featured setup, see below. Paid Proton plan; use the Bridge-generated password and the exported Bridge certificate as CA file. |
-| **Gmail** | `imap.gmail.com:993` SSL | `smtp.gmail.com:465` SSL | OAuth only in the settings UI - see below. |
-| **Outlook / Microsoft 365** | `outlook.office365.com:993` SSL | `smtp.office365.com:587` STARTTLS | OAuth only in the settings UI - see below. |
+| **Gmail** | `imap.gmail.com:993` SSL | `smtp.gmail.com:465` SSL | App password (2-Step Verification on) or OAuth - choose in Settings; see below. |
+| **Outlook / Microsoft 365** | `outlook.office365.com:993` SSL | `smtp.office365.com:587` STARTTLS | OAuth only (Microsoft offers no app-password IMAP) - see below. |
 | **iCloud Mail** | `imap.mail.me.com:993` SSL | `smtp.mail.me.com:587` STARTTLS | [App-specific password](https://account.apple.com/account/manage) required. |
 | **Fastmail** | `imap.fastmail.com:993` SSL | `smtp.fastmail.com:465` SSL | [App password](https://www.fastmail.help/hc/en-us/articles/360058752854) with IMAP scope. |
 | **GMX** | `imap.gmx.net:993` SSL | `mail.gmx.net:465` SSL | Enable IMAP in GMX mail settings first; app password if 2FA is on. |
@@ -65,11 +66,14 @@ Outlook which connect via OAuth instead (see below the table):
 | **Yahoo Mail** | `imap.mail.yahoo.com:993` SSL | `smtp.mail.yahoo.com:465` SSL | [App password](https://help.yahoo.com/kb/SLN15241.html) required. |
 | **Custom** | anything | anything | Any IMAP server with SSL or STARTTLS (Dovecot, Courier, …). |
 
-**OAuth (Gmail / Outlook).** Both presets connect via OAuth only - no
-password field is offered for them. If this server has a shared
+**Gmail: app password or OAuth.** The Gmail preset starts on *App
+password* (create one at myaccount.google.com/apppasswords; 2-Step
+Verification must be on). Switch to *OAuth* in Settings any time - both
+credentials stay stored, so you can switch back without re-entering
+anything. **Outlook** connects via OAuth only. If this server has a shared
 Microsoft app configured, Outlook needs no setup at all: click Connect,
 then enter the code shown at microsoft.com/devicelogin on any device.
-Otherwise (and always for Gmail, which has no shared-client option -
+Otherwise (and always for Gmail OAuth, which has no shared-client option -
 Google requires per-app verification for the restricted mail scope),
 you register your own free OAuth client first - see
 [docs/install.md](docs/install.md#gmail-oauth-setup) for the Gmail
@@ -421,6 +425,11 @@ in the UI; they persist in `/data`. Env bootstrap for other providers:
 > in). Both can also be bootstrapped via env (`AUTH_MODE`,
 > `AUTH_PASSWORD`, `OIDC_*` - see `deploy/.env.example`).
 > Remember that Docker published ports bypass ufw.
+>
+> Without a login, Mailbroom also refuses requests whose `Host` is not
+> `localhost` or an IP address (protection against DNS rebinding). To open
+> it under a host name, add `MAILBROOM_ALLOWED_HOSTS=<name>` (comma list,
+> `*.example.org` for subdomains) to the container environment.
 
 ### Multi-user (SSO mode)
 

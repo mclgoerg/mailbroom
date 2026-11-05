@@ -76,9 +76,16 @@ export function AiFilterPanel({ groups, members, onClose, onApply,
                 placeholder={t("aif.placeholder")}
                 onChange={(e) => setText(e.target.value)}
                 onKeyDown={(e) => {
-                  if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) send();
+                  if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
+                    e.preventDefault();
+                    send();
+                  }
                 }} />
             </Field>
+            {/* A keyboard hint: pointless on a touch screen. */}
+            <div className="type-meta text-muted coarse:hidden">
+              {t("aif.hint")}
+            </div>
             <div className="flex items-start gap-2 type-meta text-muted">
               <span className="min-w-0 flex-1">{t("aif.disclosure")}</span>
               <span className="shrink-0 tabular-nums">

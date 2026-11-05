@@ -118,8 +118,9 @@ test("Junk chip beside the Trash chip: icon + number, translated aria-labels",
     await mount();
     const junk = await screen.findByLabelText("Junk (3 mails)");
     const trash = screen.getByLabelText("Trash (12 mails)");
-    expect(junk.textContent?.trim()).toBe("3");           // icon + number only
-    expect(trash.textContent?.trim()).toBe("12");
+    // icon + number on phones, plus a word from md up (see the label test)
+    expect(junk.textContent).toBe("Junk3");
+    expect(trash.textContent).toBe("Trash12");
     expect(junk.querySelector("svg")).toBeTruthy();
     // Junk first, then Trash, in the same header cluster
     expect(junk.compareDocumentPosition(trash)
@@ -133,10 +134,10 @@ test("singular label and German labels", async () => {
   cleanup();
   setLang("de");
   await mount({ junk_count: 4 }, multiCfg);
-  expect((await screen.findByLabelText("Spam (4 Mails)")).textContent?.trim())
-    .toBe("4");
-  expect(screen.getByLabelText("Papierkorb (12 Mails)").textContent?.trim())
-    .toBe("12");
+  expect((await screen.findByLabelText("Spam (4 Mails)")).textContent)
+    .toBe("Spam4");
+  expect(screen.getByLabelText("Papierkorb (12 Mails)").textContent)
+    .toBe("Papierkorb12");
 });
 
 test("no Junk chip while Junk is empty or the count is unknown", async () => {
@@ -172,14 +173,19 @@ test("the Tools menu has a Junk & Trash entry that opens Junk", async () => {
   await waitFor(() => expect(foldersPanel).toHaveBeenLastCalledWith("junk"));
 });
 
-test("phone header: chips stay icon + number (no text label wider than the count)",
+test("header chips carry a word from md up; phones keep icon + number",
   async () => {
     await mount({ junk_count: 120, trash_count: 4500 }, multiCfg);
     const junk = await screen.findByLabelText("Junk (120 mails)");
-    expect(junk.textContent?.trim()).toBe("120");
+    const word = junk.querySelector("span")!;
+    expect(word.textContent).toBe("Junk");
+    expect(word.className).toContain("hidden");           // hidden on phones
+    expect(word.className).toContain("md:inline");        // shown from md
+    expect(screen.getByLabelText("Trash (4500 mails)").querySelector("span")!
+      .className).toContain("md:inline");
     expect(junk.className).toContain("whitespace-nowrap");
     // the header cluster does not wrap on phones
     expect(junk.parentElement!.className).toContain("flex");
-    expect(screen.getByLabelText("Trash (4500 mails)").textContent?.trim())
-      .toBe("4500");
+    expect(screen.getByLabelText("Trash (4500 mails)").textContent)
+      .toContain("4500");
   });
