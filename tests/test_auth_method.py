@@ -330,7 +330,8 @@ def test_test_connection_oauth_account_without_password(monkeypatch):
         def logout(self):
             pass
     monkeypatch.setattr(mailops, "connect", lambda im, name=None: _C())
-    monkeypatch.setattr(mailops, "list_folders", lambda c: ["INBOX", "Sent"])
+    monkeypatch.setattr(mailops, "selectable_folders",
+                        lambda c: ["INBOX", "Sent"])
     r = client.post("/api/test_connection", params={"account": "gmail"})
     assert r.status_code == 200 and r.json() == {"ok": True, "folders": 2}
 

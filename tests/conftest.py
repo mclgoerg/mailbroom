@@ -148,7 +148,14 @@ class FakeIMAP:
                  uidplus: bool = True, gmail: bool = False,
                  trash: str = "[Gmail]/Trash", delimiter: str | None = "/",
                  list_order: list[str] | None = None,
-                 renumber: bool = False, copyuid: bool = False):
+                 renumber: bool = False, copyuid: bool = False,
+                 noselect: dict[str, str] | None = None):
+        # parent-only folders: name -> the LIST flag (`\\Noselect` or
+        # `\\NonExistent`); SELECT answers NO. The gmail fake does this for
+        # a "[Gmail]" folder, like the real server.
+        self.noselect = dict(noselect or {})
+        if gmail and "[Gmail]" in mailbox:
+            self.noselect.setdefault("[Gmail]", "\\Noselect")
         self.renumber = renumber
         self.copyuid = copyuid
         self._answers: dict[str, list[bytes]] = {}   # imaplib's response()
@@ -200,6 +207,8 @@ class FakeIMAP:
         delim = f'"{self.delimiter}"' if self.delimiter else "NIL"
         for f in first + [f for f in self.mailbox if f not in first]:
             fl = "\\HasNoChildren"
+            if f in self.noselect:
+                fl = f"\\HasChildren {self.noselect[f]}"
             if f in self.flags:
                 fl += f" {self.flags[f]}"
             out.append(f'({fl}) {delim} "{f}"'.encode())
@@ -209,6 +218,8 @@ class FakeIMAP:
         name = qname.strip('"')
         if name not in self.mailbox:
             return "NO", [b"no such folder"]
+        if name in self.noselect:
+            return "NO", [b"[NONEXISTENT] Unknown Mailbox"]
         self.selected = name
         return "OK", [str(len(self.mailbox[name])).encode()]
 
