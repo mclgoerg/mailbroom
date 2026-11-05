@@ -154,8 +154,9 @@ def _env_auth() -> dict:
         # the same hash on every start (the login fingerprint stays stable);
         # the hash never leaves memory.
         "password_hash": authmod.hash_password(
-            password, hashlib.sha256(b"env:" + password.encode())
-            .digest()[:16]) if password else "",
+            password, hashlib.scrypt(
+                password.encode(), salt=b"env-auth-salt", n=2 ** 14, r=8,
+                p=1, dklen=16)) if password else "",
         # In OIDC mode this identity owns the pre-tenancy workspace and
         # the server-level settings. Empty = claimed by the first OIDC
         # login.
