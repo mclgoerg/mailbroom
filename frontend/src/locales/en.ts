@@ -1557,6 +1557,7 @@ export const EN: Record<string, string> = {
   "aif.disclosure":
     "Only this sentence and the filter syntax are sent to your AI provider - "
     + "no mail data.",
+  "aif.hint": "Press Ctrl+Enter (\u2318+Enter on a Mac) to send.",
   "aif.chars": "{n} / {max}",
   "aif.send": "Send",
   "aif.thinking": "Writing the filter…",
