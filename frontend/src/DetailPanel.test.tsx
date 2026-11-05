@@ -116,7 +116,7 @@ describe("DetailPanel", () => {
     expect(screen.queryByText(/unrated/)).toBeNull();
   });
 
-  it("on a phone Sort is an icon menu and Unsubscribe lives in the ⋯ menu",
+  it("on a phone Sort is an icon menu and Unsubscribe stays a visible button",
     async () => {
     vi.stubGlobal("matchMedia", (q: string) => ({
       matches: true, media: q, addEventListener: () => {},
@@ -127,13 +127,13 @@ describe("DetailPanel", () => {
         { group: mkGroup({ unsub: true }) });
       await waitFor(() => screen.getByText("Mail 1"));
       expect(screen.queryByDisplayValue("Sort: date")).toBeNull();
-      expect(screen.queryByRole("button", { name: "Unsubscribe" })).toBeNull();
+      expect(screen.getByRole("button", { name: "Unsubscribe" })).toBeTruthy();
       fireEvent.click(screen.getByRole("button", { name: "Sort: date" }));
       fireEvent.click(screen.getByRole("menuitemradio",
         { name: "Sort: size" }));
       expect(screen.getByRole("button", { name: "Sort: size" })).toBeTruthy();
       fireEvent.click(screen.getByRole("button", { name: "More" }));
-      expect(screen.getByRole("menuitem", { name: "Unsubscribe" })).toBeTruthy();
+      expect(screen.queryByRole("menuitem", { name: "Unsubscribe" })).toBeNull();
     } finally { vi.unstubAllGlobals(); }
   });
 
@@ -177,7 +177,7 @@ describe("DetailPanel", () => {
         }
       });
 
-    it("a pooled row has none in the phone's ⋯ menu either", async () => {
+    it("a pooled row has none on a phone either", async () => {
       vi.stubGlobal("matchMedia", (q: string) => ({
         matches: true, media: q, addEventListener: () => {},
         removeEventListener: () => {},
@@ -188,6 +188,8 @@ describe("DetailPanel", () => {
         await waitFor(() => screen.getByText("Mail 1"));
         fireEvent.click(screen.getByRole("button", { name: "More" }));
         expect(screen.queryByRole("menuitem", { name: /unsubscribe/i }))
+          .toBeNull();
+        expect(screen.queryByRole("button", { name: /unsubscribe/i }))
           .toBeNull();
       } finally { vi.unstubAllGlobals(); }
     });
@@ -204,7 +206,23 @@ describe("DetailPanel", () => {
         .toBeTruthy();
     });
 
-    it("an own row keeps it in the phone's ⋯ menu", async () => {
+    it("on a phone an unsubscribed row shows the badge, not the button",
+      async () => {
+      vi.stubGlobal("matchMedia", (q: string) => ({
+        matches: true, media: q, addEventListener: () => {},
+        removeEventListener: () => {},
+      }));
+      try {
+        renderPanel([mkMail(1)], { grouping: "smart", group: ownRow,
+          unsubscribedNow: statuses[3] });
+        await waitFor(() => screen.getByText("Mail 1"));
+        expect(screen.queryByRole("button", { name: "Unsubscribe" }))
+          .toBeNull();
+        expect(screen.getByText("Unsubscribed")).toBeTruthy();
+      } finally { vi.unstubAllGlobals(); }
+    });
+
+    it("an own row keeps the visible button on a phone", async () => {
       vi.stubGlobal("matchMedia", (q: string) => ({
         matches: true, media: q, addEventListener: () => {},
         removeEventListener: () => {},
@@ -212,8 +230,7 @@ describe("DetailPanel", () => {
       try {
         renderPanel([mkMail(1)], { grouping: "smart", group: ownRow });
         await waitFor(() => screen.getByText("Mail 1"));
-        fireEvent.click(screen.getByRole("button", { name: "More" }));
-        expect(screen.getByRole("menuitem", { name: "Unsubscribe" }))
+        expect(screen.getByRole("button", { name: "Unsubscribe" }))
           .toBeTruthy();
       } finally { vi.unstubAllGlobals(); }
     });
