@@ -218,7 +218,7 @@ def test_oidc_callback_unverified_email_lands_on_login_page(monkeypatch):
     import urllib.parse
     r = client.post("/api/config", json={"auth": {
         "mode": "oidc", "admin": "me@corp.example",
-        "oidc": {"issuer": "https://idp.example", "client_id": "mailbroom",
+        "oidc": {"issuer": "https://idp.example", "client_id": "app",
                  "client_secret": "sst", "allowed": []}}})
     assert r.status_code == 200
     monkeypatch.setattr(authmod, "discovery", lambda issuer: {
@@ -243,7 +243,7 @@ def test_startup_warns_about_open_oidc(caplog):
     from backend import main
     client.post("/api/config", json={"auth": {
         "mode": "oidc",
-        "oidc": {"issuer": "https://idp.example", "client_id": "mailbroom",
+        "oidc": {"issuer": "https://idp.example", "client_id": "app",
                  "client_secret": "sst", "allowed": []}}})
     with caplog.at_level("WARNING", logger="pmc.auth"):
         main._warn_open_oidc()
