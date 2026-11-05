@@ -16,8 +16,8 @@ import os
 from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.exception_handlers import request_validation_exception_handler
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import (FileResponse, JSONResponse, RedirectResponse,
-                               StreamingResponse)
+from fastapi.responses import (FileResponse, HTMLResponse, JSONResponse,
+                               RedirectResponse, StreamingResponse)
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
@@ -44,6 +44,7 @@ from . import secretbox
 from . import stats as statsmod
 from . import tenants
 from . import trackers
+from . import webguard
 from . import unsub
 from . import unsubstore
 from . import verdictstore
@@ -82,6 +83,14 @@ logging.getLogger("uvicorn.access").addFilter(_RedactKnowledgeKeys())
 from contextlib import asynccontextmanager
 
 
+def _log_accepted_hosts() -> None:
+    """Startup note in no-login mode: the Host names the guard accepts."""
+    if cfgmod.load_server()["auth"]["mode"] == "none":
+        logging.getLogger("pmc.auth").info(
+            "no login set - accepting requests for: %s",
+            webguard.describe_accepted())
+
+
 @asynccontextmanager
 async def _lifespan(app: FastAPI):
     from . import secretbox
@@ -91,6 +100,7 @@ async def _lifespan(app: FastAPI):
             "are stored in plaintext in /data (they would be readable in "
             "volume backups). Generate a key with `openssl rand -base64 32` "
             "and keep it OUT of the backups.")
+    _log_accepted_hosts()
     # Show the last scan of every tenant's accounts right away instead of
     # an empty view (safe: moves re-check UIDVALIDITY; undo works by
     # Message-ID).
@@ -173,6 +183,24 @@ async def _auth(request: Request, call_next):
     if sub:
         return await call_next(request)
     return JSONResponse({"detail": "login required"}, status_code=401)
+
+
+@app.middleware("http")
+async def _cross_site_guard(request: Request, call_next):
+    # Registered after _auth, so it runs before it. The host check never
+    # consults X-Forwarded-Host (a direct client could forge it).
+    path = request.url.path
+    if cfgmod.load_server()["auth"]["mode"] == "none":
+        host = request.headers.get("host", "")
+        if not webguard.host_allowed(host):
+            if path.startswith("/api/"):
+                return JSONResponse(
+                    {"detail": "host_not_allowed",
+                     "host": host[:100]}, status_code=403)
+            return HTMLResponse(webguard.blocked_page(host), status_code=403)
+    if webguard.cross_site_write(request.method, path, request.headers):
+        return JSONResponse({"detail": "cross_site_request"}, status_code=403)
+    return await call_next(request)
 
 
 def _external_base(request: Request) -> str:
@@ -1379,7 +1407,7 @@ def post_test_connection(account: str | None = Query(None)):
     try:
         conn = mailops.connect(im, acc.name)
         try:
-            n = len(mailops.list_folders(conn))
+            n = len(mailops.selectable_folders(conn))
         finally:
             try:
                 conn.logout()
@@ -1399,7 +1427,8 @@ def get_folders(account: str | None = Query(None)):
         conn = mailops.connect(cfgmod.account_imap(acc.name), acc.name)
         try:
             pairs = mailops.list_folders_ex(conn)
-            names = [n for n, _ in pairs]
+            hidden = mailops.unselectable(pairs=pairs)
+            names = [n for n, _ in pairs if n not in hidden]
             found = mailops.resolve_roles(conn, acc, pairs=pairs)
             acc.folder_roles.update(found["roles"])
             roles = found["roles"]
@@ -1527,17 +1556,18 @@ def get_export(grouping: str = Query("sender"),
 
 @app.get("/api/export_config")
 def get_export_config():
-    """Portable backup of settings + learned state. NO secrets: the IMAP
-    password and AI API key never leave the server."""
+    """Portable backup of settings + learned state. NO secrets: IMAP
+    passwords, OAuth tokens / client secrets and the AI API key never leave
+    the server (cfgmod.*_SECRET_FIELDS)."""
     cfg = cfgmod.load_config()
     data = {
         "version": 2, "app": "mailbroom",
         "config": {
-            "accounts": {n: {k: v for k, v in b.items() if k != "password"}
+            "accounts": {n: cfgmod.strip_account_secrets(b)
                          for n, b in cfg["accounts"].items()},
             "protected": cfgmod.normalize_protected(cfg.get("protected")),
             "categories": cfg.get("categories") or {},
-            "ai": {k: v for k, v in cfg["ai"].items() if k != "api_key"},
+            "ai": cfgmod.strip_ai_secrets(cfg["ai"]),
         },
         "rules": rulesmod.load_rules(),
         "verdicts": verdictstore.load(),
@@ -1562,11 +1592,11 @@ def post_import_config(body: dict):
     update = {k: c[k] for k in ("accounts", "protected", "categories", "ai")
               if k in c}
     if isinstance(update.get("accounts"), dict):
-        for b in update["accounts"].values():
-            if isinstance(b, dict):
-                b.pop("password", None)
+        update["accounts"] = {
+            n: cfgmod.strip_account_secrets(b) if isinstance(b, dict) else b
+            for n, b in update["accounts"].items()}
     if isinstance(update.get("ai"), dict):
-        update["ai"].pop("api_key", None)
+        update["ai"] = cfgmod.strip_ai_secrets(update["ai"])
     try:
         cfgmod.update_config(update)
     except ValueError as exc:
@@ -1743,6 +1773,10 @@ if STATIC_DIR.is_dir():
 
     @app.get("/{path:path}", include_in_schema=False)
     def spa(path: str):
+        # An unknown API path must be a real 404, not the HTML shell with
+        # a 200 - clients and probes would otherwise take it for success.
+        if path == "api" or path.startswith("api/"):
+            raise HTTPException(404, "not found")
         # Containment check: `path` is percent-decoded and may contain ../ or
         # be absolute (pathlib discards the left side then) - never serve
         # anything that resolves outside the static dir. CodeQL's
@@ -1762,3 +1796,21 @@ if STATIC_DIR.is_dir():
         # showing a stale shell (and stale hashed bundle) indefinitely.
         return FileResponse(_STATIC_ROOT / "index.html",
                              headers={"Cache-Control": "no-cache"})
+
+
+_SECURITY_HEADERS = {
+    "X-Frame-Options": "DENY",
+    "Content-Security-Policy": "frame-ancestors 'none'",
+    "X-Content-Type-Options": "nosniff",
+    "Referrer-Policy": "same-origin",
+}
+
+
+# Registered last = outermost, so it also covers the 401/403 answers other
+# middleware return without calling the app.
+@app.middleware("http")
+async def _security_headers(request: Request, call_next):
+    resp = await call_next(request)
+    for name, value in _SECURITY_HEADERS.items():
+        resp.headers[name] = value
+    return resp

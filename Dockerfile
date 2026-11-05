@@ -13,7 +13,7 @@ COPY backend/requirements.txt ./
 # pip is build-time only: removing it (and its vendored msgpack/
 # setuptools copies) from the runtime image shrinks the attack surface
 # and keeps image CVE scanners quiet about libraries the app never runs.
-RUN pip install --no-cache-dir -r requirements.txt \
+RUN pip install --no-cache-dir --require-hashes -r requirements.txt \
     && pip uninstall -y pip \
     && rm -rf /usr/local/lib/python3.*/site-packages/setuptools* \
               /usr/local/lib/python3.*/ensurepip \
