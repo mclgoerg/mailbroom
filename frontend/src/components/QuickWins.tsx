@@ -60,7 +60,8 @@ export function QuickWins({ groups, account, onReview, onCleanUp }: {
 
   return (
     <section aria-label={t("qw.title")}
-      className="mb-3 rounded-card border border-line bg-panel p-3">
+      className={`rounded-card border border-line bg-panel
+        ${collapsed ? "mb-1 p-1.5" : "mb-3 p-3"}`}>
       <div className="flex items-center gap-2">
         <Zap size={16} className="shrink-0 text-accent" aria-hidden />
         <h2 className="min-w-0 flex-1 type-heading">
