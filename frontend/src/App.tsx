@@ -358,7 +358,7 @@ export default function App() {
       seq: staleDel || del.status === "running"
         ? (prev ? prev.seq : (del.seq ?? 0) - 1) : del.seq };
     if (state.status === "error" && prev?.scan !== "error")
-      notify(t("err.generic", { msg: state.error }), "error");
+      notify(t("err.generic", { msg: errorText(state.error) }), "error");
     if (!prev) return;
     // A look-alike folder's move is toasted by Settings itself (with its own
     // Undo), so it is not announced a second time here.
@@ -1004,16 +1004,20 @@ export default function App() {
       return false;
     }
     const verb = actionVerb(action) + (dest ? ` → ${dest}` : "");
-    const bullets = [effective.length === 1
-      ? t(noun === "senders" ? "confirm.b_mails_one_sender"
-        : "confirm.b_mails_one_group", { n })
-      : t(noun === "senders" ? "confirm.b_mails_senders"
-        : "confirm.b_mails_groups", { n, k: effective.length })];
+    // Name what is moved: the group(s), up to three, then "and N more".
+    const labels = effective.map((k) => all[k]?.label ?? k);
+    const names = labels.length > 3
+      ? t("confirm.names_more", { names: labels.slice(0, 3).join(", "),
+        k: labels.length - 3 })
+      : labels.join(", ");
+    const bullets = [t("confirm.b_mails_from", { n, names })];
     if (effective.length !== keys.length) {
       bullets.push(t(noun === "senders" ? "confirm.b_protected_senders_skipped"
         : "confirm.b_protected_groups_skipped", { n: keys.length - effective.length }));
     }
     if (pins) bullets.push(t("confirm.b_pinned_kept", { n: pins }));
+    // Moves are reversible from the result message; mark-as-read is not a move.
+    if (action !== "mark_read") bullets.push(t("confirm.b_undo"));
     // `confirmed`: the caller's own dialog already named these counts
     // (Triage's one summary confirm) - everything above still applies.
     if (!force && !confirmed && !await confirmDialog({ title: verb, bullets,
@@ -2085,7 +2089,8 @@ export default function App() {
       )}
 
       {/* First-run onboarding: no credentials or no scan yet. */}
-      {cfg && state?.status === "idle" && allGroups.length === 0
+      {cfg && (state?.status === "idle" || state?.status === "error")
+        && allGroups.length === 0
         && !scanning && (
         <div className="mx-auto my-10 max-w-md rounded-card border border-line
           bg-panel p-4 type-body sm:p-5">

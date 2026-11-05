@@ -176,8 +176,9 @@ PROTON_INBOX = WANDER + (
              "Gutschein: 10 € für deine nächste Tour"], 51, unsub=True,
           html=newsletter_html())
     + mails('"PayBank" <service@paybank.example>',
-            ["Ihr Kontoauszug ist verfügbar", "Sicherheitshinweis zu Ihrem "
-             "Konto", "Zahlung über {n},00 € ausgeführt"],
+            ["Your statement is available", "Security notice about your "
+             "account", "Payment of ${n}.00 completed",
+             "Offer: 3% cashback on your next card purchase"],
             42, unread=0.3, size=(14000, 40000))
     + mails('"CloudBox" <billing@cloudbox.example>',
             ["Invoice CB-{n}", "Payment receipt CB-{n}"],
@@ -491,11 +492,18 @@ unsubstore.save({
 unsubstore.record("offers@couponclub.example", "done", "one-click",
                   account="proton")
 
-# Per-mail ratings on the PayBank group -> rating chips.
+# Per-mail ratings on the PayBank group -> rating chips. Plausible ones:
+# statements and payments are worth a look, security notices are kept,
+# only the promotional mails are safe to delete.
+def _paybank_rating(subject: str) -> str:
+    if subject.startswith("Offer"):
+        return "delete_safe"
+    return "keep" if subject.startswith("Security") else "review"
+
+
 paybank = [m for m in PROTON_INBOX if "paybank" in m["from"]]
 verdictstore.save_mails(
-    {m["msgid"]: ("delete_safe" if i % 3 else "review")
-     for i, m in enumerate(paybank)})
+    {m["msgid"]: _paybank_rating(m["subject"]) for m in paybank})
 
 # A saved rule + cleanup history for the stats panel.
 sweep = rules.create_rule({"name": "Sweep old newsletters",

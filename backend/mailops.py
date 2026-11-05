@@ -136,7 +136,13 @@ RULE_PURGE_KEEP_LATEST = "rule_purge_keep_latest"
 RULE_PURGE_NEEDS_AGE = "rule_purge_needs_age"
 RULE_PURGE_FILTER = "rule_purge_filter"                  # names=
 RULE_PURGE_FILTER_DOMAIN = "rule_purge_filter_domain"    # names=
+# a List-Unsubscribe mailto: that would not be one plain mail to one address
+MAILTO_UNSAFE = "mailto_unsafe"
+# connecting (first run): no account set up yet / the CA file is missing
+NO_ACCOUNT = "no_account"
+CAFILE_MISSING = "cafile_missing"    # path=
 FOLDER_ERROR_CODES = frozenset({
+    MAILTO_UNSAFE,
     NO_MESSAGE_ID, PINNED_MAILS, PROTECTED_MAILS, ALL_PINNED,
     ROLE_NOT_CANDIDATE, ROLE_AMBIGUOUS, NOT_LOOKALIKE, MOVE_UNSAFE,
     BUSY_ACTION,
@@ -173,7 +179,9 @@ FOLDER_ERROR_CODES = frozenset({
     RULE_PURGE_KEEP_LATEST,
     RULE_PURGE_NEEDS_AGE,
     RULE_PURGE_FILTER,
-    RULE_PURGE_FILTER_DOMAIN})
+    RULE_PURGE_FILTER_DOMAIN,
+    NO_ACCOUNT,
+    CAFILE_MISSING})
 
 
 def coded(code: str, **params) -> str:
@@ -531,11 +539,23 @@ def categorize(hay: str, localpart: str = "", bulk: bool = False,
 
 # --------------------------------------------------------------------- imap
 
+def tls_context(im: dict) -> ssl.SSLContext:
+    """The TLS context for IMAP and SMTP: system CAs, plus the account's own
+    CA file when set - a coded error naming the path if that file is gone."""
+    cafile = im.get("cafile") or None
+    if cafile and not os.path.isfile(cafile):
+        raise RuntimeError(coded(CAFILE_MISSING, path=cafile))
+    return ssl.create_default_context(cafile=cafile)
+
+
 def connect(im: dict, account_name: str | None = None) -> imaplib.IMAP4:
     """`account_name` lets an oauth account persist a refreshed access
     token back to its config; omit it only for throwaway connections
     (test_connection) where the refreshed token would otherwise be lost."""
-    ctx = ssl.create_default_context(cafile=im["cafile"] or None)
+    if not im.get("host") or not im.get("user") or (
+            cfgmod.auth_method(im) == "password" and not im.get("password")):
+        raise RuntimeError(coded(NO_ACCOUNT))
+    ctx = tls_context(im)
     if (im.get("security") or "ssl") == "starttls":
         conn = imaplib.IMAP4(im["host"], int(im["port"]), timeout=120)
         try:
@@ -671,6 +691,25 @@ def virtual_views(conn=None, pairs=None) -> set[str]:
             or decode_mutf7(name).lower() in _VIEW_NAMES}
 
 
+# Parent-only folders (Gmail's "[Gmail]"): the server lists them but SELECT
+# fails. RFC 3501 \\Noselect; RFC 5258 \\NonExistent implies it.
+_UNSELECTABLE_FLAGS = {"\\noselect", "\\nonexistent"}
+
+
+def unselectable(conn=None, pairs=None) -> set[str]:
+    """Raw names of folders that can't hold mail. Never offered, scanned,
+    a role or a move target; their children are unaffected."""
+    pairs = list_folders_ex(conn) if pairs is None else pairs
+    return {name for name, flags in pairs if flags & _UNSELECTABLE_FLAGS}
+
+
+def selectable_folders(conn) -> list[str]:
+    """list_folders without the unselectable ones."""
+    pairs = list_folders_ex(conn)
+    bad = unselectable(pairs=pairs)
+    return [name for name, _ in pairs if name not in bad]
+
+
 _PREFIX_RE = {}
 
 
@@ -718,12 +757,13 @@ def resolve_roles(conn, acc=None, pairs=None) -> dict:
       choices     {role: [raw, ...]} - the tied folders Settings offers
                   (also after the user confirmed one), `counts` their mail
                   counts (STATUS, only fetched for those)
-    A flag always beats a name; Gmail's virtual views are never a role.
+    A flag always beats a name; Gmail's virtual views and unselectable
+    (parent-only) folders are never a role.
     An override naming anything but a candidate of its role is ignored."""
     acc = acc or accounts.get()
     pairs = list_folders_ex(conn) if pairs is None else pairs
     delims = getattr(pairs, "delims", {})
-    views = virtual_views(pairs=pairs)
+    views = virtual_views(pairs=pairs) | unselectable(pairs=pairs)
     flagged: dict[str, list[str]] = {}
     named: dict[str, tuple[list[str], list[str]]] = {}  # whole, prefixed
     for name, flags in pairs:
@@ -2070,6 +2110,7 @@ def run_scan(acc=None) -> None:
             role_excluded |= {n for n, r in found["looks_like"].items()
                               if r in EXCLUDED_ROLES}
             role_excluded |= virtual_views(pairs=pairs)
+            role_excluded |= unselectable(pairs=pairs)
             folders = [f for f, _ in pairs
                        if f not in role_excluded
                        and not (excluded(f, rules)
@@ -2152,10 +2193,13 @@ def run_scan(acc=None) -> None:
             acc.state["progress"] = ""
             acc.state["notice"] = {"key": "scan_cancelled", "params": {}}
     except Exception as exc:
-        log.exception("scan failed")
+        if is_coded(str(exc)):       # an expected refusal: no traceback
+            log.warning("scan failed: %s", exc)
+        else:
+            log.exception("scan failed")
         with acc.lock:
             acc.state["status"] = "error"
-            acc.state["error"] = f"{type(exc).__name__}: {exc}"
+            acc.state["error"] = error_text(exc)
 
 
 def folder_message_count(conn, target: str | None) -> int | None:
@@ -2295,7 +2339,7 @@ def _resolve_dest(conn, action: str, dest: str, acc=None) -> str:
         if not name:
             raise RuntimeError(coded(ROLE_MISSING, role=action))
         return name
-    if dest not in list_folders(conn):
+    if dest not in selectable_folders(conn):
         raise RuntimeError(coded(UNKNOWN_TARGET, folder=decode_mutf7(dest)))
     return dest
 
@@ -3415,7 +3459,7 @@ def role_move(role: str, action: str, uids: list[int], uv: int = 0,
         if not src:
             raise RuntimeError(coded(ROLE_MISSING, role=role))
         if action == "not_junk":
-            inbox = next((f for f in list_folders(conn)
+            inbox = next((f for f in selectable_folders(conn)
                           if f.upper() == "INBOX"), None)
             if not inbox:
                 raise RuntimeError(INBOX_MISSING)
@@ -3500,7 +3544,7 @@ def trash_restore(uids: list[int], dest: str, uv: int = 0,
     trash = ""
     conn = connect(cfgmod.account_imap(acc.name), acc.name)
     try:
-        folders = list_folders(conn)
+        folders = selectable_folders(conn)
         trash = folder_roles(conn, acc).get("trash")
         if not trash:
             raise RuntimeError(coded(ROLE_MISSING, role="trash"))

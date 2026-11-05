@@ -229,7 +229,10 @@ export function SettingsModal({ cfg, account, onClose, onSaved,
   };
   const applyPreset = (p: Preset) => {
     if (p === "custom") {
-      setF({ ...f, preset: p, auth: presetAuth(p) });
+      // Leaving a preset must not keep its CA path (Proton's file does
+      // not exist elsewhere); an already-custom account keeps its own.
+      setF({ ...f, preset: p, auth: presetAuth(p),
+        cafile: f.preset === "custom" ? f.cafile : "" });
       return;
     }
     const pre = PRESETS[p];

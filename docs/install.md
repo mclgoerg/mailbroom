@@ -30,7 +30,11 @@ Everything set via env can also be configured later in the settings UI
 second container sharing the network namespace. Use
 [`deploy/docker-compose.proton.yml`](../deploy/docker-compose.proton.yml)
 (setup steps in the file header) - the platform recipes below cover the
-generic IMAP case (Gmail, iCloud, Fastmail, ...).
+generic IMAP case (Gmail, iCloud, Fastmail, ...). Before the first start
+set `BRIDGE_IMAGE` in `.env`: Mailbroom ships no Bridge image, so build
+one from Proton's source or pick a community image (verify it is still
+maintained). Running Bridge in Docker is a community setup that Proton
+does not support, and Bridge needs a paid Proton plan.
 
 ## Docker Compose (recommended)
 

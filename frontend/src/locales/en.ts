@@ -398,6 +398,7 @@ export const EN: Record<string, string> = {
   "tools.group_cleanup": "Clean up",
   "tools.group_insights": "Insights",
   "tools.group_ai": "AI & export",
+  "col.status_tags": "Status & tags",
   "tracker.title": "Trackers",
   "tracker.sub": "Who tracks your opens and clicks",
   "tracker.explainer":
@@ -1018,12 +1019,12 @@ export const EN: Record<string, string> = {
   "confirm.empty_trash_body_one":
     "The 1 mail in Trash will be permanently deleted. This cannot be undone.",
   "confirm.empty_trash_btn": "Delete permanently ({n})",
+  "confirm.b_mails_from": "{n} mails from {names}",
+  "confirm.b_mails_from_one": "1 mail from {names}",
+  "confirm.names_more": "{names} and {k} more",
+  "confirm.b_undo": "You can undo this from the result message.",
   "confirm.btn_anyway": "{verb} anyway",
-  "confirm.b_mails_groups": "{n} mails from {k} groups will be affected",
-  "confirm.b_mails_groups_one": "1 mail from {k} groups will be affected",
   "select.named": "Select {subject}",
-  "confirm.b_mails_one_group": "{n} mails in 1 group will be affected",
-  "confirm.b_mails_one_group_one": "1 mail in 1 group will be affected",
   "bar.groups": "{n} groups",
   "bar.groups_one": "1 group",
   "bar.selected_one_mail": "1 group · 1 mail",
@@ -1282,8 +1283,6 @@ export const EN: Record<string, string> = {
   "senders.back": "Back to the senders",
   "senders.protected_toast":
     "{n} senders protected \u2013 their mails moved to \u201cProtected senders\u201d.",
-  "confirm.b_mails_senders": "{n} mails from {k} senders will be affected",
-  "confirm.b_mails_one_sender": "{n} mails from 1 sender will be affected",
   "confirm.b_protected_senders_skipped": "{n} protected senders skipped",
   "smart.title": "Smart grouping",
   "smart.min_label": "Own row from N mails",
@@ -1512,6 +1511,9 @@ export const EN: Record<string, string> = {
     + "Nothing was deleted.",
   "ferr.cannot_open": "Could not open the “{folder}” folder on the server.",
   "ferr.cannot_list": "Could not read the folder's mail list.",
+  "ferr.mailto_unsafe":
+    "The unsubscribe address in this mail is not a single plain address "
+    + "(or its text contains line breaks), so no mail was sent.",
   "ferr.cannot_flag":
     "The server did not accept marking the mails for deletion.",
   "ferr.cannot_expunge": "The server did not remove the marked mails.",
@@ -1552,6 +1554,12 @@ export const EN: Record<string, string> = {
   "ferr.rule_purge_filter_domain":
     "This filter is not available for Junk and Trash rules: {names} (it "
     + "never matches senders - use plain text such as the domain name).",
+  "ferr.no_account":
+    "No mail account is set up yet - open Settings and fill in the "
+    + "sign-in details first.",
+  "ferr.cafile_missing":
+    "The certificate file {path} does not exist - clear the CA field in "
+    + "Settings (normal providers need none) or mount the file there.",
   "undo.from_junk": "{n} mails from Junk",
   "undo.from_junk_one": "1 mail from Junk",
   "undo.from_trash": "{n} mails from Trash",
@@ -1565,6 +1573,7 @@ export const EN: Record<string, string> = {
   "aif.disclosure":
     "Only this sentence and the filter syntax are sent to your AI provider - "
     + "no mail data.",
+  "aif.hint": "Press Ctrl+Enter (\u2318+Enter on a Mac) to send.",
   "aif.chars": "{n} / {max}",
   "aif.send": "Send",
   "aif.thinking": "Writing the filter…",

@@ -72,7 +72,7 @@ def _gmail(**imap) -> None:
     if "gmail" not in cfgmod.load_config()["accounts"]:
         cfgmod.update_config({"add_account": "gmail"})
     cfgmod.update_config({"account": "gmail", "imap": {
-        "preset": "gmail", "host": "imap.gmail.example", **imap}})
+        "preset": "gmail", "host": "imap.gmail.example", "user": "me@gmail.example", **imap}})
 
 
 # -------------------------------------------------------------- derivation
@@ -330,7 +330,8 @@ def test_test_connection_oauth_account_without_password(monkeypatch):
         def logout(self):
             pass
     monkeypatch.setattr(mailops, "connect", lambda im, name=None: _C())
-    monkeypatch.setattr(mailops, "list_folders", lambda c: ["INBOX", "Sent"])
+    monkeypatch.setattr(mailops, "selectable_folders",
+                        lambda c: ["INBOX", "Sent"])
     r = client.post("/api/test_connection", params={"account": "gmail"})
     assert r.status_code == 200 and r.json() == {"ok": True, "folders": 2}
 
@@ -339,7 +340,7 @@ def test_test_connection_without_any_credential_is_400():
     _gmail(auth="oauth")
     r = client.post("/api/test_connection", params={"account": "gmail"})
     assert r.status_code == 400
-    assert "no credentials" in r.json()["detail"]
+    assert r.json()["detail"] == "no_account"
     _gmail(auth="password")
     r = client.post("/api/test_connection", params={"account": "gmail"})
     assert r.status_code == 400
