@@ -1527,17 +1527,18 @@ def get_export(grouping: str = Query("sender"),
 
 @app.get("/api/export_config")
 def get_export_config():
-    """Portable backup of settings + learned state. NO secrets: the IMAP
-    password and AI API key never leave the server."""
+    """Portable backup of settings + learned state. NO secrets: IMAP
+    passwords, OAuth tokens / client secrets and the AI API key never leave
+    the server (cfgmod.*_SECRET_FIELDS)."""
     cfg = cfgmod.load_config()
     data = {
         "version": 2, "app": "mailbroom",
         "config": {
-            "accounts": {n: {k: v for k, v in b.items() if k != "password"}
+            "accounts": {n: cfgmod.strip_account_secrets(b)
                          for n, b in cfg["accounts"].items()},
             "protected": cfgmod.normalize_protected(cfg.get("protected")),
             "categories": cfg.get("categories") or {},
-            "ai": {k: v for k, v in cfg["ai"].items() if k != "api_key"},
+            "ai": cfgmod.strip_ai_secrets(cfg["ai"]),
         },
         "rules": rulesmod.load_rules(),
         "verdicts": verdictstore.load(),
@@ -1562,11 +1563,11 @@ def post_import_config(body: dict):
     update = {k: c[k] for k in ("accounts", "protected", "categories", "ai")
               if k in c}
     if isinstance(update.get("accounts"), dict):
-        for b in update["accounts"].values():
-            if isinstance(b, dict):
-                b.pop("password", None)
+        update["accounts"] = {
+            n: cfgmod.strip_account_secrets(b) if isinstance(b, dict) else b
+            for n, b in update["accounts"].items()}
     if isinstance(update.get("ai"), dict):
-        update["ai"].pop("api_key", None)
+        update["ai"] = cfgmod.strip_ai_secrets(update["ai"])
     try:
         cfgmod.update_config(update)
     except ValueError as exc:
