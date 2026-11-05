@@ -711,6 +711,26 @@ export function MenuDivider() {
   return <div role="separator" className="my-1 border-t border-line" />;
 }
 
+/** A labelled section of MenuItems. The label is a visual caption of the
+ *  group (role=group + aria-label carry it for assistive tech); it is not a
+ *  menuitem, so arrow-key navigation skips it. A later group gets a hairline
+ *  above it. */
+export function MenuGroup({ label, children }: {
+  label: string; children: ReactNode;
+}) {
+  return (
+    <div role="group" aria-label={label}
+      className="[&:not(:first-child)]:mt-1 [&:not(:first-child)]:border-t
+        [&:not(:first-child)]:border-line [&:not(:first-child)]:pt-1">
+      <div aria-hidden className="px-3 pb-0.5 pt-1.5 type-caption
+        font-semibold uppercase tracking-wide text-muted">
+        {label}
+      </div>
+      {children}
+    </div>
+  );
+}
+
 /* Non-semantic identity hues (never emerald/amber/rose/sky/orange - those
  * are reserved: delete-safe/review/keep/replied/attachments). */
 const ACCOUNT_HUES = [

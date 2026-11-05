@@ -30,7 +30,7 @@ import type { QuickWinCard } from "./quickwins";
 import { FoldersPanel } from "./components/FoldersPanel";
 import { AccountAvatar, applyTheme, BAR_ICON_BTN, BulkBar, Button, Chip, ChipGroup, ChipSegment,
   choiceDialog, confirmDialog, currentTheme, EmptyState, ensureAiAck, FILTER_ROW, Input, isModalOpen, LINK,
-  LINK_ACCENT, Menu, MenuDivider, MenuHeading, MenuItem, Notice, ProgressBar,
+  LINK_ACCENT, Menu, MenuDivider, MenuGroup, MenuHeading, MenuItem, Notice, ProgressBar,
   promptDialog, Segmented, Select, Spinner, useToast,
   type ToastVariant } from "./components/ui";
 import { t } from "./i18n";
@@ -1685,62 +1685,67 @@ export default function App() {
               <Wrench size={16} aria-hidden /> {t("Tools")}
               <ChevronDown size={16} aria-hidden className="text-muted" />
             </>}>
-            <MenuItem disabled={triageDisabled}
-              onClick={() => setTriageOpen(true)} sub={t("triage.menu_sub")}>
-              <Layers size={16} className="mr-1 inline align-text-bottom" />
-              {t("triage.menu")}
-            </MenuItem>
-            <MenuItem onClick={() => setRulesOpen(true)}>
-              <ClipboardList size={16} className="mr-1 inline align-text-bottom" />
-              {t("Rules")}
-            </MenuItem>
-            <MenuItem onClick={() => setAttsOpen(true)}>
-              <Paperclip size={16} className="mr-1 inline align-text-bottom" />
-              {t("Attachments")}
-            </MenuItem>
-            <MenuItem disabled={state?.status !== "done"}
-              onClick={() => setDupsOpen(true)}>
-              <Copy size={16} className="mr-1 inline align-text-bottom" />
-              {t("Duplicates")}
-            </MenuItem>
-            <MenuItem onClick={() => setTrackersOpen(true)}>
-              <Eye size={16} className="mr-1 inline align-text-bottom" />
-              {t("tracker.menu")}
-            </MenuItem>
-            <MenuItem onClick={() => setFoldersOpen("junk")}>
-              <ShieldAlert size={16} className="mr-1 inline align-text-bottom" />
-              {t("fp.menu")}
-            </MenuItem>
-            <MenuItem onClick={() => setStatsOpen(true)}>
-              <BarChart3 size={16} className="mr-1 inline align-text-bottom" />
-              {t("Statistics")}
-            </MenuItem>
-            <MenuItem disabled={state?.status !== "done"}
-              onClick={() => setSpaceOpen(true)}>
-              <LayoutGrid size={16} className="mr-1 inline align-text-bottom" />
-              {t("space.title")}
-            </MenuItem>
-            <MenuItem onClick={() => setWrappedOpen(true)}>
-              <Sparkles size={16} className="mr-1 inline align-text-bottom" />
-              {t("wrapped.menu")}
-            </MenuItem>
-            <MenuItem onClick={() => setAuditOpen(true)}>
-              <ScrollText size={16} className="mr-1 inline align-text-bottom" />
-              {t("Audit Log")}
-            </MenuItem>
-            <MenuDivider />
-            {aiEnabled && (
-              <MenuItem onClick={() => reviewWithAi()}
-                disabled={scanning || aiRunning || state?.status !== "done"}>
-                <Wand2 size={16} className="mr-1 inline align-text-bottom" />
-                {t("AI review")}
+            <MenuGroup label={t("tools.group_cleanup")}>
+              <MenuItem disabled={triageDisabled}
+                onClick={() => setTriageOpen(true)} sub={t("triage.menu_sub")}>
+                <Layers size={16} className="mr-1 inline align-text-bottom" />
+                {t("triage.menu")}
               </MenuItem>
-            )}
-            <MenuItem onClick={() => downloadFile(api.exportUrl(mode))}
-              sub={t("export.csv_tip")}>
-              <Download size={16} className="mr-1 inline align-text-bottom" />
-              {t("export.csv")}
-            </MenuItem>
+              <MenuItem onClick={() => setRulesOpen(true)}>
+                <ClipboardList size={16} className="mr-1 inline align-text-bottom" />
+                {t("Rules")}
+              </MenuItem>
+              <MenuItem disabled={state?.status !== "done"}
+                onClick={() => setDupsOpen(true)}>
+                <Copy size={16} className="mr-1 inline align-text-bottom" />
+                {t("Duplicates")}
+              </MenuItem>
+              <MenuItem onClick={() => setAttsOpen(true)}>
+                <Paperclip size={16} className="mr-1 inline align-text-bottom" />
+                {t("Attachments")}
+              </MenuItem>
+              <MenuItem onClick={() => setFoldersOpen("junk")}>
+                <ShieldAlert size={16} className="mr-1 inline align-text-bottom" />
+                {t("fp.menu")}
+              </MenuItem>
+            </MenuGroup>
+            <MenuGroup label={t("tools.group_insights")}>
+              <MenuItem onClick={() => setStatsOpen(true)}>
+                <BarChart3 size={16} className="mr-1 inline align-text-bottom" />
+                {t("Statistics")}
+              </MenuItem>
+              <MenuItem disabled={state?.status !== "done"}
+                onClick={() => setSpaceOpen(true)}>
+                <LayoutGrid size={16} className="mr-1 inline align-text-bottom" />
+                {t("space.title")}
+              </MenuItem>
+              <MenuItem onClick={() => setWrappedOpen(true)}>
+                <Sparkles size={16} className="mr-1 inline align-text-bottom" />
+                {t("wrapped.menu")}
+              </MenuItem>
+              <MenuItem onClick={() => setTrackersOpen(true)}>
+                <Eye size={16} className="mr-1 inline align-text-bottom" />
+                {t("tracker.menu")}
+              </MenuItem>
+              <MenuItem onClick={() => setAuditOpen(true)}>
+                <ScrollText size={16} className="mr-1 inline align-text-bottom" />
+                {t("Audit Log")}
+              </MenuItem>
+            </MenuGroup>
+            <MenuGroup label={t("tools.group_ai")}>
+              {aiEnabled && (
+                <MenuItem onClick={() => reviewWithAi()}
+                  disabled={scanning || aiRunning || state?.status !== "done"}>
+                  <Wand2 size={16} className="mr-1 inline align-text-bottom" />
+                  {t("AI review")}
+                </MenuItem>
+              )}
+              <MenuItem onClick={() => downloadFile(api.exportUrl(mode))}
+                sub={t("export.csv_tip")}>
+                <Download size={16} className="mr-1 inline align-text-bottom" />
+                {t("export.csv")}
+              </MenuItem>
+            </MenuGroup>
           </Menu>
         </div>
       </div>
