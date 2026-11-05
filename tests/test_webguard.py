@@ -25,8 +25,17 @@ def test_default_hosts_allowed(no_extra, host):
     assert _get(host).status_code == 200
 
 
-@pytest.mark.parametrize("host", ["nas.lan", "nas.lan:8765", "evil.example",
-                                  "localhost.evil.example", ""])
+@pytest.mark.parametrize("host", [
+    "nas.lan", "nas.lan:8765", "evil.example", "localhost.evil.example", "",
+    # lax IPv4 spellings a resolver treats as names / other addresses
+    "127.1", "0x7f.0.0.1", "0177.0.0.1", "2130706433", "127.0.0.1.",
+    "localhost.", "127.0.0.1.nip.io", "1.2.3",
+    # malformed bracket / port / userinfo forms
+    "[::1].evil.example", "[::1]evil.example", "[::1]:", "[::1]:80x",
+    "[fe80::1%x]", "[fe80::1%25eth0]", "[::1", "[]", "[evil.example]",
+    "evil.localhost:1@x", "localhost:80:80", "localhost:", "localhost:abc",
+    "local host", "localhost@evil.example", "localhost/x", "localhost:123456",
+])
 def test_other_hosts_denied(no_extra, host):
     r = _get(host)
     assert r.status_code == 403
@@ -126,3 +135,16 @@ def test_cross_site_guard_applies_with_a_login(no_extra):
     r = c.post("/api/login", json={"password": "s3cret"},
                headers={"Origin": "http://testserver"})
     assert r.status_code == 200
+
+
+def test_startup_logs_accepted_hosts_only_without_a_login(caplog, monkeypatch):
+    from backend import main
+    monkeypatch.setenv("MAILBROOM_ALLOWED_HOSTS", "nas.lan")
+    with caplog.at_level("INFO", logger="pmc.auth"):
+        main._log_accepted_hosts()
+    assert "nas.lan" in caplog.text and "accepting requests" in caplog.text
+    caplog.clear()
+    _set_password()
+    with caplog.at_level("INFO", logger="pmc.auth"):
+        main._log_accepted_hosts()
+    assert "accepting requests" not in caplog.text

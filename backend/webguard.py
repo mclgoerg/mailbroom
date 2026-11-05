@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import ipaddress
 import os
+import re
 from html import escape
 from urllib.parse import urlsplit
 
@@ -13,21 +14,43 @@ ENV_ALLOWED = "MAILBROOM_ALLOWED_HOSTS"
 WRITE_METHODS = {"POST", "PUT", "PATCH", "DELETE"}
 
 
+_NAME_RE = re.compile(r"[a-z0-9][a-z0-9._-]*\Z")
+
+
 def split_host(raw: str) -> str:
-    """Host name of a raw Host header: port stripped, lower-cased; an IPv6
-    literal keeps its brackets."""
+    """Host name of a raw Host header (port stripped, lower-cased; an IPv6
+    literal keeps its brackets), or "" when the header is not exactly
+    `name`, `name:digits`, `[ipv6]` or `[ipv6]:digits`."""
     raw = (raw or "").strip().lower()
     if raw.startswith("["):
         end = raw.find("]")
-        return raw[:end + 1] if end != -1 else raw
-    return raw.rsplit(":", 1)[0] if ":" in raw else raw
+        if end == -1:
+            return ""
+        host, rest = raw[:end + 1], raw[end + 1:]
+        try:
+            if "%" in host:                        # zone ids: not a host
+                raise ValueError
+            ipaddress.IPv6Address(host[1:-1])
+        except ValueError:
+            return ""
+    else:
+        host, sep, port = raw.partition(":")
+        rest = sep + port
+        if not _NAME_RE.match(host):
+            return ""
+    if rest and not re.fullmatch(r":[0-9]{1,5}", rest):
+        return ""
+    return host
 
 
 def _is_ip_literal(host: str) -> bool:
-    if host.startswith("[") and host.endswith("]"):
-        host = host[1:-1]
+    """Strict dotted-quad IPv4 or bracketed IPv6 (no `127.1`, hex, octal or
+    integer forms - those are host names to a DNS resolver)."""
     try:
-        ipaddress.ip_address(host)
+        if host.startswith("[") and host.endswith("]"):
+            ipaddress.IPv6Address(host[1:-1])
+        else:
+            ipaddress.IPv4Address(host)
     except ValueError:
         return False
     return True
@@ -64,7 +87,8 @@ def describe_accepted() -> str:
 
 
 def blocked_page(host: str) -> str:
-    h = escape(split_host(host) or "(none)")
+    shown = escape((host or "").strip()[:100] or "(none)")
+    h = escape(split_host(host) or "<host>")
     return (
         "<!doctype html><meta charset=utf-8>"
         "<title>Mailbroom - host not allowed</title>"
@@ -72,7 +96,7 @@ def blocked_page(host: str) -> str:
         "padding:0 1rem\">"
         "<h1>Host not allowed</h1>"
         f"<p>Mailbroom has no login set and was reached as "
-        f"<code>{h}</code>. To stop other websites from reaching it through "
+        f"<code>{shown}</code>. To stop other websites from reaching it through "
         "your browser, it only answers to localhost and IP addresses in that "
         "case.</p>"
         "<p>Either add "

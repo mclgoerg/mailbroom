@@ -83,6 +83,14 @@ logging.getLogger("uvicorn.access").addFilter(_RedactKnowledgeKeys())
 from contextlib import asynccontextmanager
 
 
+def _log_accepted_hosts() -> None:
+    """Startup note in no-login mode: the Host names the guard accepts."""
+    if cfgmod.load_server()["auth"]["mode"] == "none":
+        logging.getLogger("pmc.auth").info(
+            "no login set - accepting requests for: %s",
+            webguard.describe_accepted())
+
+
 @asynccontextmanager
 async def _lifespan(app: FastAPI):
     from . import secretbox
@@ -92,13 +100,10 @@ async def _lifespan(app: FastAPI):
             "are stored in plaintext in /data (they would be readable in "
             "volume backups). Generate a key with `openssl rand -base64 32` "
             "and keep it OUT of the backups.")
+    _log_accepted_hosts()
     # Show the last scan of every tenant's accounts right away instead of
     # an empty view (safe: moves re-check UIDVALIDITY; undo works by
     # Message-ID).
-    if cfgmod.load_server()["auth"]["mode"] == "none":
-        logging.getLogger("pmc.auth").info(
-            "no login set - accepting requests for: %s",
-            webguard.describe_accepted())
     for tenant in tenants.known():
         with tenants.use(tenant):
             for name in accountsmod.names():
@@ -191,7 +196,7 @@ async def _cross_site_guard(request: Request, call_next):
             if path.startswith("/api/"):
                 return JSONResponse(
                     {"detail": "host_not_allowed",
-                     "host": webguard.split_host(host)}, status_code=403)
+                     "host": host[:100]}, status_code=403)
             return HTMLResponse(webguard.blocked_page(host), status_code=403)
     if webguard.cross_site_write(request.method, path, request.headers):
         return JSONResponse({"detail": "cross_site_request"}, status_code=403)
