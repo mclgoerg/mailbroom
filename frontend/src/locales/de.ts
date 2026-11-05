@@ -1769,6 +1769,13 @@ export const DE: Record<string, string> = {
     "Dieser Filter ist für Spam- und Papierkorb-Regeln nicht "
     + "verfügbar: {names} (er trifft nie auf Absender – nutze "
     + "stattdessen Freitext wie den Domainnamen).",
+  "ferr.no_account":
+    "Es ist noch kein Mail-Konto eingerichtet – trage zuerst in den "
+    + "Einstellungen die Zugangsdaten ein.",
+  "ferr.cafile_missing":
+    "Die Zertifikatsdatei {path} existiert nicht – leere in den "
+    + "Einstellungen das CA-Feld (normale Anbieter brauchen keins) oder "
+    + "binde die Datei dort ein.",
   "undo.from_junk": "{n} Mails aus Spam",
   "undo.from_junk_one": "1 Mail aus Spam",
   "undo.from_trash": "{n} Mails aus dem Papierkorb",
