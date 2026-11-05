@@ -214,7 +214,7 @@ function DesktopTable({ slice, baseIdx, selected, focusedKey, openKey, compact, 
             {sortBtn("label", groupLabel)}
           </th>
           {!compact && (
-            <th className={`${th} hidden w-40 lg:table-cell`}>{t("Type")}</th>
+            <th className={`${th} hidden w-40 lg:table-cell`}>{t("col.status_tags")}</th>
           )}
           <th className={`${th} w-24`}>{t("AI")}</th>
           <th className={`${sortableTh} w-18`} aria-sort={ariaSort("engagement")}>
@@ -300,7 +300,7 @@ function DesktopTable({ slice, baseIdx, selected, focusedKey, openKey, compact, 
                     🚫 {t("Blocked")}
                   </Tag>
                 )}
-                {g.tags.map((t) => <Tag key={t}>{t}</Tag>)}
+                {g.tags.map((tag) => <Tag key={tag} tone="category">{tag}</Tag>)}
               </div>
             </td>}
             <td className="px-2 py-2 align-top">
@@ -407,9 +407,9 @@ function MobileCards({ slice, baseIdx, selected, focusedKey, onToggle,
                     🚫 {t("Blocked")}
                   </Tag>
                 )}
-                {g.tags.map((t) => <Tag key={t}>{t}</Tag>)}
                 {g.ai && <AiTag ai={g.ai} />}
                 {g.ratings && <RatingChips ratings={g.ratings} />}
+                {g.tags.map((tag) => <Tag key={tag} tone="category">{tag}</Tag>)}
               </div>
             </div>
             <ChevronRight aria-hidden size={18}
