@@ -68,6 +68,9 @@ def test_a_body_may_hold_plain_newlines_but_never_headers(sent):
     "mailto:u@list.example%20spy@evil.example",
     "mailto:%3Cu@list.example%3E",
     "mailto:Name%20%3Cu@list.example%3E",
+    "mailto:u@list.example?subject=a%E2%80%A8b",    # U+2028
+    "mailto:u@list.example?subject=a%E2%80%A9b",    # U+2029
+    "mailto:u@list.example?subject=a%C2%85b",       # U+0085
     "mailto:noat",
     "mailto:",
 ])
@@ -76,6 +79,19 @@ def test_unsafe_mailto_is_refused_and_nothing_is_sent(sent, uri):
     assert res["status"] == "failed"
     assert res["error"] == mailops.MAILTO_UNSAFE
     assert sent == []
+
+
+@pytest.mark.parametrize("hfield", [
+    "to=spy@evil.example", "cc=spy@evil.example", "bcc=spy@evil.example",
+    "Bcc=spy@evil.example&subject=hi"])
+def test_to_cc_bcc_hfields_are_ignored(sent, hfield):
+    res = _go(f"mailto:u@list.example?{hfield}")
+    assert res["status"] == "done"
+    (to, raw), = sent
+    assert to == ["u@list.example"]
+    msg = email.message_from_bytes(raw)
+    assert "evil" not in raw.decode() and msg["Bcc"] is None
+    assert msg["Cc"] is None and msg["To"] == "u@list.example"
 
 
 def test_http_link_next_to_unsafe_mailto_is_not_affected(sent):
