@@ -982,7 +982,7 @@ def test_unit_smart_own_rows_borrow_pools_do_not():
     verdictstore.save("sender", {"a@b.example": {"verdict": "keep",
                                                  "reason": "r"}})
     own = {"key": "s:a@b.example", "ai": None}
-    pool = {"key": "k:a@b.example", "ai": None, "fp": "aaaa"}
+    pool = {"key": "k:a@b.example", "ai": None}      # only s: rows borrow
     fp_row = {"key": "s:a@b.example", "ai": None, "fp": "aaaa"}
     mine = {"key": "s:c@d.example", "ai": {"verdict": "review", "reason": "x"}}
     verdictstore.save("sender", {"c@d.example": {"verdict": "keep",
