@@ -116,9 +116,9 @@ def apply_to_groups(groups: dict, account: str | None = None) -> int:
     other senders.
 
     A Smart row that stands for exactly ONE sender (`s:<addr>`, no `fp`)
-    is that sender: without a verdict of its own it shows the sender's
-    verdict from the Sender grouping (live groups first, then the cache).
-    Pooled rows never borrow."""
+    without a verdict of its own cached under "smart" always shows that
+    sender's CURRENT verdict from the Sender grouping (or none): see
+    `sync_borrowed`. Pooled rows never borrow."""
     data = load_account(account)
     applied = 0
     stale: dict[str, list[str]] = {}
@@ -126,11 +126,6 @@ def apply_to_groups(groups: dict, account: str | None = None) -> int:
         cached = data.get(grouping) or {}
         for key, rec in recs.items():
             v = cached.get(key)
-            if not v and grouping == "smart" and key.startswith("s:") \
-                    and rec.get("fp") is None and rec.get("ai") is None:
-                addr = key[2:]
-                live = (groups.get("sender") or {}).get(addr) or {}
-                v = live.get("ai") or (data.get("sender") or {}).get(addr)
             if not v:
                 continue
             if rec.get("fp") is not None and v.get("fp") != rec["fp"]:
@@ -140,7 +135,34 @@ def apply_to_groups(groups: dict, account: str | None = None) -> int:
                 applied += 1
     if stale:
         drop_verdicts(stale, account)
-    return applied
+    return applied + sync_borrowed(groups, data)
+
+
+def has_own_smart_verdict(data: dict, key: str) -> bool:
+    return key in (data.get("smart") or {})
+
+
+def sync_borrowed(groups: dict, data: dict) -> int:
+    """Make every one-sender Smart row without a verdict of its own show the
+    sender's current verdict (live Sender group first, then the cache) -
+    overwriting an older borrowed one, clearing it when the sender has none.
+    Returns how many rows newly got one."""
+    smart = groups.get("smart")
+    if not smart:
+        return 0
+    live = groups.get("sender") or {}
+    cached = data.get("sender") or {}
+    gained = 0
+    for key, rec in smart.items():
+        if not key.startswith("s:") or rec.get("fp") is not None \
+                or has_own_smart_verdict(data, key):
+            continue
+        src = (live.get(key[2:]) or {}).get("ai") or cached.get(key[2:])
+        before = rec.get("ai")
+        rec["ai"] = ({"verdict": src["verdict"], "reason": src["reason"]}
+                     if src else None)
+        gained += before is None and src is not None
+    return gained
 
 
 def drop_verdicts(keys: dict[str, list[str]],

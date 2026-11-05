@@ -978,6 +978,52 @@ def test_a_one_sender_smart_row_shows_the_sender_verdict(tail, monkeypatch):
                if not k.startswith("s:"))
 
 
+BIG = "big@bigshop.example"
+
+
+def _rate_sender(monkeypatch, verdict):
+    _fake_ai(monkeypatch, [], verdict=verdict)
+    aihelper._run_ai("sender", keys={BIG}, rerate=True)
+
+
+def test_a_borrowed_verdict_follows_a_rerate_and_a_clear(tail, monkeypatch):
+    cfgmod.update_config({"ai": {"api_key": "k"}})
+    _rate_sender(monkeypatch, "delete_safe")
+    assert smart_state()["s:" + BIG]["ai"]["verdict"] == "delete_safe"
+    _rate_sender(monkeypatch, "keep")                 # re-rated
+    assert mailops.STATE["groups"]["sender"][BIG]["ai"]["verdict"] == "keep"
+    assert smart_state()["s:" + BIG]["ai"]["verdict"] == "keep"
+    client.post("/api/config", json={"clear_ai_verdicts": True})
+    assert smart_state()["s:" + BIG]["ai"] is None    # cleared with it
+
+
+def test_a_stale_borrowed_verdict_in_a_snapshot_is_corrected(tail, monkeypatch):
+    cfgmod.update_config({"ai": {"api_key": "k"}})
+    _rate_sender(monkeypatch, "keep")
+    acc = accountsmod.get()
+    # an older image (or the old bug) left a stale borrowed verdict behind
+    mailops.STATE["groups"]["smart"]["s:" + BIG]["ai"] = {
+        "verdict": "delete_safe", "reason": "old"}
+    mailops.save_snapshot(acc)
+    accountsmod.reset()
+    acc2 = accountsmod.get()
+    assert mailops.load_snapshot(acc2)
+    assert mailops.public_state(acc2)["groups"]["smart"]["s:" + BIG][
+        "ai"]["verdict"] == "keep"
+
+
+def test_a_smart_rows_own_verdict_is_never_overwritten(tail, monkeypatch):
+    cfgmod.update_config({"ai": {"api_key": "k"}})
+    _fake_ai(monkeypatch, [], verdict="review")
+    aihelper._run_ai("smart")                         # own verdict, stored
+    assert smart_state()["s:" + BIG]["ai"]["verdict"] == "review"
+    _rate_sender(monkeypatch, "delete_safe")
+    assert smart_state()["s:" + BIG]["ai"]["verdict"] == "review"
+    verdictstore.save("sender", {BIG: {"verdict": "keep", "reason": "r"}})
+    mailops.run_scan()
+    assert smart_state()["s:" + BIG]["ai"]["verdict"] == "review"
+
+
 def test_unit_smart_own_rows_borrow_pools_do_not():
     verdictstore.save("sender", {"a@b.example": {"verdict": "keep",
                                                  "reason": "r"}})
@@ -987,6 +1033,8 @@ def test_unit_smart_own_rows_borrow_pools_do_not():
     mine = {"key": "s:c@d.example", "ai": {"verdict": "review", "reason": "x"}}
     verdictstore.save("sender", {"c@d.example": {"verdict": "keep",
                                                  "reason": "r"}})
+    verdictstore.save("smart", {"s:c@d.example": {"verdict": "review",
+                                                  "reason": "x"}})
     assert verdictstore.apply_to_groups(
         {"smart": {"s:a@b.example": own, "k:a@b.example": pool,
                    "s:c@d.example": mine}}) == 1

@@ -296,6 +296,7 @@ def _run_ai(grouping: str, acc=None, keys: set[str] | None = None,
                 applied: dict[str, dict] = {}
                 with STATE_LOCK:
                     recs = STATE["groups"][grouping]
+                    acct_cache = verdictstore.load_account(acc.name)
                     for v in data["verdicts"]:
                         rec = recs.get(v["key"]) or recs.get(v["key"].lower())
                         if rec and rec["key"] in fps \
@@ -316,10 +317,13 @@ def _run_ai(grouping: str, acc=None, keys: set[str] | None = None,
                             rec["ai"] = {"verdict": verdict,
                                          "reason": v["reason"][:160]}
                             if grouping == "sender":
-                                # A one-sender Smart row shows its verdict.
+                                # A one-sender Smart row follows it (unless
+                                # it has a verdict of its own).
                                 own = STATE["groups"].get("smart", {}).get(
                                     f"s:{rec['key']}")
-                                if own is not None and own.get("ai") is None:
+                                if own is not None and not \
+                                        verdictstore.has_own_smart_verdict(
+                                            acct_cache, own["key"]):
                                     own["ai"] = dict(rec["ai"])
                             stored = dict(rec["ai"])
                             if "fp" in rec:        # pooled row: see verdictstore
