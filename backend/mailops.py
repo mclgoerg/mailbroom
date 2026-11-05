@@ -550,8 +550,10 @@ def connect(im: dict, account_name: str | None = None) -> imaplib.IMAP4:
         conn = imaplib.IMAP4_SSL(im["host"], int(im["port"]),
                                  ssl_context=ctx, timeout=120)
     try:
-        oauth = im.get("oauth")
-        if oauth and oauth.get("refresh_token"):
+        if cfgmod.auth_method(im) == "oauth":
+            oauth = im.get("oauth") or {}
+            if not oauth.get("refresh_token"):
+                raise RuntimeError(cfgmod.OAUTH_NOT_CONNECTED)
             from . import oauthflow
             fresh = oauthflow.ensure_fresh(oauth)
             if fresh is not oauth and account_name:
