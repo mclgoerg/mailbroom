@@ -389,6 +389,7 @@ export const EN: Record<string, string> = {
   "tools.group_cleanup": "Clean up",
   "tools.group_insights": "Insights",
   "tools.group_ai": "AI & export",
+  "col.status_tags": "Status & tags",
   "tracker.title": "Trackers",
   "tracker.sub": "Who tracks your opens and clicks",
   "tracker.explainer":

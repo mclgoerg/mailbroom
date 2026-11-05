@@ -166,6 +166,7 @@ export const DE: Record<string, string> = {
   "tools.group_cleanup": "Aufräumen",
   "tools.group_insights": "Einblicke",
   "tools.group_ai": "KI & Export",
+  "col.status_tags": "Status & Tags",
   "tracker.title": "Tracker",
   "tracker.sub": "Wer deine Öffnungen und Klicks verfolgt",
   "tracker.explainer":
@@ -290,7 +291,6 @@ export const DE: Record<string, string> = {
   "Mails": "Mails",
   "Size": "Größe",
   "Last": "Zuletzt",
-  "Type": "Typ",
   "AI": "KI",
   "unread": "ungelesen",
   "(filtered)": "(gefiltert)",
