@@ -1538,7 +1538,9 @@ export default function App() {
               title={t("junk.browse")}
               aria-label={t("junk.open_label", { n: state.junk_count })}
               onClick={() => setFoldersOpen("junk")}>
-              <ShieldAlert size={14} /> {state.junk_count}
+              <ShieldAlert size={14} />
+              <span className="hidden md:inline">{t("role.junk")}</span>
+              {state.junk_count}
             </Button>
           )}
           {state?.trash_count != null && state.trash_count > 0 && (
@@ -1548,7 +1550,9 @@ export default function App() {
               title={t("trash.browse")}
               aria-label={t("trash.open_label", { n: state.trash_count })}
               onClick={() => setFoldersOpen("trash")}>
-              <Trash2 size={14} /> {state.trash_count}
+              <Trash2 size={14} />
+              <span className="hidden md:inline">{t("role.trash")}</span>
+              {state.trash_count}
             </Button>
           )}
           {/* Profile menu: account switcher (when >1 account), identity,
