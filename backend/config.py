@@ -415,6 +415,14 @@ def _load_accounts(saved: dict, env_first: bool = True) -> dict[str, dict]:
     return out
 
 
+# Every secret field of the tenant config. Sealing at rest (secretbox) AND
+# the settings backup export/import derive from these, so a new secret
+# field only has to be listed once (tests/test_backup_secrets.py checks).
+ACCOUNT_SECRET_FIELDS = ("password",)
+OAUTH_SECRET_FIELDS = ("client_secret", "refresh_token", "access_token")
+AI_SECRET_FIELDS = ("api_key",)
+
+
 def load_config() -> dict:
     """The CURRENT TENANT's config (plus the server-level auth section,
     merged in for the middleware and login endpoints). Env bootstrap
@@ -440,16 +448,34 @@ def load_config() -> dict:
     except (OSError, json.JSONDecodeError):
         pass
     for block in cfg["accounts"].values():
-        block["password"] = secretbox.unseal(block.get("password"))
+        for key in ACCOUNT_SECRET_FIELDS:
+            block[key] = secretbox.unseal(block.get(key))
         if isinstance(block.get("oauth"), dict):
             oauth = dict(block["oauth"])
-            for key in ("client_secret", "refresh_token", "access_token"):
+            for key in OAUTH_SECRET_FIELDS:
                 if oauth.get(key):
                     oauth[key] = secretbox.unseal(oauth[key])
             block["oauth"] = oauth
-    cfg["ai"]["api_key"] = secretbox.unseal(cfg["ai"].get("api_key"))
+    for key in AI_SECRET_FIELDS:
+        cfg["ai"][key] = secretbox.unseal(cfg["ai"].get(key))
     cfg["auth"] = load_server()["auth"]
     return cfg
+
+
+def strip_account_secrets(block: dict) -> dict:
+    """Copy of an account block without any secret (password, OAuth
+    tokens and client secret) - what a settings backup may contain. The
+    non-secret OAuth facts (provider, client id) stay so the UI can say
+    "reconnect"."""
+    out = {k: v for k, v in block.items() if k not in ACCOUNT_SECRET_FIELDS}
+    if isinstance(out.get("oauth"), dict):
+        out["oauth"] = {k: v for k, v in out["oauth"].items()
+                        if k not in OAUTH_SECRET_FIELDS}
+    return out
+
+
+def strip_ai_secrets(ai: dict) -> dict:
+    return {k: v for k, v in ai.items() if k not in AI_SECRET_FIELDS}
 
 
 def account_imap(name: str) -> dict:
@@ -475,13 +501,15 @@ def _write_tenant_config(cfg: dict) -> None:
     out = json.loads(json.dumps(
         {k: v for k, v in cfg.items() if k != "auth"}))
     for block in out.get("accounts", {}).values():
-        block["password"] = secretbox.seal(block.get("password"))
+        for key in ACCOUNT_SECRET_FIELDS:
+            block[key] = secretbox.seal(block.get(key))
         if isinstance(block.get("oauth"), dict):
             oauth = block["oauth"]
-            for key in ("client_secret", "refresh_token", "access_token"):
+            for key in OAUTH_SECRET_FIELDS:
                 if oauth.get(key):
                     oauth[key] = secretbox.seal(oauth[key])
-    out["ai"]["api_key"] = secretbox.seal(out["ai"].get("api_key"))
+    for key in AI_SECRET_FIELDS:
+        out["ai"][key] = secretbox.seal(out["ai"].get(key))
     _write(config_path(), out)
 
 
