@@ -77,6 +77,27 @@ def test_the_snapshot_is_saved_before_a_delete_job_reports_done(
         mailops.public_state(acc2)["groups"]["sender"]
 
 
+def test_a_failing_snapshot_write_still_ends_the_job_and_the_next_runs(
+        bridge, monkeypatch):
+    mailops.run_scan()
+    acc = accountsmod.get()
+    real = mailops.save_snapshot
+
+    def boom(a):
+        raise TypeError("not serializable")
+    monkeypatch.setattr(mailops, "save_snapshot", boom)
+    mailops.delete_groups("sender", ["noreply@dhl.example"], acc=acc)
+    wait_delete_done()
+    assert acc.state["delete"]["status"] == "done"
+    assert acc.state["delete"]["moved"] == 3
+    # a following job is run, not just queued
+    monkeypatch.setattr(mailops, "save_snapshot", real)
+    mailops.delete_groups("sender", ["news@shop.example"], acc=acc)
+    wait_delete_done()
+    assert acc.state["delete"]["status"] == "done"
+    assert len(bridge.mailbox["Trash"]) == 4
+
+
 def test_snapshot_never_clobbers_live_state(bridge):
     mailops.run_scan()
     acc = accountsmod.get()

@@ -2554,7 +2554,13 @@ def _delete_worker(acc) -> None:
                 acc.inflight = job["by_folder"]
                 persisted = False
         if save_first:
-            save_snapshot(acc)
+            try:
+                save_snapshot(acc)
+            except Exception:
+                # Never let a failed cache write strand the job as "running"
+                # (new jobs would queue forever): report done regardless.
+                log.exception("[%s] could not persist the snapshot after a "
+                              "delete job", acc.name)
             persisted = True
             continue
         if finished:
