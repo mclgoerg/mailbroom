@@ -34,6 +34,7 @@ import { AccountAvatar, applyTheme, BAR_ICON_BTN, BulkBar, Button, Chip, ChipGro
   Menu, MenuDivider, MenuGroup, MenuHeading, MenuItem, Notice, ProgressBar,
   promptDialog, Segmented, Select, Spinner, useToast,
   type ToastVariant } from "./components/ui";
+import { demoHint, setDemo, useDemo } from "./demoMode";
 import { t } from "./i18n";
 import { usePaneHeight, useSplitPane } from "./splitPane";
 import { applyStatus, fmtAgo, fmtSize, fmtUsd, hasCredentials, matchGroup,
@@ -259,7 +260,7 @@ export default function App() {
 
   useEffect(() => {
     api.authProbe()
-      .then(setAuth)
+      .then((a) => { setDemo(!!a.demo); setAuth(a); })
       .catch(() => setAuth({ mode: "none", authed: true }));
   }, []);
   const authOk = !!auth && (auth.mode === "none" || auth.authed);
@@ -576,6 +577,7 @@ export default function App() {
   const attsRunning = state?.atts?.status === "running";
   const unsubRunning = state?.unsub?.status === "running";
   const aiEnabled = !!cfg?.ai.available;
+  const demo = useDemo();
   const acct = cfg?.accounts[account] ?? null;
   const multiAccount = !!cfg && Object.keys(cfg.accounts).length > 1;
   // The wizard opens by itself while no account is set up (until the user
@@ -1560,7 +1562,7 @@ export default function App() {
       aiSort={mode === "smart" && isPooled(detail) ? {
         total: aiSortedCount, checked: aiCheckedCount,
         busy: aiRunning || scanning,
-        onSort: aiEnabled ? aiSortOther : undefined,
+        onSort: aiEnabled || demo ? aiSortOther : undefined,
         onClear: aiSortClear, onKeep: keepAnswers } : undefined}
       onClose={variant === "pane" ? closePane
         : () => { setDetail(null); refresh(); }}
@@ -1634,7 +1636,8 @@ export default function App() {
                 ))}
               </>
             )}
-            <MenuItem onClick={() => setWizard({ mode: "add", previous: account })}>
+            <MenuItem disabled={demo} sub={demo ? demoHint() : undefined}
+              onClick={() => setWizard({ mode: "add", previous: account })}>
               <Plus size={16} className="mr-1 inline align-text-bottom" />
               {t("account.add")}…
             </MenuItem>
@@ -1782,9 +1785,11 @@ export default function App() {
               </MenuItem>
             </MenuGroup>
             <MenuGroup label={t("tools.group_ai")}>
-              {aiEnabled && (
+              {(aiEnabled || demo) && (
                 <MenuItem onClick={() => reviewWithAi()}
-                  disabled={scanning || aiRunning || state?.status !== "done"}>
+                  sub={demo ? demoHint() : undefined}
+                  disabled={demo || scanning || aiRunning
+                    || state?.status !== "done"}>
                   <Wand2 size={16} className="mr-1 inline align-text-bottom" />
                   {t("AI review")}
                 </MenuItem>
@@ -1827,9 +1832,10 @@ export default function App() {
             )}
           </div>
           <QueryBuilder value={filter} onChange={setFilter} />
-          {aiEnabled && (
-            <Button variant="secondary" size="icon"
-              label={t("aif.button")}
+          {(aiEnabled || demo) && (
+            <Button variant="secondary" size="icon" disabled={demo}
+              label={demo ? `${t("aif.button")} - ${demoHint()}`
+                : t("aif.button")}
               onClick={() => setAiFilterOpen(true)}>
               <Sparkles size={18} />
             </Button>
@@ -2033,8 +2039,10 @@ export default function App() {
                 disabled={!unsubKeys([...selected]).length}>
                 {t("Unsubscribe")}
               </option>
-              {aiEnabled && (
-                <option value="ai_review">{t("AI review")}</option>
+              {(aiEnabled || demo) && (
+                <option value="ai_review" disabled={demo}>
+                  {t("AI review")}{demo ? ` - ${demoHint()}` : ""}
+                </option>
               )}
             </Select>
             {moveDest === "?" && (
@@ -2145,7 +2153,8 @@ export default function App() {
           </p>
           {cfg.setup_needed ? (<>
             <div className="mt-4">
-              <Button onClick={() => setWizard({ mode: "first" })}>
+              <Button disabled={demo} title={demo ? demoHint() : undefined}
+                onClick={() => setWizard({ mode: "first" })}>
                 {t("wizard.setup_btn")}</Button>
             </div>
           </>) : (
