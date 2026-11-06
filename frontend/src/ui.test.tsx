@@ -1177,3 +1177,23 @@ test("if the opener vanished while the dialog was open, focus falls back to its 
   expect(screen.queryByRole("dialog")).toBeNull();
   expect(document.activeElement).toBe(screen.getByTestId("list"));
 });
+
+test("the list fallback takes focus without scrolling the page to it", () => {
+  const Host = () => {
+    const [open, setOpen] = useState(false);
+    const [row, setRow] = useState(true);
+    return <div data-focus-return tabIndex={-1} data-testid="list">
+      {row && <button onClick={() => setOpen(true)}>row</button>}
+      {open && <Modal onClose={() => setOpen(false)}>
+        <button onClick={() => setRow(false)}>trash all</button></Modal>}
+    </div>;
+  };
+  render(<Host />);
+  const row = screen.getByText("row");
+  row.focus();
+  fireEvent.click(row);
+  fireEvent.click(screen.getByText("trash all"));
+  const focus = vi.spyOn(screen.getByTestId("list"), "focus");
+  fireEvent.keyDown(window, { key: "Escape" });
+  expect(focus).toHaveBeenCalledWith({ preventScroll: true });
+});

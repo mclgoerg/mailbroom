@@ -840,11 +840,11 @@ const MODAL_WIDTH = { sm: "sm:max-w-md", md: "sm:max-w-2xl",
 /** Hand focus back to what opened a dialog. Not to a <select> on a touch
  *  device: there, focusing a select opens its picker (iOS), so the bulk
  *  bar's Action menu popped open again right after a confirmed action. */
-function refocus(el: HTMLElement | null | undefined): void {
+function refocus(el: HTMLElement | null | undefined, scroll = true): void {
   if (!el) return;
   if (el instanceof HTMLSelectElement
       && window.matchMedia?.("(pointer: coarse)").matches) return;
-  el.focus?.();
+  el.focus?.(scroll ? undefined : { preventScroll: true });
 }
 
 /** Dialog shell. `sm` (448) is a bottom sheet on phones, `md` (672) /
@@ -916,7 +916,9 @@ export function Modal({ children, onClose, full = false, size, label,
       const to = back?.isConnected ? back
         : home?.isConnected ? home
         : document.querySelector<HTMLElement>("[data-focus-return]");
-      refocus(to);
+      // The fallback is the whole list: focusing it must not scroll the
+      // page to its top (an Undo picked from the menu, whose item is gone).
+      refocus(to, to === back);
     };
   }, []);
   const shape = sz === "sm"

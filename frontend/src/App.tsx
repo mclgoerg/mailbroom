@@ -828,7 +828,22 @@ export default function App() {
         { count: entry.count, label: undoLabel(entry) }),
       confirmLabel: t("confirm.restore_btn") })) return;
     setPending(t("Restoring…"));
-    try { await api.undo(index); refresh(); }
+    try {
+      const r = await api.undo(index);
+      // The result is a toast, where the user is: the backend's notice for
+      // it sits above the list (see the filter at the Notice) and would
+      // move the page.
+      const params = { n: r.restored, restored: r.restored, of: r.of,
+        label: undoLabel(entry) };
+      const partial = r.restored < r.of;
+      // rescan === false with mails back: no scan could start, tell them
+      const rescan = !r.rescan && r.restored > 0
+        && entry.action !== "move_contents";
+      notify(rescan ? t("toast.restored_rescan", params)
+        : t(partial ? "toast.restored_partial" : "toast.restored", params),
+      partial || rescan ? "info" : "success");
+      refresh();
+    }
     catch (e: any) { fail(e, "err.undo"); }
     setPending("");
   };
@@ -2132,7 +2147,9 @@ export default function App() {
           </span>
         )}
       </div>
-      {state?.notice && state.notice.key !== "cached_verdicts" && (
+      {state?.notice && state.notice.key !== "cached_verdicts"
+        && state.notice.key !== "restored"
+        && state.notice.key !== "restored_rescan" && (
         <Notice className="mb-2" icon={<Info size={14} />}
           onClose={dismissNotice}>
           {t(`notice.${state.notice.key}`, noticeParams(state.notice.params))}
