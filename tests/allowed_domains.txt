@@ -27,3 +27,5 @@ google.com                # setup docs: where to create a Gmail app password and
 inboxrake.com            # the project's own website (docs site base URL, website/)
 astro.build              # docs site generator documentation (website/README.md)
 jsdelivr.net             # Pyodide release CDN: the demo bundle build downloads the pinned wheels from it (scripts/demo-bundle/build.mjs)
+schema.org               # JSON-LD vocabulary on the landing page (website/landing/src/pages/index.astro)
+sitemaps.org             # XML namespace of website/public/sitemap.xml
