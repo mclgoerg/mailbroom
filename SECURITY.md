@@ -8,7 +8,8 @@ on real mailboxes - security reports are taken seriously.
 Please use GitHub's **private vulnerability reporting**:
 [Report a vulnerability](https://github.com/mclgoerg/inboxrake/security/advisories/new)
 ("Security" tab → "Report a vulnerability" works the same way). Do not
-open a public issue for security problems.
+open a public issue for security problems. You can also write to
+<security@inboxrake.com> if you prefer email.
 
 You can expect an initial response within a week. Please include steps
 to reproduce and the deployment mode (reverse proxy / built-in login /

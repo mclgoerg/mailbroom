@@ -1,5 +1,6 @@
 node_modules/
 dist/
+dist-landing/
 __pycache__/
 *.pyc
 .pytest_cache/
