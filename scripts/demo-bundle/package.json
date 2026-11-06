@@ -1,0 +1,15 @@
+{
+  "name": "inboxrake-demo-bundle",
+  "private": true,
+  "type": "module",
+  "description": "Builds the static file set the in-browser demo loads (see README.md). Dev-only; never shipped in the app image.",
+  "scripts": {
+    "build": "node build.mjs"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "dependencies": {
+    "pyodide": "314.0.7"
+  }
+}

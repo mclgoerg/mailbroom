@@ -1362,7 +1362,8 @@ def test_no_default_config_or_demo_triggers_a_purge():
     import pathlib
     root = pathlib.Path(__file__).resolve().parent.parent
     assert not any("purge" in k for k in cfgmod.load_config())
-    for path in (root / "scripts" / "demo.py",):
+    for path in (root / "scripts" / "demo.py",
+                 root / "scripts" / "demo_generate.py"):
         if path.exists():
             assert "purge_mails" not in path.read_text()
     called_from = []
