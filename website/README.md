@@ -15,7 +15,11 @@ npm run build      # static site in website/dist/, URLs rooted at /docs/
 npm run dev        # live preview on http://127.0.0.1:4321/docs/
 ```
 
-Serve `dist/` under `/docs/` (the `base` in `astro.config.mjs`).
+Serve `dist/` under `/docs/` (`BASE` in `site.config.mjs`, shared by the
+Astro config and the link plugin).
+
+`@astrojs/markdown-remark` is listed although nothing imports it: Astro 7
+requires it to be installed for `markdown.remarkPlugins` to run.
 
 ## Writing pages
 

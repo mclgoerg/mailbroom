@@ -1,3 +1,5 @@
+import { BASE } from "../site.config.mjs";
+
 const REPO = "https://github.com/mclgoerg/inboxrake/blob/main/";
 
 function visitLinks(node, fn) {
@@ -13,7 +15,7 @@ function visitLinks(node, fn) {
  */
 export function docsLinks() {
   return (tree, file) => {
-    const base = "/docs/";
+    const base = `${BASE}/`;
     const first = tree.children.findIndex(
       (n) => n.type === "heading" && n.depth === 1,
     );

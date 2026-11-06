@@ -1,13 +1,14 @@
 import { defineConfig } from "astro/config";
 import starlight from "@astrojs/starlight";
 import { docsLinks } from "./plugins/docs-links.mjs";
+import { BASE } from "./site.config.mjs";
 
 // The documentation site is a static build of ../docs, served under
 // https://inboxrake.com/docs/ (the deploy PR merges it with the landing
 // page and the demo into one tree).
 export default defineConfig({
   site: "https://inboxrake.com",
-  base: "/docs",
+  base: BASE,
   trailingSlash: "always",
   markdown: { remarkPlugins: [docsLinks] },
   integrations: [
