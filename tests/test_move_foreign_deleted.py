@@ -145,9 +145,10 @@ def test_a_refused_trash_restore_still_runs_its_bookkeeping(monkeypatch):
     fake.mailbox["Trash"][0]["deleted"] = False
     mailops.STATE["trash_count"] = 3
     uids = [m["uid"] for m in fake.mailbox["Trash"] if m["uid"] != 90]
-    _flag_theirs_after_first_move(fake, monkeypatch)
+    rescans = _flag_theirs_after_first_move(fake, monkeypatch)
     with pytest.raises(RuntimeError) as exc:
         mailops.trash_restore(uids, "INBOX")
     assert str(exc.value) == "move_foreign_deleted:folder=Trash"
+    assert rescans == [1]                 # the mail that moved is rescanned
     assert mailops.STATE["trash_count"] == 2          # the one that moved
     assert 90 in {m["uid"] for m in fake.mailbox["Trash"]}
