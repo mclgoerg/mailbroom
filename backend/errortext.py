@@ -45,6 +45,13 @@ TEXT: dict[str, str | tuple[str, str]] = {
     'mailto_unsafe':
         'The unsubscribe address in this mail is not a single plain address '
         '(or its text contains line breaks), so no mail was sent.',
+    'move_foreign_deleted':
+        'Stopped: another mail program has marked mails in \u201c{folder}\u201d for '
+        'deletion, and this server cannot remove just ours, so nothing more '
+        'was purged there. Copies of the mails just moved may already be in '
+        'the destination folder, and trying again would add another set '
+        'while those marks remain. First empty the deleted mails in the other '
+        'mail program (expunge), then try again.',
     'cannot_flag':
         'The server did not accept marking the mails for deletion.',
     'cannot_expunge':

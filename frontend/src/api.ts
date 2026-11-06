@@ -127,6 +127,8 @@ const ERROR_CODES: Record<string, string> = {
   tls_failed: "ferr.tls_failed",
   connect_failed: "ferr.connect_failed",
   scan_failed: "ferr.scan_failed",
+  // a move on a server without MOVE/UIDPLUS refused (backend/mailops.py)
+  move_foreign_deleted: "ferr.move_foreign_deleted",
   // plain words -> filter (backend/aifilter.py)
   aifilter_not_configured: "aif.err.not_configured",
   aifilter_text_empty: "aif.err.text_empty",
