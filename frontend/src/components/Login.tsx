@@ -41,7 +41,7 @@ export function Login({ mode, onLogin }: {
     <div className="mx-auto mt-24 max-w-xs rounded-card border border-line
       bg-panel p-4 type-body sm:p-5">
       <div className="mb-4 text-center type-title">
-        Mailbroom
+        Inboxrake
       </div>
       {mode === "password" && (
         <form onSubmit={submit} className="space-y-3">

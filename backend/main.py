@@ -22,6 +22,7 @@ from fastapi.staticfiles import StaticFiles
 from starlette.concurrency import run_in_threadpool
 from pydantic import BaseModel, Field
 
+from . import FORMER_ENV
 from . import accounts as accountsmod
 from . import aifilter
 from . import aihelper
@@ -145,12 +146,33 @@ def _check_data_dir() -> None:
             "or start the container with `--user <uid>:<gid>`.", folder)
 
 
+# Read by the `ports:` line of the old starter compose file, not by the app:
+# renaming them in .env alone would move the published port.
+_COMPOSE_ONLY_ENV = ("MAILBROOM_BIND", "MAILBROOM_PORT")
+
+
+def _log_former_env() -> None:
+    """Startup hint per MAILBROOM_* setting (backend/__init__.py adopted
+    each one where the INBOXRAKE_* name is unset)."""
+    log = logging.getLogger("pmc.config")
+    for old in FORMER_ENV:
+        if old in _COMPOSE_ONLY_ENV:
+            continue
+        new = "INBOXRAKE_" + old[len("MAILBROOM_"):]
+        if os.environ.get(new) == os.environ.get(old):
+            log.warning("%s still works but is the former name - rename it "
+                        "to %s", old, new)
+        else:
+            log.warning("%s is ignored - %s is set", old, new)
+
+
 @asynccontextmanager
 async def _lifespan(app: FastAPI):
+    _log_former_env()
     from . import secretbox
     if not secretbox.enabled():
         logging.getLogger("pmc.secrets").warning(
-            "MAILBROOM_SECRET_KEY is not set - IMAP passwords and API keys "
+            "INBOXRAKE_SECRET_KEY is not set - IMAP passwords and API keys "
             "are stored in plaintext in /data (they would be readable in "
             "volume backups). Generate a key with `openssl rand -base64 32` "
             "and keep it OUT of the backups.")
@@ -182,7 +204,7 @@ def _app_version() -> str:
     return v or "0.0.0-dev"
 
 
-app = FastAPI(title="mailbroom", version=_app_version(),
+app = FastAPI(title="inboxrake", version=_app_version(),
               docs_url=None, redoc_url=None, lifespan=_lifespan)
 
 
@@ -456,7 +478,7 @@ def get_oidc_callback(request: Request, code: str = Query(""),
 # ------------------------------------------------------ IMAP account OAuth
 #
 # Connecting a mail ACCOUNT to Gmail/Outlook via OAuth, distinct from the
-# OIDC login above (that authenticates a Mailbroom user; this authorizes
+# OIDC login above (that authenticates an Inboxrake user; this authorizes
 # XOAUTH2 access to one IMAP account). Requires an existing session - the
 # tenant is whatever the middleware already resolved for this request.
 
@@ -689,7 +711,7 @@ class IndexBuildBody(BaseModel):
 
 @app.get("/api/index")
 def get_index(account: str | None = Query(None)):
-    """Local body-search index of the account: mode, whether MAILBROOM_
+    """Local body-search index of the account: mode, whether INBOXRAKE_
     SECRET_KEY allows it, persisted facts (docs, built_ts, usable/reason)
     and the running job's progress."""
     acc = _acc(account)
@@ -1088,7 +1110,7 @@ def get_audit_export(account: str | None = Query(None)):
     return StreamingResponse(
         iter([buf.getvalue()]), media_type="text/csv",
         headers={"Content-Disposition":
-                 'attachment; filename="mailbroom-audit-log.csv"'})
+                 'attachment; filename="inboxrake-audit-log.csv"'})
 
 
 @app.post("/api/digest/test")
@@ -1676,7 +1698,7 @@ def get_export_config():
     the server (cfgmod.*_SECRET_FIELDS)."""
     cfg = cfgmod.load_config()
     data = {
-        "version": 2, "app": "mailbroom",
+        "version": 2, "app": "inboxrake",
         "config": {
             "accounts": {n: cfgmod.strip_account_secrets(b)
                          for n, b in cfg["accounts"].items()},

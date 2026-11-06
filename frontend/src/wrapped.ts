@@ -30,7 +30,7 @@ export interface SummaryStrings {
   stats: { value: string; label: string }[];
   topTitle: string;       // "Loudest senders"
   topRows: string[];      // "12 mails" (aligned with top_senders)
-  footer: string;         // "Made locally with Mailbroom"
+  footer: string;         // "Made locally with Inboxrake"
 }
 
 // Control characters are not valid XML 1.0 (the image would fail to load).

@@ -218,7 +218,7 @@ export function FolderSettings({ account, data, included, setIncluded,
                       <Select value={r.ambiguous ? "" : r.raw} disabled={busy}
                         aria-label={t("folder.choose_label",
                           { role: roleName(r.role) })}
-                        // any pick is saved - also the folder Mailbroom
+                        // any pick is saved - also the folder Inboxrake
                         // already uses by default: that is how it is confirmed
                         onChange={(e) => e.target.value
                           && choose(r, e.target.value)}>

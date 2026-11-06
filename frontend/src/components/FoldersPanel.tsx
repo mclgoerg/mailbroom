@@ -11,7 +11,7 @@ import { Button, confirmDialog, EmptyState, Input, Loading, MailRow, Modal,
 
 type Grouping = "sender" | "mails";
 
-/** Folders panel: the special folders Mailbroom manages (Junk, Trash) in one
+/** Folders panel: the special folders Inboxrake manages (Junk, Trash) in one
  *  place - live contents (also mail that arrived or was deleted elsewhere),
  *  search, a by-sender view, and per-folder actions: Junk "Not junk" (to the
  *  Inbox, undoable, then offers Protect) and "Move to Trash"; Trash

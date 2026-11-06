@@ -84,7 +84,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6
         with:
-          images: ghcr.io/${{ github.repository }}
+          images: ghcr.io/${{ github.repository_owner }}/inboxrake
           tags: |
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
@@ -95,6 +95,7 @@ jobs:
           # this the label would read "latest" on main builds.
           labels: |
             org.opencontainers.image.version=${{ steps.ver.outputs.version }}
+            org.opencontainers.image.title=Inboxrake
 
       - name: Build (and push on main/tags)
         uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7
@@ -127,5 +128,5 @@ jobs:
           # fallback for a human manually pushing a tag outside that flow.
           gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1 && exit 0
           gh release create "$GITHUB_REF_NAME" \
-            --title "Mailbroom $GITHUB_REF_NAME" \
+            --title "Inboxrake $GITHUB_REF_NAME" \
             --generate-notes --verify-tag

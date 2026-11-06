@@ -1,6 +1,6 @@
 """Per-account daily/weekly activity digest email.
 
-A summary of what Mailbroom did for one account since its last digest:
+A summary of what Inboxrake did for one account since its last digest:
 actions taken (from the audit log), mails/bytes freed, rule runs (incl.
 report-mode previews not yet applied), and unsubscribe outcomes. Sent
 as multipart/alternative (plain text + a lightly branded HTML part, no
@@ -55,7 +55,7 @@ _PERIOD_DAYS = {"daily": 1, "weekly": 7}
 _LOCK = threading.Lock()
 
 STRINGS = {
-    "subject": "Mailbroom activity digest ({account})",
+    "subject": "Inboxrake activity digest ({account})",
     "heading": "Activity digest",
     "since": "Since {since}",
     "since_ever": "the beginning",
@@ -77,8 +77,8 @@ STRINGS = {
     "unsub_done": "done",
     "unsub_link": "needs manual confirmation",
     "unsub_failed": "failed",
-    "footer": "Sent by Mailbroom.",
-    "demo_subject": "Mailbroom activity digest preview ({account})",
+    "footer": "Sent by Inboxrake.",
+    "demo_subject": "Inboxrake activity digest preview ({account})",
     "demo_banner":
         "PREVIEW with made-up example data - nothing below has actually "
         "happened yet. Do some cleanup, then send another test to see "
@@ -340,7 +340,7 @@ def _compose_html(account: str, since_str: str, rows: list[tuple[str, str]],
           border-bottom:1px solid {_LIGHT["line"]};">
           <div style="font-size:12px;letter-spacing:.04em;
             text-transform:uppercase;color:{_LIGHT["muted"]};">
-            Mailbroom &middot; {esc(account)}
+            Inboxrake &middot; {esc(account)}
           </div>
           <div style="font-size:18px;font-weight:600;
             color:{_LIGHT["body"]};margin-top:2px;">

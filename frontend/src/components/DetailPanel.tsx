@@ -77,7 +77,7 @@ export function DetailPanel({ grouping, group, aiEnabled, protectedNow,
     onSort?: () => void; onClear: () => void; onKeep?: () => void };
   // Pooled Smart rows: "File in Smart as..." for ticked senders, and the
   // user's own categories they can be filed into. One sender opened inside
-  // a pool shows `filingBox` ("How Mailbroom files this sender") on top.
+  // a pool shows `filingBox` ("How Inboxrake files this sender") on top.
   onFile?: (entries: FileEntry[], senders: number) => Promise<boolean>;
   categories?: string[];
   filingBox?: ReactNode;

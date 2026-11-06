@@ -138,7 +138,7 @@ def _post_one_click(url: str) -> None:
                 + (f"?{parts.query}" if parts.query else ""),
                 body=b"List-Unsubscribe=One-Click",
                 headers={"Content-Type": "application/x-www-form-urlencoded",
-                         "User-Agent": "mailbroom"})
+                         "User-Agent": "inboxrake"})
             status = conn.getresponse().status
         except (OSError, http.client.HTTPException) as exc:
             last = exc          # try the next validated address

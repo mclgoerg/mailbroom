@@ -1,4 +1,4 @@
-# Mailbroom starter - any IMAP provider (Gmail, iCloud, Fastmail, …).
+# Inboxrake starter - any IMAP provider (Gmail, iCloud, Fastmail, …).
 #
 #   cp .env.example .env    # edit it
 #   docker compose up -d    # open http://localhost:8765
@@ -6,18 +6,18 @@
 # For Proton Mail via the Bridge use docker-compose.proton.yml instead.
 
 services:
-  mailbroom:
-    image: ghcr.io/mclgoerg/mailbroom:latest
-    container_name: mailbroom
+  inboxrake:
+    image: ghcr.io/mclgoerg/inboxrake:latest
+    container_name: inboxrake
     restart: unless-stopped
     ports:
-      # Localhost only by default - override MAILBROOM_BIND in .env (to
+      # Localhost only by default - override INBOXRAKE_BIND in .env (to
       # e.g. 0.0.0.0) only once you enabled AUTH_MODE or run a reverse
       # proxy with its own auth in front. Docker ports bypass ufw!
-      - "${MAILBROOM_BIND:-127.0.0.1}:${MAILBROOM_PORT:-8765}:8765"
+      - "${INBOXRAKE_BIND:-127.0.0.1}:${INBOXRAKE_PORT:-8765}:8765"
     env_file: .env
     volumes:
-      - mailbroom_data:/data
+      - inboxrake_data:/data
 
 volumes:
-  mailbroom_data:
+  inboxrake_data:

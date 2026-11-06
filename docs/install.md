@@ -1,11 +1,11 @@
-# Installing Mailbroom
+# Installing Inboxrake
 
-Mailbroom is a single container. Whatever platform you use, it boils
+Inboxrake is a single container. Whatever platform you use, it boils
 down to the same four things:
 
 | What | Value |
 |---|---|
-| Image | `ghcr.io/mclgoerg/mailbroom:latest` (or pin `:1.0`) |
+| Image | `ghcr.io/mclgoerg/inboxrake:latest` (or pin `:1.0`) |
 | Port | `8765` (HTTP web UI + API) |
 | Volume | `/data` - all settings, scan caches and stats live here |
 | Env vars | all optional bootstrap - see [`deploy/.env.example`](../deploy/.env.example) |
@@ -17,21 +17,21 @@ Everything set via env can also be configured later in the settings UI
   port on localhost behind a reverse proxy with auth, or enable the
   built-in password/SSO login (Settings -> Server -> Login, or `AUTH_MODE` env).
   Never publish port 8765 straight to the internet without one of these.
-  Without a login, Mailbroom only answers to `localhost` and IP
+  Without a login, Inboxrake only answers to `localhost` and IP
   addresses (DNS-rebinding protection); to open it under a host name,
-  add `MAILBROOM_ALLOWED_HOSTS=<name>` to the container environment
+  add `INBOXRAKE_ALLOWED_HOSTS=<name>` to the container environment
   (comma list, `*.example.org` for subdomains).
-- **Secrets encryption:** set `MAILBROOM_SECRET_KEY` (generate with
+- **Secrets encryption:** set `INBOXRAKE_SECRET_KEY` (generate with
   `openssl rand -base64 32`) so IMAP passwords and API keys are
   encrypted inside `/data` - protects volume backups.
 
-**Proton Mail users:** Mailbroom talks to Proton through the
+**Proton Mail users:** Inboxrake talks to Proton through the
 [Proton Mail Bridge](https://proton.me/mail/bridge), which runs as a
 second container sharing the network namespace. Use
 [`deploy/docker-compose.proton.yml`](../deploy/docker-compose.proton.yml)
 (setup steps in the file header) - the platform recipes below cover the
 generic IMAP case (Gmail, iCloud, Fastmail, ...). Before the first start
-set `BRIDGE_IMAGE` in `.env`: Mailbroom ships no Bridge image, so build
+set `BRIDGE_IMAGE` in `.env`: Inboxrake ships no Bridge image, so build
 one from Proton's source or pick a community image (verify it is still
 maintained). Running Bridge in Docker is a community setup that Proton
 does not support, and Bridge needs a paid Proton plan.
@@ -39,8 +39,8 @@ does not support, and Bridge needs a paid Proton plan.
 ## Docker Compose (recommended)
 
 ```bash
-git clone https://github.com/mclgoerg/mailbroom
-cd mailbroom/deploy
+git clone https://github.com/mclgoerg/inboxrake
+cd inboxrake/deploy
 cp .env.example .env        # optional edits - account setup is in the UI
 docker compose up -d
 ```
@@ -51,13 +51,13 @@ Open http://localhost:8765. Update later with
 ## Plain `docker run`
 
 ```bash
-docker run -d --name mailbroom \
+docker run -d --name inboxrake \
   -e IMAP_HOST=imap.mail.me.com -e IMAP_PORT=993 -e IMAP_CAFILE= \
   -e IMAP_USER=you@icloud.com -e IMAP_PASSWORD=app-password \
-  -e MAILBROOM_SECRET_KEY=$(openssl rand -base64 32) \
-  -v mailbroom_data:/data \
+  -e INBOXRAKE_SECRET_KEY=$(openssl rand -base64 32) \
+  -v inboxrake_data:/data \
   -p 127.0.0.1:8765:8765 \
-  ghcr.io/mclgoerg/mailbroom:latest
+  ghcr.io/mclgoerg/inboxrake:latest
 ```
 
 (Note: generating the key inline like this means it only lives in the
@@ -66,9 +66,9 @@ ever plan to recreate the container.)
 
 ## Data folder ownership
 
-The image runs as user ID 1000. A named volume (`mailbroom_data`) just
+The image runs as user ID 1000. A named volume (`inboxrake_data`) just
 works; a **host folder** mounted at `/data` that you created yourself is
-usually owned by root, and Mailbroom then logs `Cannot write to /data` and
+usually owned by root, and Inboxrake then logs `Cannot write to /data` and
 the UI says it cannot write to its data folder. Fix it once on the host
 and restart:
 
@@ -79,7 +79,7 @@ chown -R 1000:1000 /path/to/the/folder      # or: docker run --user <uid>:<gid> 
 ## Synology (Container Manager, DSM 7.2+)
 
 1. Container Manager -> **Project** -> Create.
-2. Name it `mailbroom`, pick a folder (e.g. `/docker/mailbroom`), choose
+2. Name it `inboxrake`, pick a folder (e.g. `/docker/inboxrake`), choose
    "Create docker-compose.yml" and paste the contents of
    [`deploy/docker-compose.yml`](../deploy/docker-compose.yml).
 3. Put your variables in the project's `.env` (copy from
@@ -92,7 +92,7 @@ for `/data`, give it to user ID 1000 first (SSH: `sudo chown -R 1000:1000
 <folder>`) - see [Data folder ownership](#data-folder-ownership).
 
 On older DSM (Docker package): download the image
-`ghcr.io/mclgoerg/mailbroom` in Registry, then create a container with
+`ghcr.io/mclgoerg/inboxrake` in Registry, then create a container with
 port `8765` and a volume mounted at `/data`; add the env vars in the
 Advanced Settings -> Environment tab.
 
@@ -101,14 +101,14 @@ Advanced Settings -> Environment tab.
 No Community Applications template yet - add it manually:
 
 1. Docker tab -> **Add Container**.
-2. Repository: `ghcr.io/mclgoerg/mailbroom:latest`.
+2. Repository: `ghcr.io/mclgoerg/inboxrake:latest`.
 3. Add a Port: container `8765` -> host port of your choice.
-4. Add a Path: container `/data` -> host `/mnt/user/appdata/mailbroom`.
+4. Add a Path: container `/data` -> host `/mnt/user/appdata/inboxrake`.
 5. Add Variables for your IMAP provider (`IMAP_HOST`, `IMAP_PORT`,
    `IMAP_USER`, `IMAP_PASSWORD`, `IMAP_CAFILE=` empty for normal
-   providers) plus `MAILBROOM_SECRET_KEY`.
+   providers) plus `INBOXRAKE_SECRET_KEY`.
 6. Make the appdata folder writable for the container (user ID 1000):
-   `chown -R 1000:1000 /mnt/user/appdata/mailbroom` in the Unraid
+   `chown -R 1000:1000 /mnt/user/appdata/inboxrake` in the Unraid
    terminal.
 7. Apply, then open `http://<unraid-ip>:<port>` (a host name needs the
    "Login" note above).
@@ -117,7 +117,7 @@ No Community Applications template yet - add it manually:
 
 Apps -> Discover Apps -> ⋮ -> **Install via YAML** (or "Custom App"):
 
-- Image repository `ghcr.io/mclgoerg/mailbroom`, tag `latest`.
+- Image repository `ghcr.io/mclgoerg/inboxrake`, tag `latest`.
 - Port forwarding: container port `8765`.
 - Storage: host path or ixVolume mounted at `/data`. For a host path,
   set the dataset's ACL/owner so user ID 1000 can write
@@ -139,7 +139,7 @@ Nothing special to do - the image is multi-arch (amd64 + arm64). A
 
 ## Gmail app password
 
-The simple path, and the default for a new Gmail account. In Mailbroom,
+The simple path, and the default for a new Gmail account. In Inboxrake,
 choose the **Gmail** preset, leave the sign-in method on **App
 password**, enter your address as the user and the app password below.
 
@@ -150,7 +150,7 @@ password**, enter your address as the user and the app password below.
    for work/school accounts where the administrator blocks it (see
    Google's help page "Sign in with app passwords").
 2. Google shows it as four groups of four letters. Paste it as shown -
-   Mailbroom removes the spaces.
+   Inboxrake removes the spaces.
 3. Changing your Google Account password revokes your app passwords;
    create a new one then.
 
@@ -174,20 +174,20 @@ because the restricted mail scope needs per-app Google verification.
 3. **APIs & Services -> Credentials -> Create credentials -> OAuth
    client ID**, application type "Web application". Add this authorized
    redirect URI (replace with your instance's URL):
-   `https://your-mailbroom-domain/api/oauth/imap/callback`
-4. In Mailbroom, add or edit an account, select the **Gmail** preset,
+   `https://your-inboxrake-domain/api/oauth/imap/callback`
+4. In Inboxrake, add or edit an account, select the **Gmail** preset,
    paste the client ID and client secret under "Connect via OAuth",
    then click **Connect** and sign in with the Google account you added
    as a test user.
 
 ## Microsoft OAuth setup
 
-Mailbroom connects to Outlook/Microsoft 365 via OAuth only (Microsoft
+Inboxrake connects to Outlook/Microsoft 365 via OAuth only (Microsoft
 has no app-password option for IMAP). Select the **Outlook / Microsoft
 365** preset for the account, then:
 
 - If the maintainer's shared app is configured
-  (`MAILBROOM_MS_CLIENT_ID` set on the server), no registration is
+  (`INBOXRAKE_MS_CLIENT_ID` set on the server), no registration is
   needed - click **Connect with a device code**, then enter the shown
   code at microsoft.com/devicelogin.
 - Otherwise, register your own public client in

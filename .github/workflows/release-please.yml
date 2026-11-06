@@ -8,7 +8,7 @@ name: Release Please
 # tag it pushes then triggers ci.yml's own build/release jobs normally
 # (see the token note below).
 #
-# Versioned at the repo root (not frontend/), deliberately: Mailbroom
+# Versioned at the repo root (not frontend/), deliberately: Inboxrake
 # ships backend + frontend as one container under one version, so EVERY
 # commit must count, not just ones touching frontend/ - release-please
 # only considers commits that touch a package's own path.

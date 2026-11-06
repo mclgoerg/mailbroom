@@ -1,12 +1,12 @@
 # Security policy
 
-Mailbroom holds IMAP credentials and (optionally) AI API keys, and acts
+Inboxrake holds IMAP credentials and (optionally) AI API keys, and acts
 on real mailboxes - security reports are taken seriously.
 
 ## Reporting a vulnerability
 
 Please use GitHub's **private vulnerability reporting**:
-[Report a vulnerability](https://github.com/mclgoerg/mailbroom/security/advisories/new)
+[Report a vulnerability](https://github.com/mclgoerg/inboxrake/security/advisories/new)
 ("Security" tab → "Report a vulnerability" works the same way). Do not
 open a public issue for security problems.
 

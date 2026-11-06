@@ -11,7 +11,7 @@
  *     --user "$(id -u):$(id -g)" -e HOME=/tmp \
  *     --tmpfs /data:uid=$(id -u),gid=$(id -g) \
  *     -v "$PWD":/repo:ro -e STATIC_DIR=/repo/frontend/dist \
- *     ghcr.io/mclgoerg/mailbroom:latest python /repo/scripts/demo.py
+ *     ghcr.io/mclgoerg/inboxrake:latest python /repo/scripts/demo.py
  *   docker run --rm --network mb-docs-net -v "$PWD":/repo -w /tmp node:26 \
  *     bash -c "apt-get update -q && apt-get install -yq --no-install-recommends \
  *       chromium fonts-noto-color-emoji fonts-noto-core || exit 1; \

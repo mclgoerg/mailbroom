@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-/* "How Mailbroom files this sender": where the sender sits and why, the kind
+/* "How Inboxrake files this sender": where the sender sits and why, the kind
  * select (Automatic / every kind / own categories), who filed it, Reset, and
  * why a filing has no effect when it has none. */
 
@@ -51,7 +51,7 @@ describe("the box", () => {
   it("says where the sender sits, with Automatic selected and nothing to reset",
     async () => {
       mount(sender());
-      expect(screen.getByText("How Mailbroom files this sender")).toBeTruthy();
+      expect(screen.getByText("How Inboxrake files this sender")).toBeTruthy();
       expect(screen.getByText("Now in “Other senders”. Nothing in its mails "
         + "says what it is about.")).toBeTruthy();
       await waitFor(() => expect(knowledge).toHaveBeenCalledTimes(1));
@@ -203,7 +203,7 @@ describe("the box", () => {
     list([entry({})]);
     mount(sender({ smart_why: { r: "rule", k: "orders", by: "a",
       entry: "a:a@solo.example" } }));
-    expect(screen.getByText("So ordnet Mailbroom diesen Absender ein")).toBeTruthy();
+    expect(screen.getByText("So ordnet Inboxrake diesen Absender ein")).toBeTruthy();
     await screen.findByText("Von dir eingeordnet");
     expect(screen.getByRole("button", { name: "Auf automatisch zurücksetzen" }))
       .toBeTruthy();

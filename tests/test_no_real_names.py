@@ -1,6 +1,6 @@
 """Privacy guard: no real mailbox data in the repository.
 
-Mailbroom is public and its maintainers read their own mail with it, so the
+Inboxrake is public and its maintainers read their own mail with it, so the
 code, tests, fixtures, demo and docs use invented `.example` data only (see
 CONTRIBUTING.md "Privacy"). This test enforces the part a machine can see:
 

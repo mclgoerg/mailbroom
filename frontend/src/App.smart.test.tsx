@@ -1035,7 +1035,7 @@ test("in a company row the action is disabled and says why", async () => {
     + "filing has no effect here.")).toBeTruthy();
 });
 
-test("one sender opens with the box 'How Mailbroom files this sender'; "
+test("one sender opens with the box 'How Inboxrake files this sender'; "
   + "choosing a kind files that sender, Reset puts it back", async () => {
   knowledge.mockResolvedValue({ entries: [{ key: "a:hello@zine.example",
     kind: "newsletter", src: "user", ts: 1, note: "", status: "active",
@@ -1046,7 +1046,7 @@ test("one sender opens with the box 'How Mailbroom files this sender'; "
   openRow("Newsletters");
   await screen.findByRole("tab", { name: "Senders (2)" });
   fireEvent.click(screen.getByRole("button", { name: "hello@zine.example" }));
-  expect(await screen.findByText("How Mailbroom files this sender")).toBeTruthy();
+  expect(await screen.findByText("How Inboxrake files this sender")).toBeTruthy();
   expect(screen.getByText(/^Now in “Newsletters”\. /)).toBeTruthy();
   await screen.findByText("Filed by you");
   const sel = screen.getByRole("combobox", { name: "File this sender under" });
@@ -1075,7 +1075,7 @@ test("the box is German in the German UI", async () => {
   openRow("Newsletter");
   await screen.findByRole("tab", { name: "Absender (2)" });
   fireEvent.click(screen.getByRole("button", { name: "hello@zine.example" }));
-  expect(await screen.findByText("So ordnet Mailbroom diesen Absender ein"))
+  expect(await screen.findByText("So ordnet Inboxrake diesen Absender ein"))
     .toBeTruthy();
   expect(screen.getByText(/^Gerade in „Newsletter“\. /)).toBeTruthy();
 });

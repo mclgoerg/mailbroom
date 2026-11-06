@@ -1,10 +1,10 @@
-# Mailbroom + Proton Mail Bridge (paid Proton plan required: Bridge does
+# Inboxrake + Proton Mail Bridge (paid Proton plan required: Bridge does
 # not work with free accounts).
 #
-# Mailbroom ships NO Bridge image. Before the first start, set BRIDGE_IMAGE
+# Inboxrake ships NO Bridge image. Before the first start, set BRIDGE_IMAGE
 # in .env to an image you built yourself from Proton's open-source Bridge,
 # or to a community image (check that it is still maintained and that you
-# trust its author - Mailbroom does not endorse a specific one). Running
+# trust its author - Inboxrake does not endorse a specific one). Running
 # Bridge in Docker is a community setup; Proton does not support it.
 #
 # One-time interactive Bridge setup:
@@ -26,14 +26,14 @@ services:
       - protonbridge_data:/root
     ports:
       # The UI port lives on the BRIDGE service (shared namespace below).
-      # Localhost only by default - override MAILBROOM_BIND in .env (to
+      # Localhost only by default - override INBOXRAKE_BIND in .env (to
       # e.g. 0.0.0.0) only once you enabled AUTH_MODE or run a reverse
       # proxy with its own auth in front. Docker ports bypass ufw!
-      - "${MAILBROOM_BIND:-127.0.0.1}:${MAILBROOM_PORT:-8765}:8765"
+      - "${INBOXRAKE_BIND:-127.0.0.1}:${INBOXRAKE_PORT:-8765}:8765"
 
-  mailbroom:
-    image: ghcr.io/mclgoerg/mailbroom:latest
-    container_name: mailbroom
+  inboxrake:
+    image: ghcr.io/mclgoerg/inboxrake:latest
+    container_name: inboxrake
     restart: unless-stopped
     # Shares the bridge's network namespace so 127.0.0.1 matches the SAN
     # of the bridge's self-signed TLS certificate.
@@ -42,7 +42,7 @@ services:
       - protonbridge
     env_file: .env
     volumes:
-      - mailbroom_data:/data
+      - inboxrake_data:/data
       - type: volume
         source: protonbridge_data
         target: /certs/bridge-cert.pem
@@ -52,4 +52,4 @@ services:
 
 volumes:
   protonbridge_data:
-  mailbroom_data:
+  inboxrake_data:

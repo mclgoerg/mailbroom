@@ -10,7 +10,7 @@ import re
 from html import escape
 from urllib.parse import urlsplit
 
-ENV_ALLOWED = "MAILBROOM_ALLOWED_HOSTS"
+ENV_ALLOWED = "INBOXRAKE_ALLOWED_HOSTS"
 WRITE_METHODS = {"POST", "PUT", "PATCH", "DELETE"}
 
 
@@ -57,7 +57,7 @@ def _is_ip_literal(host: str) -> bool:
 
 
 def extra_hosts() -> list[str]:
-    """MAILBROOM_ALLOWED_HOSTS entries (comma list), lower-cased."""
+    """INBOXRAKE_ALLOWED_HOSTS entries (comma list), lower-cased."""
     raw = os.environ.get(ENV_ALLOWED, "")
     return [h.strip().lower() for h in raw.split(",") if h.strip()]
 
@@ -82,7 +82,7 @@ def describe_accepted() -> str:
     extra = extra_hosts()
     base = "localhost, *.localhost and IP addresses"
     if "*" in extra:
-        return "any host name (MAILBROOM_ALLOWED_HOSTS=*)"
+        return "any host name (INBOXRAKE_ALLOWED_HOSTS=*)"
     return base + (", " + ", ".join(extra) if extra else "")
 
 
@@ -91,17 +91,17 @@ def blocked_page(host: str) -> str:
     h = escape(split_host(host) or "<host>")
     return (
         "<!doctype html><meta charset=utf-8>"
-        "<title>Mailbroom - host not allowed</title>"
+        "<title>Inboxrake - host not allowed</title>"
         "<body style=\"font-family:sans-serif;max-width:40rem;margin:3rem auto;"
         "padding:0 1rem\">"
         "<h1>Host not allowed</h1>"
-        f"<p>Mailbroom has no login set and was reached as "
+        f"<p>Inboxrake has no login set and was reached as "
         f"<code>{shown}</code>. To stop other websites from reaching it through "
         "your browser, it only answers to localhost and IP addresses in that "
         "case.</p>"
         "<p>Either add "
-        f"<code>MAILBROOM_ALLOWED_HOSTS={h}</code> to the container "
-        "environment, or open Mailbroom via localhost and turn on a login "
+        f"<code>INBOXRAKE_ALLOWED_HOSTS={h}</code> to the container "
+        "environment, or open Inboxrake via localhost and turn on a login "
         "(Settings &rarr; Server).</p></body>")
 
 

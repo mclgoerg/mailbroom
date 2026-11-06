@@ -4,7 +4,7 @@
   <rect x="96" y="152" width="320" height="224" rx="24" fill="#faf5e9"/>
   <path d="M96 176l160 128 160-128" fill="none" stroke="#a16207"
         stroke-width="28" stroke-linecap="round" stroke-linejoin="round"/>
-  <!-- broom sweep -->
+  <!-- rake strokes -->
   <path d="M120 412c60 24 212 24 272 0" fill="none" stroke="#faf5e9"
         stroke-width="20" stroke-linecap="round" stroke-dasharray="8 34"/>
 </svg>

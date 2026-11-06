@@ -307,7 +307,7 @@ test("every call is pinned to the account being edited", async () => {
     { ts: 9, label: "Deleted Items", count: 2 }, "icloud"));
 });
 
-test("confirming the folder Mailbroom already picked saves it", async () => {
+test("confirming the folder Inboxrake already picked saves it", async () => {
   setRole.mockResolvedValue({});
   mount(ambiguous());          // pick = "Deleted Items", not confirmed yet
   const select = screen.getByLabelText(

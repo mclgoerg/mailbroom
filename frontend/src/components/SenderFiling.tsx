@@ -6,7 +6,7 @@ import type { Group, KnowledgeEntry } from "../types";
 import type { FileEntry } from "./SenderList";
 import { LINK, Select, Tag } from "./ui";
 
-/** "How Mailbroom files this sender": where the sender sits and why, a kind
+/** "How Inboxrake files this sender": where the sender sits and why, a kind
  *  select to file it yourself (or back to Automatic), who filed it (you, or
  *  an AI answer you kept) and - when a filing of yours has no effect right
  *  now - why not. Filing never moves mail; it only decides the Smart row.

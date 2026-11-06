@@ -1,5 +1,5 @@
 """Opt-in local mail-text search: the keyed word index stores no readable
-text, needs MAILBROOM_SECRET_KEY, is built by a cancellable job and kept
+text, needs INBOXRAKE_SECRET_KEY, is built by a cancellable job and kept
 current by scans, and answers whole-word searches."""
 
 import sqlite3
@@ -20,7 +20,7 @@ client = TestClient(app)
 
 @pytest.fixture(autouse=True)
 def secret_key(monkeypatch):
-    monkeypatch.setenv("MAILBROOM_SECRET_KEY", "test-key-one")
+    monkeypatch.setenv("INBOXRAKE_SECRET_KEY", "test-key-one")
 
 
 @pytest.fixture
@@ -95,13 +95,13 @@ def test_words_are_capped_per_mail():
 # ------------------------------------------------------- config / key gate
 
 def test_local_mode_needs_the_secret_key(bridge, monkeypatch):
-    monkeypatch.delenv("MAILBROOM_SECRET_KEY")
-    with pytest.raises(ValueError, match="MAILBROOM_SECRET_KEY"):
+    monkeypatch.delenv("INBOXRAKE_SECRET_KEY")
+    with pytest.raises(ValueError, match="INBOXRAKE_SECRET_KEY"):
         cfgmod.update_config({"imap": {"body_search": "local"}})
     assert client.post("/api/config", json={
         "imap": {"body_search": "local"}}).status_code == 400
     assert client.get("/api/config").json()["secret_key_set"] is False
-    monkeypatch.setenv("MAILBROOM_SECRET_KEY", "k")
+    monkeypatch.setenv("INBOXRAKE_SECRET_KEY", "k")
     cfgmod.update_config({"imap": {"body_search": "local"}})
     assert cfgmod.account_imap("default")["body_search"] == "local"
     assert client.get("/api/config").json()["secret_key_set"] is True
@@ -117,8 +117,8 @@ def test_build_without_key_or_scan_or_while_busy_is_refused(
     with pytest.raises(RuntimeError, match="busy"):
         bodyindex.start_build(acc())
     acc().state["ai"]["status"] = "idle"
-    monkeypatch.delenv("MAILBROOM_SECRET_KEY")
-    with pytest.raises(ValueError, match="MAILBROOM_SECRET_KEY"):
+    monkeypatch.delenv("INBOXRAKE_SECRET_KEY")
+    with pytest.raises(ValueError, match="INBOXRAKE_SECRET_KEY"):
         bodyindex.start_build(acc())
 
 
@@ -254,13 +254,13 @@ def test_scan_is_refused_while_the_index_runs(scanned):
 def test_an_index_built_under_another_key_is_unusable_until_rebuilt(
         scanned, monkeypatch):
     build()
-    monkeypatch.setenv("MAILBROOM_SECRET_KEY", "a-different-key")
+    monkeypatch.setenv("INBOXRAKE_SECRET_KEY", "a-different-key")
     res = local("biergarten")
     assert uids(res) == [] and res["notes"][0]["key"] == "index_key"
     assert bodyindex.info(acc())["usable"] is False
     build()                                        # rebuilds under the new key
     assert uids(local("biergarten")) == [1]
-    monkeypatch.delenv("MAILBROOM_SECRET_KEY")
+    monkeypatch.delenv("INBOXRAKE_SECRET_KEY")
     assert local("biergarten")["notes"][0]["key"] == "index_key"
 
 

@@ -54,11 +54,11 @@ export const EN: Record<string, string> = {
   "account.err_dup": 'An account named "{name}" already exists.',
   "account.remove_title": "Remove account",
   "account.remove_help":
-    "Removes this account from Mailbroom. Mails on the server are untouched.",
+    "Removes this account from Inboxrake. Mails on the server are untouched.",
   "account.delete": 'Delete account "{name}"…',
   "account.delete_title": 'Delete account "{name}"',
   "account.delete_data":
-    "Mailbroom deletes its sign-in and connection settings, scan results, "
+    "Inboxrake deletes its sign-in and connection settings, scan results, "
     + "local search index, saved filters, pins, unsubscribe records, known "
     + "senders, digest and auto-scan settings.",
   "account.delete_rules":
@@ -67,7 +67,7 @@ export const EN: Record<string, string> = {
   "account.delete_mails": "Mails on the server are untouched.",
   "account.delete_confirm": "Delete account",
   "menu.accounts": "Accounts",
-  "update.available": "A new version of Mailbroom is available.",
+  "update.available": "A new version of Inboxrake is available.",
   "update.reload": "Reload",
   "menu.version": "v{version} (build {id})",
   "scan.age": "scanned {ago} ago",
@@ -146,7 +146,7 @@ export const EN: Record<string, string> = {
   "ai.shared_key_ph": "using the shared server key",
   "usage.section": "User statistics",
   "usage.help":
-    "Usage per workspace - counts, AI spend and disk only. Mailbroom "
+    "Usage per workspace - counts, AI spend and disk only. Inboxrake "
     + "never shows you other users' mail data, account names or senders.",
   "usage.user": "User / workspace",
   "usage.mails": "Mails (last scan)",
@@ -212,7 +212,7 @@ export const EN: Record<string, string> = {
   "digest.recipient_placeholder": "this account's own address",
   "digest.time": "Time (24h, server's local time)",
   "digest.help":
-    "A summary of what Mailbroom did for this account since the last "
+    "A summary of what Inboxrake did for this account since the last "
     + "digest - actions taken, mails/bytes freed, rule previews (matches "
     + "found by rules still in report-only mode, not yet applied) and "
     + "unsubscribe outcomes. Skipped entirely when nothing happened.",
@@ -271,12 +271,12 @@ export const EN: Record<string, string> = {
   "body_search.local_help":
     "Meant for large mailboxes and slow providers: builds a local index "
     + "once, then searches instantly. It stores NO readable mail text, only keyed hashes of each "
-    + "mail's words (the key comes from MAILBROOM_SECRET_KEY). Searches match "
+    + "mail's words (the key comes from INBOXRAKE_SECRET_KEY). Searches match "
     + "whole words (case and accents ignored, several words must all "
     + "appear), not parts of words. Scans keep the index up to date; "
     + "switching this off deletes it.",
   "index.need_key":
-    "The local index needs MAILBROOM_SECRET_KEY to be set on the server.",
+    "The local index needs INBOXRAKE_SECRET_KEY to be set on the server.",
   "index.save_first":
     "Save the settings first, then build the index here.",
   "index.none": "No index built yet.",
@@ -320,7 +320,7 @@ export const EN: Record<string, string> = {
     "{n} newer mails are not in the index yet - results may be incomplete.",
   "body_search.disabled": "Off (subject and sender only)",
   "body_search.help":
-    "Mail-text search runs on your mail server for each query - Mailbroom "
+    "Mail-text search runs on your mail server for each query - Inboxrake "
     + "stores nothing. It can be slow on remote providers; Proton Bridge "
     + "answers locally. Turn it off to keep search to subject and sender.",
   "auto_scan.align": "Start at minute (0-59)",
@@ -418,7 +418,7 @@ export const EN: Record<string, string> = {
   "tracker.sub": "Who tracks your opens and clicks",
   "tracker.explainer":
     "A tracking pixel tells the sender when and where you opened the mail. "
-    + "Mailbroom never loads remote images.",
+    + "Inboxrake never loads remote images.",
   "tracker.headline":
     "{pct}% of the mails we checked carry a tracking pixel",
   "tracker.headline_none":
@@ -987,7 +987,7 @@ export const EN: Record<string, string> = {
   "folders.special": "Special folders",
   "folders.special_hint":
     "Not part of the cleanup scan. The folder shown for each role is the one "
-    + "Mailbroom moves mail into - and the one permanent actions use.",
+    + "Inboxrake moves mail into - and the one permanent actions use.",
   "folders.none": "No folders found.",
   "folder.src.flag": "server flag",
   "folder.src.name": "by name",
@@ -996,7 +996,7 @@ export const EN: Record<string, string> = {
   "folder.archive_scanned": "Archive is still scanned - tick it below.",
   "folder.ambiguous":
     "More than one folder could be your {role} folder. Until you choose, "
-    + "Mailbroom uses \u201c{pick}\u201d for moves to {role} and refuses to "
+    + "Inboxrake uses \u201c{pick}\u201d for moves to {role} and refuses to "
     + "delete permanently or empty it.",
   "folder.choose": "Not confirmed yet - choose\u2026",
   "folder.choose_label": "Which folder is your {role} folder?",
@@ -1402,7 +1402,7 @@ export const EN: Record<string, string> = {
   "know.kept_skipped_one":
     "1 sender was left as it is: it has a filing of your own, or its address cannot be filed.",
   "know.kept_none": "No AI answer applies right now.",
-  "know.box_title": "How Mailbroom files this sender",
+  "know.box_title": "How Inboxrake files this sender",
   "know.box_now": "Now in “{row}”.",
   "know.box_select": "File this sender under",
   "know.box_auto": "Automatic",
@@ -1436,10 +1436,10 @@ export const EN: Record<string, string> = {
   "know.err.full": "The list of filed senders is full.",
   "know.err.ai_running": "An AI run is going - try again when it is done.",
   "know.err.unscanned": "Scan every account first.",
-  // Settings > Senders: what Mailbroom knows about your senders.
+  // Settings > Senders: what Inboxrake knows about your senders.
   "tab.senders": "Filed senders",
   "tab.senders_short": "Senders",
-  "know.table_title": "What Mailbroom knows about your senders",
+  "know.table_title": "What Inboxrake knows about your senders",
   "know.table_help":
     "Where you filed senders and companies in Smart, and the AI answers you "
     + "kept. It stays on this server and is never sent to an AI. Changes "
@@ -1558,7 +1558,7 @@ export const EN: Record<string, string> = {
   "ferr.count_required":
     "The folder was not counted yet - reload it and confirm again.",
   "ferr.data_not_writable":
-    "Mailbroom cannot write to its data folder. On the host, give the user "
+    "Inboxrake cannot write to its data folder. On the host, give the user "
     + "ID 1000 ownership of the folder mounted at /data (chown -R 1000:1000 "
     + "<folder>) or start the container with --user, then restart it.",
   "ferr.role_missing": "No “{folder}” folder found on the server.",
@@ -1848,5 +1848,5 @@ export const EN: Record<string, string> = {
   "wrapped.names_hidden": "Sender names are hidden in the image.",
   "wrapped.names_shown": "Sender names are visible in the image.",
   "wrapped.local_only": "It is created on this device; nothing is uploaded.",
-  "wrapped.footer": "Mailbroom",
+  "wrapped.footer": "Inboxrake",
 };

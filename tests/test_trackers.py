@@ -21,7 +21,7 @@ client = TestClient(app)
 
 @pytest.fixture(autouse=True)
 def secret_key(monkeypatch):
-    monkeypatch.setenv("MAILBROOM_SECRET_KEY", "test-key-one")
+    monkeypatch.setenv("INBOXRAKE_SECRET_KEY", "test-key-one")
 
 
 def acc():

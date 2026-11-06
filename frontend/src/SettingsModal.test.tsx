@@ -734,7 +734,7 @@ test("mail-text search mode is read from the account being edited", () => {
     HTMLSelectElement).value).toBe("disabled");
 });
 
-test("the local index option needs MAILBROOM_SECRET_KEY on the server", () => {
+test("the local index option needs INBOXRAKE_SECRET_KEY on the server", () => {
   render(<SettingsModal cfg={cfg} account="default" onClose={() => {}}
     onSaved={() => {}} onAccountsChanged={() => {}} />);
   const local = screen.getByText(/Local word index/) as HTMLOptionElement;
@@ -845,7 +845,7 @@ test("the Filed senders tab lists what the user filed; nothing to save there",
       account="default" onClose={() => {}} onSaved={() => {}}
       onAccountsChanged={() => {}} aiAnswers={2} /></DialogProvider></ToastProvider>);
     fireEvent.click(screen.getByRole("tab", { name: "Filed senders" }));
-    expect(await screen.findByText("What Mailbroom knows about your senders"))
+    expect(await screen.findByText("What Inboxrake knows about your senders"))
       .toBeTruthy();
     expect(await screen.findByText("amy@solo.example")).toBeTruthy();
     expect(screen.getByText(/Changes here apply at once/)).toBeTruthy();
