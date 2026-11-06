@@ -2155,7 +2155,7 @@ export default function App() {
           bg-panel p-4 type-body sm:p-5">
           <div className="mb-3 type-heading">
             {cfg.setup_needed ? t("wizard.setup_btn")
-              : unverified ? t("onboard.unverified", { account })
+              : unverified ? t("onboard.unverified", { account: acct?.user || account })
               : t("onboard.ready")}
           </div>
           <p className="text-muted">

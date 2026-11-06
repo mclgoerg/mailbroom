@@ -187,13 +187,21 @@ test("an account whose connection was never confirmed shows a setup card, " +
   async () => {
     sessionStorage.clear();
     await openRaw(mkCfg({ password_set: true, verified: false }));
-    expect(await screen.findByText("Finish setting up proton")).toBeTruthy();
+    expect(await screen.findByText("Finish setting up me@mail.example"))
+      .toBeTruthy();
     expect(screen.queryByText(/Ready for the first scan/)).toBeNull();
     expect(screen.queryByRole("button", { name: "Test connection" })).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "Continue setup" }));
     expect(await screen.findByRole("button", { name: "Test connection" }))
       .toBeTruthy();
     expect(screen.queryByText(/Where does your mail live/)).toBeNull();
+  });
+
+test("the setup card falls back to the account name without an address",
+  async () => {
+    sessionStorage.clear();
+    await openRaw(mkCfg({ password_set: true, verified: false, user: "" }));
+    expect(await screen.findByText("Finish setting up proton")).toBeTruthy();
   });
 
 test("a verified account (or an older backend without the flag) gets the " +
