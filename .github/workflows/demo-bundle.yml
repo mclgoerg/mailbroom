@@ -52,7 +52,8 @@ jobs:
         working-directory: scripts/demo-bundle
         run: |
           npm ci --no-audit --no-fund
-          echo "python=$(node pyodide-pins.mjs python)" >> "$GITHUB_OUTPUT"
+          # the minor: setup-python's runners carry the latest patch only
+          echo "python=$(node pyodide-pins.mjs python | cut -d. -f1,2)" >> "$GITHUB_OUTPUT"
           node pyodide-pins.mjs constraints | tee "$RUNNER_TEMP/pyodide-pins.txt"
           node pyodide-pins.mjs requirements
 
