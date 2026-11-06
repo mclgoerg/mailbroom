@@ -1623,7 +1623,9 @@ export default function App() {
     <div className="mx-auto max-w-6xl p-3 xl:max-w-360 pb-[calc(var(--bulkbar-h,0px)+0.75rem)]
       sm:p-5 sm:pb-[calc(var(--bulkbar-h,0px)+1.25rem)]">
       <header className="mb-2 flex items-center gap-3 md:mb-4">
-        <h1 className="type-title">
+        <h1 className="type-title flex items-center gap-2">
+          <img src={`${import.meta.env.BASE_URL}icon.svg`} alt=""
+            width="32" height="32" className="shrink-0" />
           Inboxrake
         </h1>
         <span className="ml-auto flex items-center gap-2">

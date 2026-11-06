@@ -14,6 +14,8 @@ export default defineConfig({
   integrations: [
     starlight({
       title: "Inboxrake",
+      logo: { src: "./public/favicon.svg", replacesTitle: false },
+      components: { SiteTitle: "./src/components/SiteTitle.astro" },
       description:
         "Self-hosted cleanup for a mailbox that piled up: see which senders fill it, then trash, block or unsubscribe in bulk.",
       head: [
