@@ -18,7 +18,10 @@ const demoSite = (): Plugin => {
     name: "inboxrake-demo-site",
     apply: "build",
     configResolved(c) { outDir = resolve(c.root, c.build.outDir); },
-    transformIndexHtml: () => [
+    transformIndexHtml: (html) => ({
+      html: html.replace(/<title>[^<]*<\/title>/, `<title>${title}</title>`),
+      tags: [
+      { tag: "link", injectTo: "head", attrs: { rel: "canonical", href: "https://inboxrake.com/demo/" } },
       { tag: "meta", injectTo: "head", attrs: { name: "description", content: description } },
       { tag: "meta", injectTo: "head", attrs: { property: "og:type", content: "website" } },
       { tag: "meta", injectTo: "head", attrs: { property: "og:title", content: title } },
@@ -28,7 +31,8 @@ const demoSite = (): Plugin => {
       { tag: "meta", injectTo: "head", attrs: { property: "og:image:width", content: "1200" } },
       { tag: "meta", injectTo: "head", attrs: { property: "og:image:height", content: "630" } },
       { tag: "meta", injectTo: "head", attrs: { name: "twitter:card", content: "summary_large_image" } },
-    ],
+      ],
+    }),
     closeBundle() {
       const file = resolve(outDir, "manifest.webmanifest");
       const m = JSON.parse(readFileSync(file, "utf-8"));

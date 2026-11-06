@@ -173,3 +173,12 @@ def test_block_accepts_normal_keys(bridge):
         # the key goes into the query as given: the match is exact
         assert r.json()["rule"]["query"] == \
             f"{'from' if grouping == 'sender' else 'domain'}:{key}"
+
+
+def test_a_new_block_rule_has_no_reset_reason(bridge):
+    mailops.run_scan()
+    r = client.post("/api/block",
+                    json={"grouping": "sender", "key": "noreply@dhl.example"})
+    assert r.status_code == 200
+    assert r.json()["rule"]["reset_reason"] == ""
+    assert rulesmod.load_rules()[0]["reset_reason"] == ""
