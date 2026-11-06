@@ -39,6 +39,14 @@ example the Docker network's subnet), and attempts are counted per visitor.
 append to the header they received), so anyone can dodge the throttle by
 sending a different fake address with every attempt.
 
+The trusted address must carry **only the reverse proxy's traffic**. Prefer
+the proxy container's own address over a whole Docker subnet: the subnet
+includes its gateway, and anything that reaches the app through Docker's
+own port forwarding (a process on the host, or IPv6 clients when the port
+is published without IPv6 on the bridge) arrives from the gateway and
+could then fake `X-Forwarded-For`. When a proxy fronts Inboxrake, keep
+`INBOXRAKE_BIND=127.0.0.1` (the default) or do not publish the port at all.
+
 ## Behaviour worth knowing
 
 - **Host check (no login only).** Without a login, Inboxrake refuses
