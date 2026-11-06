@@ -49,6 +49,16 @@ def test_former_env_fills_in_only_unset_names():
     assert env["INBOXRAKE_MS_TENANT"] == "new"
 
 
+def test_a_blank_new_name_does_not_hide_the_former_one():
+    # e.g. `INBOXRAKE_SECRET_KEY=` copied from the new .env.example next to
+    # the filled old key: the secrets must stay readable.
+    env = {"MAILBROOM_SECRET_KEY": "old-key", "INBOXRAKE_SECRET_KEY": "",
+           "MAILBROOM_MS_TENANT": "old", "INBOXRAKE_MS_TENANT": "  "}
+    adopt_former_env(env)
+    assert env["INBOXRAKE_SECRET_KEY"] == "old-key"
+    assert env["INBOXRAKE_MS_TENANT"] == "old"
+
+
 def test_a_process_with_only_former_names_uses_them():
     # Adopted at package import, before modules that read env at import.
     env = {k: v for k, v in os.environ.items()
@@ -62,8 +72,12 @@ def test_a_process_with_only_former_names_uses_them():
 
 
 def test_former_env_gets_a_rename_hint(monkeypatch, caplog):
+    # BIND/PORT only feed the old compose file's `ports:` line: no hint.
     monkeypatch.setattr(main, "FORMER_ENV",
-                        ["MAILBROOM_MS_TENANT", "MAILBROOM_SECRET_KEY"])
+                        ["MAILBROOM_BIND", "MAILBROOM_MS_TENANT",
+                         "MAILBROOM_PORT", "MAILBROOM_SECRET_KEY"])
+    monkeypatch.setenv("MAILBROOM_BIND", "0.0.0.0")
+    monkeypatch.setenv("INBOXRAKE_BIND", "0.0.0.0")
     monkeypatch.setenv("MAILBROOM_SECRET_KEY", "made-up")
     monkeypatch.setenv("INBOXRAKE_SECRET_KEY", "made-up")
     monkeypatch.setenv("MAILBROOM_MS_TENANT", "old")

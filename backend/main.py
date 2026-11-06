@@ -146,11 +146,18 @@ def _check_data_dir() -> None:
             "or start the container with `--user <uid>:<gid>`.", folder)
 
 
+# Read by the `ports:` line of the old starter compose file, not by the app:
+# renaming them in .env alone would move the published port.
+_COMPOSE_ONLY_ENV = ("MAILBROOM_BIND", "MAILBROOM_PORT")
+
+
 def _log_former_env() -> None:
     """Startup hint per MAILBROOM_* setting (backend/__init__.py adopted
     each one where the INBOXRAKE_* name is unset)."""
     log = logging.getLogger("pmc.config")
     for old in FORMER_ENV:
+        if old in _COMPOSE_ONLY_ENV:
+            continue
         new = "INBOXRAKE_" + old[len("MAILBROOM_"):]
         if os.environ.get(new) == os.environ.get(old):
             log.warning("%s still works but is the former name - rename it "

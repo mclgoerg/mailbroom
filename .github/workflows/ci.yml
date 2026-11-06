@@ -95,6 +95,7 @@ jobs:
           # this the label would read "latest" on main builds.
           labels: |
             org.opencontainers.image.version=${{ steps.ver.outputs.version }}
+            org.opencontainers.image.title=Inboxrake
 
       - name: Build (and push on main/tags)
         uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7
