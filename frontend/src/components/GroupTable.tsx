@@ -6,7 +6,8 @@ import { useEffect, useRef, useState, type MouseEvent } from "react";
 import { fmtSize } from "../api";
 import type { Group, Grouping, SmartKind } from "../types";
 import { t } from "../i18n";
-import { AiTag, Avatar, Button, Checkbox, EngagementMeter, PinBadge, RatingChips, ShortDate, StillMailingBadge, Tag, TrackerBadge, Select, isModalOpen } from "./ui";
+import { AiTag, Avatar, Button, Checkbox, EngagementMeter, PinBadge, RatingChips, ShortDate, StillMailingBadge, Tag, TrackerBadge, Select, isModalOpen, useOptionalToast } from "./ui";
+import { useDemo } from "../demoMode";
 
 export type SortKey = "count" | "size" | "label" | "last" | "unreadPct"
   | "engagement";
@@ -104,6 +105,8 @@ const unreadPct = (g: Group) =>
    it without re-running the whole bulk job. */
 function UnsubBadge({ g, onAck }: { g: Group; onAck: (addr: string) => void }) {
   const u = g.unsubscribed;
+  const demo = useDemo();
+  const toast = useOptionalToast();
   // A broken promise outranks the "✓ Unsubscribed" it contradicts - and it
   // shows even on a row with no unsubscribe header of its own.
   if (g.still_mailing) return <StillMailingBadge sm={g.still_mailing} />;
@@ -134,16 +137,26 @@ function UnsubBadge({ g, onAck }: { g: Group; onAck: (addr: string) => void }) {
   // fixed w-40, and the full "Open unsubscribe page" text wrapped onto
   // two lines there and blew up the row height (390px + 1440px screenshot
   // check against scripts/demo.py, 2026-09-28).
+  const linkCls = `cursor-pointer whitespace-nowrap rounded-badge bg-review-bg
+    px-1.5 py-0.5 type-caption text-review-fg underline hover:opacity-80`;
   return (
     <span className="inline-flex shrink-0 items-center gap-1">
+      {demo ? (
+        // the demo's links point at a made-up host: explain, open nothing
+        <button type="button" title={t("unsub.open_link")}
+          onClick={(e) => { e.stopPropagation();
+            toast?.show(t("unsub.demo_hint")); }}
+          className={linkCls}>
+          ✉ {t("unsub.badge_link")}
+        </button>
+      ) : (
       <a href={u.link} target="_blank" rel="noopener noreferrer"
         title={t("unsub.open_link")}
         onClick={(e) => e.stopPropagation()}
-        className="cursor-pointer whitespace-nowrap rounded-badge bg-review-bg
-          px-1.5 py-0.5 type-caption text-review-fg underline
-          hover:opacity-80">
+        className={linkCls}>
         ✉ {t("unsub.badge_link")}
       </a>
+      )}
       <button title={t("unsub.mark_done")} aria-label={t("unsub.mark_done")}
         className="rounded-badge bg-chip px-1.5 py-0.5 type-caption
           text-chiptext hover:bg-chiph"

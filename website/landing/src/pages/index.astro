@@ -16,8 +16,15 @@ const heroAlt =
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>{title}</title>
     <meta name="description" content={description} />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Inboxrake" />
     <meta property="og:title" content={title} />
     <meta property="og:description" content={description} />
+    <meta property="og:url" content="https://inboxrake.com/" />
+    <meta property="og:image" content="https://inboxrake.com/og.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta name="twitter:card" content="summary_large_image" />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <script is:inline>
       // Same choice as the docs site (Starlight stores it in localStorage),
@@ -57,7 +64,7 @@ const heroAlt =
           <a class="btn" href="/docs/">Read the docs</a>
           <a class="btn" href={GITHUB}>GitHub</a>
         </p>
-        <img class="shot only-dark" loading="lazy" src={hero.src} width={hero.width} height={hero.height} alt={heroAlt} />
+        <img class="shot only-dark" loading="eager" fetchpriority="high" src={hero.src} width={hero.width} height={hero.height} alt={heroAlt} />
         <img class="shot only-light" loading="lazy" src={heroLight.src} width={heroLight.width} height={heroLight.height} alt={heroAlt} />
       </section>
 
@@ -65,7 +72,7 @@ const heroAlt =
         <h2>Nothing is deleted without asking</h2>
         <p>
           Everything is undoable - moves go to Trash with an Undo -{" "}
-          <strong>except</strong> the explicit "delete permanently" actions in Trash and Junk (manual, or an opt-in purge rule), which show exact counts first. Scans are read-only, and nothing leaves your machine unless you turn on AI review (then only metadata, never mail bodies or attachments).
+          <strong>except</strong> permanent deletion in Trash and Junk: the manual "delete permanently" actions confirm with exact counts, and opt-in purge rules only act after you have reviewed a report run. Scans are read-only, and nothing leaves your machine unless you turn on AI review (then only metadata, never mail bodies or attachments).
         </p>
         <p><a href="/docs/security/">Security &amp; privacy in detail</a></p>
       </section>
