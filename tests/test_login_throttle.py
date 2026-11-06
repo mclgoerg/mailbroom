@@ -190,3 +190,25 @@ def test_ipv4_stays_per_address_and_mapped_ipv6_matches_it():
         t.attempt("192.0.2.7")
     assert t.attempt("192.0.2.8") == 0
     assert t.attempt("::ffff:192.0.2.7") > 0
+
+
+def test_unparsable_peers_share_one_bucket():
+    t = authmod.LoginThrottle(clock=Clock())
+    for i in range(5):
+        assert t.attempt(f"x{i}") == 0
+    assert t.attempt("junk") > 0
+    assert t.attempt("10.0.0.1") == 0
+
+
+def test_table_sweep_is_amortised():
+    clock = Clock()
+    t = authmod.LoginThrottle(clock=clock)
+    for i in range(1100):
+        t.attempt(f"10.1.{i // 250}.{i % 250}")
+    sweeps = []
+    orig = t._recent
+    t._recent = lambda peer: (sweeps.append(peer), orig(peer))[1]
+    for _ in range(50):
+        t.attempt("10.9.9.9")
+    # a full sweep would touch >1000 peers each time; at most one happens
+    assert len(sweeps) < 1200

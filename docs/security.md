@@ -32,8 +32,12 @@ Inboxrake never trusts `X-Forwarded-For` itself. Behind a reverse proxy
 every visitor therefore shares the proxy's address, so **5 wrong passwords
 from anyone lock everyone out for 15 minutes**, unless uvicorn is told
 which proxy to believe. Set `FORWARDED_ALLOW_IPS` in the container
-environment to your proxy's address (comma list; `*` only if nothing but
-the proxy can reach the port) and attempts are counted per visitor.
+environment to your proxy's address, or to its network in CIDR form (for
+example the Docker network's subnet), and attempts are counted per visitor.
+**Never set it to `*`**: uvicorn then believes the leftmost
+`X-Forwarded-For` entry, which the visitor writes themselves (proxies
+append to the header they received), so anyone can dodge the throttle by
+sending a different fake address with every attempt.
 
 ## Behaviour worth knowing
 

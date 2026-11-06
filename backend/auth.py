@@ -218,7 +218,7 @@ def peer_key(host: str) -> str:
     try:
         ip = ipaddress.ip_address(host)
     except ValueError:
-        return host
+        return "?"        # one shared bucket: junk values must not mint new ones
     if isinstance(ip, ipaddress.IPv6Address):
         if ip.ipv4_mapped:
             return str(ip.ipv4_mapped)
@@ -237,6 +237,7 @@ class LoginThrottle:
                  clock=time.time):
         self.limit, self.window, self.clock = limit, window, clock
         self._fails: dict[str, list[float]] = {}
+        self._next_sweep = 0.0
         self._lock = threading.Lock()
 
     def _recent(self, peer: str) -> list[float]:
@@ -274,7 +275,9 @@ class LoginThrottle:
             self._record(peer_key(peer))
 
     def _record(self, peer: str) -> None:
-        if len(self._fails) > 1000:                # bound the table
+        now = self.clock()
+        if len(self._fails) > 1000 and now >= self._next_sweep:
+            self._next_sweep = now + 60            # bound the table, amortised
             for other in list(self._fails):
                 self._recent(other)
         self._recent(peer)
