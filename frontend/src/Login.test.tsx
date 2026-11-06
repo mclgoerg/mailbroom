@@ -59,3 +59,16 @@ test("oidc mode renders the SSO link", () => {
   const a = screen.getByText("Sign in with SSO") as HTMLAnchorElement;
   expect(a.getAttribute("href")).toBe("/api/oidc/login");
 });
+
+test("an SSO refusal code in the URL is worded on the login page", () => {
+  window.history.replaceState(null, "", "/?login_error=email_unverified");
+  render(<Login mode="oidc" onLogin={() => {}} />);
+  expect(screen.getByText(/not verified this email/)).toBeTruthy();
+  expect(window.location.search).toBe("");
+});
+
+test("an unknown refusal code shows nothing", () => {
+  window.history.replaceState(null, "", "/?login_error=whatever");
+  render(<Login mode="oidc" onLogin={() => {}} />);
+  expect(screen.queryByText(/refused/)).toBeNull();
+});

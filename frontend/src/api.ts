@@ -117,6 +117,10 @@ const ERROR_CODES: Record<string, string> = {
   rule_purge_needs_age: "ferr.rule_purge_needs_age",
   rule_purge_filter: "ferr.rule_purge_filter",
   rule_purge_filter_domain: "ferr.rule_purge_filter_domain",
+  // List-Unsubscribe mailto: refused (backend/smtpout.py)
+  mailto_unsafe: "ferr.mailto_unsafe",
+  no_account: "ferr.no_account",
+  cafile_missing: "ferr.cafile_missing",
   // plain words -> filter (backend/aifilter.py)
   aifilter_not_configured: "aif.err.not_configured",
   aifilter_text_empty: "aif.err.text_empty",

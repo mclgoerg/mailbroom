@@ -58,6 +58,18 @@ def test_spa_fallback_is_contained():
         assert b"placeholder index" in r.content, path
 
 
+def test_unknown_api_paths_answer_404_json():
+    for path in ["/api/nope", "/api/state/extra/nope", "/api/", "/api"]:
+        r = client.get(path)
+        assert r.status_code == 404, path
+        assert r.headers["content-type"].startswith("application/json")
+        assert r.json() == {"detail": "not found"}
+    # Real endpoints and SPA routes that merely start with "api" still work.
+    assert client.get("/api/version").status_code == 200
+    r = client.get("/apiary")
+    assert r.status_code == 200 and b"placeholder index" in r.content
+
+
 def test_spa_index_is_never_cached():
     # index.html references the current build's hashed /assets bundle - it
     # must always be revalidated, or an installed PWA can keep showing a
@@ -160,3 +172,37 @@ def test_post_ai_threads_keys_through_to_start_group_review(bridge, monkeypatch)
 
     client.post("/api/ai", json={"grouping": "sender"})
     assert captured["keys"] is None   # omitted -> every unrated group
+
+
+def _access_record(client_addr, method, path):
+    import logging
+    return logging.LogRecord(
+        "uvicorn.access", logging.INFO, __file__, 0,
+        '%s - "%s %s HTTP/%s" %d',
+        (client_addr, method, path, "1.1", 200), None)
+
+
+def test_healthcheck_access_lines_are_dropped_only():
+    import logging
+    log = logging.getLogger("uvicorn.access")
+
+    def kept(*a):
+        return all(f.filter(_access_record(*a)) for f in log.filters)
+
+    # The container's own probe is silent ...
+    assert not kept("127.0.0.1:41234", "GET", "/api/auth")
+    assert not kept("::1:41234", "GET", "/api/auth")
+    # ... but the same path from a real client, other paths and other
+    # methods are still logged.
+    assert kept("192.0.2.7:5555", "GET", "/api/auth")
+    assert kept("127.0.0.1:41234", "GET", "/api/state")
+    assert kept("127.0.0.1:41234", "POST", "/api/auth")
+
+
+def test_openapi_version_is_the_release_version():
+    from pathlib import Path
+    from backend.main import app
+    want = (Path(__file__).resolve().parent.parent
+            / "version.txt").read_text().strip()
+    assert want and app.version == want
+    assert app.openapi()["info"]["version"] == want

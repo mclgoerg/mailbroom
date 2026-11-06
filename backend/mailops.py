@@ -136,7 +136,13 @@ RULE_PURGE_KEEP_LATEST = "rule_purge_keep_latest"
 RULE_PURGE_NEEDS_AGE = "rule_purge_needs_age"
 RULE_PURGE_FILTER = "rule_purge_filter"                  # names=
 RULE_PURGE_FILTER_DOMAIN = "rule_purge_filter_domain"    # names=
+# a List-Unsubscribe mailto: that would not be one plain mail to one address
+MAILTO_UNSAFE = "mailto_unsafe"
+# connecting (first run): no account set up yet / the CA file is missing
+NO_ACCOUNT = "no_account"
+CAFILE_MISSING = "cafile_missing"    # path=
 FOLDER_ERROR_CODES = frozenset({
+    MAILTO_UNSAFE,
     NO_MESSAGE_ID, PINNED_MAILS, PROTECTED_MAILS, ALL_PINNED,
     ROLE_NOT_CANDIDATE, ROLE_AMBIGUOUS, NOT_LOOKALIKE, MOVE_UNSAFE,
     BUSY_ACTION,
@@ -173,7 +179,9 @@ FOLDER_ERROR_CODES = frozenset({
     RULE_PURGE_KEEP_LATEST,
     RULE_PURGE_NEEDS_AGE,
     RULE_PURGE_FILTER,
-    RULE_PURGE_FILTER_DOMAIN})
+    RULE_PURGE_FILTER_DOMAIN,
+    NO_ACCOUNT,
+    CAFILE_MISSING})
 
 
 def coded(code: str, **params) -> str:
@@ -531,11 +539,23 @@ def categorize(hay: str, localpart: str = "", bulk: bool = False,
 
 # --------------------------------------------------------------------- imap
 
+def tls_context(im: dict) -> ssl.SSLContext:
+    """The TLS context for IMAP and SMTP: system CAs, plus the account's own
+    CA file when set - a coded error naming the path if that file is gone."""
+    cafile = im.get("cafile") or None
+    if cafile and not os.path.isfile(cafile):
+        raise RuntimeError(coded(CAFILE_MISSING, path=cafile))
+    return ssl.create_default_context(cafile=cafile)
+
+
 def connect(im: dict, account_name: str | None = None) -> imaplib.IMAP4:
     """`account_name` lets an oauth account persist a refreshed access
     token back to its config; omit it only for throwaway connections
     (test_connection) where the refreshed token would otherwise be lost."""
-    ctx = ssl.create_default_context(cafile=im["cafile"] or None)
+    if not im.get("host") or not im.get("user") or (
+            cfgmod.auth_method(im) == "password" and not im.get("password")):
+        raise RuntimeError(coded(NO_ACCOUNT))
+    ctx = tls_context(im)
     if (im.get("security") or "ssl") == "starttls":
         conn = imaplib.IMAP4(im["host"], int(im["port"]), timeout=120)
         try:
@@ -2173,10 +2193,13 @@ def run_scan(acc=None) -> None:
             acc.state["progress"] = ""
             acc.state["notice"] = {"key": "scan_cancelled", "params": {}}
     except Exception as exc:
-        log.exception("scan failed")
+        if is_coded(str(exc)):       # an expected refusal: no traceback
+            log.warning("scan failed: %s", exc)
+        else:
+            log.exception("scan failed")
         with acc.lock:
             acc.state["status"] = "error"
-            acc.state["error"] = f"{type(exc).__name__}: {exc}"
+            acc.state["error"] = error_text(exc)
 
 
 def folder_message_count(conn, target: str | None) -> int | None:
