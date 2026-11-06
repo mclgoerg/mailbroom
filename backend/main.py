@@ -1935,8 +1935,9 @@ def post_config(body: dict, request: Request, response: Response):
 
 # Static React bundle (single-page app: unknown paths fall back to index.html)
 if STATIC_DIR.is_dir():
-    app.mount("/assets", StaticFiles(directory=STATIC_DIR / "assets"),
-              name="assets")
+    if (STATIC_DIR / "assets").is_dir():       # a bare placeholder has none
+        app.mount("/assets", StaticFiles(directory=STATIC_DIR / "assets"),
+                  name="assets")
 
     # Resolve the base ONCE: comparing a resolved child against an
     # unresolved (possibly relative or symlinked) base would break the

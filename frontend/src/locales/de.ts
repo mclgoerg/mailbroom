@@ -1833,6 +1833,7 @@ export const DE: Record<string, string> = {
     "Diese Gruppe gibt es nicht mehr - scanne neu und versuche es erneut.",
   "ferr.unsub_failed":
     "Das Abbestellen ist unerwartet fehlgeschlagen. Details stehen im Server-Log.",
+  "ferr.not_in_demo": "In der Demo nicht verfügbar.",
   "ferr.cannot_flag":
     "Der Server hat das Markieren der Mails zum Löschen nicht "
     + "akzeptiert.",
