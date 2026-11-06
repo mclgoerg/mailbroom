@@ -1,0 +1,5 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://inboxrake.com/sitemap.xml
+Sitemap: https://inboxrake.com/docs/sitemap-index.xml
