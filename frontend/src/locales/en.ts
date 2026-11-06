@@ -912,8 +912,8 @@ export const EN: Record<string, string> = {
   "preset.label": "Provider preset (prefills the fields below)",
   "preset.hint.proton":
     "Proton needs the Mail Bridge (paid plans): switch its IMAP mode to "
-    + "SSL, export its certificate and point the CA file at it - see the "
-    + "README.",
+    + "SSL, export its certificate and point the CA file at it - see "
+    + "inboxrake.com/docs/providers/.",
   "preset.hint.apppw":
     "Use an app-specific password, not your normal account password - "
     + "create one in the provider's security settings (links in the "

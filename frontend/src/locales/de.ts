@@ -770,7 +770,7 @@ export const DE: Record<string, string> = {
   "preset.hint.proton":
     "Proton braucht die Mail Bridge (Bezahltarife): IMAP-Modus auf SSL "
     + "stellen, Zertifikat exportieren und als CA-Datei eintragen - "
-    + "siehe README.",
+    + "siehe inboxrake.com/docs/providers/.",
   "preset.hint.apppw":
     "App-spezifisches Passwort verwenden, nicht das normale "
     + "Konto-Passwort - anlegen in den Sicherheitseinstellungen des "
