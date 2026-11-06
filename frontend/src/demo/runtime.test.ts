@@ -2,7 +2,7 @@
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import { nowMs, setClockShift } from "../clock";
 import { fakeRuntime } from "./fakeWorker";
-import { STALL_MS } from "./runtime";
+import { REQUEST_TIMEOUT_MS, STALL_MS } from "./runtime";
 
 beforeEach(() => { vi.useFakeTimers(); });
 afterEach(() => { vi.useRealTimers(); setClockShift(0); });
@@ -112,4 +112,28 @@ test("reset rejects what is in flight", async () => {
   const p = runtime.request("GET", "/api/state", "", null, {});
   runtime.start();
   await expect(p).rejects.toThrow(TypeError);
+});
+
+test("a request the worker never answers becomes a 504; a late answer is ignored",
+  async () => {
+    const { runtime, last } = fakeRuntime();
+    runtime.start();
+    last().emit({ type: "ready", clockShiftMs: 0 });
+    last().postMessage = () => {};                     // never answered
+    const p = runtime.request("GET", "/api/state", "", null, {});
+    vi.advanceTimersByTime(REQUEST_TIMEOUT_MS - 1);
+    vi.advanceTimersByTime(2);
+    const res = await p;
+    expect(res.status).toBe(504);
+    last().emit({ type: "res", id: 1, status: 200, headers: [],
+      body: new ArrayBuffer(0) });                     // no crash
+  });
+
+test("the worker's fatal error text is logged", () => {
+  const err = vi.spyOn(console, "error").mockImplementation(() => {});
+  const { runtime, last } = fakeRuntime();
+  runtime.start();
+  last().emit({ type: "fatal", error: "boom" });
+  expect(err).toHaveBeenCalledWith("demo worker failed:", "boom");
+  err.mockRestore();
 });

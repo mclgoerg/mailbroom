@@ -30,6 +30,11 @@ export const STALL_MS: Record<StepId, number> = {
   download: 30_000, python: 120_000, libraries: 120_000, seed: 120_000,
 };
 
+/** One backend call that has not come back after this long gets a 504 (a
+ *  Python call that never returns would otherwise hang its fetch forever).
+ *  Generous: a slow phone's first /api/state takes tens of seconds. */
+export const REQUEST_TIMEOUT_MS = 120_000;
+
 const MB = 1e6;
 
 export function browserSupportsDemo(): boolean {
@@ -58,7 +63,8 @@ export class DemoRuntime {
     mb: 0, totalMb: 0 };
   private listeners = new Set<() => void>();
   private pending = new Map<number, {
-    resolve: (r: Response) => void; reject: (e: unknown) => void }>();
+    resolve: (r: Response) => void; reject: (e: unknown) => void;
+    timer: ReturnType<typeof setTimeout> }>();
   private nextId = 0;
   private stall: ReturnType<typeof setTimeout> | undefined;
 
@@ -109,6 +115,7 @@ export class DemoRuntime {
     if (m.type === "res") {
       const p = this.pending.get(m.id);
       this.pending.delete(m.id);
+      if (p) clearTimeout(p.timer);
       p?.resolve(toResponse(m.status, m.headers, m.body));
     } else if (s.phase !== "booting") {
       return;
@@ -128,6 +135,7 @@ export class DemoRuntime {
       setClockShift(m.clockShiftMs);
       this.set({ phase: "ready" });
     } else if (m.type === "fatal") {
+      console.error("demo worker failed:", m.error);
       this.fail("error");
     }
   }
@@ -150,7 +158,10 @@ export class DemoRuntime {
     if (w) { w.onmessage = w.onerror = w.onmessageerror = null; w.terminate(); }
     // what was in flight will never be answered: a network error, like a
     // dropped connection (callers handle those already)
-    for (const p of this.pending.values()) p.reject(new TypeError("Failed to fetch"));
+    for (const p of this.pending.values()) {
+      clearTimeout(p.timer);
+      p.reject(new TypeError("Failed to fetch"));
+    }
     this.pending.clear();
   }
 
@@ -165,7 +176,12 @@ export class DemoRuntime {
     }
     return new Promise((resolve, reject) => {
       const id = ++this.nextId;
-      this.pending.set(id, { resolve, reject });
+      const timer = setTimeout(() => {
+        this.pending.delete(id);
+        resolve(new Response(JSON.stringify({ detail: "demo request timed out" }),
+          { status: 504, headers: { "content-type": "application/json" } }));
+      }, REQUEST_TIMEOUT_MS);
+      this.pending.set(id, { resolve, reject, timer });
       w.postMessage({ type: "req", id, method, path, query, body, headers });
     });
   }
