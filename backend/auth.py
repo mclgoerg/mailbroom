@@ -215,9 +215,19 @@ def exchange_code(oidc_cfg: dict, redirect_uri: str, code: str,
         headers={"Authorization": f"Bearer {tokens['access_token']}"})
 
 
+def email_unverified(claims: dict) -> bool:
+    """True when the IdP says the email is NOT verified (bool False or the
+    string "false"). A missing claim counts as verified: some IdPs omit it."""
+    v = claims.get("email_verified")
+    return v is False or (isinstance(v, str) and v.strip().lower() == "false")
+
+
 def allowed_subject(claims: dict, allowed: list[str]) -> str | None:
     """The session subject if the claims pass the allow-list (an empty
-    list admits ANY user the IdP authenticates)."""
+    list admits ANY user the IdP authenticates). An email the IdP marks
+    as unverified is refused: anyone could register it there."""
+    if email_unverified(claims):
+        return None
     email = str(claims.get("email") or "").strip().lower()
     sub = str(claims.get("sub") or "")
     if not (email or sub):

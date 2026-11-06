@@ -29,7 +29,7 @@ export const LINK = "cursor-pointer underline hover:text-body";
 export const LINK_ACCENT = "cursor-pointer text-accent underline hover:text-accenth";
 
 export type TagTone = "neutral" | "safe" | "review" | "keep" | "info"
-  | "attach" | "new" | "accent";
+  | "attach" | "new" | "accent" | "category";
 
 const TAG_TONE: Record<TagTone, string> = {
   neutral: "bg-chip text-chiptext",
@@ -40,6 +40,9 @@ const TAG_TONE: Record<TagTone, string> = {
   attach: "bg-attach-bg text-attach-fg",
   new: "bg-new-bg text-new-fg",
   accent: "bg-chip text-accent",
+  // A sender's category (newsletter, shopping...): outlined and muted, so it
+  // reads as a label next to the filled state badges.
+  category: "border border-line text-muted",
 };
 
 /** Small badge (caption layer). `tone` picks a semantic bg/fg pair. */

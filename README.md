@@ -430,6 +430,11 @@ in the UI; they persist in `/data`. Env bootstrap for other providers:
 > `localhost` or an IP address (protection against DNS rebinding). To open
 > it under a host name, add `MAILBROOM_ALLOWED_HOSTS=<name>` (comma list,
 > `*.example.org` for subdomains) to the container environment.
+>
+> SSO refuses an identity whose email the provider reports as unverified
+> (`email_verified: false`); providers that omit the claim are accepted.
+> Keep the allowed-users list filled - empty means every account at the
+> provider may sign in.
 
 ### Multi-user (SSO mode)
 

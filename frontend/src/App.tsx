@@ -358,7 +358,7 @@ export default function App() {
       seq: staleDel || del.status === "running"
         ? (prev ? prev.seq : (del.seq ?? 0) - 1) : del.seq };
     if (state.status === "error" && prev?.scan !== "error")
-      notify(t("err.generic", { msg: state.error }), "error");
+      notify(t("err.generic", { msg: errorText(state.error) }), "error");
     if (!prev) return;
     // A look-alike folder's move is toasted by Settings itself (with its own
     // Undo), so it is not announced a second time here.
@@ -1004,16 +1004,20 @@ export default function App() {
       return false;
     }
     const verb = actionVerb(action) + (dest ? ` → ${dest}` : "");
-    const bullets = [effective.length === 1
-      ? t(noun === "senders" ? "confirm.b_mails_one_sender"
-        : "confirm.b_mails_one_group", { n })
-      : t(noun === "senders" ? "confirm.b_mails_senders"
-        : "confirm.b_mails_groups", { n, k: effective.length })];
+    // Name what is moved: the group(s), up to three, then "and N more".
+    const labels = effective.map((k) => all[k]?.label ?? k);
+    const names = labels.length > 3
+      ? t("confirm.names_more", { names: labels.slice(0, 3).join(", "),
+        k: labels.length - 3 })
+      : labels.join(", ");
+    const bullets = [t("confirm.b_mails_from", { n, names })];
     if (effective.length !== keys.length) {
       bullets.push(t(noun === "senders" ? "confirm.b_protected_senders_skipped"
         : "confirm.b_protected_groups_skipped", { n: keys.length - effective.length }));
     }
     if (pins) bullets.push(t("confirm.b_pinned_kept", { n: pins }));
+    // Moves are reversible from the result message; mark-as-read is not a move.
+    if (action !== "mark_read") bullets.push(t("confirm.b_undo"));
     // `confirmed`: the caller's own dialog already named these counts
     // (Triage's one summary confirm) - everything above still applies.
     if (!force && !confirmed && !await confirmDialog({ title: verb, bullets,
@@ -1414,7 +1418,23 @@ export default function App() {
   const statusLine = () => {
     if (!state) return <Spinner />;
     const running = job ?? (pending ? { label: pending, progress: "" } : null);
-    if (!running) return summary();
+    if (!running) {
+      // The "N cached AI verdicts applied" notice lives here as a muted
+      // suffix (full sentence as tooltip) instead of a banner of its own.
+      const n = state.notice?.key === "cached_verdicts"
+        ? Number(state.notice.params.n) : 0;
+      return (
+        <>
+          {summary()}
+          {n > 0 && (
+            <span data-testid="cached-verdicts" className="text-faint"
+              title={t("notice.cached_verdicts", { n })}>
+              {" · "}{t("status.cached_verdicts", { n })}
+            </span>
+          )}
+        </>
+      );
+    }
     return (
       <span className="inline-flex items-center gap-1.5">
         {job?.icon}
@@ -1808,7 +1828,8 @@ export default function App() {
           selection-dependent chrome here (that lives in the bottom bar,
           which only renders once something is selected). */}
       {!flat && (
-      <div className="mb-2 flex flex-wrap items-center gap-2">
+      <div className="mb-2 flex items-center gap-2 overflow-x-auto pb-1
+        md:flex-wrap md:overflow-visible md:pb-0" data-testid="chip-row">
         {PRESET_CHIPS.slice(0, 1).map((p) => (
           <Chip key={p.key} className="shrink-0"
             on={filter === presetFilterQuery(p.key)}
@@ -2069,7 +2090,7 @@ export default function App() {
           </span>
         )}
       </div>
-      {state?.notice && (
+      {state?.notice && state.notice.key !== "cached_verdicts" && (
         <Notice className="mb-2" icon={<Info size={14} />}
           onClose={dismissNotice}>
           {t(`notice.${state.notice.key}`, noticeParams(state.notice.params))}
@@ -2085,7 +2106,8 @@ export default function App() {
       )}
 
       {/* First-run onboarding: no credentials or no scan yet. */}
-      {cfg && state?.status === "idle" && allGroups.length === 0
+      {cfg && (state?.status === "idle" || state?.status === "error")
+        && allGroups.length === 0
         && !scanning && (
         <div className="mx-auto my-10 max-w-md rounded-card border border-line
           bg-panel p-4 type-body sm:p-5">

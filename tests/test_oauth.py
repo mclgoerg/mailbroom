@@ -159,7 +159,8 @@ def test_connect_refreshes_and_persists_expired_token(monkeypatch, isolate):
                                        "expires_in": 3600}))
     cfgmod.update_config({"add_account": "gmail"})
     cfgmod.update_config({"account": "gmail", "imap": {
-        "host": "imap.gmail.com", "oauth": {
+        "host": "imap.gmail.com", "user": "me@gmail.example",
+        "oauth": {
             "provider": "google", "client_id": "cid",
             "client_secret": "sec"}}})
     cfgmod.save_oauth("gmail", {"provider": "google", "client_id": "cid",
@@ -168,7 +169,7 @@ def test_connect_refreshes_and_persists_expired_token(monkeypatch, isolate):
                                 "access_token": "old-at", "expires_at": 0})
     im = cfgmod.account_imap("gmail")
     conn = mailops.connect(im, "gmail")
-    assert conn.response == b"user=\x01auth=Bearer new-at\x01\x01"
+    assert conn.response == b"user=me@gmail.example\x01auth=Bearer new-at\x01\x01"
     saved = cfgmod.account_imap("gmail")["oauth"]
     assert saved["access_token"] == "new-at"
     assert saved["refresh_token"] == "rt"
