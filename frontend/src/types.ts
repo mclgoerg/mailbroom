@@ -612,6 +612,7 @@ export interface AuthProbe {
   authed: boolean;
   sub?: string;        // OIDC identity of the session (empty otherwise)
   is_admin?: boolean;  // may edit server-level settings (auth, shared AI)
+  demo?: boolean;      // the in-browser demo: network controls are disabled
 }
 
 // Non-admins only ever receive {mode, is_admin} - the server-side login
