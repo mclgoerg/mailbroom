@@ -63,8 +63,9 @@ has the full commands):
 2. `cert export` to `/root/exported-certs`. The compose file mounts
    `exported-certs/cert.pem` into Inboxrake as `/certs/bridge-cert.pem`,
    which is used as the CA file automatically.
-3. `info` shows the IMAP username and the Bridge-generated password; put
-   them into `.env` or the settings UI (not your Proton password).
+3. `info` shows the IMAP username and the Bridge-generated password.
+   Enter both in `.env` or in Inboxrake's Settings - the Bridge password,
+   not the password of the Proton account.
 
 Proton's labels (`Starred`, `Labels/*`) are
 excluded from scans because their mails also live in a real folder. The
