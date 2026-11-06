@@ -15,6 +15,7 @@ import os
 import random
 import re
 import time
+import zlib
 from pathlib import Path
 
 from conftest import FakeIMAP, make_msg
@@ -81,39 +82,127 @@ def _kind(m: dict) -> str:
         return "practice"
     if (addr.endswith(FREEMAIL) or "anna.weber@" in addr
             or addr.split("@")[1].startswith(("familienpost", "kletterhalle",
-                                              "mietverein", "kanzlei"))):
+                                              "mietverein"))):
         return "person"
     if any(w in subj for w in ("sendung", "paket", "shipped", "delivery",
                                "zustellung", "unterwegs", "bestellung")):
         return "parcel"
-    return "newsletter" if m["unsub"] else "service"
+    if m["unsub"]:
+        return "newsletter"
+    return "club" if "club" in addr else "service"
 
 
 _BODY = {
     "person": ("Hallo!\n\n{subj} - melde dich einfach, wenn es dir "
-               "passt. Ich freue mich!\n\nLG {name}",
+               "passt. Ich freue mich!\n\nLG {sig}",
                "Hi!\n\n{subj} - let me know what works for you.\n\n"
-               "Cheers,\n{name}"),
-    "me": ("Hallo {first},\n\n{subj} - passt für mich, danke dir!\n\n"
-           "Viele Grüße\nDemo",
-           "Hi {first},\n\n{subj} - works for me, thanks!\n\nBest,\nDemo"),
+               "Cheers,\n{sig}"),
     "practice": ("Guten Tag,\n\n{subj}. Bitte bringen Sie Ihre "
-                 "Versichertenkarte mit.\n\nFreundliche Grüße\n{name}",
+                 "Versichertenkarte mit.\n\nFreundliche Grüße\n{sig}",
                  "Hello,\n\n{subj}. Please bring your insurance card.\n\n"
-                 "Kind regards,\n{name}"),
+                 "Kind regards,\n{sig}"),
+    "club": ("Hallo zusammen,\n\n{subj}. Wir treffen uns wie immer am "
+             "Donnerstagabend - bringt eure Kameras mit!\n\nBis dann,\n{sig}",
+             "Hi everyone,\n\n{subj}. We meet as usual on Thursday evening - "
+             "bring your cameras!\n\nSee you there,\n{sig}"),
     "parcel": ("Hallo,\n\n{subj}. Den aktuellen Status sehen Sie jederzeit "
-               "in der Sendungsverfolgung.\n\n{name}",
+               "in der Sendungsverfolgung.\n\n{sig}",
                "Hello,\n\n{subj}. You can follow the delivery any time in "
-               "your account.\n\n{name}"),
+               "your account.\n\n{sig}"),
     "service": ("Guten Tag,\n\n{subj}. Die Details finden Sie in Ihrem "
-                "Konto.\n\nDies ist eine automatische Nachricht.\n{name}",
+                "Konto.\n\nDies ist eine automatische Nachricht.\n{sig}",
                 "Hello,\n\n{subj}. The details are in your account.\n\n"
-                "This is an automated message.\n{name}"),
+                "This is an automated message.\n{sig}"),
     "newsletter": ("Hallo,\n\n{subj}\n\nDas gibt es diese Woche Neues. "
-                   "Kein Interesse mehr? Abmelden geht ganz unten.\n\n{name}",
+                   "Kein Interesse mehr? Abmelden geht ganz unten.\n\n{sig}",
                    "Hi,\n\n{subj}\n\nHere is what is new this week. Not "
-                   "interested any more? Unsubscribe at the bottom.\n\n{name}"),
+                   "interested any more? Unsubscribe at the bottom.\n\n{sig}"),
 }
+
+# Conversation turns by position in the chain (opener / answer of the demo
+# user / follow-up of the other side / the closing mail), per register
+# (informal "du", formal "Sie") and language: a few variants each, picked per
+# conversation. {first} is the other side's first name, {sig} its signature.
+_TURN = {
+    ("informal", True): {
+        "open": ["Hallo!\n\n{subj} - hast du kurz Zeit? Ich freue mich auf "
+                 "deine Antwort.\n\nLG {sig}",
+                 "Hi!\n\nwegen {subj}: melde dich, wenn es dir passt.\n\n"
+                 "Liebe Grüße\n{sig}",
+                 "Hallo,\n\n{subj} wollte ich noch mit dir besprechen. "
+                 "Wann hast du Zeit?\n\nBis bald, {sig}"],
+        "answer": ["Hallo {first},\n\ndanke dir, das passt gut. Ich melde "
+                   "mich gleich noch einmal.\n\nViele Grüße",
+                   "Hi {first},\n\nklingt gut, ich bin dabei!\n\nBis später",
+                   "Hallo {first},\n\nsuper, danke für die Nachricht. Gib "
+                   "mir bis morgen Zeit.\n\nLG"],
+        "follow": ["Prima, dann machen wir das so!\n\nLG {sig}",
+                   "Alles klar, ich freue mich.\n\nBis dann, {sig}",
+                   "Perfekt, danke dir. Bis bald!\n\n{sig}"],
+        "close": ["Super, dann ist alles geklärt. Danke dir!\n\nLG {sig}",
+                  "Wunderbar, bis bald!\n\n{sig}"],
+        "close_me": ["Danke dir, bis bald!\n\nLG", "Super, dann sehen wir "
+                     "uns. Danke!\n\nViele Grüße"]},
+    ("informal", False): {
+        "open": ["Hi!\n\n{subj} - do you have a minute? Looking forward to "
+                 "hearing from you.\n\nCheers,\n{sig}",
+                 "Hello,\n\nabout {subj}: let me know what works for "
+                 "you.\n\nBest,\n{sig}"],
+        "answer": ["Hi {first},\n\nthanks, that works for me. I'll get back "
+                   "to you shortly.\n\nBest",
+                   "Hi {first},\n\nsounds good, count me in!\n\nSpeak "
+                   "soon",
+                   "Hi {first},\n\nthanks - I'll have a look and get back "
+                   "to you.\n\nBest"],
+        "follow": ["Great, let's do it that way!\n\nCheers,\n{sig}",
+                   "Perfect, thanks. Talk soon!\n\n{sig}",
+                   "Sounds great, thanks!\n\n{sig}"],
+        "close": ["Great, all settled. Thanks!\n\n{sig}"],
+        "close_me": ["Thanks, see you soon!\n\nBest"]},
+    ("formal", True): {
+        "open": ["Guten Tag,\n\nzu {subj}: Bitte melden Sie sich bei "
+                 "Rückfragen gern bei uns.\n\nFreundliche Grüße\n{sig}",
+                 "Guten Tag,\n\nwir bestätigen {subj}. Bei Fragen erreichen "
+                 "Sie uns telefonisch.\n\nMit freundlichen Grüßen\n{sig}"],
+        "answer": ["Guten Tag,\n\nvielen Dank, das passt für mich.\n\n"
+                   "Freundliche Grüße",
+                   "Guten Tag,\n\nvielen Dank für die Information. Eine "
+                   "Rückfrage: Wäre auch ein späterer Zeitpunkt möglich?\n\n"
+                   "Mit freundlichen Grüßen",
+                   "Guten Tag,\n\nbesten Dank, ich werde pünktlich da "
+                   "sein.\n\nFreundliche Grüße"],
+        "follow": ["Guten Tag,\n\ngerne, das ist möglich. Wir notieren "
+                   "es.\n\nFreundliche Grüße\n{sig}",
+                   "Guten Tag,\n\nvielen Dank für Ihre Rückmeldung.\n\n"
+                   "Mit freundlichen Grüßen\n{sig}",
+                   "Guten Tag,\n\nsehr gern. Wir freuen uns auf Sie.\n\n"
+                   "Mit freundlichen Grüßen\n{sig}"],
+        "close": ["Vielen Dank, damit ist alles geklärt.\n\nFreundliche "
+                  "Grüße\n{sig}"],
+        "close_me": ["Vielen Dank, dann ist alles klar.\n\nFreundliche "
+                     "Grüße"]},
+    ("formal", False): {
+        "open": ["Hello,\n\nthank you for getting in touch about {subj}. "
+                 "We will look into it.\n\nKind regards,\n{sig}",
+                 "Hello,\n\nregarding {subj}: please let us know if you "
+                 "have any questions.\n\nKind regards,\n{sig}"],
+        "answer": ["Hello,\n\nthank you, that works for me.\n\nKind "
+                   "regards",
+                   "Hello,\n\nthank you for the update. One question: could "
+                   "we do this a little later?\n\nKind regards",
+                   "Hello,\n\nmany thanks, I will be there on time.\n\n"
+                   "Kind regards"],
+        "follow": ["Hello,\n\nof course, we have made a note of it.\n\n"
+                   "Kind regards,\n{sig}",
+                   "Hello,\n\nthank you for your reply.\n\nKind regards,"
+                   "\n{sig}",
+                   "Hello,\n\nwith pleasure. We look forward to seeing "
+                   "you.\n\nKind regards,\n{sig}"],
+        "close": ["Thank you, that settles it.\n\nKind regards,\n{sig}"],
+        "close_me": ["Thank you, all clear.\n\nKind regards"]},
+}
+
+_NOT_A_NAME = {"Family", "Photo", "Dr.", "Prof.", "Praxis", "Team", "Support"}
 
 
 def _who(addr: str) -> str:
@@ -122,26 +211,52 @@ def _who(addr: str) -> str:
     return name or addr.strip("<>").split("@")[0].split(".")[0].title() or "Demo"
 
 
+def _first(frm: str) -> str:
+    """The first name of a sender: the display name's first word when that
+    is a name, else the address local part (`lisa@...` -> Lisa)."""
+    word = _who(frm).split()[0]
+    if word in _NOT_A_NAME or "<" not in frm:
+        local = frm.rsplit("<", 1)[-1].rstrip(">").split("@")[0]
+        return local.split(".")[0].title()
+    return word
+
+
+def _sig(m: dict, kind: str) -> str:
+    """How the sender signs: a person with their first name, a business or
+    practice with its display name."""
+    return _first(m["from"]) if kind == "person" else _who(m["from"])
+
+
 def body_for(m: dict) -> str:
     """A short plain-text body fitting the sender: friendly for people, terse
     for services, a pitch for newsletters; German or English by subject."""
     kind = _kind(m)
-    disp = _who(m["from"])
-    first = _who(m.get("to") or "").split()[0] if kind == "me" \
-        else disp.split()[0]
     subj = re.sub(r"^(re|fwd): *", "", m["subject"], flags=re.I).rstrip("?!.")
     de = bool(_DE.search(m["subject"]))
-    return _BODY[kind][0 if de else 1].format(
-        first=first, subj=subj, name=disp)
+    return _BODY[kind][0 if de else 1].format(subj=subj, sig=_sig(m, kind))
+
+
+STUB = "-"
+
+
+def _stub(box: list[dict]) -> None:
+    """Before the Proton body index is built: personal and practice mails get
+    their final body (a few, searchable), every other plain-text mail just
+    a one-character stub. Nothing of the test double's stock text may get indexed."""
+    for m in box:
+        if m["body"] is None and m["html"] is None and _kind(m) != "me":
+            m["body"] = body_for(m) if _kind(m) in ("person", "practice") \
+                else STUB
 
 
 def fill_bodies(box: list[dict]) -> list[dict]:
-    """Give every plain-text mail without a body one (see `body_for`). Run
-    AFTER the Proton body index was built: that index keeps every body it
-    sees (encrypted, so it does not compress) and is part of the seed's
-    size budget; the viewer reads the mail from the server, not the index."""
+    """After the index is built: the stubs get their real body.
+    The index keeps every body it sees (encrypted, so it does not compress)
+    and is part of the seed's size budget; the viewer reads the mail from the
+    server, not the index."""
     for m in box:
-        if m["body"] is None and m["html"] is None:
+        if m["html"] is None and _kind(m) != "me" \
+                and m["body"] in (None, STUB):
             m["body"] = body_for(m)
     return box
 
@@ -150,22 +265,31 @@ def _when(date: str) -> float:
     return datetime.datetime.strptime(date, "%d-%b-%Y %H:%M:%S %z").timestamp()
 
 
-def thread_chains(msgs: list[dict], sent: list[dict], me: str = ME,
-                  seed: int = 23) -> list[dict]:
+def thread_chains(msgs: list[dict], sent: list[dict], me: str = ME) -> list[dict]:
     """Turn runs of 3-7 neighbouring mails (newest first, as `mails` makes
     them) into conversations: the sender writes, the demo user answers (the
     answer moves to `sent`), the sender replies again, ... Each reply follows
     the mail before it by a few hours to a day or two, with In-Reply-To /
-    References and a `Re:` subject. Own random stream: nothing else in the
-    demo shifts. Returns the mails that stay in the folder."""
-    rng = random.Random(seed)
+    References, a `Re:` subject and a text that depends on its place in the
+    conversation. Own random stream per sender (reproducible, but not the
+    same times everywhere): nothing else in the demo shifts. Returns the mails
+    that stay in the folder."""
+    if not msgs:
+        return msgs
+    rng = random.Random(23 + zlib.crc32(msgs[0]["from"].encode()))
     keep: list[dict] = []
     i = 0
     while i < len(msgs):
         run = msgs[i:i + rng.randint(3, 7)]
         i += len(run)
         run.reverse()                       # oldest first, the sender starts
-        person = run[0]["from"]
+        root, person = run[0], run[0]["from"]
+        kind = _kind(root)
+        turns = _TURN["informal" if kind == "person" else "formal",
+                      bool(_DE.search(root["subject"]))]
+        subj = root["subject"].rstrip("?!.")
+        sig, first = _sig(root, kind), _first(person)
+        pick = rng.randrange(6)
         t = _when(run[-1]["date"])
         stamps = [t]
         for _ in run[:-1]:                  # walk back from the newest
@@ -178,9 +302,16 @@ def thread_chains(msgs: list[dict], sent: list[dict], me: str = ME,
                                       time.gmtime(stamps[k]))
             if refs:
                 m["irt"], m["refs"] = refs[-1], " ".join(refs)
-                m["subject"] = "Re: " + run[0]["subject"].removeprefix("Re: ")
+                m["subject"] = "Re: " + root["subject"].removeprefix("Re: ")
             refs.append(m["msgid"])
-            if k % 2:                       # the user's turn
+            mine = bool(k % 2)              # the user's turn
+            last = k == len(run) - 1 and k > 0
+            part = ("close_me" if last and mine else "close" if last
+                    else "open" if k == 0 else "answer" if mine else "follow")
+            options = turns[part]
+            m["body"] = options[(pick + k // 2) % len(options)].format(
+                subj=subj, first=first, sig=sig)
+            if mine:
                 m.update(to=person, atts=[], unsub=None, seen=True, size=2500)
                 m["from"] = me
                 sent.append(m)
@@ -219,6 +350,15 @@ def mails(frm: str, subjects: list[str], n: int, *, newest_days=1.0,
             html=html(i) if html else None,
             body=None))
     return out if chain is None else thread_chains(out, chain, me)
+
+
+def double_send(m: dict, minutes: float) -> dict:
+    """The same mail sent twice: same sender and subject, its own
+    Message-ID, arriving `minutes` later (a shop's confirmation, a club mail
+    that went out again)."""
+    return {**m, "uid": next(_UID), "msgid": f"<demo-{next(_UID)}@demo.example>",
+            "date": time.strftime("%d-%b-%Y %H:%M:%S +0000", time.gmtime(
+                _when(m["date"]) + minutes * 60))}
 
 
 def copies(msgs: list[dict], *, seen=None) -> list[dict]:
@@ -474,7 +614,11 @@ ICLOUD_SENT = ICLOUD_TAIL_SENT
 _state = random.getstate()
 random.seed(31)
 _by = lambda inbox, key: [m for m in inbox if key in m["from"]]   # noqa: E731
-PROTON_COPIES = copies(_by(PROTON_INBOX, "paybank")[:3])
+_shop = [m for m in _by(PROTON_INBOX, "northwind.example")
+         if m["subject"].startswith("Your order")]
+PROTON_COPIES = (copies(_by(PROTON_INBOX, "paybank")[:3])
+                 + [double_send(_shop[3], 2), double_send(
+                     _by(PROTON_INBOX, "photoclub")[1], 4)])
 PROTON_ARCHIVE = (
     copies(_by(PROTON_INBOX, "cloudbox")[:6])
     + copies(_by(PROTON_INBOX, "greenenergy")[:4])
@@ -524,7 +668,11 @@ ICLOUD_INBOX = (
                   [("Mietvertrag.docx", 900000), ("Anlage.zip", 6000000)]],
             att_n=9)
     + ICLOUD_TAIL)
-ICLOUD_COPIES = copies(_by(ICLOUD_INBOX, "cloudphotos")[:3])
+_fruit = [m for m in _by(ICLOUD_INBOX, "fruitstore")
+          if "has shipped" in m["subject"]]
+ICLOUD_COPIES = (copies(_by(ICLOUD_INBOX, "cloudphotos")[:3])
+                 + [double_send(_fruit[2], 3),
+                    double_send(_by(ICLOUD_INBOX, "kino-zentral")[5], 1)])
 ICLOUD_ARCHIVE = (copies(_by(ICLOUD_INBOX, "fruitstore")[:3])
                   + copies(_by(ICLOUD_INBOX, "hausverwaltung-nord")[:2]))
 random.setstate(_state)
@@ -811,6 +959,10 @@ def generate() -> dict:
             "kind": "jobs", "src": "user", "ts": _NOW - 86400 * 30,
             "note": "left the mailbox"},
     }))
+
+    for fake in FAKES.values():
+        for box in fake.mailbox.values():
+            _stub(box)
 
     # Pre-scan both accounts (incl. attachments) so screenshots are instant. The
     # Proton demo also builds its local body index, which is where the tracker
