@@ -146,6 +146,8 @@ const ERROR_CODES: Record<string, string> = {
   aifilter_text_empty: "aif.err.text_empty",
   aifilter_text_too_long: "aif.err.text_too_long",
   aifilter_budget: "aif.err.budget",
+  // password login throttle (backend/auth.py)
+  login_throttled: "ferr.login_throttled",
 };
 
 /** The role names a `role=` param stands for (translated). */

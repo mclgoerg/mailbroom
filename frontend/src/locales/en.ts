@@ -111,6 +111,10 @@ export const EN: Record<string, string> = {
     "Every browser and device that is signed in must sign in again. This "
     + "browser stays signed in.",
   "confirm.sign_out_all_confirm": "Sign out all",
+  "ferr.login_throttled":
+    "Too many failed attempts. Try again in {n} minutes.",
+  "ferr.login_throttled_one":
+    "Too many failed attempts. Try again in 1 minute.",
   "login.submit": "Sign in",
   "login.sso": "Sign in with SSO",
   "login.logout": "Logout",

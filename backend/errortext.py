@@ -10,6 +10,9 @@ from urllib.parse import unquote
 
 # code -> English text, or (text, text for n == 1)
 TEXT: dict[str, str | tuple[str, str]] = {
+    'login_throttled': (
+        'Too many failed attempts. Try again in {n} minutes.',
+        'Too many failed attempts. Try again in 1 minute.'),
     'busy_action':
         'Another action is still running - try again when it has finished.',
     'busy_purge':

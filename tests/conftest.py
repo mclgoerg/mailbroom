@@ -56,6 +56,7 @@ def isolate(tmp_path, monkeypatch):
     monkeypatch.setattr(authmod, "SESSION_SECRET_PATH",
                         tmp_path / "session_secret")
     monkeypatch.setattr(authmod, "_secret_cache", None)
+    monkeypatch.setattr(authmod, "login_throttle", authmod.LoginThrottle())
     monkeypatch.setattr(rulesmod, "RULES_PATH", tmp_path / "rules.json")
     monkeypatch.setattr(presetsmod, "PRESETS_PATH", tmp_path / "presets.json")
     monkeypatch.setattr(statsmod, "HISTORY_PATH",
