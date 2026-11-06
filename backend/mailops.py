@@ -3331,14 +3331,18 @@ def _search_message_id(conn, msgid: str) -> list[bytes]:
     escaped quoted string, or as a literal when it cannot be one (non-ASCII
     ids try CHARSET UTF-8 first, then plain). An id the server cannot be
     asked about (NUL) or refuses (BAD) finds nothing instead of failing the
-    caller. IMAP HEADER search is a case-insensitive SUBSTRING match, so
-    the hits are verified against their fetched Message-ID header: `@`
-    must not match every mail, nor `bank.example` its neighbours."""
+    caller (only a BAD answer to the SEARCH counts as "this id is
+    unsearchable"; any other failure, including of the verification FETCH,
+    raises so that undo keeps its entry for a retry). IMAP HEADER search
+    is a case-insensitive SUBSTRING match, so the hits are verified against
+    their fetched Message-ID header: `@` must not match every mail, nor
+    `bank.example` its neighbours."""
     if "\0" in msgid:
         return []
     quoted = _quoted_id(msgid)
     tries = [()] if msgid.isascii() else [("CHARSET", "UTF-8"), ()]
     hits: list[bytes] = []
+    refused = False          # BAD for an id the server cannot parse
     for charset in tries:
         try:
             if quoted is None:
@@ -3351,12 +3355,18 @@ def _search_message_id(conn, msgid: str) -> list[bytes]:
         except imaplib.IMAP4.abort:
             raise
         except imaplib.IMAP4.error:
+            refused = True
             continue
         finally:
             conn.literal = None
+        refused = False
         if st == "OK":
             hits = data[0].split() if data and data[0] else []
             break
+        if charset == tries[-1]:     # NO: a server problem, not this id
+            raise imaplib.IMAP4.error(f"SEARCH failed: {st}")
+    if refused:
+        return []
     return _exact_message_id_hits(conn, hits, msgid)
 
 
@@ -3366,16 +3376,11 @@ def _exact_message_id_hits(conn, uids: list[bytes], msgid: str) -> list[bytes]:
     exact: list[bytes] = []
     for start in range(0, len(uids), MOVE_CHUNK):
         chunk = uids[start:start + MOVE_CHUNK]
-        try:
-            st, data = conn.uid(
-                "FETCH", b",".join(chunk).decode(),
-                "(UID BODY.PEEK[HEADER.FIELDS (MESSAGE-ID)])")
-        except imaplib.IMAP4.abort:
-            raise
-        except imaplib.IMAP4.error:
-            continue
-        if st != "OK":
-            continue
+        st, data = conn.uid(
+            "FETCH", b",".join(chunk).decode(),
+            "(UID BODY.PEEK[HEADER.FIELDS (MESSAGE-ID)])")
+        if st != "OK":      # the UIDs are ours, so this is a server problem
+            raise imaplib.IMAP4.error(f"FETCH failed: {st}")
         for item in data or []:
             if not (isinstance(item, tuple) and len(item) >= 2):
                 continue
