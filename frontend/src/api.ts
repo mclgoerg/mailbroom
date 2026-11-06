@@ -343,7 +343,8 @@ export const api = {
     req<{ deleted: number }>("/api/empty_trash", counted),
   cancel: (target: "scan" | "ai" | "delete" | "atts" | "unsub" | "index") =>
     req<{ ok: boolean }>("/api/cancel", { target }),
-  clearNotice: () => req<{ ok: boolean }>("/api/notice/clear", {}),
+  clearNotice: (keys?: string[]) =>
+    req<{ ok: boolean }>("/api/notice/clear", keys ? { keys } : {}),
   mails: (p: { offset: number; limit: number; sort: string; dir: string;
             q: string }) =>
     req<MailsResp>(`/api/mails?offset=${p.offset}&limit=${p.limit}`

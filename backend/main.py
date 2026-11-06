@@ -631,6 +631,10 @@ class UndoBody(BaseModel):
     ident: dict | None = None    # {ts, label, count}: pick by identity
 
 
+class NoticeClearBody(BaseModel):
+    keys: list[str] | None = None    # clear only a notice with one of these
+
+
 class AiGroupBody(BaseModel):
     grouping: str = "sender"
     key: str
@@ -1533,10 +1537,15 @@ def post_cancel(body: CancelBody, account: str | None = Query(None)):
 
 
 @app.post("/api/notice/clear")
-def post_notice_clear(account: str | None = Query(None)):
+def post_notice_clear(body: NoticeClearBody = NoticeClearBody(),
+                      account: str | None = Query(None)):
+    """Drop the notice - or, with `keys`, only if it is one of those (a
+    caller that showed a notice elsewhere must not drop another one)."""
     acc = _acc(account)
     with acc.lock:
-        acc.state["notice"] = None
+        n = acc.state["notice"]
+        if body.keys is None or (n and n["key"] in body.keys):
+            acc.state["notice"] = None
     return {"ok": True}
 
 
