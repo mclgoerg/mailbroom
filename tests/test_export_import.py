@@ -104,5 +104,5 @@ def test_test_connection_failure(monkeypatch):
     monkeypatch.setattr(mailops, "connect", boom)
     r = client.post("/api/test_connection", json={})
     assert r.status_code == 502
-    assert r.json()["detail"] == "host_unreachable:host=127.0.0.1"
+    assert r.json()["detail"] == "conn_refused:host=127.0.0.1"
     assert "nobody home" not in r.text

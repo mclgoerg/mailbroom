@@ -155,6 +155,16 @@ CAFILE_MISSING = "cafile_missing"    # path=
 AUTH_FAILED = "auth_failed"
 HOST_UNREACHABLE = "host_unreachable"
 TLS_FAILED = "tls_failed"
+# what the connection test tells apart (host=): the name does not resolve /
+# the port is closed / nothing answered in time / the server answered but
+# not with TLS (or not IMAP) of the kind chosen / its certificate is not
+# trusted (no param for the last three but host)
+HOST_NOT_FOUND = "host_not_found"
+CONN_REFUSED = "conn_refused"
+CONN_TIMEOUT = "conn_timeout"
+TLS_MISMATCH = "tls_mismatch"
+NOT_IMAP = "not_imap"
+CERT_FAILED = "cert_failed"
 CONNECT_FAILED = "connect_failed"
 SCAN_FAILED = "scan_failed"
 # the data folder (/data) cannot be written - see data_dir_problem()
@@ -235,6 +245,12 @@ FOLDER_ERROR_CODES = frozenset({
     AUTH_FAILED,
     HOST_UNREACHABLE,
     TLS_FAILED,
+    HOST_NOT_FOUND,
+    CONN_REFUSED,
+    CONN_TIMEOUT,
+    TLS_MISMATCH,
+    NOT_IMAP,
+    CERT_FAILED,
     CONNECT_FAILED,
     SCAN_FAILED,
     DATA_NOT_WRITABLE})
@@ -327,10 +343,18 @@ def classify_connect_error(exc: BaseException,
     import socket
     if demo.denied(exc):
         return coded(NOT_IN_DEMO)
+    if isinstance(exc, ssl.SSLCertVerificationError):
+        return coded(CERT_FAILED, host=host or "?")
     if isinstance(exc, ssl.SSLError):
         return TLS_FAILED
-    if isinstance(exc, (socket.gaierror, ConnectionError, TimeoutError,
-                        socket.timeout)) or (
+    if isinstance(exc, socket.gaierror):
+        return coded(HOST_NOT_FOUND, host=host or "?")
+    if isinstance(exc, (TimeoutError, socket.timeout)):
+        return coded(CONN_TIMEOUT, host=host or "?")
+    if isinstance(exc, ConnectionRefusedError) or (
+            isinstance(exc, OSError) and exc.errno == errno.ECONNREFUSED):
+        return coded(CONN_REFUSED, host=host or "?")
+    if isinstance(exc, (ConnectionError,)) or (
             isinstance(exc, OSError) and exc.errno in _UNREACHABLE_ERRNOS):
         return coded(HOST_UNREACHABLE, host=host or "?")
     if isinstance(exc, imaplib.IMAP4.error) \
@@ -692,6 +716,58 @@ def tls_context(im: dict) -> ssl.SSLContext:
     return ssl.create_default_context(cafile=cafile)
 
 
+# Opening the connection (TCP connect, greeting, TLS handshake) gives up
+# after this; the socket then gets the long timeout for everything on an
+# established connection (scans and moves on big mailboxes).
+CONNECT_TIMEOUT = 15
+OPERATION_TIMEOUT = 120
+
+
+def _handshake_error(exc: BaseException, host: str,
+                     starttls: bool) -> BaseException:
+    """`exc` from opening the connection as the error to raise: a coded one
+    for the ways a wrong port / security choice shows up. Only for the
+    opening - mid-session errors keep `classify_connect_error`."""
+    if isinstance(exc, ssl.SSLCertVerificationError):
+        return RuntimeError(coded(CERT_FAILED, host=host))
+    if isinstance(exc, ssl.SSLError):
+        # `wrong version number` & co: the other side did not speak TLS
+        return RuntimeError(coded(TLS_MISMATCH, host=host))
+    if isinstance(exc, (ConnectionResetError, ConnectionAbortedError)):
+        # the server answered, then hung up on the first bytes
+        return RuntimeError(coded(NOT_IMAP if starttls else TLS_MISMATCH,
+                                  host=host))
+    if isinstance(exc, (imaplib.IMAP4.error, imaplib.IMAP4.abort)):
+        return RuntimeError(coded(NOT_IMAP, host=host))
+    return exc
+
+
+def _open(im: dict, ctx: ssl.SSLContext) -> imaplib.IMAP4:
+    host, port = im["host"], int(im["port"])
+    starttls = (im.get("security") or "ssl") == "starttls"
+    try:
+        if starttls:
+            conn = imaplib.IMAP4(host, port, timeout=CONNECT_TIMEOUT)
+            try:
+                conn.starttls(ssl_context=ctx)
+            except BaseException as exc:
+                try:
+                    conn.shutdown()
+                except Exception:
+                    pass
+                if isinstance(exc, imaplib.IMAP4.error):
+                    # the server answered but offers no STARTTLS
+                    raise RuntimeError(coded(TLS_MISMATCH, host=host))
+                raise
+        else:
+            conn = imaplib.IMAP4_SSL(host, port, ssl_context=ctx,
+                                     timeout=CONNECT_TIMEOUT)
+    except Exception as exc:
+        raise _handshake_error(exc, host, starttls) from exc
+    _set_timeout(conn, OPERATION_TIMEOUT)
+    return conn
+
+
 def connect(im: dict, account_name: str | None = None) -> imaplib.IMAP4:
     """`account_name` lets an oauth account persist a refreshed access
     token back to its config; omit it only for throwaway connections
@@ -702,19 +778,7 @@ def connect(im: dict, account_name: str | None = None) -> imaplib.IMAP4:
             cfgmod.auth_method(im) == "password" and not im.get("password")):
         raise RuntimeError(coded(NO_ACCOUNT))
     ctx = tls_context(im)
-    if (im.get("security") or "ssl") == "starttls":
-        conn = imaplib.IMAP4(im["host"], int(im["port"]), timeout=120)
-        try:
-            conn.starttls(ssl_context=ctx)
-        except BaseException:
-            try:
-                conn.shutdown()
-            except Exception:
-                pass
-            raise
-    else:
-        conn = imaplib.IMAP4_SSL(im["host"], int(im["port"]),
-                                 ssl_context=ctx, timeout=120)
+    conn = _open(im, ctx)
     try:
         if cfgmod.auth_method(im) == "oauth":
             oauth = im.get("oauth") or {}

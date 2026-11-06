@@ -130,21 +130,34 @@ export function Wizard({ cfg, mode, initialStep, initialAccount, scan,
     return name;
   };
 
+  // the running connection test, which Cancel / X / Esc walk away from
+  // (the server's attempt ends by itself; its answer is never used)
+  const testCtl = useRef<AbortController | null>(null);
+  const [testing, setTesting] = useState(false);
+  const stopTest = () => testCtl.current?.abort();
+  useEffect(() => () => testCtl.current?.abort(), []);
+
   const test = async () => {
     setErr("");
     setBusy(t("wizard.testing"));
+    const ctl = new AbortController();
     try {
       const name = await saveSignIn();
       if (!name) return;
-      const r = await api.testConnection(name);
+      testCtl.current = ctl;
+      setTesting(true);
+      const r = await api.testConnection(name, ctl.signal);
+      if (ctl.signal.aborted) return;
       // the account now counts as set up: pick that up for the home card
       try { onConfig(await api.getConfig(), null); } catch { /* next load */ }
       setTested(true);
       setConnected(r.folders);
       setStep("folders");
     } catch (e: any) {
-      setErr(String(e.message ?? e));
+      if (!ctl.signal.aborted) setErr(String(e.message ?? e));
     } finally {
+      testCtl.current = null;
+      setTesting(false);
       setBusy("");
     }
   };
@@ -290,7 +303,8 @@ export function Wizard({ cfg, mode, initialStep, initialAccount, scan,
 
   // ---- leaving
   const close = async () => {
-    if (busy) return;               // a save/test is in flight: not now
+    if (testCtl.current) testCtl.current.abort();   // leave the test behind
+    else if (busy) return;          // a save is in flight: not now
     // add mode: an account this session created but never got to sign in
     // goes away again (only that one, never a pre-existing account)
     if (mode === "add" && created.current && !tested) {
@@ -416,6 +430,10 @@ export function Wizard({ cfg, mode, initialStep, initialAccount, scan,
               </div>
             </details>
             {busy && <Busy label={busy} />}
+            {testing && (
+              <Button variant="secondary" onClick={stopTest}>
+                {t("wizard.test_cancel")}</Button>
+            )}
             {err && <Notice tone="danger">{err}</Notice>}
             {needOauth && !err && (
               <p className="type-meta text-muted">{t("wizard.oauth_needed")}</p>
