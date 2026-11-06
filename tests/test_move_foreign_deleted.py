@@ -94,8 +94,17 @@ def _deleted_then_foreign_flag(monkeypatch):
 
 def _flag_theirs_after_first_move(fake, monkeypatch):
     """Another client flags its own Trash mail while our job is running:
-    the first chunk moves fine, the second one is refused."""
+    the first chunk moves fine, the second one is refused.
+
+    Returns the list of restore-rescans requested. A restore starts a
+    background rescan whose result overwrites `trash_count` with the real
+    folder count at some point; it is stubbed out so the assertions on the
+    restore's own bookkeeping don't race that thread."""
     monkeypatch.setattr(mailops, "MOVE_CHUNK", 1)
+    rescans = []
+    monkeypatch.setattr(mailops, "_rescan_after_restore",
+                        lambda acc, restored, key, params:
+                        rescans.append(restored) or True)
     real = fake.uid
     state = {"copies": 0}
 
@@ -106,24 +115,26 @@ def _flag_theirs_after_first_move(fake, monkeypatch):
                 fake.mailbox["Trash"][0]["deleted"] = True
         return real(cmd, *args)
     monkeypatch.setattr(fake, "uid", uid)
+    return rescans
 
 
 def test_a_refused_undo_keeps_its_undo_entry(monkeypatch):
     fake = _deleted_then_foreign_flag(monkeypatch)
     fake.mailbox["Trash"][0]["deleted"] = False
     assert len(mailops.STATE["undo"]) == 1
-    _flag_theirs_after_first_move(fake, monkeypatch)
+    rescans = _flag_theirs_after_first_move(fake, monkeypatch)
     before = mailops.STATE["trash_count"]
     with pytest.raises(RuntimeError) as exc:
         mailops.undo_last()
     assert str(exc.value) == "move_foreign_deleted:folder=Trash"
+    assert rescans == [1]                 # the mail that moved is rescanned
     assert len(mailops.STATE["undo"]) == 1           # can be tried again
     # one mail is back; the refused one was copied but its original stays
     trash = {m["uid"]: m for m in fake.mailbox["Trash"]}
     assert set(trash) == {2, 90} and not trash[2].get("deleted")
     assert trash[90]["deleted"] is True                       # theirs stays
-    if before is not None:                            # bookkeeping still ran
-        assert mailops.STATE["trash_count"] == before - 1
+    assert before is not None
+    assert mailops.STATE["trash_count"] == before - 1  # bookkeeping still ran
     # the other program expunges; the retry restores the rest
     fake.mailbox["Trash"] = [m for m in fake.mailbox["Trash"]
                              if m["uid"] != 90]
