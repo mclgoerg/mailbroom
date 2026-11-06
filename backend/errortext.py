@@ -102,6 +102,8 @@ TEXT: dict[str, str | tuple[str, str]] = {
         'Could not connect to the server - check the settings and try again.',
     'scan_failed':
         'The scan failed unexpectedly - try again; if it keeps failing, check the server log.',
+    'data_not_writable':
+        'Mailbroom cannot write to its data folder. On the host, give the user ID 1000 ownership of the folder mounted at /data (chown -R 1000:1000 <folder>) or start the container with --user, then restart it.',
 }
 
 ROLE_NAMES = {"trash": "Trash", "junk": "Junk", "archive": "Archive"}

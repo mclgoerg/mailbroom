@@ -148,6 +148,8 @@ HOST_UNREACHABLE = "host_unreachable"
 TLS_FAILED = "tls_failed"
 CONNECT_FAILED = "connect_failed"
 SCAN_FAILED = "scan_failed"
+# the data folder (/data) cannot be written - see data_dir_problem()
+DATA_NOT_WRITABLE = "data_not_writable"
 FOLDER_ERROR_CODES = frozenset({
     MAILTO_UNSAFE,
     NO_MESSAGE_ID, PINNED_MAILS, PROTECTED_MAILS, ALL_PINNED,
@@ -193,7 +195,8 @@ FOLDER_ERROR_CODES = frozenset({
     HOST_UNREACHABLE,
     TLS_FAILED,
     CONNECT_FAILED,
-    SCAN_FAILED})
+    SCAN_FAILED,
+    DATA_NOT_WRITABLE})
 
 
 def coded(code: str, **params) -> str:
@@ -206,6 +209,24 @@ def coded(code: str, **params) -> str:
         return code
     return code + ":" + ",".join(
         f"{k}={quote(str(v), safe='')}" for k, v in params.items())
+
+
+def data_dir_problem() -> Path | None:
+    """The first data folder this process cannot write to, else None. A
+    fresh host-folder mount is owned by root while the image runs as uid
+    1000, and everything would later fail with a bare `Permission denied`.
+    Probes with a real file so a read-only mount is caught too."""
+    for folder in dict.fromkeys(
+            (cfgmod.CONFIG_PATH.parent, cfgmod.SERVER_PATH.parent,
+             SNAPSHOT_DIR)):
+        probe = folder / f".write-test-{os.getpid()}"
+        try:
+            folder.mkdir(parents=True, exist_ok=True)
+            probe.write_bytes(b"")
+            probe.unlink()
+        except OSError:
+            return folder
+    return None
 
 
 def is_coded(text: str) -> bool:

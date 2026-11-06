@@ -1543,6 +1543,10 @@ export const EN: Record<string, string> = {
     "Another rule is running - try again when it has finished.",
   "ferr.count_required":
     "The folder was not counted yet - reload it and confirm again.",
+  "ferr.data_not_writable":
+    "Mailbroom cannot write to its data folder. On the host, give the user "
+    + "ID 1000 ownership of the folder mounted at /data (chown -R 1000:1000 "
+    + "<folder>) or start the container with --user, then restart it.",
   "ferr.role_missing": "No “{folder}” folder found on the server.",
   "ferr.inbox_missing": "No Inbox found on the server.",
   "ferr.junk_needs_trash":
