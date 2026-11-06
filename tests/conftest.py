@@ -384,12 +384,16 @@ class FakeIMAP:
                                and toks[i + 1] == "Message-ID"]
                 if self.reject_or and "OR" in args:
                     raise imaplib.IMAP4.error("SEARCH BAD OR not supported")
+                # Real servers match HEADER case-insensitively as a
+                # SUBSTRING (RFC 3501 6.4.4); "" matches every mail.
+                def has(m, t):
+                    return t.casefold() in m["msgid"].casefold()
                 if "OR" in args:
-                    hits = [m for m in msgs if m["msgid"] in set(targets)]
+                    hits = [m for m in msgs
+                            if any(has(m, t) for t in targets)]
                 else:
                     hits = [m for m in msgs
-                            if all(t == "" or m["msgid"] == t
-                                   for t in targets)]
+                            if all(has(m, t) for t in targets)]
             else:
                 raise AssertionError(f"unexpected SEARCH {args!r}")
             return "OK", [b" ".join(str(m["uid"]).encode() for m in hits)]

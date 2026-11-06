@@ -3326,29 +3326,65 @@ def _rescan_after_restore(acc, restored: int, key: str,
 
 
 def _search_message_id(conn, msgid: str) -> list[bytes]:
-    """UIDs in the selected folder whose Message-ID header matches `msgid`.
-    The id comes from mail data, so it is sent as an escaped quoted string,
-    or as a literal when it cannot be one. An id the server cannot be asked
-    about safely (NUL) or refuses (BAD) finds nothing instead of failing
-    the caller."""
+    """UIDs in the selected folder whose Message-ID is exactly `msgid`.
+    The id is mail data (a sender-controlled header), so it is sent as an
+    escaped quoted string, or as a literal when it cannot be one (non-ASCII
+    ids try CHARSET UTF-8 first, then plain). An id the server cannot be
+    asked about (NUL) or refuses (BAD) finds nothing instead of failing the
+    caller. IMAP HEADER search is a case-insensitive SUBSTRING match, so
+    the hits are verified against their fetched Message-ID header: `@`
+    must not match every mail, nor `bank.example` its neighbours."""
     if "\0" in msgid:
         return []
     quoted = _quoted_id(msgid)
-    if quoted is None:
-        conn.literal = msgid.encode("utf-8")
-    try:
-        if quoted is None:
-            st, data = conn.uid("SEARCH", None, "HEADER", "Message-ID")
-        else:
-            st, data = conn.uid("SEARCH", None, "HEADER", "Message-ID",
-                                quoted)
-    except imaplib.IMAP4.abort:
-        raise
-    except imaplib.IMAP4.error:
-        return []
-    finally:
-        conn.literal = None
-    return data[0].split() if st == "OK" and data and data[0] else []
+    tries = [()] if msgid.isascii() else [("CHARSET", "UTF-8"), ()]
+    hits: list[bytes] = []
+    for charset in tries:
+        try:
+            if quoted is None:
+                conn.literal = msgid.encode("utf-8")
+                st, data = conn.uid("SEARCH", *charset, "HEADER",
+                                    "Message-ID")
+            else:
+                st, data = conn.uid("SEARCH", None, *charset, "HEADER",
+                                    "Message-ID", quoted)
+        except imaplib.IMAP4.abort:
+            raise
+        except imaplib.IMAP4.error:
+            continue
+        finally:
+            conn.literal = None
+        if st == "OK":
+            hits = data[0].split() if data and data[0] else []
+            break
+    return _exact_message_id_hits(conn, hits, msgid)
+
+
+def _exact_message_id_hits(conn, uids: list[bytes], msgid: str) -> list[bytes]:
+    """The `uids` whose Message-ID header equals `msgid`, normalised the
+    way scans store it (`header_text(...).strip()[:300]`)."""
+    exact: list[bytes] = []
+    for start in range(0, len(uids), MOVE_CHUNK):
+        chunk = uids[start:start + MOVE_CHUNK]
+        try:
+            st, data = conn.uid(
+                "FETCH", b",".join(chunk).decode(),
+                "(UID BODY.PEEK[HEADER.FIELDS (MESSAGE-ID)])")
+        except imaplib.IMAP4.abort:
+            raise
+        except imaplib.IMAP4.error:
+            continue
+        if st != "OK":
+            continue
+        for item in data or []:
+            if not (isinstance(item, tuple) and len(item) >= 2):
+                continue
+            um = re.search(rb"UID (\d+)", item[0])
+            mid = header_text(email.message_from_bytes(item[1]).get(
+                "Message-ID")).strip()[:300]
+            if um and mid == msgid:
+                exact.append(um.group(1))
+    return exact
 
 
 def _present_in_targets(conn, items) -> set[tuple[str, str]]:
