@@ -34,6 +34,7 @@ import urllib.parse
 from . import accounts
 from . import auditlog
 from . import config as cfgmod
+from . import demo
 from . import mailops
 from . import smtpout
 from . import tenants
@@ -94,6 +95,8 @@ def _resolve_public(host: str, port: int) -> list[str]:
     try:
         infos = socket.getaddrinfo(host, port, type=socket.SOCK_STREAM)
     except OSError as exc:
+        if demo.denied(exc):
+            raise demo.refusal() from exc
         raise RuntimeError(mailops.coded(mailops.UNSUB_UNREACHABLE))
     addrs: list[str] = []
     for info in infos:
@@ -169,6 +172,8 @@ def classify(exc: Exception, mail: bool = False) -> str:
     = the attempt was an unsubscribe mail, not an HTTPS POST."""
     if mailops.is_coded(str(exc)):
         return str(exc)
+    if demo.denied(exc):                     # URLError & co. wrap the cause
+        return mailops.NOT_IN_DEMO
     if isinstance(exc, smtplib.SMTPException) or (
             mail and isinstance(exc, (OSError, RuntimeError))):
         return mailops.UNSUB_MAIL_FAILED

@@ -34,6 +34,7 @@ from . import accounts
 from . import auditlog
 from . import bodyindex
 from . import config as cfgmod
+from . import demo
 from . import knownsenders
 from . import pinstore
 from . import aisortstore
@@ -171,10 +172,14 @@ UNSUB_CODES = (UNSUB_BLOCKED, UNSUB_HTTP, UNSUB_TLS, UNSUB_UNREACHABLE,
                UNSUB_TIMEOUT, UNSUB_BAD_URL, UNSUB_NO_METHOD,
                UNSUB_MAIL_FAILED, UNSUB_POOLED, UNSUB_UNKNOWN_GROUP,
                UNSUB_FAILED)
+# the in-browser demo has no network, no real mail server and no AI
+# (backend/demo.py: socket denial, connect and AI refusals)
+NOT_IN_DEMO = "not_in_demo"
 # password login (backend/auth.py LoginThrottle): n= minutes to wait
 LOGIN_THROTTLED = "login_throttled"
 FOLDER_ERROR_CODES = frozenset({
     MAILTO_UNSAFE, MOVE_FOREIGN_DELETED, *UNSUB_CODES, LOGIN_THROTTLED,
+    NOT_IN_DEMO,
     NO_MESSAGE_ID, PINNED_MAILS, PROTECTED_MAILS, ALL_PINNED,
     ROLE_NOT_CANDIDATE, ROLE_AMBIGUOUS, NOT_LOOKALIKE, MOVE_UNSAFE,
     BUSY_ACTION,
@@ -272,6 +277,8 @@ def classify_connect_error(exc: BaseException,
     in (never a password or any server text), or None for anything else.
     `host` is the server the connection went to (shown by the UI)."""
     import socket
+    if demo.denied(exc):
+        return coded(NOT_IN_DEMO)
     if isinstance(exc, ssl.SSLError):
         return TLS_FAILED
     if isinstance(exc, (socket.gaierror, ConnectionError, TimeoutError,
@@ -641,6 +648,8 @@ def connect(im: dict, account_name: str | None = None) -> imaplib.IMAP4:
     """`account_name` lets an oauth account persist a refreshed access
     token back to its config; omit it only for throwaway connections
     (test_connection) where the refreshed token would otherwise be lost."""
+    if demo.enabled():
+        raise demo.refusal()      # the demo's fake servers replace connect
     if not im.get("host") or not im.get("user") or (
             cfgmod.auth_method(im) == "password" and not im.get("password")):
         raise RuntimeError(coded(NO_ACCOUNT))

@@ -446,7 +446,8 @@ def get_oidc_callback(request: Request, code: str = Query(""),
         claims = authmod.exchange_code(cfg["auth"]["oidc"], redirect, code,
                                        verifier)
     except Exception as exc:
-        raise HTTPException(502, f"token exchange failed: {exc}")
+        raise HTTPException(502, str(exc) if mailops.is_coded(str(exc))
+                            else f"token exchange failed: {exc}")
     if authmod.email_unverified(claims):
         logging.getLogger("inboxrake.auth").warning(
             "OIDC login refused for %r (email not verified by the IdP)",
@@ -546,7 +547,8 @@ def get_oauth_imap_callback(request: Request, code: str = Query(""),
         tokens = oauthflow.exchange_code(provider, client_id, client_secret,
                                          redirect, code, verifier)
     except Exception as exc:
-        raise HTTPException(502, f"token exchange failed: {exc}")
+        raise HTTPException(502, str(exc) if mailops.is_coded(str(exc))
+                            else f"token exchange failed: {exc}")
     cfgmod.save_oauth(account, {"provider": provider, "client_id": client_id,
                                 "client_secret": client_secret, **tokens},
                       use=True)
@@ -1935,8 +1937,9 @@ def post_config(body: dict, request: Request, response: Response):
 
 # Static React bundle (single-page app: unknown paths fall back to index.html)
 if STATIC_DIR.is_dir():
-    app.mount("/assets", StaticFiles(directory=STATIC_DIR / "assets"),
-              name="assets")
+    if (STATIC_DIR / "assets").is_dir():       # a bare placeholder has none
+        app.mount("/assets", StaticFiles(directory=STATIC_DIR / "assets"),
+                  name="assets")
 
     # Resolve the base ONCE: comparing a resolved child against an
     # unresolved (possibly relative or symlinked) base would break the

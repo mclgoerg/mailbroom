@@ -70,7 +70,7 @@ def _fixture(*a, **k):
 sys.modules.setdefault("pytest", types.SimpleNamespace(fixture=_fixture))
 
 from conftest import FakeIMAP, make_msg          # noqa: E402
-from backend import (accounts, aihelper, bodyindex, knowledgestore, mailops,   # noqa: E402
+from backend import (accounts, aihelper, bodyindex, demo, knowledgestore, mailops,   # noqa: E402
                      rules, unsubstore, verdictstore)
 
 
@@ -450,7 +450,15 @@ ICLOUD = FakeIMAP({
 }, flags={"Deleted Messages": "\\Trash"})
 
 FAKES = {"demo-proton": PROTON, "demo-icloud": ICLOUD}
-mailops.connect = lambda im, name=None: FAKES[im["host"]]
+
+
+def _connect(im, name=None):
+    if im.get("host") not in FAKES:
+        raise demo.refusal()          # "Add account" with a real server
+    return FAKES[im["host"]]
+
+
+mailops.connect = _connect
 
 # Two configured accounts (hosts route to the fakes above).
 Path(os.environ["CONFIG_PATH"]).write_text(json.dumps({

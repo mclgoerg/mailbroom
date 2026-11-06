@@ -21,6 +21,8 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
+from . import demo
+
 log = logging.getLogger("inboxrake.oauth")
 
 PROVIDERS = ("google", "microsoft")
@@ -57,6 +59,10 @@ def _http_json(url: str, data: bytes | None = None,
             return json.loads(body)   # OAuth error responses are JSON too
         except json.JSONDecodeError:
             raise RuntimeError(f"oauth request failed: {exc} {body}")
+    except urllib.error.URLError as exc:
+        if demo.denied(exc):
+            raise demo.refusal() from exc
+        raise
 
 
 def _tokens_to_block(tokens: dict) -> dict:

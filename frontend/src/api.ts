@@ -148,6 +148,8 @@ const ERROR_CODES: Record<string, string> = {
   aifilter_budget: "aif.err.budget",
   // password login throttle (backend/auth.py)
   login_throttled: "ferr.login_throttled",
+  // the in-browser demo (backend/demo.py)
+  not_in_demo: "ferr.not_in_demo",
 };
 
 /** The role names a `role=` param stands for (translated). */
