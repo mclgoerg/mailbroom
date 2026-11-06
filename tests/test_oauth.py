@@ -265,9 +265,31 @@ def test_oauth_device_start_and_poll(monkeypatch):
                         "expires_in": 3600}))
     r2 = client.post("/api/oauth/imap/device/poll",
                      params={"account": "outlook", "device_code": "dc"})
-    assert r2.json()["status"] == "complete"
+    assert r2.json() == {"status": "complete"}
+    body = r2.text
+    for secret in ("at", "rt", "access_token", "refresh_token",
+                   "client_secret", "expires_at"):
+        assert f'"{secret}"' not in body
     saved = cfgmod.account_imap("outlook")["oauth"]
     assert saved["provider"] == "microsoft" and saved["refresh_token"] == "rt"
+    assert saved["access_token"] == "at"
+
+
+def test_device_poll_response_carries_only_status_and_error(monkeypatch):
+    monkeypatch.setattr(oauthflow, "MS_SHARED_CLIENT_ID", "shared-id")
+    cfgmod.update_config({"add_account": "outlook"})
+    monkeypatch.setattr(
+        urllib.request, "urlopen", lambda req, timeout=15:
+        _json_response({"error": "expired_token"}))
+    r = client.post("/api/oauth/imap/device/poll",
+                    params={"account": "outlook", "device_code": "dc"})
+    assert r.json() == {"status": "error", "error": "expired_token"}
+    monkeypatch.setattr(
+        urllib.request, "urlopen", lambda req, timeout=15:
+        _json_response({"error": "authorization_pending"}))
+    r = client.post("/api/oauth/imap/device/poll",
+                    params={"account": "outlook", "device_code": "dc"})
+    assert r.json() == {"status": "pending"}
 
 
 def test_unsub_smtp_uses_xoauth2(monkeypatch):
