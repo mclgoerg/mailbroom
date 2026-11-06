@@ -17,7 +17,9 @@ name: Demo bundle
 # No `paths:` filter on purpose: a workflow that is skipped by one leaves its
 # jobs "expected" forever, so they could never be required checks. Instead
 # every run starts with `changes`, and the two jobs are skipped at job level
-# (which counts as passing) when nothing that goes into the demo changed.
+# (which counts as passing) when nothing that goes into the demo changed -
+# and run anyway if `changes` itself did not succeed (fail closed).
+# (A merge queue would need a `merge_group` trigger here.)
 on:
   pull_request:
   push:
@@ -52,8 +54,11 @@ jobs:
           relevant=true
           if [ "$EVENT" = pull_request ]; then
             relevant=false
-            if git diff --name-only "$BASE"...HEAD | grep -E -q \
-              '^(backend/|frontend/|tests/|scripts/demo\.py$|scripts/demo_|scripts/demo-bundle/|scripts/demo-e2e/|version\.txt$|\.github/workflows/demo-bundle\.yml$)'; then
+            # captured first: an unresolvable base fails the step (fail
+            # closed) instead of dying inside a pipeline as "no match"
+            files=$(git diff --name-only "$BASE"...HEAD)
+            if grep -E -q \
+              '^(backend/|frontend/|tests/|scripts/demo\.py$|scripts/demo_|scripts/demo-bundle/|scripts/demo-e2e/|version\.txt$|\.github/workflows/demo-bundle\.yml$)' <<< "$files"; then
               relevant=true
             fi
           fi
@@ -61,7 +66,7 @@ jobs:
 
   pyodide-versions:
     needs: changes
-    if: needs.changes.outputs.relevant == 'true'
+    if: ${{ !cancelled() && (needs.changes.result != 'success' || needs.changes.outputs.relevant == 'true') }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -115,8 +120,10 @@ jobs:
 
   bundle:
     needs: changes
-    if: needs.changes.outputs.relevant == 'true'
-    runs-on: ubuntu-latest
+    if: ${{ !cancelled() && (needs.changes.result != 'success' || needs.changes.outputs.relevant == 'true') }}
+    # pinned: Chromium's system libraries come with the image (no --with-deps),
+    # so an image switch should be a deliberate change
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7

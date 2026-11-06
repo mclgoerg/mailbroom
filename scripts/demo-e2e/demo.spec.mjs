@@ -118,23 +118,36 @@ test("job endpoints: scan, delete, undo all come back", async () => {
   expect(key in await senders()).toBe(true);
 });
 
-// The other thread users: attachment analysis, a rule run, bulk unsubscribe.
-// Each only has to come back (a wait on a missing thread would hang).
+// The other thread users: attachment analysis, an executed rule, bulk
+// unsubscribe. Each has to come back (a wait on a missing thread would hang).
 test("job endpoints: attachment scan, rule run, bulk unsubscribe come back", async () => {
-  const att = await api("POST", "/api/attachments?account=proton");
-  expect(att.status).toBe(200);
-  await expect.poll(async () => (await api("GET", "/api/attachments?account=proton")).status,
-    { timeout: 60_000 }).toBe(200);
+  expect((await api("POST", "/api/attachments?account=proton")).status).toBe(200);
+  await expect.poll(async () => {
+    const r = await api("GET", "/api/attachments?account=proton");
+    return r.status === 200 && JSON.stringify(r.json).length > 2;
+  }, { timeout: 60_000 }).toBe(true);
 
+  // a rule that really acts: report run first (required), then execute on
+  // the smallest unprotected sender, then put the mails back
+  const [key] = Object.entries(await senders())
+    .filter(([, g]) => !g.protected && g.count > 0).sort((a, b) => a[1].count - b[1].count)[0];
   const rule = await api("POST", "/api/rules?account=proton",
-    { name: "e2e", query: "text:no-such-word-e2e", schedule: "manual" });
+    { name: "e2e", query: key, schedule: "manual" });
   expect(rule.status).toBe(200);
-  expect((await api("POST", `/api/rules/${rule.json.id}/run`)).status).toBe(200);
-  await api("DELETE", `/api/rules/${rule.json.id}`);
+  const id = rule.json.id;
+  expect((await api("POST", `/api/rules/${id}/run`)).status).toBe(200);
+  expect((await api("POST", `/api/rules/${id}`, { mode: "execute" })).status).toBe(200);
+  const run = await api("POST", `/api/rules/${id}/run`);
+  expect(run.status).toBe(200);
+  expect(run.json.acted).toBeGreaterThan(0);
+  expect(key in await senders()).toBe(false);
+  expect((await api("POST", "/api/undo?account=proton", {})).status).toBe(200);
+  expect(key in await senders()).toBe(true);
+  expect((await api("DELETE", `/api/rules/${id}`)).status).toBe(200);
 
-  const [key] = Object.entries(await senders()).find(([, g]) => !g.protected && g.count > 5);
+  const [bulk] = Object.entries(await senders()).find(([, g]) => !g.protected && g.count > 5);
   const unsub = await api("POST", "/api/unsubscribe_bulk?account=proton",
-    { grouping: "sender", keys: [key] });
+    { grouping: "sender", keys: [bulk] });
   expect(unsub.status).toBe(200);
 });
 
