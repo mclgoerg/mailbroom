@@ -5,7 +5,8 @@ down to the same four things:
 
 | What | Value |
 |---|---|
-| Image | `ghcr.io/mclgoerg/inboxrake:latest` (or pin `:1.0`) |
+| Image | `ghcr.io/mclgoerg/inboxrake:latest` (or pin a minor tag such as `:1.10`, so updates within it stay
+backward compatible) |
 | Port | `8765` (HTTP web UI + API) |
 | Volume | `/data` - all settings, scan caches and stats live here |
 | Env vars | all optional bootstrap - see [`deploy/.env.example`](../deploy/.env.example) |
@@ -48,6 +49,14 @@ docker compose up -d
 Open http://localhost:8765. Update later with
 `docker compose pull && docker compose up -d`.
 
+**Reaching it from other devices.** The kit publishes the port on
+`127.0.0.1` only. To open it to your LAN set `INBOXRAKE_BIND=0.0.0.0` in
+`.env` (and `docker compose up -d` again) - but **set a login first**
+([security.md](security.md)): until you do, anyone on that network can read
+the mailbox metadata and change the IMAP settings. Without a login you
+also need `INBOXRAKE_ALLOWED_HOSTS` for a host name (an IP address works
+as is).
+
 ## Plain `docker run`
 
 ```bash
@@ -85,7 +94,10 @@ chown -R 1000:1000 /path/to/the/folder      # or: docker run --user <uid>:<gid> 
 3. Put your variables in the project's `.env` (copy from
    [`deploy/.env.example`](../deploy/.env.example)).
 4. Build & run, then open `http://<nas-ip>:8765` (an IP address works
-   as is; for a host name see "Login" above).
+   as is; for a host name see "Login" above). The kit listens on
+   localhost only: to reach it from your LAN set `INBOXRAKE_BIND=0.0.0.0`
+   in the project's `.env` - and set a login first (see
+   [Docker Compose](#docker-compose-recommended)).
 
 If you use a folder under `/volume1/docker/` instead of a named volume
 for `/data`, give it to user ID 1000 first (SSH: `sudo chown -R 1000:1000
@@ -130,7 +142,9 @@ Apps -> Discover Apps -> ⋮ -> **Install via YAML** (or "Custom App"):
 Stacks -> **Add stack** -> paste
 [`deploy/docker-compose.yml`](../deploy/docker-compose.yml), fill the
 environment variables in the "Environment variables" section (same
-names as `.env.example`), deploy.
+names as `.env.example`), deploy. The kit listens on localhost only; to
+reach it from your LAN set `INBOXRAKE_BIND=0.0.0.0` there too, after
+setting a login (see [Docker Compose](#docker-compose-recommended)).
 
 ## Raspberry Pi / ARM servers
 
@@ -198,10 +212,12 @@ has no app-password option for IMAP). Select the **Outlook / Microsoft
 
 ## After the first start
 
-1. Open the web UI -> the onboarding asks for IMAP credentials if env
-   didn't provide them (Settings -> Mail account has presets for
-   Gmail/iCloud/Fastmail/GMX/mailbox.org/Yahoo).
-2. Hit **Scan**.
+1. Open the web UI. On a fresh install the setup wizard walks you
+   through provider, sign-in (with a connection test), folders, an
+   optional login password and the first scan. (Settings -> Mail account
+   has the same presets: Gmail, iCloud, Fastmail, GMX, mailbox.org,
+   Yahoo, Outlook.)
+2. Hit **Scan** (the wizard starts the first one).
 3. Optional: Settings -> AI for AI-assisted cleanup verdicts, Settings
    -> Server -> Login to protect the UI, Settings -> General for protected
    senders.
