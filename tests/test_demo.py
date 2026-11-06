@@ -4,6 +4,7 @@ sockets - jobs finish inside the request that started them."""
 
 import asyncio
 import json
+import os
 import socket
 import sys
 import threading
@@ -26,6 +27,34 @@ def call(method, path, query="", body=None, **kw):
 
 def jbody(res):
     return json.loads(res["body"])
+
+
+def _patched():
+    """Which of the demo's patches are in place right now."""
+    import concurrent.futures as cf
+    import anyio.to_thread
+    from backend import aisort
+    def stub(name):             # the demo's stand-ins have no file
+        return name in sys.modules and not hasattr(sys.modules[name],
+                                                    "__file__")
+    return {"Thread.start": threading.Thread.start.__module__ != "threading",
+            "cf.ThreadPoolExecutor": cf.ThreadPoolExecutor is demo.InlineExecutor,
+            "aisort.ThreadPoolExecutor":
+                aisort.ThreadPoolExecutor is demo.InlineExecutor,
+            "anyio run_sync": anyio.to_thread.run_sync is demo._run_sync,
+            "socket.create_connection": socket.create_connection is demo._deny,
+            "socket.getaddrinfo": socket.getaddrinfo is demo._deny,
+            "anthropic stub": stub("anthropic"),
+            "cryptography stub": stub("cryptography"),
+            "cryptography.fernet stub": stub("cryptography.fernet")}
+
+
+@pytest.fixture(autouse=True)
+def everything_is_restored():
+    """Whatever a test installs, it must leave nothing patched behind."""
+    yield
+    demo.uninstall()
+    assert [k for k, v in _patched().items() if v] == []
 
 
 @pytest.fixture
@@ -317,3 +346,38 @@ def test_main_imports_without_an_assets_folder(tmp_path):
                         "STATIC_DIR": str(tmp_path / "static")},
         cwd=str(__import__("pathlib").Path(__file__).resolve().parent.parent))
     assert out.returncode == 0, out.stderr
+
+
+# ----------------------------------------------- review follow-ups
+
+def test_install_sets_the_one_flag_and_uninstall_restores_it(monkeypatch):
+    monkeypatch.delenv(demo.ENV_VAR, raising=False)
+    demo.install(fernet=False)
+    try:
+        assert demo.enabled()
+        # a worker that only calls install() still gets the coded refusal
+        cfg = {"ai": {"provider": "openai", "api_key": "k",
+                      "foundry_endpoint": ""}}
+        with pytest.raises(RuntimeError, match=CODE):
+            aihelper._ai_call(cfg, "model", "system", {}, {})
+    finally:
+        demo.uninstall()
+    assert not demo.enabled()
+
+
+def test_running_a_rule_that_needs_a_scan_does_not_hang(bridge, shim):
+    res = call("POST", "/api/rules", body={
+        "name": "r", "query": "from:news@shop.example"})
+    assert res["status"] == 200, res["body"]
+    rule_id = jbody(res)["id"]
+    res = call("POST", f"/api/rules/{rule_id}/run")      # nothing scanned yet
+    assert res["status"] == 409 and jbody(res)["detail"] == CODE
+
+
+def test_an_unhandled_error_comes_back_as_a_500(shim, monkeypatch):
+    def boom(*a, **k):
+        raise ValueError("boom")
+    monkeypatch.setattr(mailops, "public_state", boom)
+    res = call("GET", "/api/state")
+    assert res["status"] == 500
+    assert res["body"]

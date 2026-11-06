@@ -83,6 +83,8 @@ _saved: dict[str, object] = {}               # originals, while installed
 
 
 def _run_job(thread: threading.Thread) -> None:
+    # A shim-run thread is never marked started: join() raises and
+    # is_alive() is False. Nothing on the demo path joins; keep it so.
     try:
         thread.run()
     except Exception:
@@ -204,12 +206,14 @@ def install(*, fernet: bool = True) -> None:
     import socket
     import anyio.to_thread
     _saved.update(
+        env=os.environ.get(ENV_VAR),         # one flag: installed == enabled
         thread_start=threading.Thread.start,
         executor=cf.ThreadPoolExecutor,
         run_sync=anyio.to_thread.run_sync,
         create_connection=socket.create_connection,
         getaddrinfo=socket.getaddrinfo,
         modules={})
+    os.environ[ENV_VAR] = "1"
     threading.Thread.start = _start
     cf.ThreadPoolExecutor = InlineExecutor
     # aisort did `from concurrent.futures import ThreadPoolExecutor`
@@ -234,6 +238,10 @@ def uninstall() -> None:
         return
     import socket
     import anyio.to_thread
+    if _saved["env"] is None:
+        os.environ.pop(ENV_VAR, None)
+    else:
+        os.environ[ENV_VAR] = _saved["env"]
     threading.Thread.start = _saved["thread_start"]
     cf.ThreadPoolExecutor = _saved["executor"]
     from . import aisort
@@ -296,5 +304,12 @@ async def request(method: str, path: str, query: str = "", body=None,
         elif message["type"] == "http.response.body":
             out["body"] += message.get("body", b"")
 
-    await app(scope, receive, send)
+    try:
+        await app(scope, receive, send)
+    except Exception:
+        # an unhandled error: Starlette has already sent its 500 and
+        # re-raised; hand that response on instead of crashing the bridge
+        if not out["status"]:
+            raise
+        log.exception("demo: unhandled error in %s %s", method, path)
     return out
