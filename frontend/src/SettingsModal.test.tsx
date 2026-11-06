@@ -15,8 +15,10 @@ const oauthDisconnectCalls: string[] = [];
 let foldersResult: unknown = null;   // null: picker stays loading
 let testDigestResult: { sent: boolean; demo: boolean } =
   { sent: true, demo: false };
+const signOutAllCalls: number[] = [];
 vi.mock("./api", () => ({
   api: {
+    signOutAll: () => { signOutAllCalls.push(1); return Promise.resolve({ ok: true }); },
     folders: (account?: string) => {
       foldersCalls.push(account);
       return foldersResult
@@ -543,6 +545,29 @@ test("SSO warnings: open allow-list and missing admin", () => {
   show(mk("", []));
   expect(screen.getByText(/allowed-users list is empty.*No admin is set/))
     .toBeTruthy();
+});
+
+test("Sign out all sessions asks first, then calls the API; hidden without a login", async () => {
+  signOutAllCalls.length = 0;
+  const withLogin: Config = {
+    ...cfg, auth: { ...cfg.auth, mode: "password", is_admin: true } };
+  renderWithDialogs({ cfg: withLogin });
+  fireEvent.click(screen.getByRole("tab", { name: /Server/ }));
+  fireEvent.click(screen.getByText("Sign out all sessions…"));
+  await cancelDialog();
+  await expectNoDialog();
+  expect(signOutAllCalls).toEqual([]);
+  fireEvent.click(screen.getByText("Sign out all sessions…"));
+  await pressDialog("Sign out all");
+  await waitFor(() => expect(signOutAllCalls).toEqual([1]));
+  expect(await screen.findByText(/All other sessions were signed out/))
+    .toBeTruthy();
+  cleanup();
+  render(<SettingsModal cfg={{ ...cfg, auth: { ...cfg.auth, mode: "none",
+    is_admin: true } }} account="default" onClose={() => {}}
+    onSaved={() => {}} onAccountsChanged={() => {}} />);
+  fireEvent.click(screen.getByRole("tab", { name: /Server/ }));
+  expect(screen.queryByText("Sign out all sessions…")).toBeNull();
 });
 
 test("tab switches keep unsaved edits and Save persists every tab", () => {

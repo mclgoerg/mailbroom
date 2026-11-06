@@ -972,6 +972,16 @@ export const DE: Record<string, string> = {
   "login.err.email_unverified":
     "Anmeldung abgelehnt: Dein Identity Provider hat diese E-Mail-Adresse "
     + "nicht bestätigt.",
+  "login.sign_out_all": "Alle Sitzungen abmelden…",
+  "login.sign_out_all_help":
+    "Das passiert automatisch, wenn du Passwort, Anmeldemethode, erlaubte "
+    + "Nutzer oder Admin änderst.",
+  "login.signed_out_all": "Alle anderen Sitzungen wurden abgemeldet.",
+  "confirm.sign_out_all": "Alle Sitzungen abmelden",
+  "confirm.sign_out_all_body":
+    "Jeder Browser und jedes Gerät, das angemeldet ist, muss sich neu "
+    + "anmelden. Dieser Browser bleibt angemeldet.",
+  "confirm.sign_out_all_confirm": "Alle abmelden",
   "login.submit": "Anmelden",
   "login.sso": "Mit SSO anmelden",
   "login.logout": "Abmelden",
@@ -1753,6 +1763,11 @@ export const DE: Record<string, string> = {
   "ferr.count_required":
     "Der Ordner wurde noch nicht gezählt – lade ihn neu und "
     + "bestätige erneut.",
+  "ferr.data_not_writable":
+    "Mailbroom kann nicht in seinen Datenordner schreiben. Gib auf dem "
+    + "Host der Benutzer-ID 1000 den Ordner, der unter /data eingebunden ist "
+    + "(chown -R 1000:1000 <Ordner>), oder starte den Container mit --user, "
+    + "und starte ihn dann neu.",
   "ferr.role_missing":
     "Auf dem Server wurde kein Ordner für „{folder}“ gefunden.",
   "ferr.inbox_missing": "Auf dem Server wurde kein Posteingang gefunden.",
@@ -1783,6 +1798,15 @@ export const DE: Record<string, string> = {
     "Die Abmelde-Adresse in dieser Mail ist keine einzelne einfache "
     + "Adresse (oder ihr Text enthält Zeilenumbrüche), deshalb wurde keine "
     + "Mail gesendet.",
+  "ferr.move_foreign_deleted":
+    "Abgebrochen: Ein anderes Mailprogramm hat Mails in „{folder}“ zum "
+    + "Löschen markiert, und dieser Server kann nicht nur unsere entfernen - "
+    + "deshalb wurde dort nichts weiter gelöscht. Kopien der eben "
+    + "verschobenen Mails können schon im Zielordner liegen, und ein neuer "
+    + "Versuch würde eine weitere Kopie anlegen, solange diese Markierungen "
+    + "bleiben. Lösche zuerst die markierten Mails im anderen Mailprogramm "
+    + "endgültig (Ordner komprimieren / „Gelöschte entfernen“) und versuche "
+    + "es dann erneut.",
   "ferr.cannot_flag":
     "Der Server hat das Markieren der Mails zum Löschen nicht "
     + "akzeptiert.",

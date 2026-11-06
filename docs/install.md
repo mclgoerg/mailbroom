@@ -64,6 +64,18 @@ docker run -d --name mailbroom \
 container config - put it in an env file you keep out of backups if you
 ever plan to recreate the container.)
 
+## Data folder ownership
+
+The image runs as user ID 1000. A named volume (`mailbroom_data`) just
+works; a **host folder** mounted at `/data` that you created yourself is
+usually owned by root, and Mailbroom then logs `Cannot write to /data` and
+the UI says it cannot write to its data folder. Fix it once on the host
+and restart:
+
+```bash
+chown -R 1000:1000 /path/to/the/folder      # or: docker run --user <uid>:<gid> ...
+```
+
 ## Synology (Container Manager, DSM 7.2+)
 
 1. Container Manager -> **Project** -> Create.
@@ -74,6 +86,10 @@ ever plan to recreate the container.)
    [`deploy/.env.example`](../deploy/.env.example)).
 4. Build & run, then open `http://<nas-ip>:8765` (an IP address works
    as is; for a host name see "Login" above).
+
+If you use a folder under `/volume1/docker/` instead of a named volume
+for `/data`, give it to user ID 1000 first (SSH: `sudo chown -R 1000:1000
+<folder>`) - see [Data folder ownership](#data-folder-ownership).
 
 On older DSM (Docker package): download the image
 `ghcr.io/mclgoerg/mailbroom` in Registry, then create a container with
@@ -91,7 +107,10 @@ No Community Applications template yet - add it manually:
 5. Add Variables for your IMAP provider (`IMAP_HOST`, `IMAP_PORT`,
    `IMAP_USER`, `IMAP_PASSWORD`, `IMAP_CAFILE=` empty for normal
    providers) plus `MAILBROOM_SECRET_KEY`.
-6. Apply, then open `http://<unraid-ip>:<port>` (a host name needs the
+6. Make the appdata folder writable for the container (user ID 1000):
+   `chown -R 1000:1000 /mnt/user/appdata/mailbroom` in the Unraid
+   terminal.
+7. Apply, then open `http://<unraid-ip>:<port>` (a host name needs the
    "Login" note above).
 
 ## TrueNAS SCALE (24.10+)
@@ -100,7 +119,10 @@ Apps -> Discover Apps -> ⋮ -> **Install via YAML** (or "Custom App"):
 
 - Image repository `ghcr.io/mclgoerg/mailbroom`, tag `latest`.
 - Port forwarding: container port `8765`.
-- Storage: host path or ixVolume mounted at `/data`.
+- Storage: host path or ixVolume mounted at `/data`. For a host path,
+  set the dataset's ACL/owner so user ID 1000 can write
+  ([Data folder ownership](#data-folder-ownership)); an ixVolume needs
+  nothing.
 - Environment variables as in [`deploy/.env.example`](../deploy/.env.example).
 
 ## Portainer
