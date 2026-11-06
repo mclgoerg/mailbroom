@@ -34,6 +34,10 @@ Bridge) and any other IMAP server.
 
 - Nothing is deleted without asking: moving to Trash always shows the exact
   count first, and can be undone.
+- Permanent deletion exists only in Trash and Junk: manual, with exact
+  counts, or an opt-in purge rule that you run in report mode first.
+- Protected senders and pinned mails are skipped by bulk actions, rules and
+  the Folders-panel purges; Empty Trash empties everything in Trash.
 - Scans are read-only.
 - The optional AI review only ever receives mail metadata, never bodies or
   attachments.

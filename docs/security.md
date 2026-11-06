@@ -75,9 +75,11 @@ client ID, if you run one, is `INBOXRAKE_MS_CLIENT_ID` (see
   affected. UIDVALIDITY is checked before acting on cached UIDs, and scans
   are read-only.
 - **Everything is undoable** except the explicit permanent-delete actions
-  in Trash and Junk (manual, or an opt-in purge rule). Those show exact
-  counts first, rules and purge rules start in report mode, and protected
-  senders and pinned mails are never touched.
+  in Trash and Junk (manual, with exact counts, or an opt-in purge rule
+  that starts in report mode). Rules start in report mode too.
+- **Protected senders and pinned mails** are skipped by bulk actions,
+  rules and the Folders-panel purges. The exception is **Empty Trash**,
+  which empties everything in Trash, protected or not.
 - **Accounts stay strictly separate** - nothing is aggregated across
   accounts, and with SSO nothing is shared between users.
 

@@ -17,7 +17,8 @@ safe to delete. *(Formerly Mailbroom.)*
 
 **Nothing is deleted without asking, and everything is undoable** - moves
 go to Trash with an Undo - **except** the explicit "delete permanently"
-actions in Trash and Junk, which confirm with exact counts first.
+actions in Trash and Junk (manual, or an opt-in purge rule), which show
+exact counts first.
 
 ![The group list (dark theme): senders with mail counts, sizes, AI verdicts and quick filters](docs/screenshots/groups-dark.png)
 
@@ -95,8 +96,9 @@ the Trash folder, always behind a confirmation that names how many mails
 are affected, with an Undo. UIDVALIDITY is checked before every move and
 scans are read-only. Permanent deletion exists only as explicit actions in
 Trash and Junk (manual, or an opt-in purge rule that starts in report
-mode); they show exact counts first, and protected senders and mails are
-never touched. Rules also start in report mode.
+mode); they show exact counts first. Protected senders and pinned mails are skipped by bulk
+actions, rules and the Folders-panel purges, but **Empty Trash empties
+everything in Trash**, protected or not. Rules also start in report mode.
 
 **What leaves my machine?** Nothing, unless you turn on AI review - and then
 only metadata (addresses, counts, subject lines), never mail bodies or

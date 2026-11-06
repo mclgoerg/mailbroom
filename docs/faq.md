@@ -12,8 +12,9 @@ confirmation that names how many mails are affected, with an Undo.
 UIDVALIDITY is checked before every move, and scans are read-only.
 Permanent deletion exists only as explicit actions in Trash and Junk
 (manual, or an opt-in purge rule that starts in report mode); they show
-exact counts first, and protected senders and mails are never touched.
-Rules also start in report mode.
+exact counts first. Protected senders and pinned mails are skipped by bulk
+actions, rules and the Folders-panel purges, but **Empty Trash empties
+everything in Trash**, protected or not. Rules also start in report mode.
 
 ## What leaves my machine?
 
