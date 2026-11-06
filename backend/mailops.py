@@ -3349,9 +3349,10 @@ def undo_last(index: int = -1, acc=None, ident: dict | None = None) -> dict:
     restored = 0
     moved: list[int] = []
     trash = ""
-    refused: RuntimeError | None = None
-    conn = connect(cfgmod.account_imap(acc.name), acc.name)
+    failed: Exception | None = None
+    conn = None
     try:
+        conn = connect(cfgmod.account_imap(acc.name), acc.name)
         trash = entry.get("in") or folder_roles(conn, acc).get("trash")
         if not trash:
             raise RuntimeError(coded(ROLE_MISSING, role="trash"))
@@ -3374,13 +3375,14 @@ def undo_last(index: int = -1, acc=None, ident: dict | None = None) -> dict:
                              trash):
                     restored += len(chunk)
                     moved.extend(int(u) for u in chunk)
-    except RuntimeError as exc:
-        if not str(exc).startswith(MOVE_FOREIGN_DELETED):
-            raise
-        # A refusal changed nothing it should not: keep the entry for a
-        # retry (once the other program has expunged its mails) and still
-        # do the bookkeeping for whatever did move before it.
-        refused = exc
+    except Exception as exc:
+        # Whatever went wrong (a refusal because another program flagged
+        # mails \Deleted, a failed connect, an unopenable or missing
+        # folder, a dropped connection): the entry was already taken off
+        # the list, so put it back for a retry - mails that did move are
+        # no longer in Trash, so a retry only picks up the rest - and still
+        # do the bookkeeping for whatever did move before the failure.
+        failed = exc
         with acc.lock:
             acc.undo_log.insert(pos, entry)
             acc.state["undo"] = _undo_summaries(acc)
@@ -3389,7 +3391,8 @@ def undo_last(index: int = -1, acc=None, ident: dict | None = None) -> dict:
         if role:
             role_drop(role, trash, moved, acc)
         try:
-            conn.logout()
+            if conn is not None:
+                conn.logout()
         except Exception:
             pass
 
@@ -3410,13 +3413,13 @@ def undo_last(index: int = -1, acc=None, ident: dict | None = None) -> dict:
     auditlog.record(
         "undo", account=acc.name, count=restored, label=entry["label"],
         outcome="ok" if restored == entry["count"] else "partial",
-        error=str(refused or ""))
-    if refused is not None:
+        error=str(failed or ""))
+    if failed is not None:
         if restored:
             _rescan_after_restore(acc, restored, "restored", {
                 "restored": restored, "of": entry["count"],
                 "label": entry["label"]})
-        raise refused
+        raise failed
     if entry.get("action") == "move_contents":
         # the mails went back to a folder that is never scanned: nothing
         # in the index changes, so no rescan and no "rescan" notice
