@@ -192,9 +192,15 @@ def test_connection_failures_get_a_code_not_raw_text():
     import ssl
     cls = mailops.classify_connect_error
     unreachable = mailops.coded("host_unreachable", host="mail.example")
-    assert cls(socket.gaierror("x"), "mail.example") == unreachable
-    assert cls(ConnectionRefusedError(), "mail.example") == unreachable
-    assert cls(TimeoutError(), "mail.example") == unreachable
+    assert cls(ConnectionResetError(), "mail.example") == unreachable
+    assert cls(socket.gaierror("x"), "mail.example") \
+        == mailops.coded("host_not_found", host="mail.example")
+    assert cls(ConnectionRefusedError(), "mail.example") \
+        == mailops.coded("conn_refused", host="mail.example")
+    assert cls(TimeoutError(), "mail.example") \
+        == mailops.coded("conn_timeout", host="mail.example")
+    assert cls(ssl.SSLCertVerificationError("x"), "mail.example") \
+        == mailops.coded("cert_failed", host="mail.example")
     assert cls(ssl.SSLError("bad cert")) == "tls_failed"
     assert cls(imaplib.IMAP4.error(
         "[AUTHENTICATIONFAILED] Invalid credentials")) == "auth_failed"
@@ -206,7 +212,7 @@ def test_connection_failures_get_a_code_not_raw_text():
 
 def test_a_plain_network_oserror_is_host_unreachable():
     import errno
-    for no in (errno.EHOSTUNREACH, errno.ENETUNREACH, errno.ETIMEDOUT):
+    for no in (errno.EHOSTUNREACH, errno.ENETUNREACH):
         exc = OSError(no, "No route to host")
         assert mailops.error_text(exc, "mail.example") == mailops.coded(
             "host_unreachable", host="mail.example")
@@ -229,7 +235,7 @@ def test_test_connection_codes(monkeypatch):
     r = _fail_with(monkeypatch, imaplib.IMAP4.error("LOGIN failed"))
     assert (r.status_code, r.json()["detail"]) == (502, "auth_failed")
     r = _fail_with(monkeypatch, socket.gaierror("nodename secret.example"))
-    assert r.json()["detail"] == mailops.coded("host_unreachable",
+    assert r.json()["detail"] == mailops.coded("host_not_found",
                                                host="imap.example")
 
 

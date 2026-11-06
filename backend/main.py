@@ -1551,6 +1551,7 @@ def post_test_connection(account: str | None = Query(None)):
     im = cfgmod.account_imap(acc.name)
     if not cfgmod.has_credentials(im):
         raise HTTPException(400, mailops.coded(mailops.NO_ACCOUNT))
+    sig = cfgmod.conn_sig(im)          # what this test vouches for
     try:
         conn = mailops.connect(im, acc.name)
         try:
@@ -1566,7 +1567,7 @@ def post_test_connection(account: str | None = Query(None)):
         text = mailops.error_text(exc, im["host"])
         raise HTTPException(502, text if mailops.is_coded(text)
                             else mailops.coded(mailops.CONNECT_FAILED))
-    cfgmod.mark_verified(acc.name)
+    cfgmod.mark_verified(acc.name, sig)
     return {"ok": True, "folders": n}
 
 

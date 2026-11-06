@@ -130,6 +130,12 @@ const ERROR_CODES: Record<string, string> = {
   auth_failed: "ferr.auth_failed",
   host_unreachable: "ferr.host_unreachable",
   tls_failed: "ferr.tls_failed",
+  host_not_found: "ferr.host_not_found",
+  conn_refused: "ferr.conn_refused",
+  conn_timeout: "ferr.conn_timeout",
+  tls_mismatch: "ferr.tls_mismatch",
+  not_imap: "ferr.not_imap",
+  cert_failed: "ferr.cert_failed",
   connect_failed: "ferr.connect_failed",
   scan_failed: "ferr.scan_failed",
   // a move on a server without MOVE/UIDPLUS refused (backend/mailops.py)
@@ -225,8 +231,10 @@ export function noticeParams(
 }
 
 async function req<T>(path: string, body?: unknown,
-                      method?: "PUT" | "DELETE"): Promise<T> {
+                      method?: "PUT" | "DELETE",
+                      signal?: AbortSignal): Promise<T> {
   const res = await fetch(withAccount(path), {
+    signal,
     method: method ?? (body === undefined ? "GET" : "POST"),
     headers: body === undefined ? {} : { "Content-Type": "application/json" },
     body: body === undefined ? undefined : JSON.stringify(body),
@@ -417,9 +425,11 @@ export const api = {
       { role, uids, uv, folder, trash_folder }),
   trashRestore: (uids: number[], dest: string, uv: number) =>
     req<{ restored: number; rescan: boolean }>("/api/trash/restore", { uids, dest, uv }),
-  testConnection: (account?: string) =>
+  // `signal` lets the wizard walk away from a slow test (the server's own
+  // attempt gives up by itself)
+  testConnection: (account?: string, signal?: AbortSignal) =>
     req<{ ok: boolean; folders: number }>(
-      forAccount("/api/test_connection", account), {}),
+      forAccount("/api/test_connection", account), {}, undefined, signal),
   authProbe: () => req<AuthProbe>("/api/auth"),
   // cache: "no-store" - this specifically must never answer from a cached
   // response, or an update-available check can never detect anything.

@@ -53,7 +53,16 @@ beforeEach(() => {
     "/api/scan": () => [200, { ok: true }],
   };
   vi.stubGlobal("fetch", vi.fn(async (url: string, init?: RequestInit) => {
-    if (gate && url.includes("/api/test_connection")) await gate;
+    if (gate && url.includes("/api/test_connection")) {
+      // a slow server: the request ends when the page aborts it
+      await new Promise<void>((resolve, reject) => {
+        const abort = () => reject(
+          new DOMException("aborted", "AbortError"));
+        if (init?.signal?.aborted) abort();
+        init?.signal?.addEventListener("abort", abort);
+        gate!.then(resolve);
+      });
+    }
     const body = init?.body ? JSON.parse(String(init.body)) : undefined;
     calls.push({ method: init?.method ?? "GET", url, body });
     const hit = Object.entries(routes).find(([k]) => url.includes(k));
@@ -360,7 +369,7 @@ test("the step count does not change when the password gets set mid-way",
     expect(screen.getByText(/Step 4 of 5/)).toBeTruthy();
   });
 
-test("Close is blocked while the sign-in is being tested", async () => {
+const startSlowTest = async () => {
   let release!: () => void;
   gate = new Promise((r) => { release = r; });
   routes["/api/config"] = () => [200, withNew()];
@@ -368,14 +377,96 @@ test("Close is blocked while the sign-in is being tested", async () => {
   pick("Fastmail");
   await signIn("b@mail.example");
   await screen.findByText("Testing the connection…");
-  fireEvent.click(screen.getAllByRole("button", { name: "Cancel" })[0]);
-  fireEvent.keyDown(window, { key: "Escape" });
-  await sleepMs(50);
-  expect(onClose).not.toHaveBeenCalled();
-  expect(saves().some((c) => c.body.delete_account)).toBe(false);
-  release();
-  await screen.findByText(/The ticked folders/);
+  return release;
+};
+
+test("Cancel test ends a running test and stays on the sign-in step",
+  async () => {
+    await startSlowTest();
+    fireEvent.click(await screen.findByRole("button", { name: "Cancel test" }));
+    await waitFor(() => expect(screen.queryByText("Testing the connection…"))
+      .toBeNull());
+    expect(onClose).not.toHaveBeenCalled();
+    expect(screen.getByText(/Step 2 of 4/)).toBeTruthy();
+    expect(screen.queryByText(/Could not|refused/)).toBeNull();
+    expect(screen.getByRole("button", { name: "Test connection" })
+      .hasAttribute("disabled")).toBe(false);
+  });
+
+test("Cancel test shows no error for the request it aborted", async () => {
+  await startSlowTest();
+  fireEvent.click(await screen.findByRole("button", { name: "Cancel test" }));
+  await waitFor(() => expect(screen.queryByText("Testing the connection…"))
+    .toBeNull());
+  // an aborted fetch rejects with "aborted": never shown as an error
+  expect(screen.queryByText(/abort/i)).toBeNull();
+  expect(document.querySelector("[role=alert], .text-danger-fg")).toBeNull();
 });
+
+test("a test that finishes after Cancel test changes nothing", async () => {
+  const release = await startSlowTest();
+  fireEvent.click(await screen.findByRole("button", { name: "Cancel test" }));
+  await waitFor(() => expect(screen.queryByText("Testing the connection…"))
+    .toBeNull());
+  release();
+  await sleepMs(50);
+  expect(screen.getByText(/Step 2 of 4/)).toBeTruthy();
+  expect(screen.queryByText(/The ticked folders/)).toBeNull();
+});
+
+test("X closes the wizard during a test and a late result stays silent",
+  async () => {
+    const release = await startSlowTest();
+    fireEvent.click(screen.getAllByRole("button", { name: "Cancel" })[0]);
+    await waitFor(() => expect(onClose).toHaveBeenCalled());
+    // the account this session created is removed again, like any cancel
+    expect(saves().some((c) => c.body.delete_account)).toBe(true);
+    const configs = onConfig.mock.calls.length;
+    release();
+    await sleepMs(50);
+    expect(onConfig.mock.calls.length).toBe(configs);
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+test("X right after a successful test, while the config reloads, leaves " +
+  "nothing behind", async () => {
+  routes["/api/config"] = () => [200, withNew()];
+  let release!: () => void;
+  const held = new Promise<void>((r) => { release = r; });
+  const real = globalThis.fetch;
+  vi.stubGlobal("fetch", vi.fn(async (url: string, init?: RequestInit) => {
+    // the GET of the config after the test is slow
+    if (url.includes("/api/config") && (init?.method ?? "GET") === "GET"
+      && calls.some((c) => c.url.includes("/api/test_connection")))
+      await held;
+    return real(url, init);
+  }));
+  open(mkCfg({ setup_needed: false }), "add");
+  pick("Fastmail");
+  await signIn("b@mail.example");
+  await waitFor(() => expect(calls.some((c) =>
+    c.url.includes("/api/test_connection"))).toBe(true));
+  await sleepMs(20);
+  fireEvent.click(screen.getAllByRole("button", { name: "Cancel" })[0]);
+  await waitFor(() => expect(onClose).toHaveBeenCalled());
+  const configs = onConfig.mock.calls.length;
+  release();
+  await sleepMs(50);
+  expect(onConfig.mock.calls.length).toBe(configs);
+});
+
+test("Esc closes the wizard during a test", async () => {
+  await startSlowTest();
+  fireEvent.keyDown(window, { key: "Escape" });
+  await waitFor(() => expect(onClose).toHaveBeenCalled());
+});
+
+test("the Cancel test button only shows while testing", () => {
+  open();
+  pick("iCloud Mail");
+  expect(screen.queryByRole("button", { name: "Cancel test" })).toBeNull();
+});
+
 const sleepMs = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 test("Cancel after a failed add returns to the account the user was on",

@@ -1485,8 +1485,9 @@ export default function App() {
         + ` · ${fmtSize(size)}` + (filter ? ` ${t("(filtered)")}` : "")
         + (ago ? ` · ${t("scan.age", { ago })}` : "");
     }
-    // the setup card is the guidance while the connection is unconfirmed
-    return unverified ? "" : t("No scan yet - hit “Scan”.");
+    // the setup card is the guidance while there is no account or the
+    // connection is unconfirmed
+    return unverified || cfg?.setup_needed ? "" : t("No scan yet - hit “Scan”.");
   };
 
   const statusLine = () => {
@@ -1753,11 +1754,17 @@ export default function App() {
           Search · Tools. On phones the segments take their own full-width
           line below Scan / Search / Tools. Identical in every mode. */}
       <div className="mb-2 flex flex-wrap items-center gap-2">
+        {cfg?.setup_needed ? (
+          // no account yet: the primary action is the setup card's
+          <Button onClick={() => setWizard({ mode: "first" })}>
+            {t("wizard.setup_btn")}</Button>
+        ) : (
         <Button onClick={startScan}
           disabled={scanning || aiRunning || deleting || attsRunning
             || unsubRunning}>
           {scanning ? <Spinner className="text-white" /> : t("Scan")}
         </Button>
+        )}
         {/* order-last + fill: below 768 the segments get a line of their own. */}
         <div className="order-last w-full md:order-none md:w-auto">
           <Segmented label={t("view.group_by")} fill
@@ -2302,7 +2309,8 @@ export default function App() {
           ) : (
             <EmptyState>
               {state.scanned_ts ? t("status.no_mails")
-                : unverified ? "" : t("No scan yet - hit “Scan”.")}
+                : unverified || cfg?.setup_needed ? ""
+                : t("No scan yet - hit “Scan”.")}
             </EmptyState>
           )
         )

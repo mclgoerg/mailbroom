@@ -471,7 +471,7 @@ export const DE: Record<string, string> = {
   "Starting…": "Starte…",
   "Duplicates": "Duplikate",
   "dups.hint":
-    "Gleiche Message-ID oder identischer Absender + Betreff + Größe.",
+    "Gleiche Message-ID. Mails ohne brauchbare Message-ID: identischer Absender + Betreff + Größe.",
   "dups.summary": "{n} Duplikat-Gruppen · {size} freigebbar",
   "dups.summary_one": "1 Duplikat-Gruppe · {size} freigebbar",
   "dups.keep_newest": "Alle außer der neuesten auswählen",
@@ -725,6 +725,7 @@ export const DE: Record<string, string> = {
     + "und trage den Pfad unter den erweiterten Einstellungen ein "
     + "(meist /certs/bridge-cert.pem).",
   "wizard.test": "Verbindung testen",
+  "wizard.test_cancel": "Test abbrechen",
   "wizard.testing": "Verbindung wird getestet…",
   "wizard.test_ok": "Verbunden – {n} Ordner gefunden.",
   "wizard.oauth_needed":
@@ -1938,6 +1939,18 @@ export const DE: Record<string, string> = {
     "{host} ist nicht erreichbar – prüfe Hostnamen, Port und deine Netzwerkverbindung.",
   "ferr.tls_failed":
     "Die sichere Verbindung ist fehlgeschlagen – prüfe Sicherheitsoption, Port und Zertifikat.",
+  "ferr.host_not_found":
+    "{host} wurde nicht gefunden – prüfe den Hostnamen auf Tippfehler.",
+  "ferr.conn_refused":
+    "{host} hat die Verbindung abgelehnt – prüfe den Port (IMAP ist meist 993 mit SSL/TLS oder 143 mit STARTTLS) und ob der Server läuft.",
+  "ferr.conn_timeout":
+    "{host} hat nicht rechtzeitig geantwortet – prüfe Hostnamen, Port und dein Netzwerk bzw. die Firewall.",
+  "ferr.tls_mismatch":
+    "{host} hat geantwortet, aber nicht mit der gewählten sicheren Verbindung – probiere STARTTLS auf Port 143 oder SSL/TLS auf Port 993.",
+  "ferr.not_imap":
+    "{host} hat geantwortet, aber nicht wie ein IMAP-Server – prüfe den Port (IMAP nutzt 993 oder 143).",
+  "ferr.cert_failed":
+    "Dem Zertifikat von {host} wird nicht vertraut – bei einem selbstsignierten Zertifikat (z. B. Proton Bridge) trage dessen CA-Datei im Zertifikatsfeld der Anmeldeeinstellungen ein.",
   "ferr.connect_failed":
     "Verbindung zum Server nicht möglich – prüfe die Einstellungen und versuche es erneut.",
   "ferr.scan_failed":

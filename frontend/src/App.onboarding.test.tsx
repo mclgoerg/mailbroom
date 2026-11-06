@@ -153,17 +153,33 @@ test("with no account set up the wizard opens by itself; Set up later " +
   fireEvent.click(screen.getAllByRole("button", { name: "Set up later" })[0]);
   await waitFor(() => expect(screen.queryByText(/Where does your mail live/))
     .toBeNull());
-  const setup = await screen.findByRole("button",
-    { name: "Set up your mailbox" });
+  const setup = (await screen.findAllByRole("button",
+    { name: "Set up your mailbox" }))[0];
   // it stays closed after a reload within the session
   cleanup();
   await openRaw({ ...mkCfg({ user: "", password_set: false }),
     setup_needed: true });
-  await screen.findByRole("button", { name: "Set up your mailbox" });
+  await screen.findAllByRole("button", { name: "Set up your mailbox" });
   expect(screen.queryByText(/Where does your mail live/)).toBeNull();
-  fireEvent.click(screen.getByRole("button", { name: "Set up your mailbox" }));
+  fireEvent.click(screen.getAllByRole("button",
+    { name: "Set up your mailbox" })[0]);
   expect(await screen.findByText(/Where does your mail live/)).toBeTruthy();
   expect(setup).toBeTruthy();
+  sessionStorage.clear();
+});
+
+test("with no account the toolbar offers setup, not Scan, and the status " +
+  "line does not mention Scan", async () => {
+  sessionStorage.setItem("pmc_wizard_later", "1");
+  await openRaw({ ...mkCfg({ user: "", password_set: false }),
+    setup_needed: true });
+  const btns = await screen.findAllByRole("button",
+    { name: "Set up your mailbox" });
+  expect(btns).toHaveLength(2);                    // toolbar + card
+  expect(screen.queryByRole("button", { name: "Scan" })).toBeNull();
+  expect(screen.queryByText(/hit “Scan”/)).toBeNull();
+  fireEvent.click(btns[0]);                        // the toolbar's
+  expect(await screen.findByText(/Where does your mail live/)).toBeTruthy();
   sessionStorage.clear();
 });
 
