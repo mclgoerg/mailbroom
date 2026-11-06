@@ -100,7 +100,7 @@ if [ -z "$BUNDLE" ]; then
   echo "== demo bundle"
   BUNDLE="$(mktemp -d)"
   trap 'rm -rf "$BUNDLE"' EXIT
-  node "$REPO/scripts/demo-bundle/build.mjs" --out "$BUNDLE"
+  node "$REPO/scripts/demo-bundle/build.mjs" --out "$BUNDLE" --ui "$REPO/frontend/dist-demo"
 fi
 
 echo "== assemble $OUT"
