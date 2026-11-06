@@ -91,6 +91,7 @@ const sortValue = (g: Group, k: SortKey): number | string => {
   return g[k];
 };
 
+const RESTORE_NOTICES = ["restored", "restored_rescan"];
 const undoId = (u: { ts: number; count: number; label: string }) =>
   `${u.ts}|${u.count}|${u.label}`;
 
@@ -822,7 +823,7 @@ export default function App() {
   // The restore notice is shown as a toast: drop it so it doesn't linger
   // (it would hide the status line's cached-verdicts suffix until a scan).
   const clearRestoreNotice = async () => {
-    try { await api.clearNotice(); } catch { /* cosmetic */ }
+    try { await api.clearNotice(RESTORE_NOTICES); } catch { /* cosmetic */ }
   };
 
   const undo = async (index: number) => {
@@ -855,10 +856,14 @@ export default function App() {
       fail(e, "err.undo");
       // Some mails may have come back before it failed: the backend's
       // restore notice says how many (hidden inline, see the Notice).
-      await refresh();
-      const n = stateRef.current?.notice;
-      if (n && (n.key === "restored" || n.key === "restored_rescan")) {
-        notify(t(`notice.${n.key}`, noticeParams(n.params)));
+      // read directly: an SSE-triggered refresh already in flight would
+      // make refresh() return before stateRef has the notice
+      let n: AppState["notice"] = null;
+      try { n = (await api.state()).notice; } catch { /* the error shows */ }
+      refresh();
+      if (n && RESTORE_NOTICES.includes(n.key)) {
+        notify(t(n.key === "restored" ? "toast.restored_partial"
+          : "toast.restored_rescan", noticeParams(n.params)), "info");
         await clearRestoreNotice();
         refresh();
       }

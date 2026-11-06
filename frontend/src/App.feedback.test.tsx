@@ -431,9 +431,23 @@ test("an Undo that fails after restoring some mails still says how many",
     expect(await screen.findByText(
       "Undo error: The server refused the move.")).toBeTruthy();
     expect(await screen.findByText(
-      "Restored 3 of 5 mails (Shop News) - rescan to see them again."))
+      "Restored 3 of 5 mails (Shop News) - rescan to see them again"))
       .toBeTruthy();
-    expect(api.clearNotice).toHaveBeenCalled();
+    expect(api.clearNotice).toHaveBeenCalledWith(["restored", "restored_rescan"]);
+  });
+
+test("an Undo only asks to clear a restore notice, not any other",
+  async () => {
+    await mount({ ...baseState, undo: [entry(1, 5)] } as any);
+    (api.clearNotice as any).mockClear();
+    undoApi.mockResolvedValueOnce({ restored: 5, of: 5, rescan: true });
+    fireEvent.click(screen.getByRole("button", { name: /Undo/ }));
+    fireEvent.click(screen.getByRole("button", { name: /5 mails.*Shop News/ }));
+    await pressDialog("Restore");
+    await screen.findByText(/Restored 5 mails/);
+    expect(api.clearNotice).toHaveBeenCalledTimes(1);
+    expect((api.clearNotice as any).mock.calls[0][0])
+      .toEqual(["restored", "restored_rescan"]);
   });
 
 test("the backend's restore notice no longer renders above the list",
