@@ -229,20 +229,45 @@ def _token_ok(kind: str, val: str, tags: "set[str] | frozenset[str] | None"
     return bool(val)
 
 
+# What a single-value token overwrites in parse_filter's result: a second
+# token for the same slot silently replaces the first (`age:>5y age:>1m` is
+# `age:>1m`, a wider match). `is:` flags that are plain booleans (unsub, new,
+# protected, still-mailing) and `has:` / `tag:` accumulate or are idempotent,
+# so they may repeat.
+_IS_SLOT = {"replied": "replied", "noreply-ever": "replied",
+            "unsubscribed": "unsubscribed", "not-unsubscribed": "unsubscribed"}
+_SINGLE = frozenset({"ai", "age", "unread", "att", "eng", "from", "domain"})
+
+
+def _slot(kind: str, val: str) -> str | None:
+    if kind in _SINGLE:
+        return kind
+    return _IS_SLOT.get(val) if kind == "is" else None
+
+
 def validate_filter(q: str, tags=None) -> list[str]:
     """The tokens of `q` that contain a colon (so are meant as a qualifier,
     however mangled: `-tag:x`, `(tag:x`) but are not a known qualifier with
     a valid value. parse_filter lets those fall
     through to free text silently - fine for typing, wrong for a query an AI
     wrote. With `tags` (the accepted tag names) a `tag:` value must also
-    be part of (a substring of) one of them. Free words are always valid."""
+    be part of (a substring of) one of them. Free words are always valid.
+    A single-value qualifier given twice (`_slot`) reports the repeat: the
+    parsers keep the last one, which could widen the match unnoticed."""
     bad = []
+    seen = set()
     for tok in (q or "").strip().lower().split():
         if ":" not in tok:
             continue
         kind, _, val = tok.partition(":")
         if not _token_ok(kind, val, tags):
             bad.append(tok)
+            continue
+        slot = _slot(kind, val)
+        if slot is not None:
+            if slot in seen:
+                bad.append(tok)
+            seen.add(slot)
     return bad
 
 

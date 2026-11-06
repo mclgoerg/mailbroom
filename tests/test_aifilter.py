@@ -28,8 +28,8 @@ client = TestClient(app)
 
 @pytest.mark.parametrize("q", [
     "", "shop sale", "tag:newsletter unread:>90 age:>1y",
-    "ai:safe ai:review eng:low is:unsub is:not-unsubscribed has:pinned",
-    "att:>10m att:500k age:6m from:a@b.example domain:b.example",
+    "ai:safe eng:low is:unsub is:not-unsubscribed has:pinned",
+    "att:500k age:6m from:a@b.example domain:b.example",
     "TAG:Shipping is:noreply-ever is:new unread:>100"])
 def test_valid_filters_have_no_bad_tokens(q):
     assert rules.validate_filter(q) == []
