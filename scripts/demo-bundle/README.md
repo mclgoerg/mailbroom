@@ -48,3 +48,15 @@ public, max-age=31536000, immutable`. The worker reads the manifest, then:
   and fixes the random bytes while it is generated (`demo.py build`).
   The browser shifts its clock back to that instant on load
   (`demo_seed.set_clock`), so ages stay as designed however old the bundle is.
+
+## The page that loads it
+
+The UI side is `frontend/src/demo/` (boot screen, banner, the worker, the
+`window.fetch` intercept). `npm run build:demo` in `frontend/` builds it
+(`vite build --mode demo --base /demo/`, output `dist-demo/`); the deploy puts
+this bundle's output at `/demo/bundle/` next to it:
+
+    /demo/index.html, /demo/assets/*   the UI + the hashed worker
+    /demo/bundle/manifest.json, ...    what `build.mjs` wrote
+
+Cache headers for those paths are in `website/public/_headers`.

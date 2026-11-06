@@ -2,6 +2,7 @@
  * tail of tiny items merged into an "Other" tile. Pure and client-side;
  * the panel (components/SpaceMapPanel.tsx) renders it. */
 
+import { nowMs } from "./clock";
 import { engagementTier, fmtSizeGb } from "./lib";
 
 /** Size with a GB step (fmtSize stops at MB). */
@@ -148,7 +149,7 @@ export type ColorBy = "engagement" | "age" | "ai";
 export type Heat = 0 | 1 | 2;
 
 export function heatOf(it: MapItem, by: Exclude<ColorBy, "ai">,
-                       now = Date.now()): Heat {
+                       now = nowMs()): Heat {
   if (by === "engagement") {
     return { low: 2, medium: 1, high: 0 }[engagementTier(it.engagement)] as Heat;
   }

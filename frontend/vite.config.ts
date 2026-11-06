@@ -9,13 +9,19 @@ import tailwindcss from "@tailwindcss/vite";
 const pkg = JSON.parse(
   readFileSync(new URL("./package.json", import.meta.url), "utf-8"));
 
-export default defineConfig({
+// `vite build --mode demo` (npm run build:demo) is the in-browser demo: the
+// same UI plus src/demo/, with VITE_DEMO baked in as a constant so the normal
+// build drops all of it (see main.tsx).
+export default defineConfig(({ mode }) => ({
   plugins: [react(), tailwindcss()],
   define: {
     __APP_VERSION__: JSON.stringify(pkg.version),
+    ...(mode === "demo" ? { "import.meta.env.VITE_DEMO": '"1"' } : {}),
   },
+  // the demo's Pyodide worker is a module worker (it import()s pyodide.mjs)
+  worker: { format: "es" },
   server: {
     // Local dev: proxy API calls to the backend container/port.
     proxy: { "/api": "http://127.0.0.1:8765" },
   },
-});
+}));

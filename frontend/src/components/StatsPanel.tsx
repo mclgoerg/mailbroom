@@ -1,11 +1,12 @@
 import { BarChart3, Sparkles } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
 import { api, fmtSize } from "../api";
+import { nowDate } from "../clock";
 import { t } from "../i18n";
 import type { StatsResp } from "../types";
 import { Button, Loading, Modal, PanelHeader, SectionLabel, Tag } from "./ui";
 
-const month = () => new Date().toISOString().slice(0, 7);
+const month = () => nowDate().toISOString().slice(0, 7);
 const pct = (n: number, of: number) => (of ? Math.round((100 * n) / of) : 0);
 
 function Card({ value, label }: { value: ReactNode; label: string }) {

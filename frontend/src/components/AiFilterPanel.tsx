@@ -1,6 +1,7 @@
 import { Sparkles } from "lucide-react";
 import { useMemo, useState } from "react";
 import { api, fmtSize, fmtUsd } from "../api";
+import { nowMs } from "../clock";
 import { getLang, t } from "../i18n";
 import { matchGroup, parseFilter, type SmartMembers } from "../lib";
 import type { AiFilterResult, Group } from "../types";
@@ -51,7 +52,7 @@ export function AiFilterPanel({ groups, members, onClose, onApply,
   const preview = useMemo(() => {
     if (!groups.length) return null;
     const f = parseFilter(query);
-    const hits = groups.filter((g) => matchGroup(g, f, Date.now(), members));
+    const hits = groups.filter((g) => matchGroup(g, f, nowMs(), members));
     return {
       groups: hits.length,
       mails: hits.reduce((n, g) => n + g.count, 0),

@@ -6,6 +6,7 @@
  * need no extra gate: without the data nothing matches, so they stay
  * under the minimum and are hidden. */
 
+import { nowMs } from "./clock";
 import { matchGroup, parseFilter } from "./lib";
 import type { Group } from "./types";
 
@@ -59,7 +60,7 @@ const movable = (g: Group): { mails: number; size: number } => {
 };
 
 /** Visible cards (above the minimum), biggest first. */
-export function computeQuickWins(groups: Group[], now = Date.now()):
+export function computeQuickWins(groups: Group[], now = nowMs()):
     QuickWinCard[] {
   const cards: QuickWinCard[] = [];
   for (const def of QUICK_WINS) {

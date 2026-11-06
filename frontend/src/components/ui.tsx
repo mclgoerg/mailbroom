@@ -6,6 +6,7 @@ import { createContext, useCallback, useContext, useEffect, useId,
   useLayoutEffect, useMemo, useRef, useState, type ComponentProps,
   type KeyboardEvent as ReactKeyboardEvent, type ReactNode, type RefObject }
   from "react";
+import { nowDate } from "../clock";
 import { demoHint, useDemo } from "../demoMode";
 import { getLang, t } from "../i18n";
 import { engagementTier, fmtDate } from "../lib";
@@ -269,7 +270,7 @@ export function stillMailingText(sm: StillMailing): string {
   const d = new Date(sm.since_ts * 1000);
   const p2 = (n: number) => String(n).padStart(2, "0");
   const date = fmtDate(`${d.getFullYear()}-${p2(d.getMonth() + 1)}-${p2(
-    d.getDate())}`, new Date(), { lang: getLang() });
+    d.getDate())}`, nowDate(), { lang: getLang() });
   return sm.senders > 1
     ? t("still.text_many", { n: sm.n, senders: sm.senders, date })
     : t("still.text", { n: sm.n, date });
@@ -1587,7 +1588,7 @@ export function ShortDate({ iso, className = "", time = false }: {
   iso: string; className?: string; time?: boolean;
 }) {
   if (!iso) return null;
-  const short = fmtDate(iso, new Date(), { lang: getLang(), time });
+  const short = fmtDate(iso, nowDate(), { lang: getLang(), time });
   const cls = `whitespace-nowrap ${className}`;
   if (short === iso) return <span className={cls}>{iso}</span>;
   return <time dateTime={iso} title={iso} className={cls}>{short}</time>;
