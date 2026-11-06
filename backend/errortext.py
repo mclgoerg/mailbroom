@@ -126,6 +126,8 @@ TEXT: dict[str, str | tuple[str, str]] = {
         'The filter has parts Inboxrake doesn\'t understand: {names} - edit the rule. Its execute runs are skipped until then.',
     'rule_filter_too_long':
         'This filter is too long (more than {max} characters).',
+    'request_too_large':
+        'The request is too large for the server to accept.',
     'block_key_invalid':
         'This sender or domain cannot be blocked: it is not a plain address or domain name.',
     'no_account':

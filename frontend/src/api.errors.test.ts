@@ -334,6 +334,14 @@ describe("the login throttle code", () => {
   });
 });
 
+describe("the request size code", () => {
+  test("is translated, not shown raw", () => {
+    expect(errorText("request_too_large")).toContain("too large");
+    setLang("de");
+    expect(errorText("request_too_large")).toContain("zu groß");
+  });
+});
+
 describe("the block key code", () => {
   test("is translated, not shown raw", () => {
     expect(errorText("block_key_invalid")).toContain("cannot be blocked");

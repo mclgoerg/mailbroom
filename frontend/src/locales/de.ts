@@ -1916,6 +1916,8 @@ export const DE: Record<string, string> = {
     + "Ausführungsläufe werden übersprungen, bis du die Regel bearbeitest.",
   "ferr.rule_filter_too_long":
     "Dieser Filter ist zu lang (mehr als {max} Zeichen).",
+  "ferr.request_too_large":
+    "Die Anfrage ist zu groß, als dass der Server sie annehmen könnte.",
   "ferr.block_key_invalid":
     "Dieser Absender bzw. diese Domain lässt sich nicht blockieren: Es ist "
     + "keine einfache Adresse oder kein einfacher Domainname.",

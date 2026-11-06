@@ -29,6 +29,7 @@ from . import aihelper
 from . import auditlog
 from . import auth as authmod
 from . import bodyindex
+from . import bodylimit
 from . import autoscan as autoscanmod
 from . import config as cfgmod
 from . import csvsafe
@@ -1991,6 +1992,11 @@ _SECURITY_HEADERS = {
     "X-Content-Type-Options": "nosniff",
     "Referrer-Policy": "same-origin",
 }
+
+
+# Added before the security-headers middleware, so it is the outermost
+# check on the request yet its 413 still carries the headers.
+app.add_middleware(bodylimit.BodyLimit, public=_PUBLIC_API)
 
 
 # Registered last = outermost, so it also covers the 401/403 answers other

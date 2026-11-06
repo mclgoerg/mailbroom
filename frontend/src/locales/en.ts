@@ -1671,6 +1671,8 @@ export const EN: Record<string, string> = {
     + "runs are skipped until you edit the rule.",
   "ferr.rule_filter_too_long":
     "This filter is too long (more than {max} characters).",
+  "ferr.request_too_large":
+    "The request is too large for the server to accept.",
   "ferr.block_key_invalid":
     "This sender or domain cannot be blocked: it is not a plain address or "
     + "domain name.",
