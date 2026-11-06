@@ -24,3 +24,5 @@ googleapis.com            # OAuth token endpoint of the Google sign-in flow
 fastmail.help             # README: link to the provider's app-password instructions
 azure.com                 # Settings hint: endpoint form of an Azure-hosted model
 google.com                # setup docs: where to create a Gmail app password and OAuth client (Settings hint, README, install guide)
+inboxrake.com            # the project's own website (docs site base URL, website/)
+astro.build              # docs site generator documentation (website/README.md)

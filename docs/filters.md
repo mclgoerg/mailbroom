@@ -1,0 +1,71 @@
+---
+title: "Filter syntax"
+description: "The query language of the filter box and of saved rules."
+---
+
+# Filter syntax
+
+The filter box above the group list, saved rules and the "describe a
+filter" helper all use the same small query language. The browser
+(`frontend/src/lib.ts`) and the backend rules engine (`backend/rules.py`)
+implement it identically, so a rule matches exactly what you saw in the UI.
+
+A query is a list of words separated by spaces; **all** of them must match
+(logical AND). Matching is case-insensitive.
+
+## Free words
+
+A word without a qualifier must appear in the group's key (sender address,
+domain or subject), its label, or its sub-label. `shop` finds
+`news@shop.example`.
+
+## Qualifiers
+
+| Qualifier | Meaning | Example |
+|---|---|---|
+| `tag:<name>` | A category tag of the group contains this text (substring, one word). | `tag:newsletter` |
+| `ai:safe\|review\|keep` | The AI verdict of the group. | `ai:safe` |
+| `age:>N(m\|y)` | The last mail of the group is older than N months or years. | `age:>1y` |
+| `unread:>N` | More than N percent of the group's mails are unread (0-100). | `unread:>80` |
+| `att:>N(k\|m\|g)` | The group's attachments add up to more than N kilo-, mega- or gigabytes (a total over the group, not single mails). Needs attachment analysis. | `att:>10m` |
+| `is:unsub` | At least one sender has an unsubscribe link. | `is:unsub` |
+| `is:unsubscribed` | Every unsubscribable sender is already unsubscribed. | |
+| `is:not-unsubscribed` | Some sender could still be unsubscribed. | |
+| `is:protected` | The group contains protected senders. | |
+| `is:replied` | You have written to the sender before. | |
+| `is:noreply-ever` | You never wrote to any of its senders. | |
+| `is:new` | A recently first-seen sender (see `NEW_SENDER_WINDOW_DAYS` in [Configuration](configuration.md)). | |
+| `is:still-mailing` | Mail kept arriving after a successful unsubscribe. | |
+| `has:pinned` | The group contains at least one pinned mail. | |
+| `has:tracker` | A checked mail carries a tracking pixel or click tracking (needs the local body index). | |
+| `eng:low\|medium\|high` | How much you engage with the sender: scores up to 33 are low, 34-66 medium, 67 and up high. | `eng:low` |
+| `from:<address>` | Exactly this sender address. | `from:news@shop.example` |
+| `domain:<domain>` | Exactly this domain (domain grouping). | `domain:shop.example` |
+
+`age:` also accepts a leading `>` and the number alone; `age:>6m` and
+`age:6m` mean the same. A qualifier with an unknown name or an invalid
+value is not an error in the typing box - it is treated as a free word, so
+it usually matches nothing. The AI filter writer validates strictly and
+retries when the filter it wrote contains such a token.
+
+## Combining
+
+```text
+tag:newsletter age:>1y unread:>80
+```
+
+means: newsletter-tagged groups whose last mail is over a year old and
+that you mostly never opened.
+
+## Rules
+
+A saved rule is a filter plus an action and a schedule (manual, daily,
+weekly). Rules always start in **report mode** - a run only records what
+would happen - and every run is capped (`RULE_CAP`, default 500 mails).
+Executed trash actions are normal reversible moves.
+
+**Purge rules** are the only irreversible kind: they permanently delete
+from Junk or Trash. They are opt-in, need a report run of their current
+definition first, skip protected senders and pinned mails, and accept only
+a filter over sender, date and read state - the qualifiers `tag:`, `ai:`,
+`is:`, `has:pinned`, `eng:`, `att:` and `domain:` are refused there.
