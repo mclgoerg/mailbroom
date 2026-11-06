@@ -630,7 +630,8 @@ export const EN: Record<string, string> = {
   "toast.unsub_nothing":
     "Nothing to unsubscribe from - every sender is already handled or "
     + "protected.",
-  "dups.hint": "Same Message-ID, or identical sender + subject + size.",
+  "dups.hint":
+    "Same Message-ID. Mails without one: identical sender + subject + size.",
   "dups.summary": "{n} duplicate sets · {size} reclaimable",
   "dups.summary_one": "1 duplicate set · {size} reclaimable",
   "dups.keep_newest": "Select all but newest",

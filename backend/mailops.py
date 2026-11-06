@@ -3321,10 +3321,12 @@ def index_stats(acc=None) -> dict:
 # -------------------------------------------------------------- duplicates
 
 def duplicates_list(limit: int = 200, acc=None) -> list[dict]:
-    """Duplicate sets from the scanned index: same Message-ID anywhere, or
-    (for mails without a usable Message-ID match) the same exact
-    (sender, subject, size) tuple. Newest mail first inside each set;
-    'wasted' is what deleting all but the newest would free."""
+    """Duplicate sets from the scanned index: the same Message-ID anywhere,
+    or - only among mails WITHOUT a usable Message-ID - the same exact
+    (sender, subject, size) tuple. A mail that has its own Message-ID is
+    never paired by the tuple: two statements with the same sender, subject
+    and size but different ids are two mails. Newest mail first inside each
+    set; 'wasted' is what deleting all but the newest would free."""
     acc = acc or accounts.get()
     with acc.lock:
         mails = list(acc.index.values())
@@ -3333,10 +3335,9 @@ def duplicates_list(limit: int = 200, acc=None) -> list[dict]:
         if m["msgid"]:
             by_msgid.setdefault(m["msgid"], []).append(m)
     sets = [v for v in by_msgid.values() if len(v) > 1]
-    in_set = {id(m) for s in sets for m in s}
     by_tuple: dict[tuple, list] = {}
     for m in mails:
-        if id(m) in in_set or not m["subject"] or not m["size"]:
+        if m["msgid"] or not m["subject"] or not m["size"]:
             continue
         by_tuple.setdefault((m["addr"], m["subject"], m["size"]),
                             []).append(m)
