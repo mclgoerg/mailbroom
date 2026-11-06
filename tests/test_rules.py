@@ -503,3 +503,53 @@ def test_has_tracker_filter_parser_and_matching():
     assert rulesmod.match_group(base, rulesmod.parse_filter(""))
 
 
+
+
+# ------------------------------------------- a single-value qualifier twice
+
+REPEATED = {
+    "ai": "ai:safe ai:keep", "age": "age:>5y age:>1m",
+    "unread": "unread:>80 unread:>10", "att": "att:>10m att:>1k",
+    "eng": "eng:low eng:high", "from": "from:a@shop.example from:b@x.example",
+    "domain": "domain:shop.example domain:x.example",
+    "replied": "is:replied is:noreply-ever",
+    "unsubscribed": "is:unsubscribed is:not-unsubscribed",
+}
+
+
+def test_validate_filter_reports_the_repeat():
+    assert rulesmod.validate_filter("age:>5y age:>1m") == ["age:>1m"]
+    assert rulesmod.validate_filter("from:a@b.example from:c@d.example") \
+        == ["from:c@d.example"]
+
+
+@pytest.mark.parametrize("kind", sorted(REPEATED))
+def test_a_repeated_single_value_qualifier_is_refused(kind):
+    q = f"tag:shipping {REPEATED[kind]}"
+    with pytest.raises(ValueError, match="^rule_filter_invalid:"):
+        rulesmod.create_rule({"name": "dup", "query": q})
+    assert not rulesmod.load_rules()
+
+
+def test_repeatable_qualifiers_stay_valid():
+    for q in ("tag:a tag:b", "is:unsub is:new is:protected is:still-mailing",
+              "has:pinned has:tracker", "age:>1y unread:>5 from:a@b.example"):
+        assert rulesmod.validate_filter(q) == [], q
+
+
+def test_import_keeps_a_rule_with_a_repeat_flagged(bridge):
+    r = client.post("/api/import_config", json={"rules": [
+        {"name": "dup", "query": "age:>5y age:>1m"}]})
+    assert r.json()["rules"] == 1
+    imported = rulesmod.load_rules()[0]
+    assert imported["mode"] == "report"
+    assert imported["filter_invalid"] == ["age:>1m"]
+
+
+def test_legacy_rule_with_a_repeat_is_flagged_and_skips_execute(bridge):
+    _legacy_rule(bridge, query="tag:shipping age:>5y age:>1m")
+    assert client.get("/api/rules").json()["rules"][0]["filter_invalid"] \
+        == ["age:>1m"]
+    with pytest.raises(RuntimeError, match=r"^rule_filter_invalid_run:"):
+        rulesmod.run_rule("l1", rescan=False)
+    assert not bridge.mailbox["Trash"] and not mailops.UNDO_LOG

@@ -1639,3 +1639,33 @@ def test_manual_purge_by_age_is_unchanged(real_age, monkeypatch):
     _env(monkeypatch, trash=_mails([3, 4], date=OLD))
     c = mailops.purge_preview("trash", older_than_days=30)
     assert c["uids"] == [3, 4]                  # received date only, as before
+
+
+@pytest.mark.parametrize("scope", ["mail", "trash", "junk"])
+def test_a_new_rule_has_no_reset_reason(monkeypatch, scope):
+    """Filling in the blank template is not an edit: a fresh rule must not
+    claim it was put back in report mode."""
+    _env(monkeypatch)
+    rule = (_rule(scope) if scope != "mail" else
+            rulesmod.create_rule({"name": "m", "query": "tag:shipping"}))
+    assert rule["reset_reason"] == ""
+    assert _stored(rule["id"])["reset_reason"] == ""
+
+
+def test_an_imported_rule_has_no_reset_reason(monkeypatch):
+    _env(monkeypatch)
+    imp = client.post("/api/import_config", json={"rules": [
+        {"name": "i", "query": "tag:shipping"},
+        {"name": "p", "scope": "trash", "older_than_days": 30}]})
+    assert imp.status_code == 200
+    stored = rulesmod.load_rules()
+    assert len(stored) == 2
+    assert [r["reset_reason"] for r in stored] == ["", ""]
+
+
+def test_a_real_edit_of_an_armed_rule_still_says_edited(monkeypatch):
+    _env(monkeypatch)
+    rule = _armed(_rule("trash"))
+    assert _stored(rule["id"])["reset_reason"] == ""
+    edited = rulesmod.update_rule(rule["id"], {"query": "other"})
+    assert edited["mode"] == "report" and edited["reset_reason"] == "edited"
