@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import base64
 import email
+import errno
 import email.header
 import hashlib
 import html as html_mod
@@ -141,6 +142,12 @@ MAILTO_UNSAFE = "mailto_unsafe"
 # connecting (first run): no account set up yet / the CA file is missing
 NO_ACCOUNT = "no_account"
 CAFILE_MISSING = "cafile_missing"    # path=
+# classified connection failures (see `error_text`)
+AUTH_FAILED = "auth_failed"
+HOST_UNREACHABLE = "host_unreachable"
+TLS_FAILED = "tls_failed"
+CONNECT_FAILED = "connect_failed"
+SCAN_FAILED = "scan_failed"
 FOLDER_ERROR_CODES = frozenset({
     MAILTO_UNSAFE,
     NO_MESSAGE_ID, PINNED_MAILS, PROTECTED_MAILS, ALL_PINNED,
@@ -181,7 +188,12 @@ FOLDER_ERROR_CODES = frozenset({
     RULE_PURGE_FILTER,
     RULE_PURGE_FILTER_DOMAIN,
     NO_ACCOUNT,
-    CAFILE_MISSING})
+    CAFILE_MISSING,
+    AUTH_FAILED,
+    HOST_UNREACHABLE,
+    TLS_FAILED,
+    CONNECT_FAILED,
+    SCAN_FAILED})
 
 
 def coded(code: str, **params) -> str:
@@ -201,11 +213,44 @@ def is_coded(text: str) -> bool:
     return text.partition(":")[0] in FOLDER_ERROR_CODES
 
 
-def error_text(exc: Exception) -> str:
+_LOGIN_FAILED = ("authenticationfailed", "login failed", "invalid credentials",
+                 "authentication failed", "invalid login", "auth failed",
+                 "authenticate failed")
+# errnos of a network that cannot be reached (a plain OSError carries one)
+_UNREACHABLE_ERRNOS = {errno.ENETUNREACH, errno.EHOSTUNREACH, errno.ENETDOWN,
+                       errno.EHOSTDOWN, errno.ETIMEDOUT, errno.ECONNREFUSED,
+                       errno.ECONNRESET, errno.ECONNABORTED, errno.ENOTCONN}
+
+
+def classify_connect_error(exc: BaseException,
+                           host: str = "") -> str | None:
+    """The coded error for a well-known way of failing to connect or sign
+    in (never a password or any server text), or None for anything else.
+    `host` is the server the connection went to (shown by the UI)."""
+    import socket
+    if isinstance(exc, ssl.SSLError):
+        return TLS_FAILED
+    if isinstance(exc, (socket.gaierror, ConnectionError, TimeoutError,
+                        socket.timeout)) or (
+            isinstance(exc, OSError) and exc.errno in _UNREACHABLE_ERRNOS):
+        return coded(HOST_UNREACHABLE, host=host or "?")
+    if isinstance(exc, imaplib.IMAP4.error) \
+            and any(k in str(exc).lower() for k in _LOGIN_FAILED):
+        return coded(AUTH_FAILED)
+    return None
+
+
+def error_text(exc: Exception, host: str = "",
+               generic: str = "") -> str:
     """What a job records as its error: a coded refusal as it is (the UI
-    translates it), anything else as `TypeName: message`."""
+    translates it), a well-known connection failure as its code, anything
+    else as `generic` (a code; the caller logs the real exception) or, with
+    none given, `TypeName: message`."""
     text = str(exc)
-    return text if is_coded(text) else f"{type(exc).__name__}: {text}"
+    if is_coded(text):
+        return text
+    return classify_connect_error(exc, host) \
+        or (coded(generic) if generic else f"{type(exc).__name__}: {text}")
 
 
 UNDO_MAX = 10
@@ -2199,7 +2244,7 @@ def run_scan(acc=None) -> None:
             log.exception("scan failed")
         with acc.lock:
             acc.state["status"] = "error"
-            acc.state["error"] = error_text(exc)
+            acc.state["error"] = error_text(exc, im["host"], SCAN_FAILED)
 
 
 def folder_message_count(conn, target: str | None) -> int | None:

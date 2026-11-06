@@ -121,6 +121,11 @@ const ERROR_CODES: Record<string, string> = {
   mailto_unsafe: "ferr.mailto_unsafe",
   no_account: "ferr.no_account",
   cafile_missing: "ferr.cafile_missing",
+  auth_failed: "ferr.auth_failed",
+  host_unreachable: "ferr.host_unreachable",
+  tls_failed: "ferr.tls_failed",
+  connect_failed: "ferr.connect_failed",
+  scan_failed: "ferr.scan_failed",
   // plain words -> filter (backend/aifilter.py)
   aifilter_not_configured: "aif.err.not_configured",
   aifilter_text_empty: "aif.err.text_empty",
@@ -220,7 +225,8 @@ async function req<T>(path: string, body?: unknown,
 
 export const api = {
   state: () => req<AppState>("/api/state"),
-  scan: () => req<{ ok: boolean }>("/api/scan", {}),
+  scan: (account?: string) =>
+    req<{ ok: boolean }>(forAccount("/api/scan", account), {}),
   group: (grouping: Grouping, key: string) =>
     req<Mail[]>(`/api/group?grouping=${grouping}&key=${encodeURIComponent(key)}`),
   message: (folder: string, uid: number) =>
@@ -386,8 +392,9 @@ export const api = {
       { role, uids, uv, folder, trash_folder }),
   trashRestore: (uids: number[], dest: string, uv: number) =>
     req<{ restored: number; rescan: boolean }>("/api/trash/restore", { uids, dest, uv }),
-  testConnection: () =>
-    req<{ ok: boolean; folders: number }>("/api/test_connection", {}),
+  testConnection: (account?: string) =>
+    req<{ ok: boolean; folders: number }>(
+      forAccount("/api/test_connection", account), {}),
   authProbe: () => req<AuthProbe>("/api/auth"),
   // cache: "no-store" - this specifically must never answer from a cached
   // response, or an update-available check can never detect anything.

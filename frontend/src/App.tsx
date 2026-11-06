@@ -19,6 +19,7 @@ import { RulesModal } from "./components/RulesModal";
 import { AllMailsView } from "./components/AllMailsView";
 import { SearchPanel } from "./components/SearchPanel";
 import { SettingsModal } from "./components/SettingsModal";
+import { Wizard, WIZARD_RESUME_KEY, type WizardStep } from "./components/Wizard";
 import { SpaceMapPanel } from "./components/SpaceMapPanel";
 import { StatsPanel } from "./components/StatsPanel";
 import { AiFilterPanel } from "./components/AiFilterPanel";
@@ -30,7 +31,7 @@ import type { QuickWinCard } from "./quickwins";
 import { FoldersPanel } from "./components/FoldersPanel";
 import { AccountAvatar, applyTheme, BAR_ICON_BTN, BulkBar, Button, Chip, ChipGroup, ChipSegment,
   choiceDialog, confirmDialog, currentTheme, EmptyState, ensureAiAck, FILTER_ROW, Input, isModalOpen, LINK,
-  LINK_ACCENT, Menu, MenuDivider, MenuGroup, MenuHeading, MenuItem, Notice, ProgressBar,
+  Menu, MenuDivider, MenuGroup, MenuHeading, MenuItem, Notice, ProgressBar,
   promptDialog, Segmented, Select, Spinner, useToast,
   type ToastVariant } from "./components/ui";
 import { t } from "./i18n";
@@ -145,6 +146,9 @@ export default function App() {
     null);
   const [editQuery, setEditQuery] = useState("");
   const [settingsOpen, setSettingsOpen] = useState(false);
+  // First-run / "Add account" wizard (components/Wizard.tsx).
+  const [wizard, setWizard] = useState<{ mode: "first" | "add";
+    step?: WizardStep; account?: string; previous?: string } | null>(null);
   const [searchOpen, setSearchOpen] = useState(false);
   const [rulesOpen, setRulesOpen] = useState(false);
   // A filter handed to the rules form ("Save as rule" of the AI filter panel).
@@ -574,6 +578,26 @@ export default function App() {
   const aiEnabled = !!cfg?.ai.available;
   const acct = cfg?.accounts[account] ?? null;
   const multiAccount = !!cfg && Object.keys(cfg.accounts).length > 1;
+  // The wizard opens by itself while no account is set up (until the user
+  // sets it up later this session) and again after the OAuth consent
+  // redirect that it started.
+  useEffect(() => {
+    if (!cfg) return;
+    const resume = sessionStorage.getItem(WIZARD_RESUME_KEY);
+    if (resume) {
+      sessionStorage.removeItem(WIZARD_RESUME_KEY);
+      try {
+        const r = JSON.parse(resume);
+        if (cfg.accounts[r.account]) {
+          setWizard({ mode: r.mode === "add" ? "add" : "first",
+            step: "signin", account: r.account });
+          return;
+        }
+      } catch { /* ignore a broken marker */ }
+    }
+    if (cfg.setup_needed && !sessionStorage.getItem("pmc_wizard_later"))
+      setWizard((w) => w ?? { mode: "first" });
+  }, [cfg?.setup_needed, !!cfg]);
   // >= 1280 px: the group detail is a pane beside the list. It is not a
   // modal - the list stays keyboard-navigable and nothing traps focus.
   const splitPane = useSplitPane();
@@ -672,6 +696,7 @@ export default function App() {
   }, [state?.groups_rev]);
   useEffect(() => { prevGroups.current = groups; });
   const anyModal = (!!detail && !splitPane) || searchOpen || settingsOpen || rulesOpen
+    || !!wizard
     || aiFilterOpen || attsOpen || dupsOpen || trackersOpen || statsOpen || spaceOpen || wrappedOpen || auditOpen
     || triageOpen || !!foldersOpen;
 
@@ -1607,13 +1632,13 @@ export default function App() {
                     </span>
                   </MenuItem>
                 ))}
-                <MenuItem onClick={() => setSettingsOpen(true)}>
-                  <Plus size={16} className="mr-1 inline align-text-bottom" />
-                  {t("account.add")}…
-                </MenuItem>
-                <div className="my-1 border-t border-line" />
               </>
             )}
+            <MenuItem onClick={() => setWizard({ mode: "add", previous: account })}>
+              <Plus size={16} className="mr-1 inline align-text-bottom" />
+              {t("account.add")}…
+            </MenuItem>
+            <div className="my-1 border-t border-line" />
             {auth.mode === "oidc" && !!auth.sub && (
               <MenuHeading>
                 {auth.sub}
@@ -2112,19 +2137,18 @@ export default function App() {
         <div className="mx-auto my-10 max-w-md rounded-card border border-line
           bg-panel p-4 type-body sm:p-5">
           <div className="mb-3 type-heading">
-            {t("onboard.title")}
+            {cfg.setup_needed ? t("wizard.setup_btn") : t("onboard.ready")}
           </div>
-          <ol className="list-decimal space-y-2 pl-5 text-muted">
-            <li>{t("onboard.step_bridge")}</li>
-            <li>
-              {t("onboard.step_creds")}{" "}
-              <button className={LINK_ACCENT}
-                onClick={() => setSettingsOpen(true)}>
-                {t("Settings")}
-              </button>
-            </li>
-            <li>{t("onboard.step_scan")}</li>
-          </ol>
+          <p className="text-muted">
+            {cfg.setup_needed ? t("wizard.setup_text")
+              : t("onboard.step_scan")}
+          </p>
+          {cfg.setup_needed ? (<>
+            <div className="mt-4">
+              <Button onClick={() => setWizard({ mode: "first" })}>
+                {t("wizard.setup_btn")}</Button>
+            </div>
+          </>) : (
           <div className="mt-4 flex items-center gap-3">
             {hasCredentials(acct) && (
               <Button variant="secondary" onClick={async () => {
@@ -2143,6 +2167,7 @@ export default function App() {
               {t("Scan")}
             </Button>
           </div>
+          )}
         </div>
       )}
 
@@ -2306,6 +2331,25 @@ export default function App() {
           onClose={() => { setRulesOpen(false); setRulesSeed(""); }}
           onChanged={refresh}
         />
+      )}
+      {wizard && cfg && (
+        <Wizard cfg={cfg} mode={wizard.mode} initialStep={wizard.step}
+          initialAccount={wizard.account} previousAccount={wizard.previous}
+          scan={{ account: state?.account ?? "", status: state?.status ?? "",
+            progress: state?.progress ?? "", error: state?.error ?? "",
+            scannedTs: state?.scanned_ts ?? null }}
+          onConfig={(next, name) => {
+            setCfg(next);
+            if (name && next.accounts[name]) switchAccount(name);
+            else if (!next.accounts[account])
+              switchAccount(next.default_account);
+          }}
+          onClose={() => {
+            if (wizard.mode === "first")
+              sessionStorage.setItem("pmc_wizard_later", "1");
+            setWizard(null);
+            refresh();
+          }} />
       )}
       {settingsOpen && cfg && (
         <SettingsModal

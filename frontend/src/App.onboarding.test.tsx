@@ -3,7 +3,7 @@
  * under the account's own sign-in method - an OAuth-connected account has
  * no password and must still be able to use them. */
 
-import { cleanup, render, screen, waitFor, within } from
+import { cleanup, fireEvent, render, screen, waitFor, within } from
   "@testing-library/react";
 import { afterEach, expect, test, vi } from "vitest";
 
@@ -81,11 +81,11 @@ const open = async (a: object) => {
   cfg = mkCfg(a);
   state = baseState;
   render(<ToastProvider><DialogProvider><App /></DialogProvider></ToastProvider>);
-  await screen.findByText(/three steps to a tidy mailbox/);
+  await screen.findByText(/Ready for the first scan/);
 };
 // The toolbar has its own Scan button - look inside the welcome card.
 const card = () =>
-  within(screen.getByText(/three steps to a tidy mailbox/).parentElement!);
+  within(screen.getByText(/Ready for the first scan/).parentElement!);
 const scanBtn = () =>
   card().getByRole("button", { name: "Scan" }) as HTMLButtonElement;
 const testBtn = () => card().queryByRole("button",
@@ -130,8 +130,54 @@ test("a failed first scan keeps the welcome card and words the coded error",
     cfg = mkCfg({ password_set: true });
     state = { ...baseState, status: "error", error: "no_account" };
     render(<ToastProvider><DialogProvider><App /></DialogProvider></ToastProvider>);
-    await screen.findByText(/three steps to a tidy mailbox/);
+    await screen.findByText(/Ready for the first scan/);
     expect(await screen.findByText(/No mail account is set up yet/))
       .toBeTruthy();
     expect(screen.queryByText(/no_account/)).toBeNull();
   });
+
+const openRaw = async (c: Config) => {
+  localStorage.setItem("pmc_account", "proton");
+  cfg = c;
+  state = baseState;
+  render(<ToastProvider><DialogProvider><App /></DialogProvider></ToastProvider>);
+};
+
+test("with no account set up the wizard opens by itself; Set up later " +
+  "leaves a card that reopens it", async () => {
+  sessionStorage.clear();
+  await openRaw({ ...mkCfg({ user: "", password_set: false }),
+    setup_needed: true });
+  expect(await screen.findByText("Where does your mail live?", { exact:
+    false })).toBeTruthy();
+  fireEvent.click(screen.getAllByRole("button", { name: "Set up later" })[0]);
+  await waitFor(() => expect(screen.queryByText(/Where does your mail live/))
+    .toBeNull());
+  const setup = await screen.findByRole("button",
+    { name: "Set up your mailbox" });
+  // it stays closed after a reload within the session
+  cleanup();
+  await openRaw({ ...mkCfg({ user: "", password_set: false }),
+    setup_needed: true });
+  await screen.findByRole("button", { name: "Set up your mailbox" });
+  expect(screen.queryByText(/Where does your mail live/)).toBeNull();
+  fireEvent.click(screen.getByRole("button", { name: "Set up your mailbox" }));
+  expect(await screen.findByText(/Where does your mail live/)).toBeTruthy();
+  expect(setup).toBeTruthy();
+  sessionStorage.clear();
+});
+
+test("a configured install never opens the wizard by itself", async () => {
+  sessionStorage.clear();
+  await open({ password_set: true });
+  expect(screen.queryByText(/Where does your mail live/)).toBeNull();
+});
+
+test("the profile menu's Add account opens the wizard, even with a single " +
+  "account", async () => {
+  sessionStorage.clear();
+  await open({ password_set: true });
+  fireEvent.click(screen.getByRole("button", { name: "Profile & settings" }));
+  fireEvent.click(await screen.findByText(/Add account/));
+  expect(await screen.findByText(/Where does your mail live/)).toBeTruthy();
+});

@@ -1469,7 +1469,11 @@ def post_test_connection(account: str | None = Query(None)):
             except Exception:
                 pass
     except Exception as exc:
-        raise HTTPException(502, mailops.error_text(exc))
+        logging.getLogger("pmc.mail").warning(
+            "test_connection failed: %s", type(exc).__name__)
+        text = mailops.error_text(exc, im["host"])
+        raise HTTPException(502, text if mailops.is_coded(text)
+                            else mailops.coded(mailops.CONNECT_FAILED))
     return {"ok": True, "folders": n}
 
 
@@ -1494,7 +1498,11 @@ def get_folders(account: str | None = Query(None)):
             except Exception:
                 pass
     except Exception as exc:
-        raise HTTPException(500, mailops.error_text(exc))
+        logging.getLogger("pmc.mail").warning(
+            "folder listing failed: %s: %s", type(exc).__name__, exc)
+        raise HTTPException(500, mailops.error_text(
+            exc, cfgmod.account_imap(acc.name)["host"],
+            mailops.CONNECT_FAILED))
     rules = cfgmod.account_imap(acc.name).get("excluded_folders") or []
     # a folder can hold several roles (flagged \All and \Archive): report
     # the first in a fixed order, excluded if any of them is excluded
