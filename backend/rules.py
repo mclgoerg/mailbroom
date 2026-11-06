@@ -675,6 +675,8 @@ def create_rule(body: dict, lenient_filter: bool = False) -> dict:
         if body.get("older_than_days") is None:
             body["older_than_days"] = PURGE_DEFAULT_DAYS
     _validate(body, rule, lenient_filter)
+    # filling in the blank template is not an edit of an armed rule
+    rule["reset_reason"] = ""
     with _LOCK:
         rules = load_rules()
         rules.append(rule)
