@@ -477,4 +477,22 @@ test("after a successful test the config is re-read so the account " +
   await screen.findByText("Connected - 7 folders found.");
   const last = onConfig.mock.calls.at(-1)![0] as Config;
   expect(last.accounts.default.verified).toBe(true);
+
+test("the client-secret placeholder says optional for Microsoft, required " +
+  "for Google", () => {
+  const secret = (label = "Client secret") => screen.getByLabelText(label)
+    .getAttribute("placeholder");
+  open();
+  pick("Outlook / Microsoft 365");
+  expect(secret()).toBe("optional");
+  cleanup();
+  open();
+  pick("Gmail");
+  fireEvent.click(screen.getByRole("tab", { name: "OAuth" }));
+  expect(secret()).toBe("required");
+  cleanup();
+  setLang("de");
+  open();
+  pick("Outlook / Microsoft 365");
+  expect(secret("Client-Secret")).toBe("optional");
 });

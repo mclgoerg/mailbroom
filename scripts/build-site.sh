@@ -38,7 +38,7 @@ MAX_FILE_BYTES=$((25 * 1024 * 1024))
 
 check_tree() {
   local t="$1" f n
-  for f in index.html 404.html favicon.svg _headers docs/index.html docs/404.html \
+  for f in index.html 404.html favicon.svg og.png _headers docs/index.html docs/404.html \
            demo/index.html demo/bundle/manifest.json; do
     [ -f "$t/$f" ] || die "missing $f in the assembled tree"
   done
@@ -53,10 +53,19 @@ check_tree() {
     || die "demo/index.html does not load /demo/assets/ (built without --base /demo/?)"
   grep -q 'href="/docs/' "$t/docs/index.html" || die "docs are not rooted at /docs/"
 
+  # link previews: the landing page, the docs and the demo all name the image
+  for f in index.html docs/index.html demo/index.html; do
+    grep -q 'property="og:image" content="https://inboxrake.com/og.png"' "$t/$f" \
+      || die "$f has no og:image tag"
+    grep -q 'name="twitter:card"' "$t/$f" || die "$f has no twitter:card tag"
+  done
+  grep -q '"/demo/icon.svg"' "$t/demo/manifest.webmanifest" \
+    || die "demo manifest icon is not rooted at /demo/"
+
   # _headers only works at the root; one anywhere else would be a dead copy
   n=$(find "$t" -name _headers -not -path "$t/_headers" | wc -l)
   [ "$n" -eq 0 ] || die "stray _headers file(s) below the root"
-  for f in "/demo/bundle/*" "/demo/assets/*" "/docs/_astro/*" "/demo/bundle/manifest.json"; do
+  for f in "/*" "/demo/bundle/*" "/demo/assets/*" "/docs/_astro/*" "/demo/bundle/manifest.json"; do
     grep -qxF "$f" "$t/_headers" || die "_headers has no rule for $f"
   done
   [ "$(grep -c '^/' "$t/_headers")" -le 100 ] || die "_headers has over 100 rules"

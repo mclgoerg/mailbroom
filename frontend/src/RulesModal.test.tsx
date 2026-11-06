@@ -230,7 +230,7 @@ test("choosing Junk fixes the action, shows the warning and offers the " +
   expect(action.disabled).toBe(true);
   expect([...action.options].map((o) => o.textContent))
     .toEqual(["Delete permanently"]);
-  expect(screen.getByLabelText("Received more than this many days ago"))
+  expect(screen.getByLabelText("In Trash/Junk for more than this many days"))
     .toHaveProperty("value", "30");
   expect(screen.getByLabelText("Schedule")).toHaveProperty("value", "weekly");
   expect(screen.queryByLabelText("Grouping")).toBeNull();
@@ -263,7 +263,7 @@ test("a purge rule needs a whole number of days", () => {
   pickScope("junk");
   fireEvent.change(screen.getByLabelText("Name"),
     { target: { value: "x" } });
-  fireEvent.change(screen.getByLabelText("Received more than this many days ago"),
+  fireEvent.change(screen.getByLabelText("In Trash/Junk for more than this many days"),
     { target: { value: "0" } });
   fireEvent.click(screen.getByText("Create rule (report only)"));
   expect(createRule).not.toHaveBeenCalled();
@@ -390,7 +390,7 @@ test("editing an execute-mode purge rule says it goes back to report mode",
   expect(screen.getByText(/switches this rule back to report mode/))
     .toBeTruthy();
   expect(screen.getByLabelText("Applies to")).toHaveProperty("value", "junk");
-  expect(screen.getByLabelText("Received more than this many days ago"))
+  expect(screen.getByLabelText("In Trash/Junk for more than this many days"))
     .toHaveProperty("value", "30");
   fireEvent.click(screen.getByText("Save"));
   expect(updateRule).toHaveBeenCalledWith("pg1", expect.objectContaining(
@@ -416,7 +416,7 @@ test("German: folder select, warning, defaults and the confirm", async () => {
   fireEvent.change(screen.getByLabelText("Gilt für"), { target: { value: "trash" } });
   expect(screen.getByText(/Löscht Mails auf dem Server, endgültig/))
     .toBeTruthy();
-  expect(screen.getByLabelText("Vor mehr als so vielen Tagen empfangen"))
+  expect(screen.getByLabelText("Mehr als so viele Tage in Papierkorb/Spam"))
     .toHaveProperty("value", "30");
   expect((screen.getByLabelText("Aktion") as HTMLSelectElement).disabled)
     .toBe(true);
@@ -670,3 +670,14 @@ test("an error that is not a code (an older run, a raw failure) stays as is",
     expect(screen.getByText("RuntimeError: Trash is ambiguous - choose it in "
       + "Settings first")).toBeTruthy();
   });
+
+test("the editor of an armed mail rule shows the reset note", () => {
+  renderCards([{ ...rule, mode: "execute" }]);
+  fireEvent.click(screen.getByText("Edit"));
+  expect(document.body.textContent).toContain(EN["rule.edit_reset"]);
+});
+
+test("a card says why an edited mail rule went back to report mode", () => {
+  renderCards([{ ...rule, mode: "report", reset_reason: "edited" }]);
+  expect(document.body.textContent).toContain(EN["rule.reset_edited"]);
+});

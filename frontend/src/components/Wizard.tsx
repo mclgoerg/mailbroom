@@ -546,7 +546,8 @@ export function Wizard({ cfg, mode, initialStep, initialAccount, scan,
             <Field label={t("oauth.client_secret")}>
               <Input className="w-full" type="password" value={f.clientSecret}
                 placeholder={saved?.oauth?.client_secret_set
-                  ? t("(unchanged)") : t("required")}
+                  ? t("(unchanged)")
+                  : t(oauthProvider === "microsoft" ? "optional" : "required")}
                 onChange={set("clientSecret")} />
             </Field>
           </div>

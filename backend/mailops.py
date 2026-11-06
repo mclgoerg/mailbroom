@@ -3491,6 +3491,10 @@ ROLE_LABELS = {"trash": "Trash", "junk": "Junk"}
 ROLE_COUNTED = {"trash": "trash_count", "junk": "junk_count"}
 
 
+def _valid_in_since(v) -> bool:
+    return isinstance(v, (int, float)) and not isinstance(v, bool) and v > 0
+
+
 def refresh_role_index(conn, role: str, folder: str,
                        acc=None) -> tuple[int, list[dict]]:
     """Bring the `role` index up to date with `folder` on the server and
@@ -3514,7 +3518,14 @@ def refresh_role_index(conn, role: str, folder: str,
     messages: list = []
     scan_folder(conn, folder, messages, lambda *a: None, acc,
                 index=cache, uv=uv)
-    fresh = {ikey(m["folder"], m["uid"]): m for m in messages}
+    # "first seen in this folder" (`in_since`): a record that has none - new
+    # to the index, a UIDVALIDITY rebuild, an older snapshot - starts NOW,
+    # never earlier (purge rules wait N days from here, not from the date
+    # the mail was received)
+    seen_now = time.time()
+    fresh = {ikey(m["folder"], m["uid"]):
+             m if _valid_in_since(m.get("in_since"))
+             else {**m, "in_since": seen_now} for m in messages}
     new_uv = {folder: uv.get(folder, 0)}
     with acc.lock:
         changed = fresh != old or new_uv != old_uv
@@ -3522,7 +3533,7 @@ def refresh_role_index(conn, role: str, folder: str,
         acc.role_uv[role] = new_uv
     if changed:                  # persist only when something moved
         save_snapshot(acc)
-    return new_uv[folder], messages
+    return new_uv[folder], list(fresh.values())
 
 
 def role_state(role: str, folder: str, acc=None) -> tuple[int, list[dict]]:
@@ -4226,7 +4237,8 @@ def _purge_split(mails: list[dict], wanted, acc):
 
 def purge_preview(role: str, *, uids=None, senders=None,
                   older_than_days: int | None = None,
-                  everything: bool = False, match=None, acc=None) -> dict:
+                  everything: bool = False, match=None,
+                  in_folder_days: int | None = None, acc=None) -> dict:
     """The live count a permanent deletion of `role` would act on - read
     from a fresh listing of the server (never the cache), selected by
     exactly one of: `uids` (a selection), `senders` (every mail of those
@@ -4237,7 +4249,10 @@ def purge_preview(role: str, *, uids=None, senders=None,
     was read from; the confirm sends all of it back to `purge_mails`, which
     refuses when the role resolves to another folder now. `match` (purge
     rules) narrows the selection further: it gets the whole fresh listing
-    and returns the UIDs it accepts. Deletes nothing."""
+    and returns the UIDs it accepts. `in_folder_days` (purge rules) keeps only
+    mails Inboxrake has seen in the folder for at least that many days
+    (`in_since` of the role index; no or an invalid value = just seen), on
+    top of the selection. Deletes nothing."""
     acc = acc or accounts.get()
     if role not in PURGE_ROLES:
         raise ValueError("bad role")
@@ -4269,6 +4284,11 @@ def purge_preview(role: str, *, uids=None, senders=None,
         wanted = {m["uid"] for m in mails}
     if match is not None:
         wanted &= {int(u) for u in match(mails)}
+    if in_folder_days is not None:
+        since = time.time() - int(in_folder_days) * 86400
+        wanted &= {m["uid"] for m in mails
+                   if _valid_in_since(m.get("in_since"))
+                   and m["in_since"] <= since}
     keep, protected, pinned, _ = _purge_split(mails, wanted, acc)
     key = ROLE_COUNTED[role]
     with acc.lock:

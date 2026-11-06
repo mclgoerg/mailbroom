@@ -32,6 +32,29 @@ from test_purge import OLD, Spy, _env, _mails, _recent, _uids, _uv_flips
 client = TestClient(app)
 
 
+@pytest.fixture
+def real_age():
+    """Opt out of the autouse backdating below (tests of the in-folder age
+    itself)."""
+
+
+@pytest.fixture(autouse=True)
+def _long_in_folder(request, monkeypatch):
+    """The rule tests below are about filters, caps and guards, not about how
+    long a mail has been in the folder: every listing reports its mails as
+    in the folder since forever (the first-seen time has its own tests)."""
+    if "real_age" in request.fixturenames:
+        return
+    orig = mailops.refresh_role_index
+
+    def refresh(*a, **k):
+        uv, mails = orig(*a, **k)
+        for m in mails:
+            m["in_since"] = 1.0
+        return uv, mails
+    monkeypatch.setattr(mailops, "refresh_role_index", refresh)
+
+
 def _rule(scope="trash", query="", days=30, **kw):
     return rulesmod.create_rule({
         "name": "purge old", "scope": scope, "query": query,
@@ -1448,3 +1471,171 @@ def test_older_than_zero_days_is_rejected_at_save_for_purge_rules():
         "name": "z", "scope": "junk",
         "older_than_days": 0}).status_code == 400
     assert _stored(rule["id"])["older_than_days"] == 30
+
+
+# ================================================ time in the folder (M1)
+
+def _first_seen(role="trash"):
+    return {m["uid"]: m["in_since"] for m in mailops.role_mails(role)}
+
+
+def _backdate(role, days, uids=None):
+    """Pretend Inboxrake saw these mails `days` ago (the persisted field)."""
+    acc = accountsmod.get()
+    with acc.lock:
+        for m in acc.role_index[role].values():
+            if uids is None or m["uid"] in uids:
+                m["in_since"] = time.time() - days * 86400
+
+
+def test_mail_trashed_today_is_not_purged_for_its_old_date(real_age,
+                                                           monkeypatch):
+    fake = _env(monkeypatch, trash=_mails([3, 4], date=OLD))
+    rule = _armed(_rule("trash", days=30))
+    res = _run(rule)
+    assert res["mode"] == "execute" and res["error"] == ""
+    assert res["mails"] == 0 and res["acted"] == 0
+    assert _uids(fake, "Trash") == [3, 4]
+    _backdate("trash", 29)
+    assert _run(rule)["acted"] == 0 and _uids(fake, "Trash") == [3, 4]
+    _backdate("trash", 31)                      # now long enough in Trash
+    res = _run(rule)
+    assert res["acted"] == 2 and _uids(fake, "Trash") == []
+
+
+def test_only_the_mails_that_waited_long_enough_go(real_age, monkeypatch):
+    fake = _env(monkeypatch, trash=_mails([3, 4, 5], date=OLD))
+    rule = _armed(_rule("trash", days=30))
+    _backdate("trash", 40, uids={3, 4})         # 5 arrived just now
+    assert _run(rule)["acted"] == 2
+    assert _uids(fake, "Trash") == [5]
+
+
+def test_the_received_date_still_narrows_it(real_age, monkeypatch):
+    fake = _env(monkeypatch, trash=[
+        make_msg(3, frm="a@gone.example", date=OLD),
+        make_msg(4, frm="a@gone.example", date=_recent())])
+    rule = _armed(_rule("trash", days=30))
+    _backdate("trash", 90)                      # both long in Trash
+    assert _run(rule)["acted"] == 1             # but 4 was received today
+    assert _uids(fake, "Trash") == [4]
+
+
+def test_junk_rule_waits_too(real_age, monkeypatch):
+    fake = _env(monkeypatch, junk=_mails([3], date=OLD), trash=_mails([8]),
+                renumber=True, copyuid=True)
+    rule = _armed(_rule("junk", days=30))
+    assert _run(rule)["mails"] == 0 and _uids(fake, "Spam") == [3]
+    _backdate("junk", 31)
+    assert _run(rule)["acted"] == 1 and _uids(fake, "Spam") == []
+
+
+def test_report_run_shows_what_execute_would_use(real_age, monkeypatch):
+    _env(monkeypatch, trash=_mails([3, 4, 5], date=OLD))
+    rule = _rule("trash", days=30)
+    assert _run(rule)["mails"] == 0
+    _backdate("trash", 40, uids={3, 4})
+    report = _run(rule)
+    rulesmod.update_rule(rule["id"], {"mode": "execute"})
+    res = _run(rule)
+    assert report["mails"] == res["mails"] == 2
+    assert report["preview"] == res["preview"]
+    assert res["acted"] == 2
+
+
+def test_first_seen_is_set_once_and_survives_a_snapshot(real_age,
+                                                        monkeypatch):
+    _env(monkeypatch, trash=_mails([3, 4], date=OLD))
+    acc = accountsmod.get()
+    mailops.run_scan()
+    t0 = time.time()
+    mailops.trash_list()
+    seen = _first_seen()
+    assert set(seen) == {3, 4} and all(t0 - 5 <= v <= time.time()
+                                       for v in seen.values())
+    _backdate("trash", 50)
+    mailops.save_snapshot(acc)
+    old = _first_seen()
+    mailops.trash_list()                        # a later refresh keeps it
+    assert _first_seen() == old
+    accountsmod.reset()                         # "restart"
+    acc2 = accountsmod.get()
+    assert mailops.load_snapshot(acc2) is True
+    assert {m["uid"]: m["in_since"]
+            for m in acc2.role_index["trash"].values()} == old
+    mailops.trash_list(acc=acc2)
+    assert {m["uid"]: m["in_since"]
+            for m in acc2.role_index["trash"].values()} == old
+
+
+def test_records_without_the_field_start_now(real_age, monkeypatch):
+    """An older snapshot (or a hand-edited / malformed value) is treated as
+    'first seen now' - the upgrade waits N days instead of deleting."""
+    _env(monkeypatch, trash=_mails([3, 4, 5, 6, 7], date=OLD))
+    acc = accountsmod.get()
+    mailops.run_scan()
+    mailops.trash_list()
+    mailops.save_snapshot(acc)
+    path = mailops._snap_path(acc.name)
+    data = json.loads(path.read_text())
+    recs = {m["uid"]: m for m in data["role_index"]["trash"]}
+    del recs[3]["in_since"]
+    recs[4]["in_since"] = "yesterday"
+    recs[5]["in_since"] = -5
+    recs[6]["in_since"] = True
+    path.write_text(json.dumps(data))
+    accountsmod.reset()
+    acc2 = accountsmod.get()
+    assert mailops.load_snapshot(acc2) is True
+    t0 = time.time()
+    mailops.trash_list(acc=acc2)
+    got = {m["uid"]: m["in_since"] for m in acc2.role_index["trash"].values()}
+    assert all(got[u] >= t0 for u in (3, 4, 5, 6))
+    assert got[7] < t0                          # the valid one is kept
+
+
+def test_an_upgrade_from_a_snapshot_without_the_field_purges_nothing(
+        real_age, monkeypatch):
+    fake = _env(monkeypatch, trash=_mails([3, 4], date=OLD))
+    acc = accountsmod.get()
+    rule = _armed(_rule("trash", days=30))
+    mailops.run_scan()
+    mailops.trash_list()
+    _backdate("trash", 90)
+    mailops.save_snapshot(acc)
+    path = mailops._snap_path(acc.name)
+    data = json.loads(path.read_text())
+    for m in data["role_index"]["trash"]:
+        del m["in_since"]                       # what an old release wrote
+    path.write_text(json.dumps(data))
+    accountsmod.reset()
+    assert mailops.load_snapshot(accountsmod.get()) is True
+    assert _run(rule)["acted"] == 0 and _uids(fake, "Trash") == [3, 4]
+
+
+def test_a_uidvalidity_change_starts_the_clock_again(real_age, monkeypatch):
+    fake = _env(monkeypatch, trash=_mails([3, 4], date=OLD))
+    mailops.trash_list()
+    _backdate("trash", 90)
+    crit = dict(older_than_days=30, in_folder_days=30)
+    assert mailops.purge_preview("trash", **crit)["uids"] == [3, 4]
+    fake.uv["Trash"] = 9                        # folder re-created
+    assert mailops.purge_preview("trash", **crit)["uids"] == []
+    assert all(v > time.time() - 60 for v in _first_seen().values())
+
+
+def test_a_reused_uid_does_not_inherit_the_old_clock(real_age, monkeypatch):
+    fake = _env(monkeypatch, trash=_mails([3], date=OLD))
+    mailops.trash_list()
+    _backdate("trash", 90)
+    fake.mailbox["Trash"] = []                  # 3 vanished ...
+    mailops.trash_list()
+    fake.mailbox["Trash"] = _mails([4], date=OLD)
+    mailops.trash_list()
+    assert _first_seen()[4] > time.time() - 60
+
+
+def test_manual_purge_by_age_is_unchanged(real_age, monkeypatch):
+    _env(monkeypatch, trash=_mails([3, 4], date=OLD))
+    c = mailops.purge_preview("trash", older_than_days=30)
+    assert c["uids"] == [3, 4]                  # received date only, as before

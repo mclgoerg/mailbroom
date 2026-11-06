@@ -1203,6 +1203,11 @@ export function useToast(): ToastApi {
   return api;
 }
 
+/** `useToast` for components that also render outside a provider (tests). */
+export function useOptionalToast(): ToastApi | null {
+  return useContext(ToastContext);
+}
+
 const TOAST_ICON = { info: Info, success: CheckCircle2, error: AlertCircle };
 
 // `dismiss` is stable and the timer depends only on [ms, id, dismiss], so a
