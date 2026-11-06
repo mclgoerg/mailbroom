@@ -87,10 +87,10 @@ the short version; [install.md](install.md) covers running it and
   now; metadata only, nothing is uploaded.
 - **Duplicate finder** - mails with the same Message-ID (e.g. copies
   across folders), grouped into sets with one click to select everything
-  but the newest copy. Only mails that have no Message-ID at all are
-  matched by identical sender + subject + size instead; two mails with
-  their own, different Message-IDs (say, two monthly statements) are never
-  treated as duplicates.
+  but the newest copy. Only mails without a usable Message-ID (missing,
+  or junk such as `<>`) are matched by identical sender + subject + size
+  instead; two mails with their own, different Message-IDs (say, two
+  monthly statements) are never treated as duplicates.
 - **Rules + scheduler** - save a filter query (same syntax as the filter
   box) plus an action as a rule, run it manually or daily/weekly. Rules
   always start in **report mode** (they only tell you what they would do);

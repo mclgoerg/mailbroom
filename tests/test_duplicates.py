@@ -129,3 +129,43 @@ def test_an_idless_mail_is_not_paired_with_one_that_has_an_id(monkeypatch):
                            msgid="<n2@shop.example>")],
         "Trash": [], "Spam": []})
     assert mailops.duplicates_list() == []
+
+
+def test_junk_message_ids_never_pair_unrelated_mails(monkeypatch):
+    """`<>`, `@`, `<@localhost>`, `-` ... are emitted by odd mailers and
+    shared by unrelated mails; they count as "no Message-ID", so only the
+    (sender, subject, size) rule can pair them - and it doesn't here."""
+    junk = ["<>", "@", "<@>", "<@localhost>", "<a@>", "-", " < @ > ",
+            "<no-at-sign>", "a@b.example"]      # the last lacks the brackets
+    inbox = []
+    for uid, mid in enumerate(junk, start=1):
+        inbox.append(make_msg(uid, frm=f"s{uid}@x.example",
+                              subject=f"Subject {uid}", size=100 + uid,
+                              msgid=mid))
+        inbox.append(make_msg(uid + 100, frm=f"t{uid}@y.example",
+                              subject=f"Other {uid}", size=500 + uid,
+                              msgid=mid))
+    _scan(monkeypatch, {"INBOX": inbox, "Trash": [], "Spam": []})
+    assert mailops.duplicates_list() == []
+
+
+def test_truncated_long_message_ids_never_pair(monkeypatch):
+    """Two different ids that share their first 300 characters are stored
+    identically (cut at 300): that is not an identity."""
+    head = "<" + "x" * 320
+    _scan(monkeypatch, {
+        "INBOX": [make_msg(1, frm="a@x.example", subject="One", size=100,
+                           msgid=head + "-1@x.example>"),
+                  make_msg(2, frm="b@y.example", subject="Two", size=200,
+                           msgid=head + "-2@x.example>")],
+        "Trash": [], "Spam": []})
+    assert mailops.duplicates_list() == []
+
+
+def test_ordinary_message_ids_still_pair(monkeypatch):
+    _scan(monkeypatch, {
+        "INBOX": [make_msg(1, subject="Same", msgid="<a@b.example>")],
+        "Archive": [make_msg(5, subject="Same", msgid="<a@b.example>")],
+        "Trash": [], "Spam": []})
+    (s,) = mailops.duplicates_list()
+    assert len(s["mails"]) == 2
