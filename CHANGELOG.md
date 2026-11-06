@@ -1,5 +1,45 @@
 # Changelog
 
+## [1.11.0](https://github.com/mclgoerg/mailbroom/compare/v1.10.0...v1.11.0) (2026-11-06)
+
+
+### Features
+
+* first-run setup wizard ([#206](https://github.com/mclgoerg/mailbroom/issues/206)) ([2b8fb4e](https://github.com/mclgoerg/mailbroom/commit/2b8fb4ef3de59c25daf6eb1a57719300b36ad456))
+* let Gmail accounts sign in with an app password again ([780e4a8](https://github.com/mclgoerg/mailbroom/commit/780e4a88ec5a57ffd44b82e01b6c915de5c37b13))
+
+
+### Bug Fixes
+
+* a fresh install no longer fails on the first scan ([#191](https://github.com/mclgoerg/mailbroom/issues/191)) ([0e858a6](https://github.com/mclgoerg/mailbroom/commit/0e858a6c849ae0597772cb51ff754e0efb087052))
+* accounts connected via OAuth can test the connection and start the first scan ([780e4a8](https://github.com/mclgoerg/mailbroom/commit/780e4a88ec5a57ffd44b82e01b6c915de5c37b13))
+* changing an account's provider preset no longer keeps signing in via OAuth ([780e4a8](https://github.com/mclgoerg/mailbroom/commit/780e4a88ec5a57ffd44b82e01b6c915de5c37b13))
+* forbid embedding Mailbroom in other sites' frames ([#184](https://github.com/mclgoerg/mailbroom/issues/184)) ([026510d](https://github.com/mclgoerg/mailbroom/commit/026510d921f242e0123a177983cc7db7c960fa4a))
+* group the Tools menu ([#186](https://github.com/mclgoerg/mailbroom/issues/186)) ([282ce66](https://github.com/mclgoerg/mailbroom/commit/282ce666d17af949d7496638ff7d6bd303f495dd))
+* health checks no longer fill the log ([#192](https://github.com/mclgoerg/mailbroom/issues/192)) ([734bfb6](https://github.com/mclgoerg/mailbroom/commit/734bfb69a8fdd2cae41daa8fc080826a305d9337))
+* hide folders that can't hold mail, like Gmail's [Gmail] parent ([#196](https://github.com/mclgoerg/mailbroom/issues/196)) ([f43fcff](https://github.com/mclgoerg/mailbroom/commit/f43fcff59f42812a322ded111a063709e9e98a04))
+* keep sign-in tokens out of the settings backup ([#180](https://github.com/mclgoerg/mailbroom/issues/180)) ([310c1a1](https://github.com/mclgoerg/mailbroom/commit/310c1a1e03cd7da4b5e6181e56d1dcd148551932))
+* label the Junk and Trash counts in the header ([#181](https://github.com/mclgoerg/mailbroom/issues/181)) ([700fdac](https://github.com/mclgoerg/mailbroom/commit/700fdac4c4630305605d94cad4d2a4de3b427a0b))
+* less clutter above the group list ([#203](https://github.com/mclgoerg/mailbroom/issues/203)) ([fad4032](https://github.com/mclgoerg/mailbroom/commit/fad4032ef42d0dc8bbec65ad050d1a00cbb72a0b))
+* mailto unsubscribe can no longer add mail headers ([#189](https://github.com/mclgoerg/mailbroom/issues/189)) ([f47e4d8](https://github.com/mclgoerg/mailbroom/commit/f47e4d892e5e178be8f9db06cea06a8b452a2b93))
+* never purge other apps' deleted mails while moving ([#199](https://github.com/mclgoerg/mailbroom/issues/199)) ([ca3d9b3](https://github.com/mclgoerg/mailbroom/commit/ca3d9b3080d748e924df58f03af1db68024d2168))
+* refuse requests from other websites when no login is set ([#179](https://github.com/mclgoerg/mailbroom/issues/179)) ([54e5a09](https://github.com/mclgoerg/mailbroom/commit/54e5a0903ea3d0a6b4323b5029be95b588e7e552))
+* refuse single sign-on with an unverified email ([759d23e](https://github.com/mclgoerg/mailbroom/commit/759d23ef96d41ea9b36b4a6c2a1b74b1e25c8217))
+* save the scan snapshot before a delete job reports done ([#209](https://github.com/mclgoerg/mailbroom/issues/209)) ([6557221](https://github.com/mclgoerg/mailbroom/commit/6557221ff1cbd779aecfcb8ee0c815178a720e2e))
+* say clearly when the data folder is not writable ([#194](https://github.com/mclgoerg/mailbroom/issues/194)) ([04bdf61](https://github.com/mclgoerg/mailbroom/commit/04bdf6110e172631b86f8ed3490cb75ab5fcc166))
+* send "Describe a filter" with Ctrl+Enter ([#198](https://github.com/mclgoerg/mailbroom/issues/198)) ([c4517f5](https://github.com/mclgoerg/mailbroom/commit/c4517f5e4cea56e16ce6b04475bcde5da44a9b12))
+* show Unsubscribe in a group's view on phones ([#182](https://github.com/mclgoerg/mailbroom/issues/182)) ([5e8b2a5](https://github.com/mclgoerg/mailbroom/commit/5e8b2a52ad69c9a372d9bdbf3a6df45cd157bd69))
+* sign everyone out when the login changes ([#205](https://github.com/mclgoerg/mailbroom/issues/205)) ([bcfa037](https://github.com/mclgoerg/mailbroom/commit/bcfa037b845aec4e9c157add10ff43ffeb591cf9))
+* slow down password guessing on the login page ([#208](https://github.com/mclgoerg/mailbroom/issues/208)) ([b91ea9a](https://github.com/mclgoerg/mailbroom/commit/b91ea9aa51c05e1dac1a95866785927cd8df46c2))
+* Smart rows of a single sender show its AI verdict ([#200](https://github.com/mclgoerg/mailbroom/issues/200)) ([9e8cb7d](https://github.com/mclgoerg/mailbroom/commit/9e8cb7dd3aedbf7dfc012661eb9b67238a4dea52))
+* tell status badges and category tags apart in the group list ([#190](https://github.com/mclgoerg/mailbroom/issues/190)) ([bc250ab](https://github.com/mclgoerg/mailbroom/commit/bc250abf9cbc4e0351964c266eada48891b343d4))
+* the deploy starter kit works out of the box ([#178](https://github.com/mclgoerg/mailbroom/issues/178)) ([96348c4](https://github.com/mclgoerg/mailbroom/commit/96348c4a69e9a270b040765e22b896a119d528df))
+* the trash confirmation names what is moved ([#193](https://github.com/mclgoerg/mailbroom/issues/193)) ([19f500f](https://github.com/mclgoerg/mailbroom/commit/19f500f292ffcbc6ecba9812e383e8d8b52f5bb1))
+* unknown API paths answer 404 ([#188](https://github.com/mclgoerg/mailbroom/issues/188)) ([c17eac6](https://github.com/mclgoerg/mailbroom/commit/c17eac6e5a8477da19840713c10d635df0100155))
+* unsubscribe failures say what went wrong in plain words ([#207](https://github.com/mclgoerg/mailbroom/issues/207)) ([e5a0390](https://github.com/mclgoerg/mailbroom/commit/e5a03900499b2386f5e11f549a4434c18deefa78))
+* unsubscribe links can no longer reach internal addresses ([#185](https://github.com/mclgoerg/mailbroom/issues/185)) ([790c1a8](https://github.com/mclgoerg/mailbroom/commit/790c1a8f10514e6c5255517d25d8f2a200a44ca0))
+* warn when any account at the identity provider may sign in ([759d23e](https://github.com/mclgoerg/mailbroom/commit/759d23ef96d41ea9b36b4a6c2a1b74b1e25c8217))
+
 ## [1.10.0](https://github.com/mclgoerg/mailbroom/compare/v1.9.0...v1.10.0) (2026-11-01)
 
 
