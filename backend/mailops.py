@@ -745,9 +745,17 @@ def _handshake_error(exc: BaseException, host: str,
 def _open(im: dict, ctx: ssl.SSLContext) -> imaplib.IMAP4:
     host, port = im["host"], int(im["port"])
     starttls = (im.get("security") or "ssl") == "starttls"
+    tcp_up = []
+
+    class _Plain(imaplib.IMAP4):
+        def _create_socket(self, timeout):
+            sock = super()._create_socket(timeout)
+            tcp_up.append(True)         # connected: what follows is the greeting
+            return sock
+
     try:
         if starttls:
-            conn = imaplib.IMAP4(host, port, timeout=CONNECT_TIMEOUT)
+            conn = _Plain(host, port, timeout=CONNECT_TIMEOUT)
             try:
                 conn.starttls(ssl_context=ctx)
             except BaseException as exc:
@@ -762,6 +770,12 @@ def _open(im: dict, ctx: ssl.SSLContext) -> imaplib.IMAP4:
         else:
             conn = imaplib.IMAP4_SSL(host, port, ssl_context=ctx,
                                      timeout=CONNECT_TIMEOUT)
+    except TimeoutError as exc:
+        if starttls and tcp_up:
+            # the port took the connection and then waited for us: it
+            # expects TLS from the first byte (993) or is not IMAP at all
+            raise RuntimeError(coded(TLS_MISMATCH, host=host)) from exc
+        raise
     except Exception as exc:
         raise _handshake_error(exc, host, starttls) from exc
     _set_timeout(conn, OPERATION_TIMEOUT)
@@ -2346,6 +2360,7 @@ def run_scan(acc=None) -> None:
 
     cfg = cfgmod.load_config()
     im = cfg["accounts"][acc.name]
+    sig = cfgmod.conn_sig(im)
     t0 = time.time()
     log.info("[%s] scan started (host %s)", acc.name, im["host"])
     try:
@@ -2426,7 +2441,7 @@ def run_scan(acc=None) -> None:
                 log.exception("could not re-derive the smart rows after "
                               "the scan")
             try:
-                cfgmod.mark_verified(acc.name)
+                cfgmod.mark_verified(acc.name, sig)
             except Exception:
                 log.exception("could not mark the account verified")
             log.info("[%s] scan done: %d folders, %d mails, %d senders, "

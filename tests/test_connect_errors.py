@@ -98,11 +98,6 @@ def _plain_banner(conn):
     time.sleep(1)
 
 
-def _http(conn):
-    conn.sendall(b"HTTP/1.1 400 Bad Request\r\n\r\n")
-    time.sleep(1)
-
-
 def _imap(conn, login_reply=b"NO [AUTHENTICATIONFAILED] Invalid credentials",
           caps=b"IMAP4rev1"):
     """Greeting, then answers CAPABILITY (which imaplib sends on connect)
@@ -137,13 +132,33 @@ def test_an_unknown_host_is_not_found():
 
 
 def test_a_silent_listener_times_out_quickly(listener, monkeypatch):
+    """SSL/TLS against a port that waits for us: nothing to say but that
+    nothing answered."""
     monkeypatch.setattr(mailops, "CONNECT_TIMEOUT", 0.5)
     lis = listener(_silent)
+    t0 = time.monotonic()
+    assert _fail(_im(lis.port, "ssl")) == "conn_timeout:host=127.0.0.1"
+    assert time.monotonic() - t0 < 4
+
+
+def test_starttls_against_a_port_that_waits_for_tls_or_http(listener,
+                                                            monkeypatch):
+    """The TCP connect works, then nothing is said: an implicit-TLS port
+    (993) waits for a ClientHello, a web server for a request. Not 'check
+    your network' - the port answered."""
+    monkeypatch.setattr(mailops, "CONNECT_TIMEOUT", 0.5)
+    lis = listener(_silent)
+    t0 = time.monotonic()
+    assert _fail(_im(lis.port, "starttls")) == "tls_mismatch:host=127.0.0.1"
+    assert time.monotonic() - t0 < 4
+
+
+def test_a_tcp_connect_that_times_out_is_conn_timeout(monkeypatch):
+    def hang(*a, **kw):
+        raise TimeoutError("timed out")
+    monkeypatch.setattr(socket, "create_connection", hang)
     for security in ("ssl", "starttls"):
-        t0 = time.monotonic()
-        assert _fail(_im(lis.port, security)) \
-            == "conn_timeout:host=127.0.0.1"
-        assert time.monotonic() - t0 < 4
+        assert _fail(_im(993, security)) == "conn_timeout:host=127.0.0.1"
 
 
 def test_the_connect_timeout_is_bounded_and_operations_keep_theirs():
@@ -168,8 +183,13 @@ def test_starttls_against_a_server_without_it(listener):
     assert _fail(_im(lis.port, "starttls")) == "tls_mismatch:host=127.0.0.1"
 
 
-def test_starttls_against_a_non_imap_banner(listener):
-    lis = listener(_http)
+def _smtp_banner(conn):
+    conn.sendall(b"220 smtp.example ESMTP ready\r\n")
+    time.sleep(1)
+
+
+def test_starttls_against_an_smtp_banner_is_not_imap(listener):
+    lis = listener(_smtp_banner)
     assert _fail(_im(lis.port, "starttls")) == "not_imap:host=127.0.0.1"
 
 
@@ -236,3 +256,43 @@ def test_midsession_errors_are_not_reclassified_as_not_imap():
     assert mailops.error_text(imaplib.IMAP4.abort("socket error: EOF"),
                               "h") \
         == "abort: socket error: EOF"
+
+
+def _acct_cfg(password):
+    cfgmod.update_config({"imap": {"host": "127.0.0.1", "port": 1,
+                                   "user": "u@example.test",
+                                   "password": password}})
+    return cfgmod.account_imap("default")
+
+
+def test_a_test_that_ends_after_the_sign_in_changed_verifies_nothing(
+        monkeypatch):
+    """Test with password A, cancel, save password B (unverified again),
+    then A's test comes back OK: B was never tested."""
+    _acct_cfg("A")
+    assert cfgmod.account_imap("default")["verified"] is False
+
+    class Conn:
+        def logout(self):
+            pass
+
+    def slow_ok(im, name=None):
+        _acct_cfg("B")                      # saved while the test runs
+        return Conn()
+    monkeypatch.setattr(mailops, "connect", slow_ok)
+    monkeypatch.setattr(mailops, "selectable_folders", lambda c: ["INBOX"])
+    r = client.post("/api/test_connection")
+    assert r.status_code == 200
+    assert cfgmod.account_imap("default")["verified"] is False
+
+
+def test_an_unchanged_sign_in_is_still_verified_by_its_test(monkeypatch):
+    _acct_cfg("A")
+
+    class Conn:
+        def logout(self):
+            pass
+    monkeypatch.setattr(mailops, "connect", lambda im, name=None: Conn())
+    monkeypatch.setattr(mailops, "selectable_folders", lambda c: ["INBOX"])
+    assert client.post("/api/test_connection").status_code == 200
+    assert cfgmod.account_imap("default")["verified"] is True

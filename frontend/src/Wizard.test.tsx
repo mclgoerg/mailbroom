@@ -393,6 +393,16 @@ test("Cancel test ends a running test and stays on the sign-in step",
       .hasAttribute("disabled")).toBe(false);
   });
 
+test("Cancel test shows no error for the request it aborted", async () => {
+  await startSlowTest();
+  fireEvent.click(await screen.findByRole("button", { name: "Cancel test" }));
+  await waitFor(() => expect(screen.queryByText("Testing the connection…"))
+    .toBeNull());
+  // an aborted fetch rejects with "aborted": never shown as an error
+  expect(screen.queryByText(/abort/i)).toBeNull();
+  expect(document.querySelector("[role=alert], .text-danger-fg")).toBeNull();
+});
+
 test("a test that finishes after Cancel test changes nothing", async () => {
   const release = await startSlowTest();
   fireEvent.click(await screen.findByRole("button", { name: "Cancel test" }));
@@ -417,6 +427,33 @@ test("X closes the wizard during a test and a late result stays silent",
     expect(onConfig.mock.calls.length).toBe(configs);
     expect(onClose).toHaveBeenCalledTimes(1);
   });
+
+test("X right after a successful test, while the config reloads, leaves " +
+  "nothing behind", async () => {
+  routes["/api/config"] = () => [200, withNew()];
+  let release!: () => void;
+  const held = new Promise<void>((r) => { release = r; });
+  const real = globalThis.fetch;
+  vi.stubGlobal("fetch", vi.fn(async (url: string, init?: RequestInit) => {
+    // the GET of the config after the test is slow
+    if (url.includes("/api/config") && (init?.method ?? "GET") === "GET"
+      && calls.some((c) => c.url.includes("/api/test_connection")))
+      await held;
+    return real(url, init);
+  }));
+  open(mkCfg({ setup_needed: false }), "add");
+  pick("Fastmail");
+  await signIn("b@mail.example");
+  await waitFor(() => expect(calls.some((c) =>
+    c.url.includes("/api/test_connection"))).toBe(true));
+  await sleepMs(20);
+  fireEvent.click(screen.getAllByRole("button", { name: "Cancel" })[0]);
+  await waitFor(() => expect(onClose).toHaveBeenCalled());
+  const configs = onConfig.mock.calls.length;
+  release();
+  await sleepMs(50);
+  expect(onConfig.mock.calls.length).toBe(configs);
+});
 
 test("Esc closes the wizard during a test", async () => {
   await startSlowTest();

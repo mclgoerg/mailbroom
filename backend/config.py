@@ -598,6 +598,12 @@ def _conn_sig(block: dict) -> tuple:
             oauth.get("client_secret"), bool(oauth.get("refresh_token")))
 
 
+def conn_sig(block: dict) -> tuple:
+    """`_conn_sig` for callers that test a connection and later vouch for
+    it with `mark_verified(account, sig)`."""
+    return _conn_sig(block)
+
+
 def _apply_imap(block: dict, imap_in: dict) -> None:
     """Fold a partial imap update into one account's block (in place).
 
@@ -715,14 +721,18 @@ def _fold_imap(block: dict, imap_in: dict) -> None:
         block["auto_scan"] = auto_scan
 
 
-def mark_verified(account: str) -> None:
+def mark_verified(account: str, sig: tuple | None = None) -> None:
     """A connection test, an OAuth connect or a scan succeeded for this
-    account: it counts as set up (see `verified` in `_apply_imap`)."""
+    account: it counts as set up (see `verified` in `_apply_imap`). `sig` =
+    `conn_sig` of the settings it used: when the sign-in was changed while
+    it ran, it vouches for nothing."""
     with _LOCK:
         cfg = load_config()
         block = cfg["accounts"].get(account)
         if block is None or block.get("verified") is not False:
             return                      # nothing to flip, nothing to write
+        if sig is not None and _conn_sig(block) != sig:
+            return
         block["verified"] = True
         _write_tenant_config(cfg)
 

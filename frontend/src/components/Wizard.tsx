@@ -149,7 +149,10 @@ export function Wizard({ cfg, mode, initialStep, initialAccount, scan,
       const r = await api.testConnection(name, ctl.signal);
       if (ctl.signal.aborted) return;
       // the account now counts as set up: pick that up for the home card
-      try { onConfig(await api.getConfig(), null); } catch { /* next load */ }
+      let fresh: Config | null = null;
+      try { fresh = await api.getConfig(); } catch { /* next load */ }
+      if (ctl.signal.aborted) return;      // closed while that was loading
+      if (fresh) onConfig(fresh, null);
       setTested(true);
       setConnected(r.folders);
       setStep("folders");
