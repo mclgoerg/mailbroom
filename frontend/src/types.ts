@@ -341,6 +341,9 @@ export interface Rule {
   /** Purge rules: why an armed rule went back to report mode (shown on the
    *  card). */
   reset_reason?: "" | "edited" | "account" | "folder";
+  /** Parts of the filter Inboxrake does not understand (a rule saved before
+   *  filters were validated); its execute runs are skipped. */
+  filter_invalid?: string[];
   created: number;
   last_run: RuleRun | null;
 }

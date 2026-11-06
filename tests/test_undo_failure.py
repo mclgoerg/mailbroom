@@ -222,3 +222,49 @@ def test_reinsertion_survives_a_changed_list(monkeypatch):
     monkeypatch.setattr(mailops, "UNDO_MAX", 3)
     mailops._reinsert_undo(accounts_undo_log_acc(), {**entry, "ts": 0}, 99)
     assert len(log) == 3
+
+
+@pytest.mark.parametrize("failure", ["no", "bad"])
+def test_a_failing_message_id_verification_keeps_the_entry(monkeypatch,
+                                                           failure):
+    import imaplib
+    fake, before = _trashed(monkeypatch)
+    real = fake.uid
+    broken = {"on": True}
+
+    def flaky(cmd, *args):
+        if broken["on"] and cmd == "FETCH" and "MESSAGE-ID" in args[1] \
+                and "FLAGS" not in args[1]:
+            if failure == "bad":
+                raise imaplib.IMAP4.error("FETCH BAD")
+            return "NO", [b"[UNAVAILABLE] try later"]
+        return real(cmd, *args)
+
+    fake.uid = flaky
+    with pytest.raises(imaplib.IMAP4.error):
+        mailops.undo_last()
+    _assert_entry_kept(before)
+    assert len(fake.mailbox["Trash"]) == 2 and not fake.mailbox["INBOX"][1:]
+    broken["on"] = False                                 # server recovers
+    assert mailops.undo_last()["restored"] == 2
+    assert not accounts_undo_log()
+    assert sorted(m["uid"] for m in fake.mailbox["INBOX"]) == [1, 2, 3]
+    assert not fake.mailbox["Trash"]
+
+
+def test_a_failing_message_id_search_keeps_the_entry(monkeypatch):
+    fake, before = _trashed(monkeypatch)
+    real = fake.uid
+    broken = {"on": True}
+
+    def flaky(cmd, *args):
+        if broken["on"] and cmd == "SEARCH" and "HEADER" in args:
+            return "NO", [b"[UNAVAILABLE] try later"]
+        return real(cmd, *args)
+
+    fake.uid = flaky
+    with pytest.raises(Exception):
+        mailops.undo_last()
+    _assert_entry_kept(before)
+    broken["on"] = False
+    assert mailops.undo_last()["restored"] == 2

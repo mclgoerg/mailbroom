@@ -60,3 +60,54 @@ test("a refused filter reads in German", async () => {
     "Dieser Filter ist für Spam- und Papierkorb-Regeln nicht verfügbar: tag:"));
   expect(document.body.textContent).not.toContain("rule_purge_filter");
 });
+
+const submitMailRule = () => {
+  render(<DialogProvider>
+    <RulesModal state={state} onClose={() => {}} onChanged={() => {}} />
+  </DialogProvider>);
+  fireEvent.change(screen.getByLabelText(t("rule.f_name")), { target: { value: "x" } });
+  fireEvent.change(screen.getByLabelText(t("rule.f_filter")),
+    { target: { value: "age:>1yr" } });
+  fireEvent.click(screen.getByText(t("rule.create")));
+};
+
+test("a filter with a mistyped part is shown next to the filter field", async () => {
+  refuse("rule_filter_invalid:names=age%3A%3E1yr");
+  submitMailRule();
+  const alert = await screen.findByRole("alert");
+  expect(alert.textContent).toBe(
+    "This filter has parts Inboxrake doesn't understand: age:>1yr");
+  expect((screen.getByLabelText(t("rule.f_filter")) as HTMLInputElement)
+    .getAttribute("aria-invalid")).toBe("true");
+});
+
+test("German: the mistyped-filter error is translated", async () => {
+  setLang("de");
+  refuse("rule_filter_invalid:names=age%3A%3E1yr");
+  submitMailRule();
+  expect((await screen.findByRole("alert")).textContent).toContain(
+    "Dieser Filter enthält Teile, die Inboxrake nicht versteht: age:>1yr");
+});
+
+test("a saved rule with a mistyped filter shows a warning on its card", () => {
+  render(<DialogProvider>
+    <RulesModal state={{ ...state, rules: [{
+      id: "r1", name: "old", scope: "mail", grouping: "sender",
+      query: "age:>1yr", action: "trash", dest: "", schedule: "manual",
+      mode: "execute", keep_latest: null, older_than_days: null,
+      origin: "manual", report_runs: 1, created: 1, last_run: null,
+      filter_invalid: ["age:>1yr"] } as any] }}
+      onClose={() => {}} onChanged={() => {}} />
+  </DialogProvider>);
+  expect(document.body.textContent).toContain(
+    "The filter has parts Inboxrake doesn't understand: age:>1yr");
+});
+
+test("the inline filter error goes away when the filter text changes", async () => {
+  refuse("rule_filter_invalid:names=age%3A%3E1yr");
+  submitMailRule();
+  await screen.findByRole("alert");
+  fireEvent.change(screen.getByLabelText(t("rule.f_filter")),
+    { target: { value: "age:>1y" } });
+  expect(screen.queryByRole("alert")).toBeNull();
+});
