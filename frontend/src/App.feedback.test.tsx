@@ -28,6 +28,7 @@ vi.mock("./api", async (importOriginal) => ({
     exportUrl: (mode: string) => `/api/export?grouping=${mode}`,
     version: () => Promise.resolve({ build: "v1" }),
     undo: vi.fn().mockResolvedValue({ ok: true }),
+    clearNotice: vi.fn().mockResolvedValue({ ok: true }),
     deleteGroups: vi.fn().mockResolvedValue({ ok: true, queued: 1, skipped: 0 }),
   },
   setAccount: () => {},
@@ -378,15 +379,87 @@ test("the Undo list keeps the English label for English, one mail singular",
     await cancelDialog();
   });
 
-test("the restore notice words the label of a role entry itself", async () => {
-  await mount({ ...baseState });
-  setLang("de");
-  tick({ notice: { key: "restored", params: { restored: 2, of: 2,
-    label: "2 mails from Junk", label_key: "undo.from_junk", label_n: 2 } } });
-  expect(await screen.findByText(
-    "2 von 2 Mails wiederhergestellt (2 Mails aus Spam)."))
-    .toBeTruthy();
-});
+test("an Undo's result is a toast that words the label itself, no scroll",
+  async () => {
+    const st = { ...baseState, undo: [{ ts: 3, label: "2 mails from Junk",
+      label_key: "undo.from_junk", label_params: { n: 2 }, count: 2,
+      action: "not_junk" }] };
+    await mount(st as any);
+    setLang("de");
+    tick({});
+    const scrollTo = vi.fn();
+    vi.stubGlobal("scrollTo", scrollTo);
+    window.scrollTo = scrollTo as any;
+    undoApi.mockResolvedValueOnce({ restored: 2, of: 2, rescan: true });
+    fireEvent.click(await screen.findByRole("button", { name: /Rückgängig/ }));
+    fireEvent.click(screen.getByText("2 Mails aus Spam"));
+    await pressDialog("Wiederherstellen");
+    expect(await screen.findByText(
+      "2 Mails wiederhergestellt (2 Mails aus Spam)")).toBeTruthy();
+    expect(scrollTo).not.toHaveBeenCalled();
+  });
+
+test("a partial Undo toasts how many came back; a refused one the error",
+  async () => {
+    const st = { ...baseState, undo: [entry(1, 5)] };
+    await mount(st as any);
+    undoApi.mockResolvedValueOnce({ restored: 3, of: 5, rescan: true });
+    fireEvent.click(screen.getByRole("button", { name: /Undo/ }));
+    fireEvent.click(screen.getByRole("button", { name: /5 mails.*Shop News/ }));
+    await pressDialog("Restore");
+    expect(await screen.findByText(/Restored 3 of 5 mails \(/)).toBeTruthy();
+    undoApi.mockRejectedValueOnce(new Error("The server refused the move."));
+    fireEvent.click(screen.getByRole("button", { name: /Undo/ }));
+    fireEvent.click(screen.getByRole("button", { name: /5 mails.*Shop News/ }));
+    await pressDialog("Restore");
+    expect(await screen.findByText(
+      "Undo error: The server refused the move.")).toBeTruthy();
+  });
+
+test("an Undo that fails after restoring some mails still says how many",
+  async () => {
+    await mount({ ...baseState, undo: [entry(1, 5)] } as any);
+    undoApi.mockImplementationOnce(() => {
+      // the backend recorded the notice, then raised
+      state = { ...state, notice: { key: "restored_rescan",
+        params: { restored: 3, of: 5, label: "Shop News" } } };
+      return Promise.reject(new Error("The server refused the move."));
+    });
+    fireEvent.click(screen.getByRole("button", { name: /Undo/ }));
+    fireEvent.click(screen.getByRole("button", { name: /5 mails.*Shop News/ }));
+    await pressDialog("Restore");
+    expect(await screen.findByText(
+      "Undo error: The server refused the move.")).toBeTruthy();
+    expect(await screen.findByText(
+      "Restored 3 of 5 mails (Shop News) - rescan to see them again"))
+      .toBeTruthy();
+    expect(api.clearNotice).toHaveBeenCalledWith(["restored", "restored_rescan"]);
+  });
+
+test("an Undo only asks to clear a restore notice, not any other",
+  async () => {
+    await mount({ ...baseState, undo: [entry(1, 5)] } as any);
+    (api.clearNotice as any).mockClear();
+    undoApi.mockResolvedValueOnce({ restored: 5, of: 5, rescan: true });
+    fireEvent.click(screen.getByRole("button", { name: /Undo/ }));
+    fireEvent.click(screen.getByRole("button", { name: /5 mails.*Shop News/ }));
+    await pressDialog("Restore");
+    await screen.findByText(/Restored 5 mails/);
+    expect(api.clearNotice).toHaveBeenCalledTimes(1);
+    expect((api.clearNotice as any).mock.calls[0][0])
+      .toEqual(["restored", "restored_rescan"]);
+  });
+
+test("the backend's restore notice no longer renders above the list",
+  async () => {
+    await mount({ ...baseState });
+    tick({ notice: { key: "restored", params: { restored: 2, of: 2,
+      label: "Shop News" } } });
+    expect(screen.queryByText(/Restored 2 of 2/)).toBeNull();
+    tick({ notice: { key: "restored_rescan", params: { restored: 2, of: 2,
+      label: "Shop News" } } });
+    expect(screen.queryByText(/Restored 2 of 2/)).toBeNull();
+  });
 
 test("a failed move job shows its coded error in the user's language",
   async () => {
