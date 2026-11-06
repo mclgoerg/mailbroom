@@ -471,7 +471,7 @@ export const DE: Record<string, string> = {
   "Starting…": "Starte…",
   "Duplicates": "Duplikate",
   "dups.hint":
-    "Gleiche Message-ID oder identischer Absender + Betreff + Größe.",
+    "Gleiche Message-ID. Mails ohne brauchbare Message-ID: identischer Absender + Betreff + Größe.",
   "dups.summary": "{n} Duplikat-Gruppen · {size} freigebbar",
   "dups.summary_one": "1 Duplikat-Gruppe · {size} freigebbar",
   "dups.keep_newest": "Alle außer der neuesten auswählen",
