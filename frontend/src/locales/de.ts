@@ -753,6 +753,11 @@ export const DE: Record<string, string> = {
     + "Ordner, dann ein erster Scan.",
   "wizard.setup_btn": "Postfach einrichten",
   "onboard.ready": "Bereit für den ersten Scan",
+  "onboard.unverified": "Richte {account} fertig ein",
+  "onboard.unverified_text":
+    "Die Verbindung zu diesem Konto hat bisher nicht geklappt. Prüfe die "
+    + "Anmeldung und teste sie erneut, bevor du den ersten Scan startest.",
+  "onboard.unverified_btn": "Einrichtung fortsetzen",
   "onboard.step_scan":
     "Auf Scannen klicken - gelöscht wird nur nach Bestätigung, und "
     + "Löschungen landen zuerst im Papierkorb.",

@@ -2320,6 +2320,10 @@ def run_scan(acc=None) -> None:
             except Exception:
                 log.exception("could not re-derive the smart rows after "
                               "the scan")
+            try:
+                cfgmod.mark_verified(acc.name)
+            except Exception:
+                log.exception("could not mark the account verified")
             log.info("[%s] scan done: %d folders, %d mails, %d senders, "
                      "%d replied-to addrs%s in %.1fs",
                      acc.name, len(folders), len(messages),

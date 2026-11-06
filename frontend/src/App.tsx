@@ -580,6 +580,13 @@ export default function App() {
   const aiEnabled = !!cfg?.ai.available;
   const demo = useDemo();
   const acct = cfg?.accounts[account] ?? null;
+  // Credentials are saved but no test, connect or scan has worked yet.
+  const unverified = !cfg?.setup_needed && acct?.verified === false;
+  // A finished scan vouches for the account (the backend recorded it).
+  useEffect(() => {
+    if (unverified && state?.status === "done")
+      api.getConfig().then(setCfg).catch(() => {});
+  }, [unverified, state?.status]);
   const multiAccount = !!cfg && Object.keys(cfg.accounts).length > 1;
   // The wizard opens by itself while no account is set up (until the user
   // sets it up later this session) and again after the OAuth consent
@@ -1440,7 +1447,8 @@ export default function App() {
         + ` · ${fmtSize(size)}` + (filter ? ` ${t("(filtered)")}` : "")
         + (ago ? ` · ${t("scan.age", { ago })}` : "");
     }
-    return t("No scan yet - hit “Scan”.");
+    // the setup card is the guidance while the connection is unconfirmed
+    return unverified ? "" : t("No scan yet - hit “Scan”.");
   };
 
   const statusLine = () => {
@@ -2146,13 +2154,22 @@ export default function App() {
         <div className="mx-auto my-10 max-w-md rounded-card border border-line
           bg-panel p-4 type-body sm:p-5">
           <div className="mb-3 type-heading">
-            {cfg.setup_needed ? t("wizard.setup_btn") : t("onboard.ready")}
+            {cfg.setup_needed ? t("wizard.setup_btn")
+              : unverified ? t("onboard.unverified", { account })
+              : t("onboard.ready")}
           </div>
           <p className="text-muted">
             {cfg.setup_needed ? t("wizard.setup_text")
+              : unverified ? t("onboard.unverified_text")
               : t("onboard.step_scan")}
           </p>
-          {cfg.setup_needed ? (<>
+          {unverified ? (
+            <div className="mt-4">
+              <Button onClick={() => setWizard({ mode: "first",
+                step: "signin", account })}>
+                {t("onboard.unverified_btn")}</Button>
+            </div>
+          ) : cfg.setup_needed ? (<>
             <div className="mt-4">
               <Button disabled={demo} title={demo ? demoHint() : undefined}
                 onClick={() => setWizard({ mode: "first" })}>
@@ -2245,7 +2262,7 @@ export default function App() {
           ) : (
             <EmptyState>
               {state.scanned_ts ? t("status.no_mails")
-                : t("No scan yet - hit “Scan”.")}
+                : unverified ? "" : t("No scan yet - hit “Scan”.")}
             </EmptyState>
           )
         )

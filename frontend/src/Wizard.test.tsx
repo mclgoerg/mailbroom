@@ -461,6 +461,24 @@ test("an unexpected scan failure reads as words, not as an exception", () => {
   expect(screen.queryByText(/scan_failed/)).toBeNull();
 });
 
+test("after a successful test the config is re-read so the account " +
+  "counts as verified without a reload", async () => {
+  const withFlag = (v: boolean) => {
+    const c = mkCfg();
+    c.accounts = { default: { ...c.accounts.default, verified: v } };
+    return c;
+  };
+  // the save (a POST with a body) says unverified; only the re-read GET,
+  // made after the test succeeded, says verified
+  routes["/api/config"] = (b) => [200, withFlag(!!b ? false : true)];
+  open();
+  pick("iCloud Mail");
+  await signIn();
+  await screen.findByText("Connected - 7 folders found.");
+  const last = onConfig.mock.calls.at(-1)![0] as Config;
+  expect(last.accounts.default.verified).toBe(true);
+});
+
 test("the client-secret placeholder says optional for Microsoft, required " +
   "for Google", () => {
   const secret = (label = "Client secret") => screen.getByLabelText(label)

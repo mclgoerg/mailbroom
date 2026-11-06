@@ -1554,6 +1554,7 @@ def post_test_connection(account: str | None = Query(None)):
         text = mailops.error_text(exc, im["host"])
         raise HTTPException(502, text if mailops.is_coded(text)
                             else mailops.coded(mailops.CONNECT_FAILED))
+    cfgmod.mark_verified(acc.name)
     return {"ok": True, "folders": n}
 
 
