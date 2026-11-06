@@ -333,6 +333,8 @@ class FakeIMAP:
         if cmd == "SEARCH":
             if args[-1] == "ALL":
                 hits = msgs
+            elif args[-1] == "DELETED":
+                hits = [m for m in msgs if m.get("deleted")]
             elif "HEADER" in args:
                 # `HEADER Message-ID <id>` (id as literal or quoted string),
                 # also OR-chained: OR HEADER Message-ID a OR HEADER ... z

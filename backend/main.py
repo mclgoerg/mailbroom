@@ -134,6 +134,16 @@ def _warn_open_oidc() -> None:
             "the admin (set OIDC_ADMIN or enter it in Settings -> Server)")
 
 
+def _check_data_dir() -> None:
+    folder = mailops.data_dir_problem()
+    if folder is not None:
+        logging.getLogger("pmc.data").error(
+            "Cannot write to %s - nothing can be saved. Give the container's "
+            "user ownership of the folder mounted there: "
+            "`chown -R 1000:1000 <host folder>` (the image runs as uid 1000), "
+            "or start the container with `--user <uid>:<gid>`.", folder)
+
+
 @asynccontextmanager
 async def _lifespan(app: FastAPI):
     from . import secretbox
@@ -147,6 +157,7 @@ async def _lifespan(app: FastAPI):
         cfgmod.load_server()["auth"]))
     _log_accepted_hosts()
     _warn_open_oidc()
+    _check_data_dir()
     # Show the last scan of every tenant's accounts right away instead of
     # an empty view (safe: moves re-check UIDVALIDITY; undo works by
     # Message-ID).
@@ -257,6 +268,20 @@ async def _cross_site_guard(request: Request, call_next):
     if webguard.cross_site_write(request.method, path, request.headers):
         return JSONResponse({"detail": "cross_site_request"}, status_code=403)
     return await call_next(request)
+
+
+@app.middleware("http")
+async def _data_dir_guard(request: Request, call_next):
+    # Outermost (added last). An unwritable data folder shows up as a bare
+    # errno on the first save - in the auth step or an endpoint; answer with
+    # the coded text that names the fix. Anything else stays a 500.
+    try:
+        return await call_next(request)
+    except PermissionError:
+        if mailops.data_dir_problem() is None:
+            raise
+        return JSONResponse({"detail": mailops.DATA_NOT_WRITABLE},
+                            status_code=503)
 
 
 def _external_base(request: Request) -> str:
@@ -1813,6 +1838,8 @@ def post_config(body: dict, request: Request, response: Response):
     try:
         cfg = cfgmod.update_config(body)
     except PermissionError as exc:
+        if exc.errno is not None:       # the OS refused a write, not "not admin"
+            raise                       # -> _data_dir_guard words it
         raise HTTPException(403, str(exc))
     except ValueError as exc:
         raise HTTPException(400, str(exc))

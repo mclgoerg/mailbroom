@@ -1553,6 +1553,10 @@ export const EN: Record<string, string> = {
     "Another rule is running - try again when it has finished.",
   "ferr.count_required":
     "The folder was not counted yet - reload it and confirm again.",
+  "ferr.data_not_writable":
+    "Mailbroom cannot write to its data folder. On the host, give the user "
+    + "ID 1000 ownership of the folder mounted at /data (chown -R 1000:1000 "
+    + "<folder>) or start the container with --user, then restart it.",
   "ferr.role_missing": "No “{folder}” folder found on the server.",
   "ferr.inbox_missing": "No Inbox found on the server.",
   "ferr.junk_needs_trash":
@@ -1579,6 +1583,13 @@ export const EN: Record<string, string> = {
   "ferr.mailto_unsafe":
     "The unsubscribe address in this mail is not a single plain address "
     + "(or its text contains line breaks), so no mail was sent.",
+  "ferr.move_foreign_deleted":
+    "Stopped: another mail program has marked mails in “{folder}” for "
+    + "deletion, and this server cannot remove just ours, so nothing more "
+    + "was purged there. Copies of the mails just moved may already be in "
+    + "the destination folder, and trying again would add another set "
+    + "while those marks remain. First empty the deleted mails in the other "
+    + "mail program (expunge), then try again.",
   "ferr.cannot_flag":
     "The server did not accept marking the mails for deletion.",
   "ferr.cannot_expunge": "The server did not remove the marked mails.",

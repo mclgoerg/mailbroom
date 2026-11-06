@@ -45,6 +45,13 @@ TEXT: dict[str, str | tuple[str, str]] = {
     'mailto_unsafe':
         'The unsubscribe address in this mail is not a single plain address '
         '(or its text contains line breaks), so no mail was sent.',
+    'move_foreign_deleted':
+        'Stopped: another mail program has marked mails in \u201c{folder}\u201d for '
+        'deletion, and this server cannot remove just ours, so nothing more '
+        'was purged there. Copies of the mails just moved may already be in '
+        'the destination folder, and trying again would add another set '
+        'while those marks remain. First empty the deleted mails in the other '
+        'mail program (expunge), then try again.',
     'cannot_flag':
         'The server did not accept marking the mails for deletion.',
     'cannot_expunge':
@@ -102,6 +109,8 @@ TEXT: dict[str, str | tuple[str, str]] = {
         'Could not connect to the server - check the settings and try again.',
     'scan_failed':
         'The scan failed unexpectedly - try again; if it keeps failing, check the server log.',
+    'data_not_writable':
+        'Mailbroom cannot write to its data folder. On the host, give the user ID 1000 ownership of the folder mounted at /data (chown -R 1000:1000 <folder>) or start the container with --user, then restart it.',
 }
 
 ROLE_NAMES = {"trash": "Trash", "junk": "Junk", "archive": "Archive"}

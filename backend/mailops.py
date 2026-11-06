@@ -148,8 +148,14 @@ HOST_UNREACHABLE = "host_unreachable"
 TLS_FAILED = "tls_failed"
 CONNECT_FAILED = "connect_failed"
 SCAN_FAILED = "scan_failed"
+# the data folder (/data) cannot be written - see data_dir_problem()
+DATA_NOT_WRITABLE = "data_not_writable"
+# a move without MOVE/UIDPLUS found mail another client had flagged \Deleted
+# in the source folder: not purged; folder= the source (copies in the
+# destination remain)
+MOVE_FOREIGN_DELETED = "move_foreign_deleted"
 FOLDER_ERROR_CODES = frozenset({
-    MAILTO_UNSAFE,
+    MAILTO_UNSAFE, MOVE_FOREIGN_DELETED,
     NO_MESSAGE_ID, PINNED_MAILS, PROTECTED_MAILS, ALL_PINNED,
     ROLE_NOT_CANDIDATE, ROLE_AMBIGUOUS, NOT_LOOKALIKE, MOVE_UNSAFE,
     BUSY_ACTION,
@@ -193,7 +199,8 @@ FOLDER_ERROR_CODES = frozenset({
     HOST_UNREACHABLE,
     TLS_FAILED,
     CONNECT_FAILED,
-    SCAN_FAILED})
+    SCAN_FAILED,
+    DATA_NOT_WRITABLE})
 
 
 def coded(code: str, **params) -> str:
@@ -206,6 +213,24 @@ def coded(code: str, **params) -> str:
         return code
     return code + ":" + ",".join(
         f"{k}={quote(str(v), safe='')}" for k, v in params.items())
+
+
+def data_dir_problem() -> Path | None:
+    """The first data folder this process cannot write to, else None. A
+    fresh host-folder mount is owned by root while the image runs as uid
+    1000, and everything would later fail with a bare `Permission denied`.
+    Probes with a real file so a read-only mount is caught too."""
+    for folder in dict.fromkeys(
+            (cfgmod.CONFIG_PATH.parent, cfgmod.SERVER_PATH.parent,
+             SNAPSHOT_DIR)):
+        probe = folder / f".write-test-{os.getpid()}"
+        try:
+            folder.mkdir(parents=True, exist_ok=True)
+            probe.write_bytes(b"")
+            probe.unlink()
+        except OSError:
+            return folder
+    return None
 
 
 def is_coded(text: str) -> bool:
@@ -898,9 +923,10 @@ def _supports_move(conn) -> bool:
                for c in caps)
 
 
-def _uid_move(conn, uidstr: str, dest: str) -> bool:
-    """UID MOVE `uidstr` into raw folder `dest`; falls back to
-    COPY + \\Deleted + EXPUNGE for servers without the MOVE capability."""
+def _uid_move(conn, uidstr: str, dest: str, src: str = "") -> bool:
+    """UID MOVE `uidstr` into raw folder `dest` (`src`: the selected folder,
+    for the refusal's text); falls back to COPY + \\Deleted + EXPUNGE for
+    servers without the MOVE capability."""
     if _supports_move(conn):
         status, _ = conn.uid("MOVE", uidstr, quote_folder(dest))
         return status == "OK"
@@ -909,10 +935,53 @@ def _uid_move(conn, uidstr: str, dest: str) -> bool:
         return False
     conn.uid("STORE", uidstr, "+FLAGS", r"(\Deleted)")
     try:
-        conn.uid("EXPUNGE", uidstr)          # UIDPLUS: only our UIDs
+        status, _ = conn.uid("EXPUNGE", uidstr)  # UIDPLUS: only our UIDs
     except Exception:
-        conn.expunge()   # last resort: purges every \Deleted in the folder
-    return True
+        status = "NO"
+    if status == "OK":
+        return True
+    # No UID EXPUNGE: a plain EXPUNGE removes EVERY \Deleted mail in the
+    # folder, including mail another client only flagged. Only do it when
+    # nothing but our own UIDs carries the flag. Known gap: another client
+    # can still flag a mail between the SEARCH and the EXPUNGE (one round
+    # trip); only UID EXPUNGE (UIDPLUS) closes it, and this path exists for
+    # servers that have neither that nor MOVE.
+    if _only_ours_deleted(conn, uidstr):
+        conn.expunge()
+        return True
+    conn.uid("STORE", uidstr, "-FLAGS", r"(\Deleted)")      # un-flag ours
+    # The copies already made in `dest` cannot be told apart from mail that
+    # was there before (no COPYUID without UIDPLUS): they stay, and the
+    # error says so.
+    raise RuntimeError(coded(MOVE_FOREIGN_DELETED, folder=decode_mutf7(src)))
+
+
+def _uid_numbers(uidstr: str) -> set[int] | None:
+    """The UIDs of a plain "1,2,5:7" set; None for anything else ("*")."""
+    out: set[int] = set()
+    try:
+        for part in uidstr.split(","):
+            lo, _, hi = part.partition(":")
+            out.update(range(int(lo), int(hi or lo) + 1))
+    except ValueError:
+        return None
+    return out
+
+
+def _only_ours_deleted(conn, uidstr: str) -> bool:
+    """Whether SEARCH DELETED finds no UID besides `uidstr`'s. Any doubt
+    (search failed, unparseable set) counts as "no"."""
+    ours = _uid_numbers(uidstr)
+    if ours is None:
+        return False
+    try:
+        status, data = conn.uid("SEARCH", None, "DELETED")
+        if status != "OK":
+            return False
+        flagged = {int(u) for u in (data[0] or b"").split()}
+    except Exception:
+        return False
+    return flagged <= ours
 
 
 def decode_mutf7(name: str) -> str:
@@ -2428,7 +2497,8 @@ def _move_uids(by_folder: dict[str, set[int]], action: str, dest: str,
                 if cancel_requested("delete", acc):
                     raise Cancelled()
                 chunk = uids[start:start + MOVE_CHUNK]
-                if _uid_move(conn, ",".join(str(u) for u in chunk), trash):
+                if _uid_move(conn, ",".join(str(u) for u in chunk), trash,
+                             folder):
                     moved += len(chunk)
                     moved_uids.setdefault(folder, set()).update(chunk)
                 if progress_cb:
@@ -3225,12 +3295,14 @@ def undo_last(index: int = -1, acc=None, ident: dict | None = None) -> dict:
             raise RuntimeError(NOTHING_TO_UNDO)     # a stale list position
         if acc.state["delete"]["status"] == "running":
             raise RuntimeError(BUSY_ACTION)
+        pos = index if index >= 0 else len(acc.undo_log) + index
         entry = acc.undo_log.pop(index)
         acc.state["undo"] = _undo_summaries(acc)
 
     restored = 0
     moved: list[int] = []
     trash = ""
+    refused: RuntimeError | None = None
     conn = connect(cfgmod.account_imap(acc.name), acc.name)
     try:
         trash = entry.get("in") or folder_roles(conn, acc).get("trash")
@@ -3251,9 +3323,20 @@ def undo_last(index: int = -1, acc=None, ident: dict | None = None) -> dict:
         for folder, uids in by_target.items():
             for start in range(0, len(uids), MOVE_CHUNK):
                 chunk = uids[start:start + MOVE_CHUNK]
-                if _uid_move(conn, b",".join(chunk).decode(), folder):
+                if _uid_move(conn, b",".join(chunk).decode(), folder,
+                             trash):
                     restored += len(chunk)
                     moved.extend(int(u) for u in chunk)
+    except RuntimeError as exc:
+        if not str(exc).startswith(MOVE_FOREIGN_DELETED):
+            raise
+        # A refusal changed nothing it should not: keep the entry for a
+        # retry (once the other program has expunged its mails) and still
+        # do the bookkeeping for whatever did move before it.
+        refused = exc
+        with acc.lock:
+            acc.undo_log.insert(pos, entry)
+            acc.state["undo"] = _undo_summaries(acc)
     finally:
         role = role_of_folder(trash, acc) if trash else None
         if role:
@@ -3279,7 +3362,14 @@ def undo_last(index: int = -1, acc=None, ident: dict | None = None) -> dict:
                 acc.state[key] += restored
     auditlog.record(
         "undo", account=acc.name, count=restored, label=entry["label"],
-        outcome="ok" if restored == entry["count"] else "partial")
+        outcome="ok" if restored == entry["count"] else "partial",
+        error=str(refused or ""))
+    if refused is not None:
+        if restored:
+            _rescan_after_restore(acc, restored, "restored", {
+                "restored": restored, "of": entry["count"],
+                "label": entry["label"]})
+        raise refused
     if entry.get("action") == "move_contents":
         # the mails went back to a folder that is never scanned: nothing
         # in the index changes, so no rescan and no "rescan" notice
@@ -3587,6 +3677,7 @@ def trash_restore(uids: list[int], dest: str, uv: int = 0,
     restored = 0
     moved: list[int] = []
     trash = ""
+    refused: RuntimeError | None = None
     conn = connect(cfgmod.account_imap(acc.name), acc.name)
     try:
         folders = selectable_folders(conn)
@@ -3606,9 +3697,13 @@ def trash_restore(uids: list[int], dest: str, uv: int = 0,
         clean = sorted({int(u) for u in uids})
         for start in range(0, len(clean), MOVE_CHUNK):
             chunk = clean[start:start + MOVE_CHUNK]
-            if _uid_move(conn, ",".join(str(u) for u in chunk), dest):
+            if _uid_move(conn, ",".join(str(u) for u in chunk), dest, trash):
                 restored += len(chunk)
                 moved.extend(chunk)
+    except RuntimeError as exc:
+        if not str(exc).startswith(MOVE_FOREIGN_DELETED):
+            raise
+        refused = exc      # the count / rescan below still run
     finally:
         role_drop("trash", trash, moved, acc)
         try:
@@ -3619,6 +3714,11 @@ def trash_restore(uids: list[int], dest: str, uv: int = 0,
     with acc.lock:
         if acc.state["trash_count"] is not None:
             acc.state["trash_count"] = max(0, acc.state["trash_count"] - restored)
+    if refused is not None:
+        if restored:
+            _rescan_after_restore(acc, restored, "trash_restored", {
+                "n": restored, "dest": decode_mutf7(dest)})
+        raise refused
     rescan = _rescan_after_restore(acc, restored, "trash_restored", {
         "n": restored, "dest": decode_mutf7(dest)})
     return {"restored": restored, "rescan": rescan}
@@ -3679,9 +3779,10 @@ def _lookalike_target(conn, folder: str, acc) -> tuple[str, str]:
     if role in found["ambiguous"]:
         raise ValueError(ROLE_AMBIGUOUS)
     if not (_supports_move(conn) or _supports_uidplus(conn)):
-        # the COPY + plain EXPUNGE fallback of _uid_move would also remove
-        # other clients' \\Deleted mail from the folder (e.g. mail that
-        # arrived after the count): refuse rather than risk it
+        # without either, _uid_move can only fall back to a plain EXPUNGE,
+        # which it allows only while no other client's \\Deleted mail is in
+        # the folder, and a mail flagged after the count would slip through
+        # that check's one-round-trip gap: refuse up front
         raise ValueError(MOVE_UNSAFE)
     return role, target
 
@@ -3750,7 +3851,7 @@ def move_lookalike(folder: str, uv: int, max_uid: int, acc=None) -> dict:
             chunk = chosen[start:start + MOVE_CHUNK]
             uidstr = ",".join(str(u) for u in chunk)
             ids = _fetch_msgids(conn, chunk)
-            if not _uid_move(conn, uidstr, target):
+            if not _uid_move(conn, uidstr, target, folder):
                 raise RuntimeError(CANNOT_MOVE)
             moved += len(chunk)
             items.extend((folder, mid) for mid in sorted(ids))
