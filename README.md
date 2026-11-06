@@ -1,4 +1,4 @@
-# Inboxrake
+# <img src="frontend/public/icon.svg" width="40" height="40" alt="" /> Inboxrake
 
 [![CI](https://github.com/mclgoerg/inboxrake/actions/workflows/ci.yml/badge.svg)](https://github.com/mclgoerg/inboxrake/actions/workflows/ci.yml)
 [![Latest release](https://img.shields.io/github/v/release/mclgoerg/inboxrake)](https://github.com/mclgoerg/inboxrake/releases)
