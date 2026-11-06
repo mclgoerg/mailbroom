@@ -26,7 +26,7 @@ from . import config as cfgmod
 from . import mailops
 from . import rules
 
-log = logging.getLogger("pmc.ai")
+log = logging.getLogger("inboxrake.ai")
 
 TEXT_MAX = 300
 FILTER_EFFORT = "low"                # translating one sentence needs little thought

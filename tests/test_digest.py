@@ -173,7 +173,7 @@ def test_send_digest_logs_the_recipient_masked(monkeypatch, caplog):
                         account_name=None: None)
     _configure_account(recipient="digest@elsewhere.example")
     auditlog.record("trash", account="default", count=1, size=100)
-    with caplog.at_level("INFO", logger="pmc.digest"):
+    with caplog.at_level("INFO", logger="inboxrake.digest"):
         digestmod.send_digest("default")
     text = caplog.text
     assert "d***@elsewhere.example" in text

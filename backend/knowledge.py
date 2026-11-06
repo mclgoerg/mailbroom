@@ -23,7 +23,7 @@ from . import knowledgestore as ks
 from . import mailops
 from . import smartkinds as sk
 
-log = logging.getLogger("pmc.knowledge")
+log = logging.getLogger("inboxrake.knowledge")
 KnowledgeError = ks.KnowledgeError
 
 # Why an entry has no effect right now (GUI texts), most telling first.

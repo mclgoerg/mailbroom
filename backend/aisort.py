@@ -32,7 +32,7 @@ from . import mailops
 from . import smartkinds as sk
 from . import tenants
 
-log = logging.getLogger("pmc.ai")
+log = logging.getLogger("inboxrake.ai")
 
 SORT_BATCH = 40                      # units per model call
 SORT_PARALLEL = 3                    # model calls in flight at once

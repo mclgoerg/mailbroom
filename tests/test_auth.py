@@ -245,7 +245,7 @@ def test_startup_warns_about_open_oidc(caplog):
         "mode": "oidc",
         "oidc": {"issuer": "https://idp.example", "client_id": "app",
                  "client_secret": "sst", "allowed": []}}})
-    with caplog.at_level("WARNING", logger="pmc.auth"):
+    with caplog.at_level("WARNING", logger="inboxrake.auth"):
         main._warn_open_oidc()
     text = caplog.text
     assert "allow-list is empty" in text and "no SSO admin" in text
@@ -254,6 +254,6 @@ def test_startup_warns_about_open_oidc(caplog):
     server["auth"]["admin"] = "me@corp.example"
     server["auth"]["oidc"]["allowed"] = ["me@corp.example"]
     cfgmod.save_server(server)
-    with caplog.at_level("WARNING", logger="pmc.auth"):
+    with caplog.at_level("WARNING", logger="inboxrake.auth"):
         main._warn_open_oidc()
     assert caplog.text == ""

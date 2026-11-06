@@ -114,7 +114,7 @@ def _sync_session_epoch() -> None:
 def _log_accepted_hosts() -> None:
     """Startup note in no-login mode: the Host names the guard accepts."""
     if cfgmod.load_server()["auth"]["mode"] == "none":
-        logging.getLogger("pmc.auth").info(
+        logging.getLogger("inboxrake.auth").info(
             "no login set - accepting requests for: %s",
             webguard.describe_accepted())
 
@@ -125,7 +125,7 @@ def _warn_open_oidc() -> None:
     auth_cfg = cfgmod.load_server()["auth"]
     if auth_cfg["mode"] != "oidc":
         return
-    log = logging.getLogger("pmc.auth")
+    log = logging.getLogger("inboxrake.auth")
     if not (auth_cfg.get("oidc", {}).get("allowed") or []):
         log.warning(
             "SSO allow-list is empty - anyone with an account at the "
@@ -139,7 +139,7 @@ def _warn_open_oidc() -> None:
 def _check_data_dir() -> None:
     folder = mailops.data_dir_problem()
     if folder is not None:
-        logging.getLogger("pmc.data").error(
+        logging.getLogger("inboxrake.data").error(
             "Cannot write to %s - nothing can be saved. Give the container's "
             "user ownership of the folder mounted there: "
             "`chown -R 1000:1000 <host folder>` (the image runs as uid 1000), "
@@ -154,7 +154,7 @@ _COMPOSE_ONLY_ENV = ("MAILBROOM_BIND", "MAILBROOM_PORT")
 def _log_former_env() -> None:
     """Startup hint per MAILBROOM_* setting (backend/__init__.py adopted
     each one where the INBOXRAKE_* name is unset)."""
-    log = logging.getLogger("pmc.config")
+    log = logging.getLogger("inboxrake.config")
     for old in FORMER_ENV:
         if old in _COMPOSE_ONLY_ENV:
             continue
@@ -171,7 +171,7 @@ async def _lifespan(app: FastAPI):
     _log_former_env()
     from . import secretbox
     if not secretbox.enabled():
-        logging.getLogger("pmc.secrets").warning(
+        logging.getLogger("inboxrake.secrets").warning(
             "INBOXRAKE_SECRET_KEY is not set - IMAP passwords and API keys "
             "are stored in plaintext in /data (they would be readable in "
             "volume backups). Generate a key with `openssl rand -base64 32` "
@@ -373,7 +373,7 @@ async def post_login(body: LoginBody, request: Request):
     wait = authmod.login_throttle.retry_after(peer)
     if wait:
         # No hash check at all: even the right password waits its turn.
-        logging.getLogger("pmc.auth").warning(
+        logging.getLogger("inboxrake.auth").warning(
             "login from %s throttled for another %ds", peer, wait)
         raise HTTPException(
             429, mailops.coded(mailops.LOGIN_THROTTLED, n=-(-wait // 60)),
@@ -382,13 +382,13 @@ async def post_login(body: LoginBody, request: Request):
     if not await run_in_threadpool(authmod.verify_password, body.password,
                                    cfg["auth"]["password_hash"]):
         authmod.login_throttle.failed(peer)
-        logging.getLogger("pmc.auth").warning("failed login from %s", peer)
+        logging.getLogger("inboxrake.auth").warning("failed login from %s", peer)
         await asyncio.sleep(0.5)          # soften brute force
         raise HTTPException(401, "wrong password")
     authmod.login_throttle.succeeded(peer)
     resp = JSONResponse({"ok": True})
     _set_session(resp, request, "password")
-    logging.getLogger("pmc.auth").info("password login ok")
+    logging.getLogger("inboxrake.auth").info("password login ok")
     return resp
 
 
@@ -431,7 +431,7 @@ def get_oidc_callback(request: Request, code: str = Query(""),
     if cfg["auth"]["mode"] != "oidc":
         raise HTTPException(400, "OIDC login is not enabled")
     if error:      # the IdP rejected the authorization request - say why
-        logging.getLogger("pmc.auth").warning(
+        logging.getLogger("inboxrake.auth").warning(
             "OIDC login rejected by the IdP: %s (%s)",
             error, error_description)
         raise HTTPException(
@@ -448,7 +448,7 @@ def get_oidc_callback(request: Request, code: str = Query(""),
     except Exception as exc:
         raise HTTPException(502, f"token exchange failed: {exc}")
     if authmod.email_unverified(claims):
-        logging.getLogger("pmc.auth").warning(
+        logging.getLogger("inboxrake.auth").warning(
             "OIDC login refused for %r (email not verified by the IdP)",
             claims.get("email") or claims.get("sub"))
         # a top-level navigation: land on the login page, which words it
@@ -458,20 +458,20 @@ def get_oidc_callback(request: Request, code: str = Query(""),
     sub = authmod.allowed_subject(claims,
                                   cfg["auth"]["oidc"].get("allowed") or [])
     if not sub:
-        logging.getLogger("pmc.auth").warning(
+        logging.getLogger("inboxrake.auth").warning(
             "OIDC login rejected for %r (not in allow-list)",
             claims.get("email") or claims.get("sub"))
         raise HTTPException(403, "this account is not allowed to sign in")
     # No admin configured yet: the first allowed identity to sign in
     # claims the pre-tenancy workspace (set OIDC_ADMIN to pin it upfront).
     if cfgmod.claim_admin(sub):
-        logging.getLogger("pmc.auth").warning(
+        logging.getLogger("inboxrake.auth").warning(
             "OIDC admin claimed by %s - this identity now owns the "
             "existing workspace and the server settings", sub)
     resp = RedirectResponse("/")
     resp.delete_cookie(_PKCE_COOKIE)          # one roundtrip, one verifier
     _set_session(resp, request, sub)
-    logging.getLogger("pmc.auth").info("OIDC login ok: %s", sub)
+    logging.getLogger("inboxrake.auth").info("OIDC login ok: %s", sub)
     return resp
 
 
@@ -550,7 +550,7 @@ def get_oauth_imap_callback(request: Request, code: str = Query(""),
     cfgmod.save_oauth(account, {"provider": provider, "client_id": client_id,
                                 "client_secret": client_secret, **tokens},
                       use=True)
-    logging.getLogger("pmc.oauth").info(
+    logging.getLogger("inboxrake.oauth").info(
         "IMAP OAuth connected: account=%r provider=%s", account, provider)
     resp = RedirectResponse("/")
     resp.delete_cookie(_OAUTH_PENDING_COOKIE)
@@ -582,7 +582,7 @@ def post_oauth_imap_device_poll(account: str = Query(...),
     if result["status"] == "complete":
         cfgmod.save_oauth(account, {k: v for k, v in result.items()
                                     if k != "status"}, use=True)
-        logging.getLogger("pmc.oauth").info(
+        logging.getLogger("inboxrake.oauth").info(
             "IMAP OAuth connected: account=%r provider=microsoft (device "
             "code)", account)
     return result
@@ -1003,7 +1003,7 @@ def post_unsubscribe(body: AiGroupBody, account: str | None = Query(None)):
         # (the UI words it); never raw exception text
         code = unsub.classify(exc)
         if code == mailops.UNSUB_FAILED:
-            logging.getLogger("pmc.unsub").exception(
+            logging.getLogger("inboxrake.unsub").exception(
                 "unsubscribe failed unexpectedly")
             raise HTTPException(500, code)
         raise HTTPException(400, code)
@@ -1290,7 +1290,7 @@ def post_protect(body: ProtectBody):
         protected = cfgmod.set_protected_many(entries, body.on)
     except ValueError as exc:
         raise HTTPException(400, str(exc))
-    logging.getLogger("pmc.mail").info(
+    logging.getLogger("inboxrake.mail").info(
         "protected list %s %d entr%s (%d entries)",
         "add" if body.on else "remove", len(entries),
         "y" if len(entries) == 1 else "ies", len(protected))
@@ -1543,7 +1543,7 @@ def post_test_connection(account: str | None = Query(None)):
             except Exception:
                 pass
     except Exception as exc:
-        logging.getLogger("pmc.mail").warning(
+        logging.getLogger("inboxrake.mail").warning(
             "test_connection failed: %s", type(exc).__name__)
         text = mailops.error_text(exc, im["host"])
         raise HTTPException(502, text if mailops.is_coded(text)
@@ -1572,7 +1572,7 @@ def get_folders(account: str | None = Query(None)):
             except Exception:
                 pass
     except Exception as exc:
-        logging.getLogger("pmc.mail").warning(
+        logging.getLogger("inboxrake.mail").warning(
             "folder listing failed: %s: %s", type(exc).__name__, exc)
         raise HTTPException(500, mailops.error_text(
             exc, cfgmod.account_imap(acc.name)["host"],
@@ -1808,7 +1808,7 @@ def post_import_config(body: dict):
         nunsub = unsubstore.merge_import(body["unsub"],
                                          set(accountsmod.names()))
 
-    logging.getLogger("pmc.mail").info(
+    logging.getLogger("inboxrake.mail").info(
         "config import: %d rules, %d verdicts, %d replied addrs, "
         "%d unsubscribed senders, %d knowledge entries", nrules, nverdicts,
         nreplied, nunsub, nknowledge)
@@ -1862,7 +1862,7 @@ def post_sign_out_all(request: Request, response: Response):
         raise HTTPException(403, "admin only")
     old_sub = _session_sub(request)
     authmod.renew_epoch()
-    logging.getLogger("pmc.auth").info("all sessions signed out")
+    logging.getLogger("inboxrake.auth").info("all sessions signed out")
     _keep_caller_signed_in(request, response, old_sub)
     return {"ok": True}
 
@@ -1921,7 +1921,7 @@ def post_config(body: dict, request: Request, response: Response):
             pinstore.rename_account(old, new)
             autoscanmod.rename_account(old, new)
             auditlog.rename_account(old, new)
-            logging.getLogger("pmc.mail").info(
+            logging.getLogger("inboxrake.mail").info(
                 "account renamed: %r -> %r (state, verdicts, unsubscribes, "
                 "replied, stats, rules, presets, digest, known senders, "
                 "pins, auto-scan, audit log migrated)", old, new)

@@ -37,7 +37,7 @@ from . import rules as rulesmod
 from . import smtpout
 from . import tenants
 
-log = logging.getLogger("pmc.digest")
+log = logging.getLogger("inboxrake.digest")
 
 
 def _masked(addr: str) -> str:
