@@ -348,6 +348,7 @@ export const DE: Record<string, string> = {
   "Password": "Passwort",
   "(unchanged)": "(unverändert)",
   "required": "erforderlich",
+  "optional": "optional",
   "Folders to scan": "Zu scannende Ordner",
   "Load folders": "Ordner laden",
   "Excluded by rule:": "Durch Regel ausgeschlossen:",

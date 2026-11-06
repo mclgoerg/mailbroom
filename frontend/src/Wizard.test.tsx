@@ -460,3 +460,22 @@ test("an unexpected scan failure reads as words, not as an exception", () => {
   expect(screen.getByText(/The scan failed unexpectedly/)).toBeTruthy();
   expect(screen.queryByText(/scan_failed/)).toBeNull();
 });
+
+test("the client-secret placeholder says optional for Microsoft, required " +
+  "for Google", () => {
+  const secret = (label = "Client secret") => screen.getByLabelText(label)
+    .getAttribute("placeholder");
+  open();
+  pick("Outlook / Microsoft 365");
+  expect(secret()).toBe("optional");
+  cleanup();
+  open();
+  pick("Gmail");
+  fireEvent.click(screen.getByRole("tab", { name: "OAuth" }));
+  expect(secret()).toBe("required");
+  cleanup();
+  setLang("de");
+  open();
+  pick("Outlook / Microsoft 365");
+  expect(secret("Client-Secret")).toBe("optional");
+});
