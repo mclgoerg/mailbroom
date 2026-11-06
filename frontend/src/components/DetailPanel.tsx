@@ -3,6 +3,7 @@ import { ArrowUpDown, Ban, Check, ChevronLeft, MailMinus, MessagesSquare,
   from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { api } from "../api";
+import { demoHint, useDemo } from "../demoMode";
 import { t } from "../i18n";
 import { actionVerb, planMailAction } from "../mailActions";
 import { fmtSize, fmtUsd, mailKey, olderThan, shortcutTarget, sieveSnippet,
@@ -12,7 +13,7 @@ import type { AppState, Group, Grouping, GroupUnsub, Mail } from "../types";
 import { MailRows, MessageView } from "./MailList";
 import { SenderList, type FileEntry, type SenderAction } from "./SenderList";
 import { ThreadView } from "./ThreadView";
-import { Button, Chip, confirmDialog, ensureAiAck, Input, LINK, LINK_ACCENT, Loading, Menu,
+import { Button, Chip, confirmDialog, DemoHint, ensureAiAck, Input, LINK, LINK_ACCENT, Loading, Menu,
   MenuItem, Modal, Notice, PanelHeader, PinButton, ProtectButton, Segmented,
   Select, Spinner, stillMailingText, tabPanelProps, useMediaQuery }
   from "./ui";
@@ -82,6 +83,7 @@ export function DetailPanel({ grouping, group, aiEnabled, protectedNow,
   categories?: string[];
   filingBox?: ReactNode;
 }) {
+  const demo = useDemo();
   const hasSenders = !!senders && !!onSenderAct && !!onSenderProtect
     && !!renderSender && isPooled(group) && senders.length > 0;
   const [pick, setTab] = useState<"senders" | "mails">(
@@ -468,13 +470,15 @@ export function DetailPanel({ grouping, group, aiEnabled, protectedNow,
               {purposes && <p className="type-meta text-muted">{purposes}</p>}
               {(canAiSort || canAiClear) && (
                 <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-                  {canAiSort && (
+                  {canAiSort && (<>
                     <Button variant="secondary" size="sm"
-                      disabled={aiSort!.busy} onClick={aiSort!.onSort}>
+                      disabled={demo || aiSort!.busy} onClick={aiSort!.onSort}
+                      title={demo ? demoHint() : undefined}>
                       <Wand2 size={14} className="mr-1 inline align-text-bottom" />
                       {t("aisort.btn")}
                     </Button>
-                  )}
+                    <DemoHint />
+                  </>)}
                   {canAiClear && (
                     <span className="type-meta text-muted">
                       {aiSort!.total
@@ -626,8 +630,9 @@ export function DetailPanel({ grouping, group, aiEnabled, protectedNow,
                       {t("cancel")}
                     </MenuItem>
                   )}
-                  {aiEnabled && !busy && sel.size === 0 && (
-                    <MenuItem onClick={aiSelect}>
+                  {(aiEnabled || demo) && !busy && sel.size === 0 && (
+                    <MenuItem onClick={aiSelect} disabled={demo}
+                      sub={demo ? demoHint() : undefined}>
                       <Wand2 size={16} className="mr-1 inline align-text-bottom" />
                       {t("ai.rate")}
                     </MenuItem>
@@ -741,7 +746,11 @@ export function DetailPanel({ grouping, group, aiEnabled, protectedNow,
                     <option value="archive">{t("Archive")}</option>
                     <option value="move">{t("Move to folder…")}</option>
                     <option value="mark_read">{t("Mark read")}</option>
-                    {aiEnabled && <option value="ai_review">{t("ai.rate")}</option>}
+                    {(aiEnabled || demo) && (
+                      <option value="ai_review" disabled={demo}>
+                        {t("ai.rate")}{demo ? ` - ${demoHint()}` : ""}
+                      </option>
+                    )}
                   </Select>
                   {moveDest === "?" && (
                     <>

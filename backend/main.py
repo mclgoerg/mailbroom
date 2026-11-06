@@ -33,6 +33,7 @@ from . import autoscan as autoscanmod
 from . import config as cfgmod
 from . import csvsafe
 from . import digest as digestmod
+from . import demo as demomod
 from . import errortext
 from . import knowledge as knowledgemod
 from . import knowledgestore
@@ -338,6 +339,8 @@ def get_auth(request: Request):
         sub = None
     authed = mode == "none" or sub is not None
     out = {"mode": mode, "authed": authed}
+    if demomod.enabled():
+        out["demo"] = True      # the UI disables what the demo can't do
     if authed:
         # The middleware already resolved the tenant for this request.
         out["sub"] = sub if mode == "oidc" else ""

@@ -2,6 +2,7 @@
 import { cleanup, fireEvent, render, screen, waitFor, within } from
   "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { setDemo } from "./demoMode";
 import { setLang } from "./i18n";
 import type { Group, Mail } from "./types";
 
@@ -747,5 +748,46 @@ describe("DetailPanel", () => {
     await waitFor(() => screen.getByText("Mail 1"));
     fireEvent.click(await screen.findByLabelText("More"));
     expect(screen.queryByText("Read conversation")).toBeNull();
+  });
+});
+
+describe("DetailPanel in demo mode", () => {
+  afterEach(() => { cleanup(); setDemo(false); });
+  const HINT = "Not available in the demo.";
+
+  it("shows AI rate, the bulk AI option and AI sort disabled with the hint",
+    async () => {
+    setDemo(true);
+    const onSort = vi.fn();
+    renderPanel([mkMail(1), mkMail(2)], {
+      group: mkGroup({ kind: "other" } as Partial<Group>),
+      aiSort: { total: 0, checked: 0, busy: false, onSort, onClear: noop } });
+    await waitFor(() => screen.getByText("Mail 1"));
+    const sort = screen.getByRole("button", { name: /Sort with AI/ });
+    expect((sort as HTMLButtonElement).disabled).toBe(true);
+    fireEvent.click(sort);
+    expect(onSort).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByLabelText("More"));
+    const rate = screen.getByRole("menuitem", { name: /AI rate mails/ });
+    expect((rate as HTMLButtonElement).disabled).toBe(true);
+    expect(rate.textContent).toContain(HINT);
+    fireEvent.click(screen.getByLabelText("More"));
+
+    fireEvent.click(document.querySelectorAll('input[type="checkbox"]')[0]);
+    const opt = await screen.findByRole("option",
+      { name: /AI rate mails/ }) as HTMLOptionElement;
+    expect(opt.disabled).toBe(true);
+    expect(opt.textContent).toContain(HINT);
+    expect(screen.getAllByText(HINT).length).toBeGreaterThan(0);
+  });
+
+  it("hides them without a key when the flag is off", async () => {
+    renderPanel([mkMail(1), mkMail(2)]);
+    await waitFor(() => screen.getByText("Mail 1"));
+    fireEvent.click(screen.getByLabelText("More"));
+    expect(screen.queryByRole("menuitem", { name: /AI rate mails/ }))
+      .toBeNull();
+    expect(screen.queryByText(HINT)).toBeNull();
   });
 });
