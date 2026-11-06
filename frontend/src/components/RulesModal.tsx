@@ -75,6 +75,7 @@ export function RulesModal({ state, onClose, onChanged, initialQuery = "" }: {
   const [editId, setEditId] = useState<string | null>(null);
   const [busyId, setBusyId] = useState("");
   const [msg, setMsg] = useState("");
+  const [filterErr, setFilterErr] = useState("");
   const rules = state.rules ?? [];
 
   // The effective per-run cap, from the server (purge confirms name it).
@@ -118,6 +119,7 @@ export function RulesModal({ state, onClose, onChanged, initialQuery = "" }: {
 
   const save = async () => {
     setMsg("");
+    setFilterErr("");
     const { retention, retentionN, ...rest } = form;
     const n = Number(retentionN);
     if (purge && !(Number.isInteger(n) && n >= 1 && n <= 36500)) {
@@ -136,7 +138,9 @@ export function RulesModal({ state, onClose, onChanged, initialQuery = "" }: {
       setEditId(null);
       onChanged();
     } catch (e: any) {
-      setMsg(t("err.generic", { msg: e.message ?? e }));
+      // a refused filter is shown next to the filter field
+      if (e.code === "rule_filter_invalid") setFilterErr(e.message);
+      else setMsg(t("err.generic", { msg: e.message ?? e }));
     }
   };
 
@@ -262,6 +266,13 @@ export function RulesModal({ state, onClose, onChanged, initialQuery = "" }: {
                 {t("rule.purge_all_short")}
               </span>
             )}
+            {!!rule.filter_invalid?.length && (
+              <div className="mt-1 flex items-start gap-1 type-meta text-review-fg">
+                <TriangleAlert size={14} className="mt-0.5 shrink-0" />
+                {t("rule.filter_invalid",
+                  { names: rule.filter_invalid.join(", ") })}
+              </div>
+            )}
             {rule.mode === "report" && rule.reset_reason && (
               <div className="mt-1 flex items-start gap-1 type-meta text-review-fg">
                 <TriangleAlert size={14} className="mt-0.5 shrink-0" />
@@ -344,12 +355,18 @@ export function RulesModal({ state, onClose, onChanged, initialQuery = "" }: {
                   <Field label={t("rule.f_filter")}>
                     <Input className="w-full"
                       placeholder="tag:shipping age:>1y is:noreply-ever …"
-                      value={form.query} onChange={set("query")} />
+                      value={form.query} onChange={set("query")}
+                      aria-invalid={filterErr ? true : undefined} />
                   </Field>
                 </div>
                 <QueryBuilder value={form.query} senderOnly={purge}
                   onChange={(q) => setForm({ ...form, query: q })} />
               </div>
+              {filterErr && (
+                <div role="alert" className="mt-1 type-meta text-danger-fg">
+                  {filterErr}
+                </div>
+              )}
               <div className="mt-1 type-meta text-muted">
                 {purge
                   ? t("rule.purge_filter_help")

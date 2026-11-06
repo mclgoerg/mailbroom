@@ -1893,6 +1893,15 @@ export const DE: Record<string, string> = {
     "Dieser Filter ist für Spam- und Papierkorb-Regeln nicht "
     + "verfügbar: {names} (er trifft nie auf Absender – nutze "
     + "stattdessen Freitext wie den Domainnamen).",
+  "ferr.rule_filter_invalid":
+    "Dieser Filter enthält Teile, die Inboxrake nicht versteht: {names}",
+  "ferr.rule_filter_invalid_run":
+    "Der Filter enthält Teile, die Inboxrake nicht versteht: {names} – "
+    + "bearbeite die Regel. Automatische Läufe werden bis dahin "
+    + "übersprungen.",
+  "rule.filter_invalid":
+    "Der Filter enthält Teile, die Inboxrake nicht versteht: {names}. "
+    + "Ausführungsläufe werden übersprungen, bis du die Regel bearbeitest.",
   "ferr.no_account":
     "Es ist noch kein Mail-Konto eingerichtet – trage zuerst in den "
     + "Einstellungen die Zugangsdaten ein.",

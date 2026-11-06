@@ -403,6 +403,13 @@ def _normalise(r: dict) -> bool:
     r.setdefault("scope", "mail")        # tolerate pre-purge rules.json
     r.setdefault("report_at", None)
     r.setdefault("reset_reason", "")
+    # a rule saved before filters were validated: shown as a warning on the
+    # card, and its execute runs are skipped (see _filter_gate)
+    bad = validate_filter(r.get("query", ""))
+    if bad:
+        r["filter_invalid"] = bad
+    else:
+        r.pop("filter_invalid", None)
     if r["scope"] == "mail":
         if not r.get("report_sig") and r.get("report_runs", 0) >= 1:
             # Pre-binding rule: a rules.json from before mail rules were
@@ -459,7 +466,9 @@ def _save(rules: list[dict]) -> None:
     path = _path()
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp = path.with_suffix(".tmp")
-    tmp.write_text(json.dumps({"rules": rules}, indent=1))
+    tmp.write_text(json.dumps(
+        {"rules": [{k: v for k, v in r.items() if k != "filter_invalid"}
+                   for r in rules]}, indent=1))
     tmp.chmod(0o600)
     tmp.replace(path)
     _publish(rules)
@@ -502,6 +511,12 @@ def _validate(body: dict, rule: dict) -> dict:
         rule["grouping"] = body["grouping"]
     if "query" in body:
         rule["query"] = str(body["query"]).strip()[:300]
+        # a mistyped part is silently dropped by the parsers and would widen
+        # the match: refuse it, naming the parts
+        bad = validate_filter(rule["query"])
+        if bad:
+            raise ValueError(mailops.coded(
+                mailops.RULE_FILTER_INVALID, names=", ".join(bad)))
     if "action" in body:
         if body["action"] not in (*mailops.ACTIONS, PURGE_ACTION):
             raise ValueError("bad action")
@@ -723,6 +738,7 @@ def run_rule(rule_id: str, rescan: bool = True) -> dict:
         result["sig"], result["box"] = definition_sig(rule), box_sig(rule)
         if rule["mode"] == "execute" and not purge_armed(rule):
             raise RuntimeError(mailops.RULE_REPORT_FIRST)
+        _filter_gate(rule)
         with acc.lock:
             scan_ok = acc.state["status"] == "done"
         if rescan or not scan_ok:
@@ -813,6 +829,16 @@ def run_rule(rule_id: str, rescan: bool = True) -> dict:
     return _finish_run(rule_id, result)
 
 
+def _filter_gate(rule: dict) -> None:
+    """An execute run of a rule whose filter has parts the parsers drop
+    would act on a wider match than the filter says: skipped. Report runs
+    still run (they show the numbers and change nothing)."""
+    bad = validate_filter(rule.get("query", ""))
+    if rule["mode"] == "execute" and bad:
+        raise RuntimeError(mailops.coded(
+            mailops.RULE_FILTER_INVALID_RUN, names=", ".join(bad)))
+
+
 def _disarm(rule_id: str, reason: str) -> None:
     with _LOCK:
         rules = load_rules()
@@ -861,6 +887,7 @@ def _run_purge(rule: dict, acc, result: dict) -> None:
         result["sig"], result["box"] = definition_sig(rule), box_sig(rule)
         if rule["mode"] == "execute" and not purge_armed(rule):
             raise RuntimeError(mailops.RULE_REPORT_FIRST)
+        _filter_gate(rule)
         f = parse_filter(rule["query"])
         now = time.time()
 

@@ -1650,6 +1650,14 @@ export const EN: Record<string, string> = {
   "ferr.rule_purge_filter_domain":
     "This filter is not available for Junk and Trash rules: {names} (it "
     + "never matches senders - use plain text such as the domain name).",
+  "ferr.rule_filter_invalid":
+    "This filter has parts Inboxrake doesn't understand: {names}",
+  "ferr.rule_filter_invalid_run":
+    "The filter has parts Inboxrake doesn't understand: {names} - edit the "
+    + "rule. Its automatic runs are skipped until then.",
+  "rule.filter_invalid":
+    "The filter has parts Inboxrake doesn't understand: {names}. Execute "
+    + "runs are skipped until you edit the rule.",
   "ferr.no_account":
     "No mail account is set up yet - open Settings and fill in the "
     + "sign-in details first.",

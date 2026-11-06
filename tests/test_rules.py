@@ -230,7 +230,7 @@ def _armed_rule(**over):
 
 
 @pytest.mark.parametrize("edit", [
-    {"query": ""}, {"query": "tag:shipping age:>30d"},
+    {"query": ""}, {"query": "tag:shipping age:>2y"},
     {"grouping": "domain"}, {"action": "mark_read"},
     {"action": "move", "dest": "Archive"},
     {"keep_latest": 2}, {"older_than_days": 30}])
@@ -340,6 +340,88 @@ def test_edit_during_a_report_run_does_not_arm_the_edit(bridge, monkeypatch):
     assert saved["report_runs"] == 1                 # a report is on record...
     with pytest.raises(ValueError, match=mailops.RULE_REPORT_FIRST):
         rulesmod.update_rule(rule["id"], {"mode": "execute"})  # ...not this one
+
+
+# ------------------------------------------------------- filter validation
+
+BAD_FILTERS = {
+    "age": "age:>1yr", "unread": "unread:>150", "att": "att:>10x",
+    "is": "is:unsubbed", "has": "has:pin", "eng": "eng:none",
+    "ai": "ai:maybe", "unknown": "colour:red", "mangled": "-tag:x",
+}
+
+
+@pytest.mark.parametrize("kind", sorted(BAD_FILTERS))
+def test_saving_a_mistyped_filter_is_refused_naming_it(bridge, kind):
+    bad = BAD_FILTERS[kind]
+    body = {"name": "x", "query": f"tag:shipping {bad}"}
+    r = client.post("/api/rules", json=body)
+    assert r.status_code == 400
+    assert r.json()["detail"] == mailops.coded(
+        mailops.RULE_FILTER_INVALID, names=bad)
+    ok = rulesmod.create_rule({"name": "ok", "query": "tag:shipping"})
+    r = client.post(f"/api/rules/{ok['id']}", json={"query": body["query"]})
+    assert r.status_code == 400 and "rule_filter_invalid" in r.json()["detail"]
+    assert rulesmod.load_rules()[0]["query"] == "tag:shipping"
+    # import: the rule is dropped
+    r = client.post("/api/import_config", json={"rules": [body]})
+    assert r.json()["rules"] == 0
+
+
+def test_valid_filters_still_save():
+    for q in ("", "newsletter weekly", "tag:ship from:a@b.example age:>1y "
+              "unread:>80 att:>10m is:unsub has:pinned eng:low ai:safe"):
+        assert rulesmod.create_rule({"name": "ok", "query": q})["query"] == q
+
+
+def test_purge_rule_with_a_mistyped_filter_is_refused():
+    with pytest.raises(ValueError, match="^rule_filter_invalid:"):
+        rulesmod.create_rule({"name": "p", "scope": "trash",
+                              "older_than_days": 30, "query": "age:>1yr"})
+
+
+def _legacy_rule(bridge, **over):
+    import json
+    rule = {"id": "l1", "name": "legacy", "scope": "mail",
+            "grouping": "sender", "query": "tag:shipping age:>1yr",
+            "action": "trash", "dest": "", "schedule": "daily",
+            "mode": "execute", "report_runs": 1, "created": 1,
+            "last_run": None, "origin": "manual", "keep_latest": None,
+            "older_than_days": None, **over}
+    rulesmod._path().parent.mkdir(parents=True, exist_ok=True)
+    rulesmod._path().write_text(json.dumps({"rules": [rule]}))
+    return rule
+
+
+def test_legacy_invalid_rule_is_flagged_and_skips_execute(bridge):
+    import json
+    _legacy_rule(bridge)
+    listed = client.get("/api/rules").json()["rules"][0]
+    assert listed["filter_invalid"] == ["age:>1yr"]
+    with pytest.raises(RuntimeError, match=r"^rule_filter_invalid_run:"):
+        rulesmod.run_rule("l1", rescan=False)
+    saved = rulesmod.load_rules()[0]
+    assert saved["last_run"]["error"].startswith("rule_filter_invalid_run:")
+    assert not bridge.mailbox["Trash"] and not mailops.UNDO_LOG
+    # the warning flag is derived, never written to the file
+    assert "filter_invalid" not in json.loads(
+        rulesmod._path().read_text())["rules"][0]
+
+
+def test_legacy_invalid_rule_still_runs_reports(bridge):
+    _legacy_rule(bridge, mode="report")
+    res = rulesmod.run_rule("l1")
+    assert res["mode"] == "report" and not res["error"]
+
+
+def test_purge_execute_run_with_a_mistyped_filter_is_skipped(monkeypatch):
+    monkeypatch.setattr(rulesmod, "purge_armed", lambda r: True)
+    rule = {"id": "p1", "scope": "trash", "action": "purge", "mode": "execute",
+            "older_than_days": 30, "keep_latest": None,
+            "query": "age:>1yr", "account": None}
+    result = {"error": ""}
+    rulesmod._run_purge(rule, None, result)
+    assert result["error"].startswith("rule_filter_invalid_run:")
 
 
 # -------------------------------------------------------------- scheduling
