@@ -791,3 +791,48 @@ describe("DetailPanel in demo mode", () => {
     expect(screen.queryByText(HINT)).toBeNull();
   });
 });
+
+describe("DetailPanel unsubscribe links", () => {
+  afterEach(() => { cleanup(); setDemo(false); vi.unstubAllGlobals(); });
+  const HINT = "In your own install this opens the sender's unsubscribe page.";
+  const link = { n: 1, of: 1, status: "link" as const,
+    link: "https://unsub.example/u", addr: "s@x.example" };
+
+  for (const demo of [true, false]) {
+    it(`Open unsubscribe page, demo=${demo}`, async () => {
+      const open = vi.fn();
+      vi.stubGlobal("open", open);
+      setDemo(demo);
+      renderPanel([mkMail(1)], { group: mkGroup({ unsub: true }),
+        unsubscribedNow: link });
+      await waitFor(() => screen.getByText("Mail 1"));
+      fireEvent.click(screen.getByRole("button",
+        { name: "Open unsubscribe page" }));
+      if (demo) {
+        expect(open).not.toHaveBeenCalled();
+        expect(screen.getByText(HINT)).toBeTruthy();
+      } else {
+        expect(open).toHaveBeenCalledWith(link.link, "_blank", "noopener");
+        expect(screen.queryByText(HINT)).toBeNull();
+      }
+    });
+
+    it(`Unsubscribe returning a link, demo=${demo}`, async () => {
+      const open = vi.fn();
+      vi.stubGlobal("open", open);
+      setDemo(demo);
+      const { api } = await import("./api");
+      (api.unsubscribe as any).mockResolvedValue(
+        { action: "link", detail: link.link, method: "link" });
+      renderPanel([mkMail(1)], { group: mkGroup({ unsub: true }) });
+      await waitFor(() => screen.getByText("Mail 1"));
+      fireEvent.click(screen.getByRole("button", { name: "Unsubscribe" }));
+      if (demo) {
+        await waitFor(() => screen.getByText(HINT));
+        expect(open).not.toHaveBeenCalled();
+      } else {
+        await waitFor(() => expect(open).toHaveBeenCalledTimes(1));
+      }
+    });
+  }
+});
