@@ -12,6 +12,7 @@ from __future__ import annotations
 import base64
 import hashlib
 import hmac
+import ipaddress
 import json
 import logging
 import math
@@ -211,10 +212,26 @@ def verify_session(token: str, now: float | None = None) -> str | None:
         return None
 
 
+def peer_key(host: str) -> str:
+    """The throttle bucket for a peer: IPv4 per address, IPv6 per /64 (a
+    single host usually owns a whole /64, so per-address would be no limit)."""
+    try:
+        ip = ipaddress.ip_address(host)
+    except ValueError:
+        return host
+    if isinstance(ip, ipaddress.IPv6Address):
+        if ip.ipv4_mapped:
+            return str(ip.ipv4_mapped)
+        return str(ipaddress.ip_network(f"{ip}/64", strict=False))
+    return str(ip)
+
+
 class LoginThrottle:
-    """Failed password logins per peer address: after `limit` failures
-    within `window` seconds the peer is refused until the oldest one ages
-    out; a success clears the peer. In memory only (a restart forgives)."""
+    """Password login attempts per peer (see `peer_key`): after `limit`
+    attempts within `window` seconds the peer is refused until the oldest
+    one ages out; a success clears the peer. `attempt` counts an attempt
+    before the (slow) hash check, so parallel requests cannot all slip
+    through. In memory only (a restart forgives)."""
 
     def __init__(self, limit: int = 5, window: float = 15 * 60,
                  clock=time.time):
@@ -234,22 +251,38 @@ class LoginThrottle:
     def retry_after(self, peer: str) -> int:
         """Seconds until `peer` may try again; 0 when it may now."""
         with self._lock:
-            recent = self._recent(peer)
-            if len(recent) < self.limit:
-                return 0
-            return max(1, math.ceil(recent[0] + self.window - self.clock()))
+            return self._wait(peer_key(peer))
+
+    def _wait(self, peer: str) -> int:
+        recent = self._recent(peer)
+        if len(recent) < self.limit:
+            return 0
+        return max(1, math.ceil(recent[0] + self.window - self.clock()))
+
+    def attempt(self, peer: str) -> int:
+        """Check and count one attempt in a single step: 0 when it may
+        proceed (a slot is now reserved), else the seconds to wait."""
+        peer = peer_key(peer)
+        with self._lock:
+            wait = self._wait(peer)
+            if not wait:
+                self._record(peer)
+            return wait
 
     def failed(self, peer: str) -> None:
         with self._lock:
-            if len(self._fails) > 1000:            # bound the table
-                for other in list(self._fails):
-                    self._recent(other)
-            self._recent(peer)
-            self._fails.setdefault(peer, []).append(self.clock())
+            self._record(peer_key(peer))
+
+    def _record(self, peer: str) -> None:
+        if len(self._fails) > 1000:                # bound the table
+            for other in list(self._fails):
+                self._recent(other)
+        self._recent(peer)
+        self._fails.setdefault(peer, []).append(self.clock())
 
     def succeeded(self, peer: str) -> None:
         with self._lock:
-            self._fails.pop(peer, None)
+            self._fails.pop(peer_key(peer), None)
 
 
 login_throttle = LoginThrottle()

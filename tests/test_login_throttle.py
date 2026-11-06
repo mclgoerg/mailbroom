@@ -133,3 +133,60 @@ def test_throttle_table_stays_bounded():
     clock.now += 901
     t.failed("late")
     assert len(t._fails) == 1
+
+
+def test_parallel_wrong_attempts_cost_at_most_five_hash_checks(monkeypatch):
+    _setup(monkeypatch)
+    calls = []
+    real = authmod.verify_password
+    lock = threading.Lock()
+
+    def counting(password, stored):
+        with lock:
+            calls.append(password)
+        return real(password, stored)
+
+    monkeypatch.setattr(authmod, "verify_password", counting)
+    monkeypatch.setattr(main.asyncio, "sleep", lambda *_: _noop())
+    codes = []
+
+    def go(i):
+        r = TestClient(app).post("/api/login", json={"password": f"w{i}"})
+        codes.append(r.status_code)
+
+    threads = [threading.Thread(target=go, args=(i,)) for i in range(40)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+    assert len(calls) == 5
+    assert sorted(codes).count(401) == 5
+    assert sorted(codes).count(429) == 35
+
+
+async def _noop():
+    return None
+
+
+def test_attempt_reserves_a_slot_atomically():
+    t = authmod.LoginThrottle(clock=Clock())
+    assert [t.attempt("10.0.0.1") for _ in range(5)] == [0] * 5
+    assert t.attempt("10.0.0.1") > 0
+
+
+def test_ipv6_is_counted_per_slash_64():
+    t = authmod.LoginThrottle(clock=Clock())
+    for i in range(5):
+        assert t.attempt(f"2001:db8:1:2::{i + 1:x}") == 0
+    assert t.attempt("2001:db8:1:2:ffff::9") > 0      # same /64
+    assert t.attempt("2001:db8:1:3::1") == 0          # another /64
+    t.succeeded("2001:db8:1:2::77")                   # a success clears the /64
+    assert t.attempt("2001:db8:1:2::1") == 0
+
+
+def test_ipv4_stays_per_address_and_mapped_ipv6_matches_it():
+    t = authmod.LoginThrottle(clock=Clock())
+    for _ in range(5):
+        t.attempt("192.0.2.7")
+    assert t.attempt("192.0.2.8") == 0
+    assert t.attempt("::ffff:192.0.2.7") > 0

@@ -20,6 +20,21 @@ can read your mail metadata and reconfigure the IMAP host or AI endpoint
 
 Docker published ports bypass `ufw`, so a host firewall is not enough.
 
+## Password login throttling
+
+Password login allows 5 attempts per 15 minutes per client address (IPv6
+per /64); further attempts get a "try again in N minutes" answer without
+any password check, even with the right password. Attempts are counted
+before the check, so parallel requests do not get around the limit. The
+counters live in memory only: a restart forgives.
+
+Inboxrake never trusts `X-Forwarded-For` itself. Behind a reverse proxy
+every visitor therefore shares the proxy's address, so **5 wrong passwords
+from anyone lock everyone out for 15 minutes**, unless uvicorn is told
+which proxy to believe. Set `FORWARDED_ALLOW_IPS` in the container
+environment to your proxy's address (comma list; `*` only if nothing but
+the proxy can reach the port) and attempts are counted per visitor.
+
 ## Behaviour worth knowing
 
 - **Host check (no login only).** Without a login, Inboxrake refuses

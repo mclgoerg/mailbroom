@@ -52,6 +52,7 @@ setup that should come up configured; they bootstrap **one** account.
 | `OIDC_CLIENT_SECRET` | empty | Client secret. |
 | `OIDC_ALLOWED` | empty | Comma-separated emails allowed to sign in. Empty admits any account at the provider. |
 | `OIDC_REDIRECT_BASE` | empty | Only needed when auto-detection through `X-Forwarded-*` headers does not work. The callback is `<base>/api/oidc/callback`. |
+| `FORWARDED_ALLOW_IPS` | `127.0.0.1,::1` | Read by uvicorn, not by Inboxrake: the proxy addresses whose `X-Forwarded-For` is believed. Behind a reverse proxy on another address (a Docker network, say) set it to the proxy's address so failed password logins are counted per visitor instead of against the proxy. See [Security & privacy](security.md#password-login-throttling). |
 | `OIDC_ADMIN` | empty | Identity that owns the pre-SSO workspace and the server settings. Empty means the first SSO login claims it. |
 
 See [Security & privacy](security.md) for what each mode protects.
