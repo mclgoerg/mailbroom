@@ -912,8 +912,8 @@ export const EN: Record<string, string> = {
   "preset.label": "Provider preset (prefills the fields below)",
   "preset.hint.proton":
     "Proton needs the Mail Bridge (paid plans): switch its IMAP mode to "
-    + "SSL, export its certificate and point the CA file at it - see the "
-    + "README.",
+    + "SSL, export its certificate and point the CA file at it - see "
+    + "inboxrake.com/docs/providers/.",
   "preset.hint.apppw":
     "Use an app-specific password, not your normal account password - "
     + "create one in the provider's security settings (links in the "
@@ -1162,11 +1162,18 @@ export const EN: Record<string, string> = {
     "Matches the senders in this folder: free text, from:, age: (the "
     + "sender's newest mail) and unread:. An empty filter means ALL senders. "
     + "Not available here: tag:, ai:, eng:, att:, is:, has: and domain: filters. "
-    + "\"Received more than N days ago\" applies to each mail. Run it in "
-    + "report mode to preview what it would delete.",
+    + "A mail is only deleted once it has been in this folder for more than "
+    + "N days (counted from when Inboxrake first saw it there, and it must "
+    + "also have been received more than N days ago). Run it in report mode "
+    + "to preview what it would delete.",
+  "rule.purge_age_label": "In Trash/Junk for more than this many days",
+  "rule.purge_age_tag": "in Trash/Junk > {n}d",
   "rule.purge_edit_reset":
     "Changing the folder, filter or age switches this rule back to report "
     + "mode, so what you previewed is what runs.",
+  "rule.edit_reset":
+    "Changing the filter, action, target, retention or account switches "
+    + "this rule back to report mode, so what you previewed is what runs.",
   "rule.run_report_btn": "Run report",
   "rule.purge_run_report":
     "report: {n} mails would be deleted permanently · senders: {groups}",
@@ -1205,8 +1212,9 @@ export const EN: Record<string, string> = {
     "The filter is empty: this applies to ALL senders in the {folder} folder.",
   "rule.purge_all_short": "all senders",
   "rule.reset_edited":
-    "Back in report mode: the folder, filter or age was changed. Run a "
-    + "report again before switching to execute.",
+    "Back in report mode: what the rule acts on was changed (folder, "
+    + "filter, action, target or age). Run a report again before switching "
+    + "to execute.",
   "rule.reset_account":
     "Back in report mode: the account was renamed, or its server or login "
     + "changed. Run a report again before switching to execute.",
