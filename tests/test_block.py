@@ -135,7 +135,12 @@ def test_block_refuses_malformed_keys(bridge):
     mailops.run_scan()
     bad = [
         ("sender", "deals@shop.example from:noreply@dhl.example"),
-        ("sender", 'a"b@shop.example'), ("sender", "a b@shop.example"),
+        ("sender", 'a"b@shop.example'), ("sender", "a@sh\u00a0op.example"),
+        ("sender", "a@shop.example\u2028from:x@y.example"),
+        ("sender", "a@b\uff1a80.example"), ("domain", "a..example"),
+        ("domain", "x" * 70 + ".example"), ("domain", "shop_x.example"),
+        ("domain", "b\u00fccher.example from:x@y.example"),
+        ("domain", "b\u00fccher.example\n"), ("domain", "'quote.example"), ("sender", "a b@shop.example"),
         ("sender", "a@shop.example\nfrom:x@y.example"),
         ("sender", "a@shop.example\x00"), ("sender", "a(b)@shop.example"),
         ("sender", "from:a@shop.example"), ("sender", "no-at-sign"),
@@ -157,7 +162,14 @@ def test_block_refuses_malformed_keys(bridge):
 def test_block_accepts_normal_keys(bridge):
     mailops.run_scan()
     for grouping, key in (("sender", "first.last+tag@shop.example"),
+                          ("sender", "o'brien@shop.example"),
+                          ("sender", "j\u00f6rg@b\u00fccher.example"),
+                          ("sender", "j\u00f6rg@xn--bcher-kva.example"),
+                          ("domain", "b\u00fccher.example"),
                           ("domain", "xn--bcher-kva.example"),
                           ("domain", "dhl.example")):
         r = client.post("/api/block", json={"grouping": grouping, "key": key})
         assert r.status_code == 200, (grouping, key)
+        # the key goes into the query as given: the match is exact
+        assert r.json()["rule"]["query"] == \
+            f"{'from' if grouping == 'sender' else 'domain'}:{key}"

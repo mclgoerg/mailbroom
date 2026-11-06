@@ -237,29 +237,39 @@ FOLDER_ERROR_CODES = frozenset({
     DATA_NOT_WRITABLE})
 
 
-_KEY_BAD_CHARS = frozenset("\"'()<>,;:\\")
+_KEY_BAD_CHARS = frozenset('"()<>,;:\\')
 _HOST_RE = re.compile(
-    r"^(?=.{1,253}$)[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?"
-    r"(\.[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)*$")
+    r"[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?"
+    r"(\.[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)*")
+
+
+def _plain_host(host: str) -> bool:
+    """A hostname (an IDN is checked in its punycode form)."""
+    try:
+        ascii_host = host.encode("idna").decode("ascii")
+    except UnicodeError:              # empty / over-long label, bad IDN
+        return False
+    return len(ascii_host) <= 253 and _HOST_RE.fullmatch(ascii_host) is not None
 
 
 def valid_block_key(grouping: str, key: str) -> bool:
     """Whether `key` is safe to splice into a `from:` / `domain:` filter: a
-    sender key is ONE address token (no whitespace, quotes, brackets, `:`
-    or control characters; <= 254 chars), a domain key a plain hostname
-    (IDNs in punycode). Anything else could smuggle a second qualifier
-    into the rule (`from:` keeps the last one, so it would widen it)."""
-    if not isinstance(key, str) or not key or len(key) > 254:
-        return False
-    if grouping == "domain":
-        return _HOST_RE.fullmatch(key) is not None
-    if grouping != "sender":
+    sender key is ONE address token, a domain key a plain hostname (Unicode
+    IDNs allowed); neither holds whitespace, quotes, brackets, `:` or
+    control characters, and both are <= 254 chars. Anything else could
+    smuggle a second qualifier into the rule (`from:` keeps the last one,
+    so it would widen it). The key itself is used as given: the match is
+    exact."""
+    if grouping not in ("sender", "domain") or not isinstance(key, str) \
+            or not key or len(key) > 254:
         return False
     if any(c.isspace() or not c.isprintable() or c in _KEY_BAD_CHARS
            for c in key):
         return False
+    if grouping == "domain":
+        return _plain_host(key)
     local, at, host = key.partition("@")
-    return bool(local) and bool(at) and _HOST_RE.fullmatch(host) is not None
+    return bool(local) and bool(at) and _plain_host(host)
 
 
 def coded(code: str, **params) -> str:
