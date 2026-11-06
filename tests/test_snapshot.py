@@ -51,6 +51,32 @@ def test_snapshot_restore_reapplies_verdicts_and_allows_actions(bridge):
         mailops.public_state(acc2)["groups"]["sender"]
 
 
+def test_the_snapshot_is_saved_before_a_delete_job_reports_done(
+        bridge, monkeypatch):
+    """Whoever waits for "done" (a client, a restart right after) must find
+    the post-delete snapshot: it is written first, status still running."""
+    import time
+    mailops.run_scan()
+    acc = accountsmod.get()
+    seen = []
+    real = mailops.save_snapshot
+
+    def slow_save(a):
+        seen.append(a.state["delete"]["status"])
+        time.sleep(0.3)                  # a loaded runner's slow disk
+        real(a)
+    monkeypatch.setattr(mailops, "save_snapshot", slow_save)
+    mailops.delete_groups("sender", ["noreply@dhl.example"], acc=acc)
+    wait_delete_done()
+    assert seen and set(seen) == {"running"}
+    monkeypatch.setattr(mailops, "save_snapshot", real)
+    accountsmod.reset()
+    acc2 = accountsmod.get()
+    assert mailops.load_snapshot(acc2)
+    assert "noreply@dhl.example" not in \
+        mailops.public_state(acc2)["groups"]["sender"]
+
+
 def test_snapshot_never_clobbers_live_state(bridge):
     mailops.run_scan()
     acc = accountsmod.get()
