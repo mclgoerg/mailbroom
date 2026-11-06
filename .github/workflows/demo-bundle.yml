@@ -1,20 +1,34 @@
 name: Demo bundle
 
-# Builds the static file set the in-browser demo loads (scripts/demo-bundle/)
-# when a PR touches anything that goes into it, enforces the size budget,
-# proves the build is reproducible and that the bundle boots in Pyodide.
+# The in-browser demo runs the real backend on Pyodide, so a change to the
+# backend or the UI can break it. These checks run in the PR that would, not
+# at release time, on everything that goes into the demo:
+#   - pyodide-versions: the backend test suite on Pyodide's Python and
+#     package versions (catches a dependency Pyodide lacks, a newer-Python-only
+#     feature, version drift)
+#   - bundle: the bundle build with its size budget over the FINAL file set
+#     (bundle + demo UI + worker), reproducibility, the Node smoke test, and
+#     the headless-browser run (scripts/demo-e2e: boot, /api/state, Trash,
+#     Undo, scan)
 # The result is an artifact only - nothing is deployed from here.
+# Pyodide's version is pinned in ONE place, scripts/demo-bundle/package.json;
+# both jobs read it from there.
 
 on:
   pull_request:
     paths:
       - "backend/**"
-      - "tests/conftest.py"
+      - "frontend/**"
+      - "tests/**"
       - "scripts/demo.py"
       - "scripts/demo_*.py"
       - "scripts/demo-bundle/**"
+      - "scripts/demo-e2e/**"
       - "version.txt"
       - ".github/workflows/demo-bundle.yml"
+  push:
+    branches: [main]
+    tags: ["v*"]
 
 permissions:
   contents: read
@@ -24,6 +38,49 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  pyodide-versions:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
+        with:
+          node-version: 26
+
+      - name: Read the Pyodide pin
+        id: pin
+        working-directory: scripts/demo-bundle
+        run: |
+          npm ci --no-audit --no-fund
+          echo "python=$(node pyodide-pins.mjs python)" >> "$GITHUB_OUTPUT"
+          node pyodide-pins.mjs constraints | tee "$RUNNER_TEMP/pyodide-pins.txt"
+          node pyodide-pins.mjs requirements
+
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7
+        with:
+          python-version: ${{ steps.pin.outputs.python }}
+
+      # The lockfile first (same as the main CI job), then Pyodide's versions
+      # of the packages it ships over it.
+      - name: Install
+        run: |
+          pip install --require-hashes -r backend/requirements-dev.txt
+          pip install --no-deps -r "$RUNNER_TEMP/pyodide-pins.txt"
+
+      # test_other_hosts_denied builds malformed Host headers in the test
+      # client; starlette 1.0.0's TestClient (Pyodide's) raises inside urllib
+      # before the request is sent for these, so there they exercise the
+      # client, not the backend. (--deselect matches by prefix: this also
+      # skips two `[::1]:...` cases that do pass.) The main CI job runs all of
+      # them on the locked versions.
+      - name: Backend tests on Pyodide's Python and packages
+        run: |
+          python -m pytest tests/ -q \
+            --deselect "tests/test_webguard.py::test_other_hosts_denied[[::1]" \
+            --deselect "tests/test_webguard.py::test_other_hosts_denied[[]]" \
+            --deselect "tests/test_webguard.py::test_other_hosts_denied[[evil.example]]" \
+            --deselect "tests/test_webguard.py::test_other_hosts_denied[localhost/x]"
+
   bundle:
     runs-on: ubuntu-latest
     steps:
@@ -42,10 +99,16 @@ jobs:
           pip install --require-hashes -r backend/requirements.txt
           npm ci --no-audit --no-fund --prefix scripts/demo-bundle
 
-      # Fails above the size budget (10 MB on the wire) and prints the
-      # per-file breakdown either way.
+      - name: Build the demo UI
+        working-directory: frontend
+        run: |
+          npm ci --no-audit --no-fund
+          npm run build:demo
+
+      # Fails above the size budget (10 MB on the wire, bundle + UI + worker)
+      # and prints the per-file breakdown either way.
       - name: Build the bundle
-        run: node scripts/demo-bundle/build.mjs --out demo-bundle
+        run: node scripts/demo-bundle/build.mjs --out demo-bundle --ui frontend/dist-demo
 
       - name: The build is reproducible
         run: |
@@ -55,8 +118,29 @@ jobs:
       - name: The bundle boots and serves
         run: node scripts/demo-bundle/smoke.mjs demo-bundle
 
+      # The page, the worker and the bundle in headless Chromium, laid out
+      # like the deploy (/demo/ and /demo/bundle/). ~30 s, so every run does
+      # the whole thing.
+      - name: The demo runs in a browser
+        working-directory: scripts/demo-e2e
+        env:
+          DEMO_UI: ${{ github.workspace }}/frontend/dist-demo
+          DEMO_BUNDLE: ${{ github.workspace }}/demo-bundle
+        run: |
+          npm ci --no-audit --no-fund
+          npx playwright install --with-deps chromium
+          npx playwright test
+
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: demo-bundle
           path: demo-bundle
           retention-days: 14
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: failure()
+        with:
+          name: demo-e2e-traces
+          path: scripts/demo-e2e/test-results
+          retention-days: 7
+          if-no-files-found: ignore

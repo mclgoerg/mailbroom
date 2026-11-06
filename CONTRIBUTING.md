@@ -107,6 +107,45 @@ pip-compile pair and bumps both files.
 No IMAP server or network is needed - the backend suite runs against an
 in-memory fake IMAP server (`tests/conftest.py`).
 
+## The browser demo runs this code too
+
+The demo on the website is this backend and this UI, unchanged, running in
+the visitor's browser on Pyodide (Python on
+WebAssembly). Nothing is forked for it, so it can break with ordinary
+changes. What does:
+
+- **A new runtime dependency** that Pyodide does not ship (it has fastapi,
+  starlette, pydantic, anyio; not uvicorn, cryptography, anthropic or
+  openai - the demo stubs those in `backend/demo.py`). Add one and the
+  bundle cannot import it.
+- **A Python feature newer than Pyodide's Python** (3.14 while the app
+  targets 3.15): syntax or stdlib that only exists in the newest release.
+- **Threads that are waited on.** The browser has no threads; the demo
+  runs jobs (scan, delete, undo) inside the request that starts them. Code
+  that *waits* for another thread (`join`, a queue `get`, a lock held across
+  a request) hangs the demo for good.
+- **Sockets** outside the demo seam: anything that dials out directly
+  (not via `mailops.connect` / `ai_client`, which the demo cuts off).
+- **Middleware that rejects the demo's synthetic `Host: localhost`.**
+
+You see it on the PR: the **Demo bundle** workflow runs on every change to
+`backend/`, `frontend/`, `tests/` or the demo scripts, and fails if the
+backend suite breaks on Pyodide's Python and package versions, if the
+bundle build goes over its size budget, or if the headless-browser run
+(boot, first state, Trash, Undo, scan) fails. Run it locally:
+
+```bash
+(cd scripts/demo-bundle && npm ci)
+(cd frontend && npm ci && npm run build:demo)
+node scripts/demo-bundle/build.mjs --out /tmp/demo-bundle --ui frontend/dist-demo
+cd scripts/demo-e2e && npm ci && npx playwright install chromium
+DEMO_UI=../../frontend/dist-demo DEMO_BUNDLE=/tmp/demo-bundle npx playwright test
+```
+
+The Pyodide version is pinned in one place,
+`scripts/demo-bundle/package.json`; the CI jobs read it from there. More in
+`scripts/demo-bundle/README.md`.
+
 ## Ground rules for changes
 
 - **Safety invariants are non-negotiable.** Deletions must remain

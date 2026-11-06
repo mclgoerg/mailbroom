@@ -15,11 +15,14 @@
 // directory's package.json (exact, no range). A bump is that one line
 // plus `npm install` (the lockfile follows; the script checks they agree).
 //
-//   node build.mjs [--out DIR] [--budget-mb N] [--python PYTHON] [--seed DIR]
+//   node build.mjs [--out DIR] [--ui DIR] [--budget-mb N] [--python PYTHON] [--seed DIR]
 //
 // --python  interpreter that has the backend's dependencies (builds the seed);
 //           default $PYTHON, else python3
 // --seed    use an existing seed directory instead of building one
+// --ui      the demo UI build (frontend/dist-demo: page, scripts, worker):
+//           counted into the budget so it covers the FINAL file set a first
+//           visit downloads, not just the bundle. Not copied.
 // Exit code 1 when the estimated on-the-wire size is over the budget.
 
 import { createHash } from "node:crypto";
@@ -61,6 +64,7 @@ const OUT = path.resolve(opt("--out", path.join(here, "dist")));
 const budget = Number(opt("--budget-mb", BUDGET_MB)) * 1_000_000;
 const PYTHON = opt("--python", process.env.PYTHON || "python3");
 const seedArg = opt("--seed", "");
+const uiArg = opt("--ui", "");
 
 const sha = (buf) => createHash("sha256").update(buf).digest("hex");
 const log = (...a) => console.log(...a);
@@ -224,13 +228,26 @@ emit(seedName, seedZip);
 // Cloudflare compresses wasm / js / html / json with brotli; zips and wheels
 // are sent as they are (DEMO1 findings, Q6/Q9). Quality 9 like the findings'
 // measurements.
-const compressible = /\.(wasm|m?js|html|json)$/;
+const compressible = /\.(wasm|m?js|css|html|json|svg|webmanifest)$/;
 const brotli = (b) => zlib.brotliCompressSync(b, { params: {
   [zlib.constants.BROTLI_PARAM_QUALITY]: 9, [zlib.constants.BROTLI_PARAM_SIZE_HINT]: b.length } }).length;
 for (const f of files) {
   f.wire = compressible.test(f.path) ? brotli(fs.readFileSync(path.join(OUT, f.path))) : f.bytes;
 }
-const total = files.reduce((s, f) => s + f.wire, 0);
+const bundleWire = files.reduce((s, f) => s + f.wire, 0);
+// the UI build: measured the same way, listed apart (the manifest, and so the
+// boot screen's download figure, only knows the bundle)
+const ui = [];
+if (uiArg) {
+  const uiDir = path.resolve(uiArg);
+  if (!fs.existsSync(path.join(uiDir, "index.html"))) throw new Error(`${uiDir} is not a demo UI build (no index.html)`);
+  for (const f of walkFiles(uiDir).sort()) {
+    const buf = fs.readFileSync(f);
+    ui.push({ path: "ui/" + path.relative(uiDir, f).split(path.sep).join("/"), bytes: buf.length,
+      wire: compressible.test(f) ? brotli(buf) : buf.length });
+  }
+}
+const total = bundleWire + ui.reduce((s, f) => s + f.wire, 0);
 
 const manifest = {
   pyodide: { version: VERSION, python: lock.info.python, dir: pyodideDir,
@@ -238,17 +255,17 @@ const manifest = {
   app: appName,
   seed: seedName,
   seedNow: manifestOf(seedDir).built_at,
-  wireBytes: total,
+  wireBytes: bundleWire,
   files: files.map(({ path: p, bytes, sha256, wire }) => ({ path: p, bytes, wire, sha256 })),
 };
 fs.writeFileSync(path.join(OUT, "manifest.json"), JSON.stringify(manifest, null, 1) + "\n");
 
 const mb = (n) => (n / 1e6).toFixed(2).padStart(7);
 log(`\n${"raw MB".padStart(9)} ${"wire MB".padStart(8)}  file`);
-for (const f of [...files].sort((a, b) => b.wire - a.wire)) {
+for (const f of [...files, ...ui].sort((a, b) => b.wire - a.wire)) {
   log(`${mb(f.bytes)}  ${mb(f.wire)}  ${f.path}`);
 }
-log(`${mb(files.reduce((s, f) => s + f.bytes, 0))}  ${mb(total)}  TOTAL (budget ${(budget / 1e6).toFixed(2)} MB on the wire)`);
+log(`${mb([...files, ...ui].reduce((s, f) => s + f.bytes, 0))}  ${mb(total)}  TOTAL${ui.length ? " (bundle + UI)" : " (bundle only: pass --ui for the whole first visit)"} (budget ${(budget / 1e6).toFixed(2)} MB on the wire)`);
 log(`bundle in ${OUT}`);
 if (total > budget) {
   console.error(`\nOVER BUDGET: ${(total / 1e6).toFixed(2)} MB > ${(budget / 1e6).toFixed(2)} MB`);
