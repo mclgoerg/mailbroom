@@ -588,7 +588,11 @@ def post_oauth_imap_device_poll(account: str = Query(...),
         logging.getLogger("inboxrake.oauth").info(
             "IMAP OAuth connected: account=%r provider=microsoft (device "
             "code)", account)
-    return result
+    # The tokens stay on the server: the browser only learns the outcome.
+    out = {"status": result["status"]}
+    if result.get("error"):
+        out["error"] = result["error"]
+    return out
 
 
 @app.post("/api/oauth/imap/disconnect")
