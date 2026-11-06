@@ -117,3 +117,47 @@ def test_scheduler_picks_up_block_rule(bridge):
     assert after["last_run"]["mode"] == "execute"
     assert after["last_run"]["acted"] == 1
     assert "news@shop.example" not in mailops.STATE["groups"]["sender"]
+
+
+def test_block_refuses_crafted_sender_key(bridge):
+    # A bare quoted From can become a key with a space; parse_filter keeps
+    # the LAST from:, so the rule would trash the other sender's mail.
+    mailops.run_scan()
+    r = client.post("/api/block", json={
+        "grouping": "sender",
+        "key": '"deals@shop.example from:noreply@dhl.example"'})
+    assert r.status_code == 400
+    assert r.json()["detail"] == mailops.BLOCK_KEY_INVALID
+    assert rulesmod.load_rules() == []
+
+
+def test_block_refuses_malformed_keys(bridge):
+    mailops.run_scan()
+    bad = [
+        ("sender", "deals@shop.example from:noreply@dhl.example"),
+        ("sender", 'a"b@shop.example'), ("sender", "a b@shop.example"),
+        ("sender", "a@shop.example\nfrom:x@y.example"),
+        ("sender", "a@shop.example\x00"), ("sender", "a(b)@shop.example"),
+        ("sender", "from:a@shop.example"), ("sender", "no-at-sign"),
+        ("sender", "a@"), ("sender", "@shop.example"),
+        ("sender", "a" * 250 + "@shop.example"), ("sender", "a" * 400),
+        ("sender", ""),
+        ("domain", "shop.example from:noreply@dhl.example"),
+        ("domain", "shop.example\n"), ("domain", "sh op.example"),
+        ("domain", "shop.example:80"), ("domain", "a@shop.example"),
+        ("domain", "x" * 300 + ".example"), ("domain", ""),
+    ]
+    for grouping, key in bad:
+        r = client.post("/api/block", json={"grouping": grouping, "key": key})
+        assert r.status_code == 400, (grouping, key)
+        assert r.json()["detail"] == mailops.BLOCK_KEY_INVALID, (grouping, key)
+    assert rulesmod.load_rules() == []
+
+
+def test_block_accepts_normal_keys(bridge):
+    mailops.run_scan()
+    for grouping, key in (("sender", "first.last+tag@shop.example"),
+                          ("domain", "xn--bcher-kva.example"),
+                          ("domain", "dhl.example")):
+        r = client.post("/api/block", json={"grouping": grouping, "key": key})
+        assert r.status_code == 200, (grouping, key)

@@ -142,6 +142,8 @@ RULE_PURGE_FILTER_DOMAIN = "rule_purge_filter_domain"    # names=
 RULE_FILTER_INVALID = "rule_filter_invalid"              # names=
 RULE_FILTER_INVALID_RUN = "rule_filter_invalid_run"      # names=
 RULE_FILTER_TOO_LONG = "rule_filter_too_long"            # max=
+# Block: the sender / domain key is not one plain address / hostname
+BLOCK_KEY_INVALID = "block_key_invalid"
 # a List-Unsubscribe mailto: that would not be one plain mail to one address
 MAILTO_UNSAFE = "mailto_unsafe"
 # connecting (first run): no account set up yet / the CA file is missing
@@ -224,6 +226,7 @@ FOLDER_ERROR_CODES = frozenset({
     RULE_FILTER_INVALID,
     RULE_FILTER_INVALID_RUN,
     RULE_FILTER_TOO_LONG,
+    BLOCK_KEY_INVALID,
     NO_ACCOUNT,
     CAFILE_MISSING,
     AUTH_FAILED,
@@ -232,6 +235,31 @@ FOLDER_ERROR_CODES = frozenset({
     CONNECT_FAILED,
     SCAN_FAILED,
     DATA_NOT_WRITABLE})
+
+
+_KEY_BAD_CHARS = frozenset("\"'()<>,;:\\")
+_HOST_RE = re.compile(
+    r"^(?=.{1,253}$)[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?"
+    r"(\.[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)*$")
+
+
+def valid_block_key(grouping: str, key: str) -> bool:
+    """Whether `key` is safe to splice into a `from:` / `domain:` filter: a
+    sender key is ONE address token (no whitespace, quotes, brackets, `:`
+    or control characters; <= 254 chars), a domain key a plain hostname
+    (IDNs in punycode). Anything else could smuggle a second qualifier
+    into the rule (`from:` keeps the last one, so it would widen it)."""
+    if not isinstance(key, str) or not key or len(key) > 254:
+        return False
+    if grouping == "domain":
+        return _HOST_RE.fullmatch(key) is not None
+    if grouping != "sender":
+        return False
+    if any(c.isspace() or not c.isprintable() or c in _KEY_BAD_CHARS
+           for c in key):
+        return False
+    local, at, host = key.partition("@")
+    return bool(local) and bool(at) and _HOST_RE.fullmatch(host) is not None
 
 
 def coded(code: str, **params) -> str:

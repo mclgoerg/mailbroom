@@ -1252,6 +1252,8 @@ def post_block(body: BlockBody, account: str | None = Query(None)):
     report pass and then switches the fresh rule straight to execute."""
     if body.grouping not in ("sender", "domain"):
         raise HTTPException(400, "bad grouping")
+    if not mailops.valid_block_key(body.grouping, body.key):
+        raise HTTPException(400, mailops.coded(mailops.BLOCK_KEY_INVALID))
     acc = _acc(account)
     check_addr = body.key if body.grouping == "sender" else f"@{body.key}"
     plist = cfgmod.normalize_protected(cfgmod.load_config().get("protected"))
