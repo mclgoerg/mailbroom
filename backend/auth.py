@@ -15,6 +15,7 @@ import hmac
 import json
 import logging
 import os
+import re
 import secrets
 import time
 import urllib.parse
@@ -78,8 +79,8 @@ def _persist_secret(secret: bytes) -> None:
 
 # ------------------------------------------------------------ passwords
 
-def hash_password(password: str) -> str:
-    salt = secrets.token_bytes(16)
+def hash_password(password: str, salt: bytes | None = None) -> str:
+    salt = salt or secrets.token_bytes(16)
     dk = hashlib.scrypt(password.encode(), salt=salt,
                         n=2 ** 14, r=8, p=1, dklen=32)
     return f"scrypt${salt.hex()}${dk.hex()}"
@@ -103,19 +104,99 @@ def _sign(msg: bytes) -> str:
     return hmac.new(_secret(), msg, hashlib.sha256).hexdigest()
 
 
-def make_session(sub: str, now: float | None = None) -> str:
+# A session token is `exp.sub.epoch.sig`. The epoch is a server-side random
+# id kept next to the signing secret; renewing it (password / mode /
+# allow-list / admin change, "sign out all") invalidates every token at
+# once. Logout stays stateless (it only clears the cookie). The old format
+# `exp.sub.sig` has three parts: a new image refuses it (one re-login) and
+# an older image refuses the new four-part token (its unpack raises).
+
+_epoch_mem: dict[Path, str] = {}
+
+
+def _epoch_path() -> Path:
+    return SESSION_SECRET_PATH.with_name("session_epoch")
+
+
+def _new_epoch() -> str:
+    return secrets.token_hex(8)
+
+
+_EPOCH_RE = re.compile(r"[0-9a-f]{16}\Z")
+
+
+def current_epoch() -> str:
+    path = _epoch_path()
+    try:
+        value = path.read_text().strip()
+    except OSError:                        # missing (or never writable)
+        return _epoch_mem[path] if path in _epoch_mem else renew_epoch()
+    except ValueError:                     # not text: garbage
+        return renew_epoch()
+    return value if _EPOCH_RE.match(value) else renew_epoch()
+
+
+def renew_epoch() -> str:
+    """Invalidate every session issued so far."""
+    path = _epoch_path()
+    value = _new_epoch()
+    _epoch_mem[path] = value
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(value)
+        path.chmod(0o600)
+    except OSError:
+        log.exception("could not persist the session epoch - sign-out "
+                      "of all sessions will not survive a restart")
+    return value
+
+
+def sync_epoch(fingerprint: str) -> bool:
+    """Renew the epoch when the effective login settings differ from the
+    ones the stored fingerprint was taken from (a password rotated in the
+    environment, a changed allow-list, ...). The first call only records
+    the fingerprint. True when the epoch was renewed."""
+    path = _epoch_path().with_name("session_auth_fp")
+    try:
+        stored = path.read_text().strip()
+    except (OSError, ValueError):
+        stored = ""
+    if stored == fingerprint:
+        return False
+    renewed = bool(stored)
+    if renewed:
+        renew_epoch()
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(fingerprint)
+        path.chmod(0o600)
+    except OSError:
+        log.exception("could not persist the login fingerprint")
+    return renewed
+
+
+def keyed_digest(data: bytes) -> str:
+    """HMAC of `data` under the session secret (domain-separated)."""
+    return hmac.new(_secret(), b"login-fp:" + data, hashlib.sha256).hexdigest()
+
+
+def make_session(sub: str, now: float | None = None,
+                 epoch: str | None = None) -> str:
     exp = int((now or time.time()) + SESSION_MAX_AGE)
     sub64 = base64.urlsafe_b64encode(sub.encode()).decode().rstrip("=")
-    body = f"{exp}.{sub64}"
+    body = f"{exp}.{sub64}.{epoch or current_epoch()}"
     return f"{body}.{_sign(body.encode())}"
 
 
 def verify_session(token: str, now: float | None = None) -> str | None:
-    """The session's subject, or None for missing/expired/tampered."""
+    """The session's subject, or None for missing/expired/tampered/
+    issued under an older epoch."""
     try:
-        exp_s, sub64, sig = token.split(".")
-        body = f"{exp_s}.{sub64}"
+        exp_s, sub64, epoch, sig = token.split(".")
+        body = f"{exp_s}.{sub64}.{epoch}"
         if not hmac.compare_digest(sig, _sign(body.encode())):
+            return None
+        if not hmac.compare_digest(epoch, current_epoch()):
             return None
         if int(exp_s) < (now or time.time()):
             return None

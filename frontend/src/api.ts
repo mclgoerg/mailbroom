@@ -406,6 +406,7 @@ export const api = {
   login: (password: string) =>
     req<{ ok: boolean }>("/api/login", { password }),
   logout: () => req<{ ok: boolean }>("/api/logout", {}),
+  signOutAll: () => req<{ ok: boolean }>("/api/auth/sign_out_all", {}),
   adminStats: () =>
     req<{ tenants: AdminTenantStats[] }>("/api/admin/stats"),
   oauthDeviceStart: (account: string) =>

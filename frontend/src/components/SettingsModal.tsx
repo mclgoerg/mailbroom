@@ -443,6 +443,16 @@ export function SettingsModal({ cfg, account, onClose, onSaved,
     onSaved(await api.saveConfig({ reset_ai_stats: true }));
   };
 
+  const signOutAll = async () => {
+    if (!await confirmDialog({
+      title: t("confirm.sign_out_all"),
+      body: t("confirm.sign_out_all_body"),
+      confirmLabel: t("confirm.sign_out_all_confirm"), tone: "danger",
+    })) return;
+    await api.signOutAll();
+    setMsg(t("login.signed_out_all"));
+  };
+
   const clearVerdicts = async () => {
     if (!await confirmDialog({
       title: t("confirm.clear_verdicts"),
@@ -1029,6 +1039,17 @@ export function SettingsModal({ cfg, account, onClose, onSaved,
                 )}
               </div>
             </>
+          )}
+
+          {cfg.auth.mode !== "none" && (
+            <div className="sm:col-span-2">
+              <Button variant="danger-quiet" size="sm" onClick={signOutAll}>
+                {t("login.sign_out_all")}
+              </Button>
+              <p className="mt-1 type-meta text-muted">
+                {t("login.sign_out_all_help")}
+              </p>
+            </div>
           )}
 
           <SectionLabel className="sm:col-span-2 mt-2">

@@ -9,6 +9,7 @@ keeps the legacy top-level paths).
 
 from __future__ import annotations
 
+import contextvars
 import json
 import os
 import threading
@@ -148,14 +149,42 @@ def _env_auth() -> dict:
         mode = "none"
     _ENV_AUTH_CACHE = {
         "mode": mode,
-        "password_hash": authmod.hash_password(password)
-        if password else "",
+        "password_hash": authmod.hash_password(password) if password else "",
         # In OIDC mode this identity owns the pre-tenancy workspace and
         # the server-level settings. Empty = claimed by the first OIDC
         # login.
         "admin": os.environ.get("OIDC_ADMIN", "").strip().lower(),
         "oidc": oidc}
     return json.loads(json.dumps(_ENV_AUTH_CACHE))
+
+
+_SESSIONS_RENEWED: contextvars.ContextVar[bool] = contextvars.ContextVar(
+    "sessions_renewed", default=False)
+
+
+def sessions_renewed() -> bool:
+    """Whether the update_config call that just ran in THIS context ended
+    every session (so only that request may hand out a fresh cookie)."""
+    return _SESSIONS_RENEWED.get()
+
+
+def auth_fingerprint(acfg: dict) -> str:
+    """What decides who may be signed in - login method, password, admin,
+    allow-list, identity provider - as a keyed digest (HMAC with the
+    session secret), so the stored value cannot be used to test password
+    guesses. A change ends all sessions (auth.sync_epoch). The password
+    part is the stored hash, or - while the effective hash is the one
+    `_env_auth` makes fresh at every start - the raw AUTH_PASSWORD, so a
+    plain restart keeps sessions and a rotated env password ends them."""
+    from . import auth as authmod
+    oidc = acfg.get("oidc") or {}
+    stored = acfg.get("password_hash") or ""
+    pw = os.environ.get("AUTH_PASSWORD", "") \
+        if stored == _env_auth()["password_hash"] else stored
+    return authmod.keyed_digest(json.dumps([
+        acfg.get("mode"), pw, acfg.get("admin"),
+        sorted(oidc.get("allowed") or []), oidc.get("issuer"),
+        oidc.get("client_id")]).encode())
 
 
 def _default_server() -> dict:
@@ -773,9 +802,11 @@ def update_config(body: dict) -> dict:
             raise PermissionError(
                 "only the admin can change server settings")
         server = load_server() if (auth_in or shared_in) else None
+        _SESSIONS_RENEWED.set(False)
         if auth_in:
             from . import auth as authmod
             acfg = server["auth"]
+            authmod.sync_epoch(auth_fingerprint(acfg))     # the "before"
             if auth_in.get("password"):
                 acfg["password_hash"] = authmod.hash_password(
                     str(auth_in["password"]))
@@ -822,6 +853,9 @@ def update_config(body: dict) -> dict:
         if server is not None:
             _write_server(server)
             cfg["auth"] = server["auth"]
+            if auth_in and authmod.sync_epoch(auth_fingerprint(
+                    server["auth"])):
+                _SESSIONS_RENEWED.set(True)
         ai_in = body.get("ai") or {}
         if ai_in.get("provider") in AI_PROVIDERS:
             cfg["ai"]["provider"] = ai_in["provider"]

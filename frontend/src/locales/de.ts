@@ -972,6 +972,16 @@ export const DE: Record<string, string> = {
   "login.err.email_unverified":
     "Anmeldung abgelehnt: Dein Identity Provider hat diese E-Mail-Adresse "
     + "nicht bestätigt.",
+  "login.sign_out_all": "Alle Sitzungen abmelden…",
+  "login.sign_out_all_help":
+    "Das passiert automatisch, wenn du Passwort, Anmeldemethode, erlaubte "
+    + "Nutzer oder Admin änderst.",
+  "login.signed_out_all": "Alle anderen Sitzungen wurden abgemeldet.",
+  "confirm.sign_out_all": "Alle Sitzungen abmelden",
+  "confirm.sign_out_all_body":
+    "Jeder Browser und jedes Gerät, das angemeldet ist, muss sich neu "
+    + "anmelden. Dieser Browser bleibt angemeldet.",
+  "confirm.sign_out_all_confirm": "Alle abmelden",
   "login.submit": "Anmelden",
   "login.sso": "Mit SSO anmelden",
   "login.logout": "Abmelden",
