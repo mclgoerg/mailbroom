@@ -3,6 +3,8 @@ fake in-memory IMAP server that speaks imaplib's response format."""
 
 from __future__ import annotations
 
+import datetime
+import email.utils
 import imaplib
 import re
 import sys
@@ -182,7 +184,12 @@ class FakeIMAP:
                  trash: str = "[Gmail]/Trash", delimiter: str | None = "/",
                  list_order: list[str] | None = None,
                  renumber: bool = False, copyuid: bool = False,
-                 noselect: dict[str, str] | None = None):
+                 noselect: dict[str, str] | None = None,
+                 date_header: bool = False):
+        # `date_header`: also serve each mail's date as an RFC 2822 `Date:`
+        # header (the demo's viewer shows it); off, mails carry none, as
+        # the suite has always had them.
+        self.date_header = date_header
         # parent-only folders: name -> the LIST flag (`\\Noselect` or
         # `\\NonExistent`); SELECT answers NO. The gmail fake does this for
         # a "[Gmail]" folder, like the real server.
@@ -293,6 +300,9 @@ class FakeIMAP:
     def _header_blob(self, m) -> bytes:
         lines = [f"From: {m['from']}", f"Subject: {m['subject']}",
                  f"Message-ID: {m['msgid']}"]
+        if self.date_header:
+            lines.append("Date: " + email.utils.format_datetime(
+                datetime.datetime.strptime(m["date"], "%d-%b-%Y %H:%M:%S %z")))
         if m.get("irt"):
             lines.append(f"In-Reply-To: {m['irt']}")
         if m.get("refs"):
