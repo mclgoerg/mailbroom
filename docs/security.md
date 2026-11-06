@@ -20,6 +20,33 @@ can read your mail metadata and reconfigure the IMAP host or AI endpoint
 
 Docker published ports bypass `ufw`, so a host firewall is not enough.
 
+## Password login throttling
+
+Password login allows 5 attempts per 15 minutes per client address (IPv6
+per /64); further attempts get a "try again in N minutes" answer without
+any password check, even with the right password. Attempts are counted
+before the check, so parallel requests do not get around the limit. The
+counters live in memory only: a restart forgives.
+
+Inboxrake never trusts `X-Forwarded-For` itself. Behind a reverse proxy
+every visitor therefore shares the proxy's address, so **5 wrong passwords
+from anyone lock everyone out for 15 minutes**, unless uvicorn is told
+which proxy to believe. Set `FORWARDED_ALLOW_IPS` in the container
+environment to your proxy's address, or to its network in CIDR form (for
+example the Docker network's subnet), and attempts are counted per visitor.
+**Never set it to `*`**: uvicorn then believes the leftmost
+`X-Forwarded-For` entry, which the visitor writes themselves (proxies
+append to the header they received), so anyone can dodge the throttle by
+sending a different fake address with every attempt.
+
+The trusted address must carry **only the reverse proxy's traffic**. Prefer
+the proxy container's own address over a whole Docker subnet: the subnet
+includes its gateway, and anything that reaches the app through Docker's
+own port forwarding (a process on the host, or IPv6 clients when the port
+is published without IPv6 on the bridge) arrives from the gateway and
+could then fake `X-Forwarded-For`. When a proxy fronts Inboxrake, keep
+`INBOXRAKE_BIND=127.0.0.1` (the default) or do not publish the port at all.
+
 ## Behaviour worth knowing
 
 - **Host check (no login only).** Without a login, Inboxrake refuses
@@ -75,9 +102,15 @@ client ID, if you run one, is `INBOXRAKE_MS_CLIENT_ID` (see
   affected. UIDVALIDITY is checked before acting on cached UIDs, and scans
   are read-only.
 - **Everything is undoable** except the explicit permanent-delete actions
-  in Trash and Junk (manual, or an opt-in purge rule). Those show exact
-  counts first, rules and purge rules start in report mode, and protected
-  senders and pinned mails are never touched.
+  in Trash and Junk. The manual ones confirm with exact counts; an opt-in
+  purge rule only acts after you have reviewed a report run, then runs on
+  its schedule within its age limit and per-run cap. Rules start in report
+  mode too.
+- **Protected senders and pinned mails:** rules and the Folders-panel
+  purges always skip them. Moving a protected group, or a single pinned
+  mail, to Trash asks for an extra confirmation; individually selected
+  mails from a protected sender are not checked. **Empty Trash empties
+  everything in Trash**, protected or not.
 - **Accounts stay strictly separate** - nothing is aggregated across
   accounts, and with SSO nothing is shared between users.
 

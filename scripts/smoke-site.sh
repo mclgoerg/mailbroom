@@ -40,6 +40,20 @@ cc=$(header cache-control <<<"$(head_of /demo/)")
 [ "$cc" = "no-cache" ] || fail "/demo/ Cache-Control is \"$cc\", expected exactly \"no-cache\""
 ok "/demo/: Cache-Control: no-cache"
 
+# --- headers on every page (website/public/_headers) -------------------------
+for p in / /docs/ /demo/; do
+  h=$(head_of "$p")
+  [ "$(header x-content-type-options <<<"$h")" = nosniff ] || fail "$p has no X-Content-Type-Options: nosniff"
+  [ "$(header referrer-policy <<<"$h")" = strict-origin-when-cross-origin ] || fail "$p has no Referrer-Policy: strict-origin-when-cross-origin"
+  [ "$(header x-frame-options <<<"$h")" = deny ] || fail "$p has no X-Frame-Options: DENY"
+  [[ "$(header content-security-policy <<<"$h")" == *"frame-ancestors 'none'"* ]] \
+    || fail "$p has no Content-Security-Policy: frame-ancestors 'none'"
+  ok "$p: nosniff, referrer policy, frame ban"
+done
+code=$(curl -sS -o /dev/null -w '%{http_code}' "$BASE/og.png")
+[ "$code" = 200 ] || fail "/og.png answered $code"
+ok "/og.png is 200"
+
 # --- the demo bundle's headers ---------------------------------------------
 h=$(head_of /demo/bundle/manifest.json)
 [ "$(status <<<"$h")" = 200 ] || fail "manifest.json is not 200"

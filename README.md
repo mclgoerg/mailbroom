@@ -16,8 +16,9 @@ safe to delete. *(Formerly Mailbroom.)*
 **[Website](https://inboxrake.com)** · **[Documentation](https://inboxrake.com/docs/)** · **[Try it in your browser](https://inboxrake.com/demo/)**
 
 **Nothing is deleted without asking, and everything is undoable** - moves
-go to Trash with an Undo - **except** the explicit "delete permanently"
-actions in Trash and Junk, which confirm with exact counts first.
+go to Trash with an Undo - **except** permanent deletion in Trash and Junk:
+the manual "delete permanently" actions confirm with exact counts, and
+opt-in purge rules only act after you have reviewed a report run.
 
 ![The group list (dark theme): senders with mail counts, sizes, AI verdicts and quick filters](docs/screenshots/groups-dark.png)
 
@@ -94,9 +95,14 @@ All screenshots show generated demo data (`scripts/demo.py`).
 the Trash folder, always behind a confirmation that names how many mails
 are affected, with an Undo. UIDVALIDITY is checked before every move and
 scans are read-only. Permanent deletion exists only as explicit actions in
-Trash and Junk (manual, or an opt-in purge rule that starts in report
-mode); they show exact counts first, and protected senders and mails are
-never touched. Rules also start in report mode.
+Trash and Junk: the manual ones confirm with exact counts, and an opt-in
+purge rule only acts after you have reviewed a report run (then it runs on
+its schedule within its age limit and per-run cap). Rules and the
+Folders-panel purges always skip protected senders and pinned mails. Moving
+a protected group, or a single pinned mail, to Trash asks for an extra
+confirmation; individually selected mails from a protected sender are not
+checked. **Empty Trash empties everything in Trash**, protected or not.
+Rules also start in report mode.
 
 **What leaves my machine?** Nothing, unless you turn on AI review - and then
 only metadata (addresses, counts, subject lines), never mail bodies or
@@ -134,9 +140,9 @@ security; you add user and password.
 
 | Preset | IMAP host | SMTP host (unsubscribe) | Auth notes |
 |---|---|---|---|
-| **Proton Mail Bridge** | `127.0.0.1:1143` SSL | `127.0.0.1:1025` | Featured setup, see below. Paid Proton plan; use the Bridge-generated password and the exported Bridge certificate as CA file. |
+| **Proton Mail Bridge** | `127.0.0.1:1143` SSL | `127.0.0.1:1025` | Featured setup: [`deploy/docker-compose.proton.yml`](deploy/docker-compose.proton.yml) and [Proton Mail via Bridge](https://inboxrake.com/docs/providers/#proton-mail-via-bridge). Paid Proton plan; use the Bridge-generated password and the exported Bridge certificate as CA file. |
 | **Gmail** | `imap.gmail.com:993` SSL | `smtp.gmail.com:465` SSL | App password (2-Step Verification on) or OAuth - choose in Settings; see below. |
-| **Outlook / Microsoft 365** | `outlook.office365.com:993` SSL | `smtp.office365.com:587` STARTTLS | OAuth only (Microsoft offers no app-password IMAP) - see below. |
+| **Outlook / Microsoft 365** | `outlook.office365.com:993` SSL | `smtp.office365.com:587` STARTTLS | OAuth only (Microsoft offers no app-password IMAP). **You register your own Entra app** (free, no shared client ships) - [steps](docs/install.md#microsoft-oauth-setup). |
 | **iCloud Mail** | `imap.mail.me.com:993` SSL | `smtp.mail.me.com:587` STARTTLS | [App-specific password](https://account.apple.com/account/manage) required. |
 | **Fastmail** | `imap.fastmail.com:993` SSL | `smtp.fastmail.com:465` SSL | [App password](https://www.fastmail.help/hc/en-us/articles/360058752854) with IMAP scope. |
 | **GMX** | `imap.gmx.net:993` SSL | `mail.gmx.net:465` SSL | Enable IMAP in GMX mail settings first; app password if 2FA is on. |
@@ -147,7 +153,7 @@ security; you add user and password.
 - **Verified on real mailboxes:** Proton Mail (Bridge), iCloud, Gmail
   and GMX. The other presets use the same IMAP
   code and are covered by the fake-server tests; **Outlook / Microsoft 365
-  is experimental** (fake-tested only, OAuth device-code flow).
+  is experimental** (fake-tested only).
 - **Gmail OAuth** needs your own Google Cloud client. In Google's "testing"
   mode refresh tokens expire after 7 days - see
   [install.md](docs/install.md#gmail-oauth-setup); the app password avoids this.
