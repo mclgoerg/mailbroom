@@ -3331,9 +3331,10 @@ def _search_message_id(conn, msgid: str) -> list[bytes]:
     escaped quoted string, or as a literal when it cannot be one (non-ASCII
     ids try CHARSET UTF-8 first, then plain). An id the server cannot be
     asked about (NUL) or refuses (BAD) finds nothing instead of failing the
-    caller (only a BAD answer to the SEARCH counts as "this id is
-    unsearchable"; any other failure, including of the verification FETCH,
-    raises so that undo keeps its entry for a retry). IMAP HEADER search
+    caller: a BAD answer, or a NO that a control search shows to be about
+    this id, means "unsearchable id"; any other failure (server trouble,
+    the verification FETCH) raises so that undo keeps its entry for a
+    retry. IMAP HEADER search
     is a case-insensitive SUBSTRING match, so the hits are verified against
     their fetched Message-ID header: `@` must not match every mail, nor
     `bank.example` its neighbours."""
@@ -3363,11 +3364,29 @@ def _search_message_id(conn, msgid: str) -> list[bytes]:
         if st == "OK":
             hits = data[0].split() if data and data[0] else []
             break
-        if charset == tries[-1]:     # NO: a server problem, not this id
+        if charset == tries[-1]:
+            # NO may come from the id itself (RFC 3501: "can't search that
+            # [CHARSET] or criteria") or from a server in trouble: a
+            # control search tells them apart.
+            if _search_control_ok(conn):
+                return []
             raise imaplib.IMAP4.error(f"SEARCH failed: {st}")
     if refused:
         return []
     return _exact_message_id_hits(conn, hits, msgid)
+
+
+def _search_control_ok(conn) -> bool:
+    """Does the server answer a plain Message-ID search for a harmless id?
+    False means it is the server (not one odd id) that is failing."""
+    try:
+        st, _ = conn.uid("SEARCH", None, "HEADER", "Message-ID",
+                         '"<probe@inboxrake.invalid>"')
+    except imaplib.IMAP4.abort:
+        raise
+    except imaplib.IMAP4.error:
+        return False
+    return st == "OK"
 
 
 def _exact_message_id_hits(conn, uids: list[bytes], msgid: str) -> list[bytes]:
@@ -3395,7 +3414,8 @@ def _exact_message_id_hits(conn, uids: list[bytes], msgid: str) -> list[bytes]:
 def _present_in_targets(conn, items) -> set[tuple[str, str]]:
     """The (folder, Message-ID) pairs of an undo entry whose mail already
     sits in its target folder (read-only look; a folder that cannot be
-    opened or searched counts as holding nothing)."""
+    opened counts as holding nothing; an id the server refuses to search is
+    skipped, any other search failure raises)."""
     by_folder: dict[str, list[str]] = {}
     for folder, msgid in items:
         if msgid:

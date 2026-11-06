@@ -112,3 +112,52 @@ def test_non_ascii_id_retries_without_charset():
 
     fake.uid = picky
     assert mailops._search_message_id(fake, UNICODE) == [b"1"]
+
+
+def _no_for(fake, bad_ids):
+    """Server answering NO to searches for the given ids only."""
+    real = fake.uid
+
+    def uid(cmd, *args):
+        if cmd == "SEARCH" and "HEADER" in args:
+            lit = fake.literal.decode() if fake.literal else None
+            quoted = [a.strip('"').replace('\\"', '"') for a in args[-1:]]
+            if (lit or quoted[0]) in bad_ids:
+                return "NO", [b"search error: can't search that criteria"]
+        return real(cmd, *args)
+
+    fake.uid = uid
+
+
+def test_a_no_for_one_id_skips_only_that_id(bridge):
+    inbox = bridge.mailbox["INBOX"]
+    inbox[0]["msgid"] = "<odd1@x.example>"
+    mailops.run_scan()
+    assert mailops.STATE["status"] == "done", mailops.STATE["error"]
+    mailops.delete_groups("sender", ["noreply@dhl.example",
+                                     "news@shop.example"])
+    assert wait_delete_done()["moved"] == 4
+    _no_for(bridge, {"<odd1@x.example>"})
+    r = mailops.undo_last()
+    assert r["restored"] == 3 and r["of"] == 4, r
+    assert [m["msgid"] for m in bridge.mailbox["Trash"]] == [
+        "<odd1@x.example>"]
+    assert mailops.STATE["undo"] == []          # consumed, like an unfindable mail
+
+
+def test_non_ascii_id_with_no_for_both_charset_tries_is_skipped():
+    fake = _search_conn([make_msg(1, msgid=UNICODE),
+                         make_msg(2, msgid="<ok@x.example>")])
+    _no_for(fake, {UNICODE})
+    assert mailops._search_message_id(fake, UNICODE) == []
+    assert mailops._search_message_id(fake, "<ok@x.example>") == [b"2"]
+
+
+def test_a_no_for_every_search_raises():
+    fake = _search_conn([make_msg(1, msgid="<a@x.example>")])
+    real = fake.uid
+    fake.uid = lambda cmd, *a: (("NO", [b"try later"]) if cmd == "SEARCH"
+                                else real(cmd, *a))
+    import pytest
+    with pytest.raises(imaplib.IMAP4.error):
+        mailops._search_message_id(fake, "<a@x.example>")
