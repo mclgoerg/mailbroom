@@ -1671,6 +1671,9 @@ export const EN: Record<string, string> = {
     + "runs are skipped until you edit the rule.",
   "ferr.rule_filter_too_long":
     "This filter is too long (more than {max} characters).",
+  "ferr.block_key_invalid":
+    "This sender or domain cannot be blocked: it is not a plain address or "
+    + "domain name.",
   "ferr.no_account":
     "No mail account is set up yet - open Settings and fill in the "
     + "sign-in details first.",

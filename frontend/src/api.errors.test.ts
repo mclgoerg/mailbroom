@@ -333,3 +333,11 @@ describe("the login throttle code", () => {
     expect(errorText("login_throttled:n=7")).toContain("7 Minuten");
   });
 });
+
+describe("the block key code", () => {
+  test("is translated, not shown raw", () => {
+    expect(errorText("block_key_invalid")).toContain("cannot be blocked");
+    setLang("de");
+    expect(errorText("block_key_invalid")).toContain("nicht blockieren");
+  });
+});

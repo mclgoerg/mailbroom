@@ -119,6 +119,62 @@ def test_scheduler_picks_up_block_rule(bridge):
     assert "news@shop.example" not in mailops.STATE["groups"]["sender"]
 
 
+def test_block_refuses_crafted_sender_key(bridge):
+    # A bare quoted From can become a key with a space; parse_filter keeps
+    # the LAST from:, so the rule would trash the other sender's mail.
+    mailops.run_scan()
+    r = client.post("/api/block", json={
+        "grouping": "sender",
+        "key": '"deals@shop.example from:noreply@dhl.example"'})
+    assert r.status_code == 400
+    assert r.json()["detail"] == mailops.BLOCK_KEY_INVALID
+    assert rulesmod.load_rules() == []
+
+
+def test_block_refuses_malformed_keys(bridge):
+    mailops.run_scan()
+    bad = [
+        ("sender", "deals@shop.example from:noreply@dhl.example"),
+        ("sender", 'a"b@shop.example'), ("sender", "a@sh\u00a0op.example"),
+        ("sender", "a@shop.example\u2028from:x@y.example"),
+        ("sender", "a@b\uff1a80.example"), ("domain", "a..example"),
+        ("domain", "x" * 70 + ".example"), ("domain", "shop_x.example"),
+        ("domain", "b\u00fccher.example from:x@y.example"),
+        ("domain", "b\u00fccher.example\n"), ("domain", "'quote.example"), ("sender", "a b@shop.example"),
+        ("sender", "a@shop.example\nfrom:x@y.example"),
+        ("sender", "a@shop.example\x00"), ("sender", "a(b)@shop.example"),
+        ("sender", "from:a@shop.example"), ("sender", "no-at-sign"),
+        ("sender", "a@"), ("sender", "@shop.example"),
+        ("sender", "a" * 250 + "@shop.example"), ("sender", "a" * 400),
+        ("sender", ""),
+        ("domain", "shop.example from:noreply@dhl.example"),
+        ("domain", "shop.example\n"), ("domain", "sh op.example"),
+        ("domain", "shop.example:80"), ("domain", "a@shop.example"),
+        ("domain", "x" * 300 + ".example"), ("domain", ""),
+    ]
+    for grouping, key in bad:
+        r = client.post("/api/block", json={"grouping": grouping, "key": key})
+        assert r.status_code == 400, (grouping, key)
+        assert r.json()["detail"] == mailops.BLOCK_KEY_INVALID, (grouping, key)
+    assert rulesmod.load_rules() == []
+
+
+def test_block_accepts_normal_keys(bridge):
+    mailops.run_scan()
+    for grouping, key in (("sender", "first.last+tag@shop.example"),
+                          ("sender", "o'brien@shop.example"),
+                          ("sender", "j\u00f6rg@b\u00fccher.example"),
+                          ("sender", "j\u00f6rg@xn--bcher-kva.example"),
+                          ("domain", "b\u00fccher.example"),
+                          ("domain", "xn--bcher-kva.example"),
+                          ("domain", "dhl.example")):
+        r = client.post("/api/block", json={"grouping": grouping, "key": key})
+        assert r.status_code == 200, (grouping, key)
+        # the key goes into the query as given: the match is exact
+        assert r.json()["rule"]["query"] == \
+            f"{'from' if grouping == 'sender' else 'domain'}:{key}"
+
+
 def test_a_new_block_rule_has_no_reset_reason(bridge):
     mailops.run_scan()
     r = client.post("/api/block",
