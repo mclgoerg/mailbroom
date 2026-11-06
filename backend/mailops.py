@@ -1696,6 +1696,7 @@ def build_groups(messages: list, replied_to: set[str] | None = None,
             rec = _rec(groups, grouping, key, label)
             rec["count"] += 1
             rec["size"] += m["size"]
+            rec["att_size"] += m.get("att_size", 0)   # kept across rescans
             rec["unread"] += 0 if m["seen"] else 1
             if m["ts"]:
                 rec["_min"] = min(rec["_min"] or m["ts"], m["ts"])
