@@ -3325,6 +3325,40 @@ def _rescan_after_restore(acc, restored: int, key: str,
     return False
 
 
+def _present_in_targets(conn, items) -> set[tuple[str, str]]:
+    """The (folder, Message-ID) pairs of an undo entry whose mail already
+    sits in its target folder (read-only look; a folder that cannot be
+    opened or searched counts as holding nothing)."""
+    by_folder: dict[str, list[str]] = {}
+    for folder, msgid in items:
+        if msgid:
+            by_folder.setdefault(folder, []).append(msgid)
+    present: set[tuple[str, str]] = set()
+    for folder, msgids in by_folder.items():
+        status, _ = conn.select(quote_folder(folder), readonly=True)
+        if status != "OK":
+            continue
+        for msgid in msgids:
+            status, data = conn.uid("SEARCH", None, "HEADER", "Message-ID",
+                                    f'"{msgid}"')
+            if status == "OK" and data and data[0]:
+                present.add((folder, msgid))
+    return present
+
+
+def _reinsert_undo(acc, entry: dict, pos: int) -> None:
+    """Put a taken-off undo entry back (acc.lock held). The list may have
+    changed while the IMAP work ran (new entries, front-trimming, pruning),
+    so `pos` is only a hint: the entry goes into its timestamp slot, at
+    `pos` where the timestamps leave a choice."""
+    log_ = acc.undo_log
+    lo = sum(1 for e in log_ if e["ts"] < entry["ts"])
+    hi = sum(1 for e in log_ if e["ts"] <= entry["ts"])
+    log_.insert(min(max(pos, lo), hi), entry)
+    del log_[:-UNDO_MAX]
+    acc.state["undo"] = _undo_summaries(acc)
+
+
 def undo_last(index: int = -1, acc=None, ident: dict | None = None) -> dict:
     """Restore a recorded move job (found by Message-ID in its target).
     `ident` ({ts, label, count} of the entry, as returned when it was
@@ -3349,19 +3383,28 @@ def undo_last(index: int = -1, acc=None, ident: dict | None = None) -> dict:
     restored = 0
     moved: list[int] = []
     trash = ""
-    refused: RuntimeError | None = None
-    conn = connect(cfgmod.account_imap(acc.name), acc.name)
+    failed: Exception | None = None
+    conn = None
     try:
+        conn = connect(cfgmod.account_imap(acc.name), acc.name)
         trash = entry.get("in") or folder_roles(conn, acc).get("trash")
         if not trash:
             raise RuntimeError(coded(ROLE_MISSING, role="trash"))
         status, _ = conn.select(quote_folder(trash), readonly=False)
         if status != "OK":
             raise RuntimeError(coded(CANNOT_OPEN, folder=decode_mutf7(trash)))
+        # A retry after a failure must not restore twice: on a server
+        # without MOVE a dropped connection can leave the copies at their
+        # target with the originals still in Trash. What the target already
+        # holds by Message-ID counts as restored.
+        present = _present_in_targets(conn, entry["items"])
+        status, _ = conn.select(quote_folder(trash), readonly=False)
+        if status != "OK":
+            raise RuntimeError(coded(CANNOT_OPEN, folder=decode_mutf7(trash)))
         # Find each message in Trash by Message-ID, batch moves per target.
         by_target: dict[str, list[bytes]] = {}
         for folder, msgid in entry["items"]:
-            if not msgid:
+            if not msgid or (folder, msgid) in present:
                 continue
             status, data = conn.uid("SEARCH", None, "HEADER", "Message-ID",
                                     f'"{msgid}"')
@@ -3374,22 +3417,23 @@ def undo_last(index: int = -1, acc=None, ident: dict | None = None) -> dict:
                              trash):
                     restored += len(chunk)
                     moved.extend(int(u) for u in chunk)
-    except RuntimeError as exc:
-        if not str(exc).startswith(MOVE_FOREIGN_DELETED):
-            raise
-        # A refusal changed nothing it should not: keep the entry for a
-        # retry (once the other program has expunged its mails) and still
-        # do the bookkeeping for whatever did move before it.
-        refused = exc
+    except Exception as exc:
+        # Whatever went wrong (a refusal because another program flagged
+        # mails \Deleted, a failed connect, an unopenable or missing
+        # folder, a dropped connection): the entry was already taken off
+        # the list, so put it back for a retry - mails that did move are
+        # no longer in Trash, so a retry only picks up the rest - and still
+        # do the bookkeeping for whatever did move before the failure.
+        failed = exc
         with acc.lock:
-            acc.undo_log.insert(pos, entry)
-            acc.state["undo"] = _undo_summaries(acc)
+            _reinsert_undo(acc, entry, pos)
     finally:
         role = role_of_folder(trash, acc) if trash else None
         if role:
             role_drop(role, trash, moved, acc)
         try:
-            conn.logout()
+            if conn is not None:
+                conn.logout()
         except Exception:
             pass
 
@@ -3409,14 +3453,15 @@ def undo_last(index: int = -1, acc=None, ident: dict | None = None) -> dict:
                 acc.state[key] += restored
     auditlog.record(
         "undo", account=acc.name, count=restored, label=entry["label"],
-        outcome="ok" if restored == entry["count"] else "partial",
-        error=str(refused or ""))
-    if refused is not None:
+        outcome=("error" if failed and not restored else
+                 "ok" if restored == entry["count"] else "partial"),
+        error=error_text(failed) if failed else "")
+    if failed is not None:
         if restored:
             _rescan_after_restore(acc, restored, "restored", {
                 "restored": restored, "of": entry["count"],
                 "label": entry["label"]})
-        raise refused
+        raise failed
     if entry.get("action") == "move_contents":
         # the mails went back to a folder that is never scanned: nothing
         # in the index changes, so no rescan and no "rescan" notice

@@ -381,3 +381,11 @@ def test_an_unhandled_error_comes_back_as_a_500(shim, monkeypatch):
     res = call("GET", "/api/state")
     assert res["status"] == 500
     assert res["body"]
+
+
+def test_auth_probe_flags_the_demo_only_when_on(monkeypatch):
+    c = TestClient(app)
+    monkeypatch.delenv(demo.ENV_VAR, raising=False)
+    assert "demo" not in c.get("/api/auth").json()
+    monkeypatch.setenv(demo.ENV_VAR, "1")
+    assert c.get("/api/auth").json()["demo"] is True

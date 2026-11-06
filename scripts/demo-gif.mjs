@@ -97,10 +97,10 @@ await openGroup(page, "PayBank");       // beside the list (>= 1280 px)
 await shot("8 group in the split pane");
 await browser.close();
 
-// ffmpeg: ~1.8 s per frame, a palette tuned to the frames, 1280 px wide.
+// ffmpeg: ~1.2 s per frame, a palette tuned to the frames, 1280 px wide.
 const frames = readdirSync(FRAMES).length;
 execFileSync("ffmpeg", [
-  "-y", "-v", "error", "-framerate", "1/1.8", "-i", `${FRAMES}/f%02d.png`,
+  "-y", "-v", "error", "-framerate", "1/1.2", "-i", `${FRAMES}/f%02d.png`,
   "-vf", "scale=1280:-1:flags=lanczos,split[a][b];"
     + "[a]palettegen=max_colors=256:stats_mode=diff[p];"
     + "[b][p]paletteuse=dither=bayer:bayer_scale=5:diff_mode=rectangle",

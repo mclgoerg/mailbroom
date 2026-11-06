@@ -1,6 +1,7 @@
-# Documentation site
+# Website (landing page + documentation)
 
-Static site for <https://inboxrake.com/docs/>, built with
+Static site for <https://inboxrake.com/>: the landing page at `/` and the
+documentation at <https://inboxrake.com/docs/>. The docs are built with
 [Astro Starlight](https://starlight.astro.build/) from the Markdown in
 [`../docs`](../docs) (the single source - there is no copy under
 `website/`). Search is Pagefind, light/dark comes with the theme.
@@ -11,9 +12,25 @@ image, `backend/requirements*.txt` or `frontend/package.json`.
 ```bash
 cd website
 npm ci
-npm run build      # static site in website/dist/, URLs rooted at /docs/
-npm run dev        # live preview on http://127.0.0.1:4321/docs/
+npm run build      # builds both: docs -> dist/ (URLs rooted at /docs/),
+                   #                landing -> dist-landing/ (rooted at /)
+npm run dev        # docs live preview on http://127.0.0.1:4321/docs/
+npm run dev:landing
 ```
+
+The two outputs never share a directory; the deploy step puts
+`dist-landing/` at the site root and `dist/` under `docs/`.
+
+## Landing page
+
+`landing/` is a second, plain Astro build (no framework, no client JS beyond
+a tiny theme check that reuses the docs site's light/dark choice). The page
+is `landing/src/pages/index.astro`; the hero screenshots are imported from
+`../docs/screenshots/` (change the two imports at the top to swap them).
+
+The **Try the demo** button is a build-time switch: it is only emitted when
+`INBOXRAKE_DEMO_LIVE=1` is set for the build (off by default, so no dead
+`/demo/` link ships). The deploy step flips it once the demo is live.
 
 Serve `dist/` under `/docs/` (`BASE` in `site.config.mjs`, shared by the
 Astro config and the link plugin).

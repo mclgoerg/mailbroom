@@ -1,12 +1,13 @@
 import { Check } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { api, errorText } from "../api";
+import { demoHint, useDemo } from "../demoMode";
 import { t } from "../i18n";
 import { PRESET_LABELS, PRESETS, presetLabel } from "../presets";
 import type { AuthMethod, Config, FoldersResp, OauthProvider, Preset,
   Security, SmtpSecurity } from "../types";
 import { FolderSettings } from "./FolderSettings";
-import { Button, Field, Input, Modal, Notice, PanelHeader, Segmented,
+import { Button, DemoHint, Field, Input, Modal, Notice, PanelHeader, Segmented,
   Select, Spinner, tabPanelProps } from "./ui";
 
 /* First-run setup wizard (also "Add account"): provider -> sign in + test ->
@@ -49,6 +50,7 @@ export function Wizard({ cfg, mode, initialStep, initialAccount, scan,
   onConfig: (c: Config, switchTo: string | null) => void;
   onClose: () => void;
 }) {
+  const demo = useDemo();
   const existing = initialAccount && cfg.accounts[initialAccount]
     ? initialAccount : null;
   // The account the wizard works on: the default one on first run, else the
@@ -416,6 +418,7 @@ export function Wizard({ cfg, mode, initialStep, initialAccount, scan,
             {needOauth && !err && (
               <p className="type-meta text-muted">{t("wizard.oauth_needed")}</p>
             )}
+            <DemoHint />
           </div>
         )}
 
@@ -493,7 +496,8 @@ export function Wizard({ cfg, mode, initialStep, initialAccount, scan,
       {step === "signin" && footer(
         <Button variant="secondary" onClick={back} disabled={!!busy}>
           {t("wizard.back")}</Button>,
-        <Button onClick={test} disabled={!canTest}>{t("wizard.test")}</Button>)}
+        <Button onClick={test} disabled={demo || !canTest}
+          title={demo ? demoHint() : undefined}>{t("wizard.test")}</Button>)}
       {step === "folders" && footer(
         <Button variant="secondary" onClick={back}>{t("wizard.back")}</Button>,
         <Button variant="secondary" onClick={next} disabled={!!busy}>
@@ -551,9 +555,11 @@ export function Wizard({ cfg, mode, initialStep, initialAccount, scan,
         ) : (
           <div>
             <Button onClick={device_ok ? startDevice : connectOauth}
-              disabled={!f.user.trim() || (!device_ok && !f.clientId)}>
+              disabled={demo || !f.user.trim()
+                || (!device_ok && !f.clientId)}>
               {device_ok ? t("oauth.connect_device") : t("oauth.connect")}
             </Button>
+            <DemoHint className="mt-1" />
           </div>
         )}
         {device && (
