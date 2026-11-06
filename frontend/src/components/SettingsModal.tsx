@@ -558,7 +558,8 @@ export function SettingsModal({ cfg, account, onClose, onSaved,
             <Input className="w-full" type="password"
               value={f.oauthClientSecret}
               placeholder={f.oauthClientSecretSet
-                ? t("(unchanged)") : t("required")}
+                ? t("(unchanged)")
+                : t(oauthProvider === "microsoft" ? "optional" : "required")}
               onChange={set("oauthClientSecret")} />
           </Field>
         </div>

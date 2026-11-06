@@ -873,7 +873,9 @@ def _run_purge(rule: dict, acc, result: dict) -> None:
     The role folder is read LIVE (its role index is refreshed first - the
     main scan is not involved). The filter runs on that role's SENDER groups
     (same parse_filter / match_group as every rule), `older_than_days` keeps
-    the mails received more than N days ago (INTERNALDATE), protected senders
+    the mails received more than N days ago (INTERNALDATE) AND in that folder
+    for at least N days as Inboxrake saw it (`in_folder_days`: mail trashed
+    today is never purged for its old date), protected senders
     and pinned mails are dropped and counted. The run is capped at RULE_CAP,
     OLDEST UID FIRST: an exact-UID selection has no meaningful 'largest
     group', and `purge_mails` caps the same way. REPORT mode stops there -
@@ -904,6 +906,7 @@ def _run_purge(rule: dict, acc, result: dict) -> None:
             return {m["uid"] for m in mails if m["addr"] in keys}
 
         pv = mailops.purge_preview(role, older_than_days=rule["older_than_days"],
+                                   in_folder_days=rule["older_than_days"],
                                    match=match, acc=acc)
         # the folder(s) and the UIDVALIDITY of the role folder as counted: a
         # folder deleted and re-created under the same name is another one

@@ -373,7 +373,7 @@ async def post_login(body: LoginBody, request: Request):
     if cfg["auth"]["mode"] != "password":
         raise HTTPException(400, "password login is not enabled")
     peer = request.client.host if request.client else "?"
-    wait = authmod.login_throttle.retry_after(peer)
+    wait = authmod.login_throttle.attempt(peer)   # counts it, before the hash
     if wait:
         # No hash check at all: even the right password waits its turn.
         logging.getLogger("inboxrake.auth").warning(
@@ -384,7 +384,6 @@ async def post_login(body: LoginBody, request: Request):
     # scrypt takes ~100 ms of CPU: keep it off the event loop.
     if not await run_in_threadpool(authmod.verify_password, body.password,
                                    cfg["auth"]["password_hash"]):
-        authmod.login_throttle.failed(peer)
         logging.getLogger("inboxrake.auth").warning("failed login from %s", peer)
         await asyncio.sleep(0.5)          # soften brute force
         raise HTTPException(401, "wrong password")

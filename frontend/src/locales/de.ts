@@ -348,6 +348,7 @@ export const DE: Record<string, string> = {
   "Password": "Passwort",
   "(unchanged)": "(unverändert)",
   "required": "erforderlich",
+  "optional": "optional",
   "Folders to scan": "Zu scannende Ordner",
   "Load folders": "Ordner laden",
   "Excluded by rule:": "Durch Regel ausgeschlossen:",
@@ -452,6 +453,7 @@ export const DE: Record<string, string> = {
     "Abbestellen fertig: {done} erledigt, {links} brauchen Bestätigung, "
     + "{failed} fehlgeschlagen.",
   "unsub.open_link": "Abbestellseite öffnen",
+  "unsub.demo_hint": "In deiner eigenen Installation öffnet das die Abbestellseite des Absenders.",
   "unsub.badge_link": "Bestätigen ↗",
   "unsub.mark_done": "Als erledigt markieren",
   "unsub.retry": "Erneut versuchen",
@@ -771,7 +773,7 @@ export const DE: Record<string, string> = {
   "preset.hint.proton":
     "Proton braucht die Mail Bridge (Bezahltarife): IMAP-Modus auf SSL "
     + "stellen, Zertifikat exportieren und als CA-Datei eintragen - "
-    + "siehe README.",
+    + "siehe inboxrake.com/docs/providers/.",
   "preset.hint.apppw":
     "App-spezifisches Passwort verwenden, nicht das normale "
     + "Konto-Passwort - anlegen in den Sicherheitseinstellungen des "
@@ -1354,8 +1356,12 @@ export const DE: Record<string, string> = {
     "Trifft die Absender in diesem Ordner: Freitext, from:, age: (neueste "
     + "Mail des Absenders) und unread:. Ein leerer Filter bedeutet ALLE "
     + "Absender. Hier nicht verfügbar: tag:, ai:, eng:, att:, is:, has: und domain:. "
-    + "„Vor mehr als N Tagen empfangen“ gilt für jede einzelne Mail. Im "
-    + "Berichtsmodus ausführen, um die Vorschau zu sehen.",
+    + "Eine Mail wird erst gelöscht, wenn sie mehr als N Tage in diesem "
+    + "Ordner liegt (ab dem Zeitpunkt, an dem Inboxrake sie dort zum ersten "
+    + "Mal gesehen hat) und außerdem vor mehr als N Tagen empfangen wurde. "
+    + "Im Berichtsmodus ausführen, um die Vorschau zu sehen.",
+  "rule.purge_age_label": "Mehr als so viele Tage in Papierkorb/Spam",
+  "rule.purge_age_tag": "in Papierkorb/Spam > {n}T",
   "rule.purge_edit_reset":
     "Wird Ordner, Filter oder Alter geändert, wechselt die Regel zurück in "
     + "den Berichtsmodus - so läuft nur, was zuvor geprüft wurde.",
