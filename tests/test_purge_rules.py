@@ -69,9 +69,10 @@ def test_no_rule_exists_by_default_and_nothing_creates_one():
     assert client.get("/api/rules").json() == {"rules": [],
                                               "cap": rulesmod.RULE_CAP}
     root = pathlib.Path(__file__).resolve().parent.parent
-    demo = (root / "scripts" / "demo.py")
-    if demo.exists():
-        assert "scope" not in demo.read_text()
+    for name in ("demo.py", "demo_generate.py"):
+        demo = root / "scripts" / name
+        if demo.exists():
+            assert "scope" not in demo.read_text()
     assert not any("rule" in k for k in cfgmod.load_config())
 
 
