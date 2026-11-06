@@ -237,14 +237,20 @@ export function DetailPanel({ grouping, group, aiEnabled, protectedNow,
     setBusy(false);
   };
 
+  // The demo's links point at a made-up host: explain instead of opening it.
+  const openUnsubPage = (link: string): string => {
+    if (demo) return t("unsub.demo_hint");
+    window.open(link, "_blank", "noopener");
+    return t("Opened the sender's unsubscribe page - confirm it there.");
+  };
+
   const unsubscribe = async () => {
     setBusy(true);
     setNote(t("Unsubscribing…"));
     try {
       const r = await api.unsubscribe(grouping, group.key);
       if (r.action === "link") {
-        window.open(r.detail, "_blank", "noopener");
-        setNote(t("Opened the sender's unsubscribe page - confirm it there."));
+        setNote(openUnsubPage(r.detail));
       } else {
         setNote(`${t("Unsubscribed")} (${r.method}).`);
       }
@@ -601,7 +607,7 @@ export function DetailPanel({ grouping, group, aiEnabled, protectedNow,
                   ) : unsubscribedNow?.status === "link" ? (
                     <>
                       <Button variant="secondary" disabled={busy} onClick={() =>
-                        window.open(unsubscribedNow.link, "_blank", "noopener")}>
+                        setNote(openUnsubPage(unsubscribedNow.link))}>
                         {t("unsub.open_link")}
                       </Button>
                       <Button variant="secondary" onClick={ackUnsubscribe}

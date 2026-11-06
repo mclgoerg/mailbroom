@@ -615,6 +615,7 @@ export const EN: Record<string, string> = {
     "Unsubscribe done: {done} done, {links} need confirmation, "
     + "{failed} failed.",
   "unsub.open_link": "Open unsubscribe page",
+  "unsub.demo_hint": "In your own install this opens the sender's unsubscribe page.",
   "unsub.badge_link": "Confirm ↗",
   "unsub.mark_done": "Mark as done",
   "unsub.retry": "Retry unsubscribe",

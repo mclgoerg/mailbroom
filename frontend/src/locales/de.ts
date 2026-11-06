@@ -453,6 +453,7 @@ export const DE: Record<string, string> = {
     "Abbestellen fertig: {done} erledigt, {links} brauchen Bestätigung, "
     + "{failed} fehlgeschlagen.",
   "unsub.open_link": "Abbestellseite öffnen",
+  "unsub.demo_hint": "In deiner eigenen Installation öffnet das die Abbestellseite des Absenders.",
   "unsub.badge_link": "Bestätigen ↗",
   "unsub.mark_done": "Als erledigt markieren",
   "unsub.retry": "Erneut versuchen",
