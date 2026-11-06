@@ -106,3 +106,82 @@ def test_scan_refused_while_analysis_runs(bridge):
         mailops.start_scan()
     with mailops.STATE_LOCK:
         mailops.STATE["atts"]["status"] = "idle"
+
+
+# ------------------------------------------------------------------ rescans
+
+def _att_sizes():
+    groups = mailops.public_state()["groups"]
+    return {g: {k: r["att_size"] for k, r in groups[g].items()}
+            for g in ("sender", "domain", "subject", "thread")}
+
+
+def _analysed(bridge):
+    from conftest import make_msg
+    bridge.mailbox["Archive"].append(
+        make_msg(11, frm='"Newsletter" <news@shop.example>',
+                 subject="Spring catalogue", size=9000,
+                 atts=[("spring.pdf", 8000)]))
+    mailops.run_scan()
+    assert client.post("/api/attachments", json={}).json() == {"ok": True}
+    assert _wait_atts()["status"] == "done"
+    sizes = _att_sizes()
+    assert sizes["sender"]["news@shop.example"] == 36000
+    return sizes
+
+
+def test_a_rescan_keeps_attachment_sizes(bridge):
+    before = _analysed(bridge)
+    mailops.run_scan()
+    assert _att_sizes() == before
+    # the per-mail data survives too, so the explorer list is unchanged
+    assert len(client.get("/api/attachments").json()) == 2
+
+
+def test_a_rescan_keeps_them_across_a_snapshot_round_trip(bridge):
+    before = _analysed(bridge)
+    mailops.save_snapshot(mailops.accounts.get())
+    from backend import accounts as accountsmod
+    accountsmod.reset()
+    fresh = accountsmod.get()
+    assert mailops.load_snapshot(fresh)
+    assert _att_sizes() == before
+    mailops.run_scan()
+    assert _att_sizes() == before
+
+
+def test_a_removed_mail_takes_its_attachment_share_with_it(bridge):
+    _analysed(bridge)
+    bridge.mailbox["Archive"] = [m for m in bridge.mailbox["Archive"]
+                                 if m["uid"] != 11]
+    mailops.run_scan()
+    sizes = _att_sizes()
+    assert sizes["sender"]["news@shop.example"] == 28000
+    assert sizes["domain"]["shop.example"] == 28000
+
+
+def test_a_uidvalidity_change_drops_the_analysis_of_that_folder(bridge):
+    _analysed(bridge)
+    bridge.uv["Archive"] = 2            # UIDs there mean different mails now
+    mailops.run_scan()
+    # Archive's mail is a fresh record without analysis; INBOX's stays
+    assert _att_sizes()["sender"]["news@shop.example"] == 28000
+
+
+def test_a_rescan_reports_the_kept_analysis_as_done(bridge):
+    _analysed(bridge)
+    before = dict(mailops.STATE["atts"])
+    assert before["status"] == "done" and before["mails"] == 2
+    mailops.run_scan()
+    assert mailops.STATE["atts"] == before
+
+
+def test_a_rescan_without_any_analysed_mail_is_idle_again(bridge):
+    _analysed(bridge)
+    bridge.mailbox["INBOX"] = [m for m in bridge.mailbox["INBOX"]
+                               if m["uid"] != 4]
+    bridge.mailbox["Archive"] = [m for m in bridge.mailbox["Archive"]
+                                 if m["uid"] != 11]
+    mailops.run_scan()
+    assert mailops.STATE["atts"]["status"] == "idle"
+    assert mailops.STATE["atts"]["mails"] == 0
