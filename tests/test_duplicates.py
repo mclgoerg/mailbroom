@@ -191,6 +191,9 @@ def test_distinct_malformed_ids_are_not_paired(monkeypatch):
 def test_identical_junk_id_pairs_only_with_same_sender_subject_size(
         monkeypatch):
     assert len(_pair(monkeypatch, "-", "-")) == 1
+
+
+def test_identical_junk_id_alone_does_not_pair_unrelated_mails(monkeypatch):
     _scan(monkeypatch, {
         "INBOX": [make_msg(1, frm="a@x.example", subject="One", size=1,
                            msgid="-"),
