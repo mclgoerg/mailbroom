@@ -2432,6 +2432,12 @@ def run_scan(acc=None) -> None:
                                "progress": "", "error": "", "usage": None}
                 acc.state["scanned_ts"] = int(time.time())
                 acc.state["groups_rev"] += 1
+                analysed = [m.get("att_size", 0) for m in acc.index.values()
+                            if m.get("att_size")]
+                acc.state["atts"] = {
+                    "status": "done" if analysed else "idle",
+                    "progress": "", "error": "",
+                    "mails": len(analysed), "size": sum(analysed)}
             # A categories / protected list / sender knowledge change made
             # while this scan ran found no finished scan to re-derive (and
             # smart_params above was read before it): catch up now. A no-op
@@ -2517,7 +2523,8 @@ def start_scan(acc=None, notice: dict | None = None) -> None:
         acc.state["unsub"] = {"status": "idle", "progress": "", "error": "",
                           "total": 0, "done": 0, "links": 0, "failed": 0,
                           "skipped": 0}
-        # Attachment analysis is per-scan; a new scan invalidates it.
+        # Idle while the scan runs; run_scan reports it done again from the
+        # per-mail analysis the index keeps for the mails still there.
         acc.state["atts"] = {"status": "idle", "progress": "", "error": "",
                          "mails": 0, "size": 0}
         # acc.index / acc.folder_uv deliberately survive into the new scan -

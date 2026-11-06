@@ -166,3 +166,22 @@ def test_a_uidvalidity_change_drops_the_analysis_of_that_folder(bridge):
     mailops.run_scan()
     # Archive's mail is a fresh record without analysis; INBOX's stays
     assert _att_sizes()["sender"]["news@shop.example"] == 28000
+
+
+def test_a_rescan_reports_the_kept_analysis_as_done(bridge):
+    _analysed(bridge)
+    before = dict(mailops.STATE["atts"])
+    assert before["status"] == "done" and before["mails"] == 2
+    mailops.run_scan()
+    assert mailops.STATE["atts"] == before
+
+
+def test_a_rescan_without_any_analysed_mail_is_idle_again(bridge):
+    _analysed(bridge)
+    bridge.mailbox["INBOX"] = [m for m in bridge.mailbox["INBOX"]
+                               if m["uid"] != 4]
+    bridge.mailbox["Archive"] = [m for m in bridge.mailbox["Archive"]
+                                 if m["uid"] != 11]
+    mailops.run_scan()
+    assert mailops.STATE["atts"]["status"] == "idle"
+    assert mailops.STATE["atts"]["mails"] == 0
