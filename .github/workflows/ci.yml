@@ -37,7 +37,7 @@ jobs:
         with:
           fail-on-severity: high
 
-  # Docs site (website/, built from docs/): build only, so a broken docs
+  # Website (landing page + docs site, website/, docs built from docs/): build only, so a broken docs
   # change fails the PR. Tooling lives in website/ and never enters the app.
   docs:
     runs-on: ubuntu-latest
@@ -50,7 +50,7 @@ jobs:
         with:
           node-version: 26
 
-      - name: Build docs site
+      - name: Build landing page and docs site
         working-directory: website
         run: |
           npm ci --no-audit --no-fund
