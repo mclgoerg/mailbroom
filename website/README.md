@@ -21,6 +21,19 @@ npm run dev:landing
 The two outputs never share a directory; the deploy step puts
 `dist-landing/` at the site root and `dist/` under `docs/`.
 
+## Deploying
+
+`scripts/build-site.sh` builds the landing page (with the demo button), the
+docs, the demo UI and the demo bundle and lays them out as one tree in
+`site-dist/` (`/`, `/docs/`, `/demo/`, `/demo/bundle/`, `_headers` at the
+root), then checks it. `wrangler.jsonc` publishes that tree as Cloudflare
+Workers static assets (wrangler is pinned in `package.json`). The
+`deploy-site` workflow does both on every release tag and on a manual run,
+then `scripts/smoke-site.sh` checks the live site (pages, and the cache
+headers and MIME types the demo depends on). Pull requests only build and
+dry-run. It needs the repository secrets `CLOUDFLARE_API_TOKEN` and
+`CLOUDFLARE_ACCOUNT_ID`; without them it fails up front saying so.
+
 ## Landing page
 
 `landing/` is a second, plain Astro build (no framework, no client JS beyond

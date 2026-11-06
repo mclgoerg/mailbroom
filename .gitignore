@@ -10,3 +10,5 @@ __pycache__/
 config.json
 ai_usage.json
 test-results/
+site-dist/
+website/.wrangler/
