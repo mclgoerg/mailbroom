@@ -1,0 +1,17 @@
+// Cloudflare Workers static assets: no Worker code, just the files of
+// ../site-dist (scripts/build-site.sh). Headers come from its _headers file.
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "inboxrake-site",
+  "compatibility_date": "2026-11-01",
+  "assets": {
+    "directory": "../site-dist",
+    // /docs -> /docs/ and /docs/install -> /docs/install/ (the builds use trailing slashes)
+    "html_handling": "auto-trailing-slash",
+    // unknown paths get the nearest 404.html (the docs have one)
+    "not_found_handling": "404-page"
+  },
+  // the apex domain must be a zone on this Cloudflare account; wrangler
+  // creates the DNS record + certificate on the first deploy
+  "routes": [{ "pattern": "inboxrake.com", "custom_domain": true }]
+}

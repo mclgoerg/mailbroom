@@ -13,6 +13,8 @@ groups at once. Optional AI review (Anthropic, OpenAI, Claude on Microsoft
 Foundry, or local models via Ollama, LM Studio or vLLM) suggests what is
 safe to delete. *(Formerly Mailbroom.)*
 
+**[Website](https://inboxrake.com)** · **[Documentation](https://inboxrake.com/docs/)** · **[Try it in your browser](https://inboxrake.com/demo/)**
+
 **Nothing is deleted without asking, and everything is undoable** - moves
 go to Trash with an Undo - **except** the explicit "delete permanently"
 actions in Trash and Junk, which confirm with exact counts first.
@@ -54,7 +56,9 @@ environment variable are in **[docs/install.md](docs/install.md)**.
 
 ## Try the demo
 
-A playground on fake mailboxes - no account, no network:
+The quickest look is the [live demo in your browser](https://inboxrake.com/demo/)
+(fake mailboxes, nothing leaves the page). To run the same playground
+locally - no account, no network:
 
 ```bash
 git clone https://github.com/mclgoerg/inboxrake && cd inboxrake

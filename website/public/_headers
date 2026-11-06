@@ -1,5 +1,9 @@
-# Cloudflare Pages response headers (copied to the site root by the build).
+# Cloudflare Workers static assets response headers (copied to the site root by the build).
 # Only the in-browser demo needs any: everything it loads under /demo/ except
+# the docs' hashed JS/CSS/fonts
+/docs/_astro/*
+  Cache-Control: public, max-age=31536000, immutable
+
 # the entry points is content-hashed, so it can be cached for a year.
 # Rules are additive per header, so the specific no-cache rules below detach
 # (`!`) what the broad rules set before re-setting it.
@@ -10,6 +14,10 @@
 
 # the UI build: hashed JS/CSS, and the Pyodide worker (hashed too)
 /demo/assets/*
+  Cache-Control: public, max-age=31536000, immutable
+
+# the docs' hashed JS/CSS/fonts
+/docs/_astro/*
   Cache-Control: public, max-age=31536000, immutable
 
 # the entry points are the only un-hashed files: always revalidate
