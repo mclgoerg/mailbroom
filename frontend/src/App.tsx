@@ -819,6 +819,12 @@ export default function App() {
     try { await api.cancel(job?.target ?? "delete"); refresh(); } catch { /* too late */ }
   };
 
+  // The restore notice is shown as a toast: drop it so it doesn't linger
+  // (it would hide the status line's cached-verdicts suffix until a scan).
+  const clearRestoreNotice = async () => {
+    try { await api.clearNotice(); } catch { /* cosmetic */ }
+  };
+
   const undo = async (index: number) => {
     const entry = stateRef.current?.undo[index];
     if (!entry) return;
@@ -842,9 +848,21 @@ export default function App() {
       notify(rescan ? t("toast.restored_rescan", params)
         : t(partial ? "toast.restored_partial" : "toast.restored", params),
       partial || rescan ? "info" : "success");
+      await clearRestoreNotice();
       refresh();
     }
-    catch (e: any) { fail(e, "err.undo"); }
+    catch (e: any) {
+      fail(e, "err.undo");
+      // Some mails may have come back before it failed: the backend's
+      // restore notice says how many (hidden inline, see the Notice).
+      await refresh();
+      const n = stateRef.current?.notice;
+      if (n && (n.key === "restored" || n.key === "restored_rescan")) {
+        notify(t(`notice.${n.key}`, noticeParams(n.params)));
+        await clearRestoreNotice();
+        refresh();
+      }
+    }
     setPending("");
   };
 

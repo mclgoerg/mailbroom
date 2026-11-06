@@ -28,6 +28,7 @@ vi.mock("./api", async (importOriginal) => ({
     exportUrl: (mode: string) => `/api/export?grouping=${mode}`,
     version: () => Promise.resolve({ build: "v1" }),
     undo: vi.fn().mockResolvedValue({ ok: true }),
+    clearNotice: vi.fn().mockResolvedValue({ ok: true }),
     deleteGroups: vi.fn().mockResolvedValue({ ok: true, queued: 1, skipped: 0 }),
   },
   setAccount: () => {},
@@ -413,6 +414,26 @@ test("a partial Undo toasts how many came back; a refused one the error",
     await pressDialog("Restore");
     expect(await screen.findByText(
       "Undo error: The server refused the move.")).toBeTruthy();
+  });
+
+test("an Undo that fails after restoring some mails still says how many",
+  async () => {
+    await mount({ ...baseState, undo: [entry(1, 5)] } as any);
+    undoApi.mockImplementationOnce(() => {
+      // the backend recorded the notice, then raised
+      state = { ...state, notice: { key: "restored_rescan",
+        params: { restored: 3, of: 5, label: "Shop News" } } };
+      return Promise.reject(new Error("The server refused the move."));
+    });
+    fireEvent.click(screen.getByRole("button", { name: /Undo/ }));
+    fireEvent.click(screen.getByRole("button", { name: /5 mails.*Shop News/ }));
+    await pressDialog("Restore");
+    expect(await screen.findByText(
+      "Undo error: The server refused the move.")).toBeTruthy();
+    expect(await screen.findByText(
+      "Restored 3 of 5 mails (Shop News) - rescan to see them again."))
+      .toBeTruthy();
+    expect(api.clearNotice).toHaveBeenCalled();
   });
 
 test("the backend's restore notice no longer renders above the list",
