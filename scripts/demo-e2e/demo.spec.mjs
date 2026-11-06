@@ -95,7 +95,7 @@ test("Trash and Undo through the UI", async () => {
   await expect(restore).toBeVisible();
   await page.waitForTimeout(700);
   await restore.getByRole("button", { name: "Restore" }).click();
-  await expect(page.getByText(/Restored \d+ of \d+ mails/)).toBeVisible();
+  await expect(page.getByText(/Restored \d+ mails? \(/)).toBeVisible();
   expect(Object.keys(await senders()).length).toBe(Object.keys(before).length);
 });
 

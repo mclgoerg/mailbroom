@@ -6,15 +6,17 @@ import { confirmTrashMails } from "../mailActions";
 import type { DupSet, Mail } from "../types";
 import { MessageView } from "./MailList";
 import { Button, EmptyState, Loading, MailRow, Modal,
-  PanelHeader, Tag, Toolbar } from "./ui";
+  PanelHeader, SectionLabel, Tag, Toolbar } from "./ui";
 
-/** Duplicate finder: same Message-ID anywhere, or identical
- *  (sender, subject, size). "Keep newest" selects everything else. */
+/** Duplicate finder: exact sets (same Message-ID anywhere, ...) with "Select
+ *  all but newest", then a separate list of POSSIBLE duplicates (same sender
+ *  and subject within minutes) that is never selected for the user. */
 export function DuplicatesPanel({ onClose, onDeleted }: {
   onClose: () => void;
   onDeleted: () => void;
 }) {
   const [sets, setSets] = useState<DupSet[] | null>(null);
+  const [possible, setPossible] = useState<DupSet[]>([]);
   const [error, setError] = useState("");
   const [sel, setSel] = useState<Set<string>>(new Set());
   const [view, setView] = useState<Mail | null>(null);
@@ -23,7 +25,11 @@ export function DuplicatesPanel({ onClose, onDeleted }: {
   useEffect(() => {
     let alive = true;
     api.duplicates()
-      .then((s) => alive && setSets(s))
+      .then(async (s) => {
+        // the second list is a bonus: its failure must not hide the first
+        const p = await api.possibleDuplicates().catch(() => []);
+        if (alive) { setPossible(p); setSets(s); }
+      })
       .catch((e) => alive && setError(String(e.message ?? e)));
     return () => { alive = false; };
   }, []);
@@ -49,14 +55,16 @@ export function DuplicatesPanel({ onClose, onDeleted }: {
     if (!await confirmTrashMails(sel.size)) return;
     try {
       const items: [string, number][] = [];
-      sets.forEach((s) => s.mails.forEach((m) => {
+      [...sets, ...possible].forEach((s) => s.mails.forEach((m) => {
         if (sel.has(mailKey(m))) items.push([m.folder, m.uid]);
       }));
       await api.deleteMessages(items, "trash");
-      setSets(sets
+      const without = (l: DupSet[]) => l
         .map((s) => ({ ...s,
           mails: s.mails.filter((m) => !sel.has(mailKey(m))) }))
-        .filter((s) => s.mails.length > 1));
+        .filter((s) => s.mails.length > 1);
+      setSets(without(sets));
+      setPossible(without(possible));
       setSel(new Set());
       setNote(t("note.background", { verb: t("Move to Trash") }));
       onDeleted();
@@ -65,8 +73,33 @@ export function DuplicatesPanel({ onClose, onDeleted }: {
     }
   };
 
+  const setBlock = (s: DupSet, key: string, exact: boolean) => (
+    <div key={key} className="my-2 border-y border-line bg-panel2">
+      <div className="flex items-baseline gap-2 px-3 pt-2 type-meta
+        text-muted md:px-2">
+        <span className="min-w-0 flex-1 truncate">{s.mails[0].addr}</span>
+        <span className="whitespace-nowrap">
+          ×{s.mails.length}{exact && <> · {t("dups.wasted",
+            { size: fmtSize(s.wasted) })}</>}
+        </span>
+      </div>
+      {s.mails.map((m, mi) => (
+        <MailRow key={mailKey(m)} checked={sel.has(mailKey(m))}
+          onToggle={() => toggle(mailKey(m))}
+          onOpen={() => setView(m)}
+          subject={m.subject || t("(no subject)")}
+          unread={!m.seen} dateIso={m.date || ""} dateTime
+          selectLabel={t("select.named",
+            { subject: m.subject || t("(no subject)") })}
+          meta={[fmtSize(m.size), m.folder].join(" · ")}
+          trailing={exact && mi === 0
+            ? <Tag tone="safe">{t("dups.newest")}</Tag> : undefined} />
+      ))}
+    </div>
+  );
+
   return (
-    <Modal onClose={onClose} size="lg" full={!!view || !sets || sets.length > 0}>
+    <Modal onClose={onClose} size="lg" full={!!view || !sets || sets.length > 0 || possible.length > 0}>
       <PanelHeader
         title={<span className="inline-flex items-center gap-2">
           <Copy size={18} /> {t("Duplicates")}
@@ -81,7 +114,7 @@ export function DuplicatesPanel({ onClose, onDeleted }: {
         <MessageView mail={view} onBack={() => setView(null)} />
       ) : (
         <>
-          {(!!sets?.length || note) && (
+          {(!!sets?.length || sel.size > 0 || note) && (
             <Toolbar>
               {!!sets?.length && (
                 <Button variant="secondary" onClick={selectAllButNewest}>
@@ -99,37 +132,22 @@ export function DuplicatesPanel({ onClose, onDeleted }: {
           <div className="min-h-0 flex-1 overflow-y-auto pb-4">
             {error && <div className="p-4 type-body text-danger-fg">{error}</div>}
             {!sets && !error && <Loading />}
-            {sets && sets.length === 0 && (
+            {sets && sets.length === 0 && possible.length === 0 && (
               <EmptyState icon={<Copy size={18} />} title={t("dups.none")}
                 hint={t("dups.none_hint")} />
             )}
-            {sets?.map((s, si) => (
-              <div key={si}
-                className="my-2 border-y border-line bg-panel2">
-                <div className="flex items-baseline gap-2 px-3 pt-2 type-meta
-                  text-muted md:px-2">
-                  <span className="min-w-0 flex-1 truncate">
-                    {s.mails[0].addr}
-                  </span>
-                  <span className="whitespace-nowrap">
-                    ×{s.mails.length} · {t("dups.wasted",
-                      { size: fmtSize(s.wasted) })}
-                  </span>
-                </div>
-                {s.mails.map((m, mi) => (
-                  <MailRow key={mailKey(m)} checked={sel.has(mailKey(m))}
-                    onToggle={() => toggle(mailKey(m))}
-                    onOpen={() => setView(m)}
-                    subject={m.subject || t("(no subject)")}
-                    unread={!m.seen} dateIso={m.date || ""} dateTime
-                    selectLabel={t("select.named",
-                      { subject: m.subject || t("(no subject)") })}
-                    meta={[fmtSize(m.size), m.folder].join(" · ")}
-                    trailing={mi === 0
-                      ? <Tag tone="safe">{t("dups.newest")}</Tag> : undefined} />
-                ))}
+            {sets?.map((s, si) => setBlock(s, `e${si}`, true))}
+            {possible.length > 0 && (
+              <div data-testid="possible-dups">
+                <SectionLabel className="px-3 pt-3 md:px-2">
+                  {t("dups.possible_title")}
+                </SectionLabel>
+                <p className="px-3 pb-1 type-meta text-muted md:px-2">
+                  {t("dups.possible_hint")}
+                </p>
+                {possible.map((s, si) => setBlock(s, `p${si}`, false))}
               </div>
-            ))}
+            )}
           </div>
         </>
       )}

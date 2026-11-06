@@ -91,6 +91,7 @@ const sortValue = (g: Group, k: SortKey): number | string => {
   return g[k];
 };
 
+const RESTORE_NOTICES = ["restored", "restored_rescan"];
 const undoId = (u: { ts: number; count: number; label: string }) =>
   `${u.ts}|${u.count}|${u.label}`;
 
@@ -819,6 +820,12 @@ export default function App() {
     try { await api.cancel(job?.target ?? "delete"); refresh(); } catch { /* too late */ }
   };
 
+  // The restore notice is shown as a toast: drop it so it doesn't linger
+  // (it would hide the status line's cached-verdicts suffix until a scan).
+  const clearRestoreNotice = async () => {
+    try { await api.clearNotice(RESTORE_NOTICES); } catch { /* cosmetic */ }
+  };
+
   const undo = async (index: number) => {
     const entry = stateRef.current?.undo[index];
     if (!entry) return;
@@ -828,8 +835,39 @@ export default function App() {
         { count: entry.count, label: undoLabel(entry) }),
       confirmLabel: t("confirm.restore_btn") })) return;
     setPending(t("Restoring…"));
-    try { await api.undo(index); refresh(); }
-    catch (e: any) { fail(e, "err.undo"); }
+    try {
+      const r = await api.undo(index);
+      // The result is a toast, where the user is: the backend's notice for
+      // it sits above the list (see the filter at the Notice) and would
+      // move the page.
+      const params = { n: r.restored, restored: r.restored, of: r.of,
+        label: undoLabel(entry) };
+      const partial = r.restored < r.of;
+      // rescan === false with mails back: no scan could start, tell them
+      const rescan = !r.rescan && r.restored > 0
+        && entry.action !== "move_contents";
+      notify(rescan ? t("toast.restored_rescan", params)
+        : t(partial ? "toast.restored_partial" : "toast.restored", params),
+      partial || rescan ? "info" : "success");
+      await clearRestoreNotice();
+      refresh();
+    }
+    catch (e: any) {
+      fail(e, "err.undo");
+      // Some mails may have come back before it failed: the backend's
+      // restore notice says how many (hidden inline, see the Notice).
+      // read directly: an SSE-triggered refresh already in flight would
+      // make refresh() return before stateRef has the notice
+      let n: AppState["notice"] = null;
+      try { n = (await api.state()).notice; } catch { /* the error shows */ }
+      refresh();
+      if (n && RESTORE_NOTICES.includes(n.key)) {
+        notify(t(n.key === "restored" ? "toast.restored_partial"
+          : "toast.restored_rescan", noticeParams(n.params)), "info");
+        await clearRestoreNotice();
+        refresh();
+      }
+    }
     setPending("");
   };
 
@@ -2139,7 +2177,9 @@ export default function App() {
           </span>
         )}
       </div>
-      {state?.notice && state.notice.key !== "cached_verdicts" && (
+      {state?.notice && state.notice.key !== "cached_verdicts"
+        && state.notice.key !== "restored"
+        && state.notice.key !== "restored_rescan" && (
         <Notice className="mb-2" icon={<Info size={14} />}
           onClose={dismissNotice}>
           {t(`notice.${state.notice.key}`, noticeParams(state.notice.params))}

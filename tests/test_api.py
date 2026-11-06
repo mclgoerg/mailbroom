@@ -132,6 +132,12 @@ def test_scan_group_delete_via_api(bridge):
 
     assert client.post("/api/undo", json={}).json()["restored"] == 3
     assert client.get("/api/state").json()["notice"]["key"] == "restored"
+    # a scoped clear leaves a notice of another key alone
+    client.post("/api/notice/clear", json={"keys": ["emptied_trash"]})
+    assert client.get("/api/state").json()["notice"]["key"] == "restored"
+    client.post("/api/notice/clear", json={"keys": ["restored"]})
+    assert client.get("/api/state").json()["notice"] is None
+    mailops.STATE["notice"] = {"key": "emptied_trash", "params": {}}
     client.post("/api/notice/clear", json={})
     assert client.get("/api/state").json()["notice"] is None
 
