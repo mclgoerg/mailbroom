@@ -3325,10 +3325,97 @@ def _rescan_after_restore(acc, restored: int, key: str,
     return False
 
 
+def _search_message_id(conn, msgid: str) -> list[bytes]:
+    """UIDs in the selected folder whose Message-ID is exactly `msgid`.
+    The id is mail data (a sender-controlled header), so it is sent as an
+    escaped quoted string, or as a literal when it cannot be one (non-ASCII
+    ids try CHARSET UTF-8 first, then plain). An id the server cannot be
+    asked about (NUL) or refuses (BAD) finds nothing instead of failing the
+    caller: a BAD answer, or a NO that a control search shows to be about
+    this id, means "unsearchable id"; any other failure (server trouble,
+    the verification FETCH) raises so that undo keeps its entry for a
+    retry. IMAP HEADER search
+    is a case-insensitive SUBSTRING match, so the hits are verified against
+    their fetched Message-ID header: `@` must not match every mail, nor
+    `bank.example` its neighbours."""
+    if "\0" in msgid:
+        return []
+    quoted = _quoted_id(msgid)
+    tries = [()] if msgid.isascii() else [("CHARSET", "UTF-8"), ()]
+    hits: list[bytes] = []
+    refused = False          # BAD for an id the server cannot parse
+    for charset in tries:
+        try:
+            if quoted is None:
+                conn.literal = msgid.encode("utf-8")
+                st, data = conn.uid("SEARCH", *charset, "HEADER",
+                                    "Message-ID")
+            else:
+                st, data = conn.uid("SEARCH", None, *charset, "HEADER",
+                                    "Message-ID", quoted)
+        except imaplib.IMAP4.abort:
+            raise
+        except imaplib.IMAP4.error:
+            refused = True
+            continue
+        finally:
+            conn.literal = None
+        refused = False
+        if st == "OK":
+            hits = data[0].split() if data and data[0] else []
+            break
+        if charset == tries[-1]:
+            # NO may come from the id itself (RFC 3501: "can't search that
+            # [CHARSET] or criteria") or from a server in trouble: a
+            # control search tells them apart.
+            if _search_control_ok(conn):
+                return []
+            raise imaplib.IMAP4.error(f"SEARCH failed: {st}")
+    if refused:
+        return []
+    return _exact_message_id_hits(conn, hits, msgid)
+
+
+def _search_control_ok(conn) -> bool:
+    """Does the server answer a plain Message-ID search for a harmless id?
+    False means it is the server (not one odd id) that is failing."""
+    try:
+        st, _ = conn.uid("SEARCH", None, "HEADER", "Message-ID",
+                         '"<probe@inboxrake.invalid>"')
+    except imaplib.IMAP4.abort:
+        raise
+    except imaplib.IMAP4.error:
+        return False
+    return st == "OK"
+
+
+def _exact_message_id_hits(conn, uids: list[bytes], msgid: str) -> list[bytes]:
+    """The `uids` whose Message-ID header equals `msgid`, normalised the
+    way scans store it (`header_text(...).strip()[:300]`)."""
+    exact: list[bytes] = []
+    for start in range(0, len(uids), MOVE_CHUNK):
+        chunk = uids[start:start + MOVE_CHUNK]
+        st, data = conn.uid(
+            "FETCH", b",".join(chunk).decode(),
+            "(UID BODY.PEEK[HEADER.FIELDS (MESSAGE-ID)])")
+        if st != "OK":      # the UIDs are ours, so this is a server problem
+            raise imaplib.IMAP4.error(f"FETCH failed: {st}")
+        for item in data or []:
+            if not (isinstance(item, tuple) and len(item) >= 2):
+                continue
+            um = re.search(rb"UID (\d+)", item[0])
+            mid = header_text(email.message_from_bytes(item[1]).get(
+                "Message-ID")).strip()[:300]
+            if um and mid == msgid:
+                exact.append(um.group(1))
+    return exact
+
+
 def _present_in_targets(conn, items) -> set[tuple[str, str]]:
     """The (folder, Message-ID) pairs of an undo entry whose mail already
     sits in its target folder (read-only look; a folder that cannot be
-    opened or searched counts as holding nothing)."""
+    opened counts as holding nothing; an id the server refuses to search is
+    skipped, any other search failure raises)."""
     by_folder: dict[str, list[str]] = {}
     for folder, msgid in items:
         if msgid:
@@ -3339,9 +3426,7 @@ def _present_in_targets(conn, items) -> set[tuple[str, str]]:
         if status != "OK":
             continue
         for msgid in msgids:
-            status, data = conn.uid("SEARCH", None, "HEADER", "Message-ID",
-                                    f'"{msgid}"')
-            if status == "OK" and data and data[0]:
+            if _search_message_id(conn, msgid):
                 present.add((folder, msgid))
     return present
 
@@ -3406,10 +3491,9 @@ def undo_last(index: int = -1, acc=None, ident: dict | None = None) -> dict:
         for folder, msgid in entry["items"]:
             if not msgid or (folder, msgid) in present:
                 continue
-            status, data = conn.uid("SEARCH", None, "HEADER", "Message-ID",
-                                    f'"{msgid}"')
-            if status == "OK" and data and data[0]:
-                by_target.setdefault(folder, []).extend(data[0].split())
+            found = _search_message_id(conn, msgid)
+            if found:
+                by_target.setdefault(folder, []).extend(found)
         for folder, uids in by_target.items():
             for start in range(0, len(uids), MOVE_CHUNK):
                 chunk = uids[start:start + MOVE_CHUNK]
