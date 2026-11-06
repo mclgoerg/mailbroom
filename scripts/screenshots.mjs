@@ -9,6 +9,7 @@
  *   docker network create mb-docs-net || true
  *   docker run -d --name mb-docs-demo --network mb-docs-net \
  *     --user "$(id -u):$(id -g)" -e HOME=/tmp \
+ *     -e INBOXRAKE_ALLOWED_HOSTS=mb-docs-demo \
  *     --tmpfs /data:uid=$(id -u),gid=$(id -g) \
  *     -v "$PWD":/repo:ro -e STATIC_DIR=/repo/frontend/dist \
  *     ghcr.io/mclgoerg/inboxrake:latest python /repo/scripts/demo.py
