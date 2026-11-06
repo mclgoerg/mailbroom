@@ -341,3 +341,11 @@ describe("the request size code", () => {
     expect(errorText("request_too_large")).toContain("zu groß");
   });
 });
+
+describe("the block key code", () => {
+  test("is translated, not shown raw", () => {
+    expect(errorText("block_key_invalid")).toContain("cannot be blocked");
+    setLang("de");
+    expect(errorText("block_key_invalid")).toContain("nicht blockieren");
+  });
+});

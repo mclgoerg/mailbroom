@@ -128,6 +128,8 @@ TEXT: dict[str, str | tuple[str, str]] = {
         'This filter is too long (more than {max} characters).',
     'request_too_large':
         'The request is too large for the server to accept.',
+    'block_key_invalid':
+        'This sender or domain cannot be blocked: it is not a plain address or domain name.',
     'no_account':
         'No mail account is set up yet - open Settings and fill in the sign-in details first.',
     'cafile_missing':

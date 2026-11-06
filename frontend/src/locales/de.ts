@@ -1918,6 +1918,9 @@ export const DE: Record<string, string> = {
     "Dieser Filter ist zu lang (mehr als {max} Zeichen).",
   "ferr.request_too_large":
     "Die Anfrage ist zu groß, als dass der Server sie annehmen könnte.",
+  "ferr.block_key_invalid":
+    "Dieser Absender bzw. diese Domain lässt sich nicht blockieren: Es ist "
+    + "keine einfache Adresse oder kein einfacher Domainname.",
   "ferr.no_account":
     "Es ist noch kein Mail-Konto eingerichtet – trage zuerst in den "
     + "Einstellungen die Zugangsdaten ein.",

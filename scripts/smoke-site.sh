@@ -50,6 +50,11 @@ for p in / /docs/ /demo/; do
     || fail "$p has no Content-Security-Policy: frame-ancestors 'none'"
   ok "$p: nosniff, referrer policy, frame ban"
 done
+# Cloudflare may prepend its own content-signals block, so only look for the lines
+robots=$(curl -sS --fail "$BASE/robots.txt") || fail "GET /robots.txt failed"
+grep -q '^Sitemap: https://inboxrake.com/sitemap.xml' <<<"$robots" || fail "/robots.txt has no Sitemap line"
+curl -sS --fail "$BASE/sitemap.xml" | grep -q '<loc>https://inboxrake.com/</loc>' || fail "/sitemap.xml does not list the landing page"
+ok "/robots.txt names the sitemap, /sitemap.xml lists the pages"
 code=$(curl -sS -o /dev/null -w '%{http_code}' "$BASE/og.png")
 [ "$code" = 200 ] || fail "/og.png answered $code"
 ok "/og.png is 200"

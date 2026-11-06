@@ -6,6 +6,19 @@ import { DEMO_LIVE, GITHUB } from "../../site.mjs";
 const title = "Inboxrake - self-hosted cleanup for a mailbox that piled up";
 const description =
   "Inboxrake rakes an IMAP mailbox into tidy piles: group mail by sender, subject or thread, then trash, unsubscribe from or block whole groups at once.";
+// Structured data: only facts the project states elsewhere (README, LICENSE).
+const jsonLd = {
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  name: "Inboxrake",
+  description,
+  url: "https://inboxrake.com/",
+  applicationCategory: "UtilitiesApplication",
+  operatingSystem: "Linux (Docker)",
+  license: `${GITHUB}/blob/main/LICENSE`,
+  offers: { "@type": "Offer", price: "0", priceCurrency: "USD" },
+  sameAs: [GITHUB],
+};
 const heroAlt =
   "The group list: senders with mail counts, sizes, AI verdicts and quick filters";
 ---
@@ -16,6 +29,8 @@ const heroAlt =
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>{title}</title>
     <meta name="description" content={description} />
+    <link rel="canonical" href="https://inboxrake.com/" />
+    <script type="application/ld+json" set:html={JSON.stringify(jsonLd)} />
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="Inboxrake" />
     <meta property="og:title" content={title} />
