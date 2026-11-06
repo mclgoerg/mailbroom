@@ -21,7 +21,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
-log = logging.getLogger("pmc.oauth")
+log = logging.getLogger("inboxrake.oauth")
 
 PROVIDERS = ("google", "microsoft")
 

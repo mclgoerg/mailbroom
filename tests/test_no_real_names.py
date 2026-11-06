@@ -363,7 +363,7 @@ def test_a_real_registrable_domain_is_not_an_example(tmp_path):
 
 
 @pytest.mark.parametrize("rel,content", [
-    ("tests/t.py", 'KEY = "smart.reason.ai"\nL = logging.getLogger("pmc.ai")\n'),
+    ("tests/t.py", 'KEY = "smart.reason.ai"\nL = logging.getLogger("inboxrake.ai")\n'),
     ("tests/t.py", 'F = "changelog.md"; G = "tests/test_x.py"; H = "a.json"\n'),
     ("tests/t.py", 'A = "jane@shop.example"\nB = "https://news.example/x"\n'),
     ("tests/t.py", 'A = "x@gmail.com"; B = "web.de"; C = "me@proton.me"\n'),

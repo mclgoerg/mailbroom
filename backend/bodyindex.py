@@ -47,7 +47,7 @@ from . import secretbox
 from . import tenants
 from . import trackers
 
-log = logging.getLogger("pmc.bodyindex")
+log = logging.getLogger("inboxrake.bodyindex")
 
 SCHEMA_VERSION = 1
 TEXT_CAP = 20_000            # characters of a mail's text that are indexed

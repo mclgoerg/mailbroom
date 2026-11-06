@@ -19,7 +19,7 @@ from pathlib import Path
 from . import accounts
 from . import tenants
 
-log = logging.getLogger("pmc.stats")
+log = logging.getLogger("inboxrake.stats")
 
 HISTORY_PATH = Path(
     os.environ.get("STATS_HISTORY_PATH", "/data/stats_history.json"))

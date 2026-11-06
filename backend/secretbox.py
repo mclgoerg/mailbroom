@@ -21,7 +21,7 @@ import hashlib
 import logging
 import os
 
-log = logging.getLogger("pmc.secrets")
+log = logging.getLogger("inboxrake.secrets")
 
 PREFIX = "enc:v1:"
 ENV_VAR = "INBOXRAKE_SECRET_KEY"

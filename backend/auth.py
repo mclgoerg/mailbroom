@@ -24,7 +24,7 @@ import urllib.parse
 import urllib.request
 from pathlib import Path
 
-log = logging.getLogger("pmc.auth")
+log = logging.getLogger("inboxrake.auth")
 
 SESSION_SECRET_PATH = Path(
     os.environ.get("SESSION_SECRET_PATH", "/data/session_secret"))

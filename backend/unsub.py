@@ -39,7 +39,7 @@ from . import smtpout
 from . import tenants
 from . import unsubstore
 
-log = logging.getLogger("pmc.unsub")
+log = logging.getLogger("inboxrake.unsub")
 
 # One bulk run is capped like a rule run: the user selected groups, not
 # senders, and a domain grouping can hide hundreds of them.

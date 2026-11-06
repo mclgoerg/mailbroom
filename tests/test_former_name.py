@@ -82,7 +82,7 @@ def test_former_env_gets_a_rename_hint(monkeypatch, caplog):
     monkeypatch.setenv("INBOXRAKE_SECRET_KEY", "made-up")
     monkeypatch.setenv("MAILBROOM_MS_TENANT", "old")
     monkeypatch.setenv("INBOXRAKE_MS_TENANT", "new")
-    with caplog.at_level(logging.WARNING, logger="pmc.config"):
+    with caplog.at_level(logging.WARNING, logger="inboxrake.config"):
         main._log_former_env()
     assert caplog.messages == [
         "MAILBROOM_MS_TENANT is ignored - INBOXRAKE_MS_TENANT is set",

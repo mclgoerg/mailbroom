@@ -20,7 +20,7 @@ from . import pinstore
 from . import tenants
 from . import verdictstore
 
-log = logging.getLogger("pmc.ai")
+log = logging.getLogger("inboxrake.ai")
 
 AI_BATCH = 80
 REVIEW_EFFORT = "low"                    # group review: a verdict + a short reason per group needs
