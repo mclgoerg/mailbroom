@@ -98,8 +98,8 @@ client ID, if you run one, is `INBOXRAKE_MS_CLIENT_ID` (see
 ## The safety promises
 
 - **Nothing is deleted without asking.** Trashing is an IMAP move to the
-  Trash folder, behind a confirmation that names how many mails are
-  affected. UIDVALIDITY is checked before acting on cached UIDs, and scans
+  Trash folder, behind a confirmation (the mail count; a single protected
+  group or pinned mail asks "anyway?" naming it instead). UIDVALIDITY is checked before acting on cached UIDs, and scans
   are read-only.
 - **Everything is undoable** except the explicit permanent-delete actions
   in Trash and Junk. The manual ones confirm with exact counts; an opt-in

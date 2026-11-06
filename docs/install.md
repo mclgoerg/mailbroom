@@ -9,8 +9,7 @@ down to the same four things:
 
 | What | Value |
 |---|---|
-| Image | `ghcr.io/mclgoerg/inboxrake:latest` (or pin a minor tag such as `:2.0`, so updates within it stay
-backward compatible) |
+| Image | `ghcr.io/mclgoerg/inboxrake:latest` follows `main` (every merge, possibly ahead of the last release); pin `:2.0` (or `:2.0.x`) for release-only updates |
 | Port | `8765` (HTTP web UI + API) |
 | Volume | `/data` - all settings, scan caches and stats live here |
 | Env vars | all optional bootstrap - see [`deploy/.env.example`](../deploy/.env.example) |
@@ -27,8 +26,12 @@ Everything set via env can also be configured later in the settings UI
   add `INBOXRAKE_ALLOWED_HOSTS=<name>` to the container environment
   (comma list, `*.example.org` for subdomains).
 - **Secrets encryption:** set `INBOXRAKE_SECRET_KEY` (generate with
-  `openssl rand -base64 32`) so IMAP passwords and API keys are
-  encrypted inside `/data` - protects volume backups.
+  `openssl rand -base64 32`) **before the first start**, so IMAP
+  passwords, API keys and OAuth tokens are encrypted inside `/data` and the
+  stored secrets in a copied volume backup are unreadable without the
+  key (mail metadata, verdicts and stats are not encrypted). Without it
+  the secrets are stored as plaintext and every start logs a warning. Keep the key out of
+  your backups; if it is lost you re-enter the secrets.
 
 **Proton Mail users:** Inboxrake talks to Proton through the
 [Proton Mail Bridge](https://proton.me/mail/bridge), which runs as a
