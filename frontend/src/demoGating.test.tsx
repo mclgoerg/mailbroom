@@ -10,6 +10,7 @@ vi.mock("./api", () => ({
   api: {
     folders: () => new Promise(() => {}),
     getConfig: () => new Promise(() => {}),
+    adminStats: () => Promise.resolve({ tenants: [] }),
     knowledge: () => new Promise(() => {}),
   },
   fmtUsd: (n: number) => `$${n.toFixed(2)}`,
@@ -67,6 +68,24 @@ test("settings: add account, digest and AI key are disabled with the hint", () =
   expect(screen.getByText(HINT)).toBeTruthy();
 });
 
+test("settings: shared AI key and SSO login are disabled in the demo", () => {
+  setDemo(true);
+  settings();
+  fireEvent.click(screen.getByRole("tab", { name: /Server/ }));
+  const sso = screen.getByRole("option", { name: /SSO/ }) as HTMLOptionElement;
+  expect(sso.disabled).toBe(true);
+  expect(sso.textContent).toContain(HINT);
+  expect(screen.getByRole("checkbox", { name: "Share this key with all users" })
+    .matches(":disabled")).toBe(true);
+  cleanup();
+  setDemo(false);
+  settings();
+  fireEvent.click(screen.getByRole("tab", { name: /Server/ }));
+  expect((screen.getByRole("option", { name: /SSO/ }) as HTMLOptionElement)
+    .disabled).toBe(false);
+  expect(document.querySelector("fieldset")).toBeNull();
+});
+
 test("settings: the hint is translated", () => {
   setDemo(true);
   setLang("de");
@@ -77,6 +96,8 @@ test("settings: the hint is translated", () => {
 
 test("settings: identical render when the demo flag is off", () => {
   const off = settings().container.innerHTML;
+  // no wrapper elements of any kind are added outside the demo
+  expect(document.querySelector("fieldset")).toBeNull();
   cleanup();
   setDemo(true);
   const on = settings().container.innerHTML;
@@ -84,6 +105,7 @@ test("settings: identical render when the demo flag is off", () => {
   cleanup();
   setDemo(false);
   expect(settings().container.innerHTML).toBe(off);
+  expect(document.querySelector("fieldset")).toBeNull();
   expect(screen.queryByText(HINT)).toBeNull();
   expect(btn("Add account").disabled).toBe(false);
   expect(btn("Send test digest").disabled).toBe(false);
@@ -118,4 +140,36 @@ test("wizard: Test connection is enabled again outside the demo", () => {
   fireEvent.change(document.querySelector("input[type=password]")!,
     { target: { value: "secret" } });
   expect(btn("Test connection").disabled).toBe(false);
+});
+
+const oauthAcct = { ...acct, preset: "outlook" as const, password_set: false,
+  oauth: { provider: "microsoft" as const, client_id: "cid",
+    client_secret_set: true, connected: false } };
+const oauthCfg = (over: object = {}, connected = false) => ({
+  ...cfg, oauth_ms_device_available: true,
+  accounts: { default: { ...oauthAcct,
+    oauth: { ...oauthAcct.oauth, connected }, auth: "oauth", ...over } },
+}) as unknown as Config;
+const settingsWith = (c: Config) => render(<ToastProvider><DialogProvider>
+  <SettingsModal cfg={c} account="default" onClose={() => {}}
+    onSaved={() => {}} onAccountsChanged={() => {}} />
+</DialogProvider></ToastProvider>);
+
+test("settings: OAuth connect (device and redirect) and disconnect are disabled",
+  () => {
+  setDemo(true);
+  settingsWith(oauthCfg());
+  expect(btn("Connect with a device code").disabled).toBe(true);
+  cleanup();
+  settingsWith({ ...oauthCfg(), oauth_ms_device_available: false } as Config);
+  expect(btn("Connect account").disabled).toBe(true);
+  cleanup();
+  settingsWith(oauthCfg({}, true));
+  expect(btn("Disconnect").disabled).toBe(true);
+  expect(screen.getAllByText(HINT).length).toBeGreaterThan(0);
+});
+
+test("settings: OAuth connect is enabled outside the demo", () => {
+  settingsWith(oauthCfg());
+  expect(btn("Connect with a device code").disabled).toBe(false);
 });

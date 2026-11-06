@@ -12,7 +12,7 @@ import { FolderSettings } from "./FolderSettings";
 import { IndexPanel } from "./IndexPanel";
 import { KnowledgeSettings } from "./KnowledgeSettings";
 import { demoHint, useDemo } from "../demoMode";
-import { Button, Checkbox, confirmDialog, DemoHint, Field, Input, LINK_ACCENT, Loading,
+import { Button, Checkbox, confirmDialog, DemoFieldset, DemoHint, Field, Input, LINK_ACCENT, Loading,
   Modal, Notice, PanelHeader, promptDialog, SectionLabel, Segmented, Select, Spinner,
   Tag, tabPanelProps, TextArea, useMediaQuery } from "./ui";
 
@@ -667,6 +667,7 @@ export function SettingsModal({ cfg, account, onClose, onSaved,
               title={demo ? demoHint() : undefined}>
               {t("account.add")}
             </Button>
+            <DemoHint />
             <Button variant="secondary" onClick={renameAccount}>
               {t("account.rename")}
             </Button>
@@ -789,7 +790,7 @@ export function SettingsModal({ cfg, account, onClose, onSaved,
         <div className="sm:col-span-2 rounded-card border border-line
           bg-panel2 p-3">
           <SectionLabel className="mb-2">{t("digest.title")}</SectionLabel>
-          <fieldset disabled={demo} className="contents">
+          <DemoFieldset>
           <div className="grid gap-3 sm:grid-cols-2">
             <Field label={t("digest.schedule")}>
               <Select className="w-full" value={f.digestSchedule}
@@ -822,7 +823,7 @@ export function SettingsModal({ cfg, account, onClose, onSaved,
               <span className="type-meta text-muted">{digestTestMsg}</span>
             )}
           </div>
-          </fieldset>
+          </DemoFieldset>
           <DemoHint className="mt-2" />
         </div>
 
@@ -986,7 +987,9 @@ export function SettingsModal({ cfg, account, onClose, onSaved,
               onChange={set("authMode")}>
               <option value="none">{t("login.mode_none")}</option>
               <option value="password">{t("login.mode_password")}</option>
-              <option value="oidc">{t("login.mode_oidc")}</option>
+              <option value="oidc" disabled={demo}>
+                {t("login.mode_oidc")}{demo ? ` - ${demoHint()}` : ""}
+              </option>
             </Select>
           </Field>
           {f.authMode === "password" && (
@@ -1066,6 +1069,8 @@ export function SettingsModal({ cfg, account, onClose, onSaved,
           <p className="sm:col-span-2 -mt-2 type-meta text-muted">
             {t("shared.help")}
           </p>
+          <DemoHint className="sm:col-span-2 -mt-2" />
+          <DemoFieldset>
           <Checkbox checked={f.sharedEnabled}
             label={t("shared.enabled")}
             onChange={(e) =>
@@ -1109,6 +1114,7 @@ export function SettingsModal({ cfg, account, onClose, onSaved,
               </Field>
             </div>
           </>)}
+          </DemoFieldset>
 
           <SectionLabel className="sm:col-span-2 mt-2">
             {t("usage.section")}
@@ -1199,7 +1205,7 @@ export function SettingsModal({ cfg, account, onClose, onSaved,
           {t("ai.data_note")}
         </p>
         <DemoHint className="sm:col-span-2 -mt-2" />
-        <fieldset disabled={demo} className="contents">
+        <DemoFieldset>
         <Field label={t("Provider")}>
           <Select className="w-full" value={f.provider}
             onChange={set("provider")}>
@@ -1272,7 +1278,7 @@ export function SettingsModal({ cfg, account, onClose, onSaved,
             {t("ai.sort_instructions_help")}
           </p>
         </div>
-        </fieldset>
+        </DemoFieldset>
 
         <div className="sm:col-span-2 rounded-card border border-line
           bg-panel2 p-3">

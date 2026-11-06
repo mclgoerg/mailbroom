@@ -1162,6 +1162,13 @@ export function DemoHint({ className = "" }: { className?: string }) {
   return <p className={`type-meta text-muted ${className}`}>{demoHint()}</p>;
 }
 
+/** Disables a group of controls in demo mode. Outside the demo it renders
+ *  just its children - no wrapper, so the DOM and a11y tree stay as before. */
+export function DemoFieldset({ children }: { children: ReactNode }) {
+  if (!useDemo()) return <>{children}</>;
+  return <fieldset disabled className="contents">{children}</fieldset>;
+}
+
 /* --------------------------------- toasts --------------------------------- */
 
 export type ToastVariant = "info" | "success" | "error";
