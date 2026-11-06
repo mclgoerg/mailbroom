@@ -2095,4 +2095,33 @@ export const DE: Record<string, string> = {
   "wrapped.names_shown": "Absendernamen sind im Bild sichtbar.",
   "wrapped.local_only": "Es wird auf diesem Gerät erstellt; nichts wird hochgeladen.",
   "wrapped.footer": "Inboxrake",
+  "demo.boot.title": "Deine Demo wird gerade zusammengeharkt …",
+  "demo.boot.download": "Demo-Engine wird heruntergeladen",
+  "demo.boot.mb": "{done} von {total} MB",
+  "demo.boot.python": "Python wird gestartet",
+  "demo.boot.libraries": "Bibliotheken werden geladen",
+  "demo.boot.seed": "Demo-Postfächer werden gefüllt",
+  "demo.boot.ready": "Fertig",
+  "demo.boot.done": "Erledigt",
+  "demo.boot.privacy":
+    "Alles läuft in deinem Browser. Kein Postfach, kein Konto, nichts wird "
+    + "irgendwohin gesendet.",
+  "demo.boot.hint":
+    "Am besten am Computer - auf dem Handy kann das 30-50 Sekunden dauern.",
+  "demo.fail.title": "Die Demo konnte nicht starten.",
+  "demo.fail.unsupported":
+    "Dieser Browser kann die Demo nicht ausführen (sie braucht WebAssembly "
+    + "und Module-Web-Worker). Ein aktueller Chrome, Firefox, Safari oder "
+    + "Edge schafft das.",
+  "demo.fail.stalled":
+    "Ein Schritt dauert viel länger als normal, deshalb haben wir nicht "
+    + "weiter gewartet. Prüfe deine Verbindung und versuche es erneut.",
+  "demo.fail.error": "Beim Starten der Demo ist etwas schiefgelaufen.",
+  "demo.retry": "Erneut versuchen",
+  "demo.banner": "Demo - deine Änderungen gelten nur in diesem Tab",
+  "demo.reset": "Demo zurücksetzen",
+  "demo.reset.title": "Demo zurücksetzen?",
+  "demo.reset.body":
+    "Deine Änderungen werden verworfen und die Demo-Postfächer werden neu "
+    + "gefüllt.",
 };

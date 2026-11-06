@@ -7,12 +7,20 @@ import { installViewportGuard } from "./viewport";
 
 installViewportGuard();
 
-createRoot(document.getElementById("root")!).render(
-  <StrictMode>
-    <ToastProvider>
-      <DialogProvider>
-        <App />
-      </DialogProvider>
-    </ToastProvider>
-  </StrictMode>,
-);
+const root = createRoot(document.getElementById("root")!);
+
+if (import.meta.env.VITE_DEMO === "1") {
+  // The in-browser demo (demo/): a build-time switch, so the normal build
+  // contains none of it.
+  void import("./demo/entry").then((m) => m.mountDemo(root));
+} else {
+  root.render(
+    <StrictMode>
+      <ToastProvider>
+        <DialogProvider>
+          <App />
+        </DialogProvider>
+      </ToastProvider>
+    </StrictMode>,
+  );
+}

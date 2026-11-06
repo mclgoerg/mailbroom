@@ -1,5 +1,6 @@
 /* Pure helpers - kept dependency-free so they are unit-testable. */
 
+import { nowDate, nowMs } from "./clock";
 import type { AuthMethod, Grouping, Group, ImapAccount } from "./types";
 
 /** How an account signs in. Older backends send no `auth`: they used
@@ -30,7 +31,7 @@ export const fmtSizeGb = (b: number): string =>
  *  returned unchanged. `lang` is passed in (callers use getLang()) so this
  *  file stays dependency-free. Put the full ISO date in a title - see
  *  ShortDate in ui.tsx. */
-export function fmtDate(iso: string, now: Date = new Date(),
+export function fmtDate(iso: string, now: Date = nowDate(),
                         opts: { lang?: "en" | "de"; time?: boolean } = {}
 ): string {
   const m = /^(\d{4})-(\d{2})-(\d{2})(?:[T ](\d{2}):(\d{2}))?/.exec(iso || "");
@@ -57,7 +58,7 @@ export const mailKey = (m: { folder: string; uid: number }): string =>
 
 /** Compact relative age: "3m", "2h", "5d" (empty for missing/future). */
 export const fmtAgo = (ts: number | null | undefined,
-                       now = Date.now() / 1000): string => {
+                       now = nowMs() / 1000): string => {
   if (!ts || ts > now) return "";
   const s = now - ts;
   if (s < 90) return "1m";
@@ -77,7 +78,7 @@ export const applyStatus = <S extends { account: string; groups_rev: number;
 };
 
 export const olderThan = (m: { ts: number }, months: number): boolean =>
-  m.ts > 0 && m.ts < Date.now() / 1000 - months * 30.44 * 86400;
+  m.ts > 0 && m.ts < nowMs() / 1000 - months * 30.44 * 86400;
 
 /** Mirrors backend/mailops.py retained_mails(): the mails a retention
  * restriction EXEMPTS from an action (the keep-window), as mailKey()s.
@@ -101,7 +102,7 @@ export function retainedMailKeys(
   if (keepLatest) {
     keep = items.slice(0, keepLatest);
   } else {
-    const cutoff = Date.now() / 1000 - (olderThanDays as number) * 86400;
+    const cutoff = nowMs() / 1000 - (olderThanDays as number) * 86400;
     keep = items.filter((m) => m.ts !== 0 && m.ts >= cutoff);
   }
   for (const m of keep) out.add(mailKey(m));
@@ -282,7 +283,7 @@ const someAddr = (g: Group, members: SmartMembers | undefined,
 
 /** `members` (Smart tab only) lets `from:`, `domain:` and free text reach
  *  every sender pooled into a row, however many there are. */
-export function matchGroup(g: Group, f: ParsedFilter, now = Date.now(),
+export function matchGroup(g: Group, f: ParsedFilter, now = nowMs(),
     members?: SmartMembers): boolean {
   if (f.fromAddr !== null && g.key !== f.fromAddr
       && !someAddr(g, members, (a) => a === f.fromAddr)) return false;

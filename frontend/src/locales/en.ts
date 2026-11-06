@@ -1850,4 +1850,31 @@ export const EN: Record<string, string> = {
   "wrapped.names_shown": "Sender names are visible in the image.",
   "wrapped.local_only": "It is created on this device; nothing is uploaded.",
   "wrapped.footer": "Inboxrake",
+  "demo.boot.title": "Getting your demo ready to rake it",
+  "demo.boot.download": "Downloading the demo engine",
+  "demo.boot.mb": "{done} of {total} MB",
+  "demo.boot.python": "Starting Python",
+  "demo.boot.libraries": "Loading libraries",
+  "demo.boot.seed": "Filling the demo mailboxes",
+  "demo.boot.ready": "Ready",
+  "demo.boot.done": "Done",
+  "demo.boot.privacy":
+    "Everything runs in your browser. No mailbox, no account, nothing is "
+    + "sent anywhere.",
+  "demo.boot.hint":
+    "Best on a computer - on a phone this can take 30-50 seconds.",
+  "demo.fail.title": "The demo could not start.",
+  "demo.fail.unsupported":
+    "This browser can't run the demo (it needs WebAssembly and module web "
+    + "workers). A current Chrome, Firefox, Safari or Edge will.",
+  "demo.fail.stalled":
+    "A step is taking much longer than it should, so we stopped waiting. "
+    + "Check your connection and try again.",
+  "demo.fail.error": "Something went wrong while starting the demo.",
+  "demo.retry": "Try again",
+  "demo.banner": "Demo - your changes live only in this tab",
+  "demo.reset": "Reset demo",
+  "demo.reset.title": "Reset the demo?",
+  "demo.reset.body":
+    "Your changes are discarded and the demo mailboxes are filled again.",
 };

@@ -34,6 +34,7 @@ import { AccountAvatar, applyTheme, BAR_ICON_BTN, BulkBar, Button, Chip, ChipGro
   Menu, MenuDivider, MenuGroup, MenuHeading, MenuItem, Notice, ProgressBar,
   promptDialog, Segmented, Select, Spinner, useToast,
   type ToastVariant } from "./components/ui";
+import { nowMs } from "./clock";
 import { demoHint, setDemo, useDemo } from "./demoMode";
 import { t } from "./i18n";
 import { usePaneHeight, useSplitPane } from "./splitPane";
@@ -461,7 +462,7 @@ export default function App() {
 
   const groups = useMemo(() => {
     const f = parseFilter(filter);
-    const now = Date.now();
+    const now = nowMs();
     const filtered = allGroups.filter((g) => matchGroup(g, f, now, members));
     return filtered.sort((a, b) => {
       const va = sortValue(a, sortK), vb = sortValue(b, sortK);
@@ -918,7 +919,7 @@ export default function App() {
     }
     const f = parseFilter(query);
     const matchingKeys = allGroups
-      .filter((g) => matchGroup(g, f, Date.now(), members) && !g.protected)
+      .filter((g) => matchGroup(g, f, nowMs(), members) && !g.protected)
       .map((g) => g.key);
     const next = new Set(selected);
     if (activeChip.step === "filtered") {
