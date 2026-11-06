@@ -2,11 +2,12 @@
   "name": "inboxrake-docs",
   "private": true,
   "type": "module",
-  "description": "Static documentation site, built from ../docs. Never shipped in the app image.",
+  "description": "Static site (landing page + documentation), docs built from ../docs. Never shipped in the app image.",
   "scripts": {
     "dev": "astro dev --host 127.0.0.1",
-    "build": "astro build",
-    "preview": "astro preview --host 127.0.0.1"
+    "build": "astro build && astro build --config landing/astro.config.mjs",
+    "preview": "astro preview --host 127.0.0.1",
+    "dev:landing": "astro dev --host 127.0.0.1 --config landing/astro.config.mjs"
   },
   "engines": {
     "node": ">=22"
