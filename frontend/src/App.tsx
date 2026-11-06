@@ -2153,9 +2153,9 @@ export default function App() {
         && !scanning && (
         <div className="mx-auto my-10 max-w-md rounded-card border border-line
           bg-panel p-4 type-body sm:p-5">
-          <div className="mb-3 type-heading">
+          <div className="mb-3 break-words type-heading">
             {cfg.setup_needed ? t("wizard.setup_btn")
-              : unverified ? t("onboard.unverified", { account })
+              : unverified ? t("onboard.unverified", { account: acct?.user || account })
               : t("onboard.ready")}
           </div>
           <p className="text-muted">
