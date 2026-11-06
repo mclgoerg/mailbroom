@@ -1,3 +1,7 @@
+---
+title: "Security & privacy"
+---
+
 # Login, multi-user and secrets
 
 Out of the box Inboxrake has **no login**: anyone who can reach the port
@@ -63,6 +67,32 @@ Outlook / Microsoft 365 sign-in uses the `consumers` tenant by default
 to its tenant ID or domain (or `organizations` / `common`); the shared
 client ID, if you run one, is `INBOXRAKE_MS_CLIENT_ID` (see
 [install.md](install.md#microsoft-oauth-setup)).
+
+## The safety promises
+
+- **Nothing is deleted without asking.** Trashing is an IMAP move to the
+  Trash folder, behind a confirmation that names how many mails are
+  affected. UIDVALIDITY is checked before acting on cached UIDs, and scans
+  are read-only.
+- **Everything is undoable** except the explicit permanent-delete actions
+  in Trash and Junk (manual, or an opt-in purge rule). Those show exact
+  counts first, rules and purge rules start in report mode, and protected
+  senders and pinned mails are never touched.
+- **Accounts stay strictly separate** - nothing is aggregated across
+  accounts, and with SSO nothing is shared between users.
+
+## What the optional AI review sends
+
+Only mail **metadata**, and only to the AI provider you configure (a cloud
+provider or a local model such as Ollama): sender names and addresses,
+mail counts, sizes, dates, read state, category tags, subject lines,
+protected-sender markers and whether you ever replied to a sender. Mail
+bodies and attachments are never sent. AI sorting of the "Other" row sends,
+per sender, its name and address, mail count, whether it offers an
+unsubscribe link and up to three recent subject lines, plus your own sorting
+instructions. Describing a filter in words sends only your sentence, the
+filter syntax and the names of your tags. The review is off until you set it
+up and consent in the UI.
 
 ## Reporting a vulnerability
 

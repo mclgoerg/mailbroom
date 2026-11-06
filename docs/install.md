@@ -1,3 +1,7 @@
+---
+title: "Install"
+---
+
 # Installing Inboxrake
 
 Inboxrake is a single container. Whatever platform you use, it boils
