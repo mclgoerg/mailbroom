@@ -221,6 +221,127 @@ def test_run_errors_are_recorded(bridge):
     assert saved["last_run"]["error"]
 
 
+def _armed_rule(**over):
+    rule = rulesmod.create_rule({
+        "name": "shipping", "grouping": "sender", "query": "tag:shipping",
+        "action": "trash", **over})
+    rulesmod.run_rule(rule["id"])
+    return rulesmod.update_rule(rule["id"], {"mode": "execute"})
+
+
+@pytest.mark.parametrize("edit", [
+    {"query": ""}, {"query": "tag:shipping age:>30d"},
+    {"grouping": "domain"}, {"action": "mark_read"},
+    {"action": "move", "dest": "Archive"},
+    {"keep_latest": 2}, {"older_than_days": 30}])
+def test_editing_a_definition_field_sends_armed_mail_rule_back(bridge, edit):
+    rule = _armed_rule()
+    assert rule["mode"] == "execute"
+    edited = rulesmod.update_rule(rule["id"], edit)
+    assert edited["mode"] == "report"
+    assert edited["report_runs"] == 0 and edited["reset_reason"] == "edited"
+    with pytest.raises(ValueError, match=mailops.RULE_REPORT_FIRST):
+        rulesmod.update_rule(rule["id"], {"mode": "execute"})
+    # a report run of the NEW definition arms it again
+    rulesmod.run_rule(rule["id"], rescan=False)
+    again = rulesmod.update_rule(rule["id"], {"mode": "execute"})
+    assert again["mode"] == "execute" and again["reset_reason"] == ""
+
+
+def test_editing_the_account_sends_armed_mail_rule_back(bridge):
+    rule = _armed_rule()
+    stored = rulesmod.load_rules()
+    stored[0]["report_box"] = "someotherbox"      # another mailbox behind it
+    rulesmod._save(stored)
+    again = rulesmod.load_rules()[0]
+    assert again["mode"] == "report" and again["reset_reason"] == "account"
+    assert rule["id"] == again["id"]
+
+
+@pytest.mark.parametrize("edit", [
+    {"name": "renamed"}, {"schedule": "daily"}, {"query": "tag:shipping"}])
+def test_non_definition_edits_keep_a_mail_rule_armed(bridge, edit):
+    rule = _armed_rule()
+    edited = rulesmod.update_rule(rule["id"], edit)
+    assert edited["mode"] == "execute" and edited["report_runs"] == 1
+
+
+def test_execute_refused_without_a_report_of_the_current_definition(
+        bridge, monkeypatch):
+    rule = _armed_rule()
+    monkeypatch.setattr(rulesmod, "_normalise", lambda r: None)
+    stored = rulesmod.load_rules()
+    stored[0]["query"] = ""                 # edited behind the API's back
+    rulesmod._save(stored)
+    assert rulesmod.load_rules()[0]["mode"] == "execute"
+    with pytest.raises(RuntimeError, match=mailops.RULE_REPORT_FIRST):
+        rulesmod.run_rule(rule["id"], rescan=False)
+    assert "alice@friends.example" in mailops.STATE["groups"]["sender"]
+    assert not mailops.UNDO_LOG
+
+
+def _v111_file(bridge):
+    """A v1.11-shaped rules.json: report_sig "" on every rule, armed mail
+    rule plus a Block-sender rule."""
+    import json
+    base = {"scope": "mail", "grouping": "sender", "action": "trash",
+            "dest": "", "schedule": "daily", "mode": "execute",
+            "report_runs": 1, "created": 1, "last_run": None,
+            "report_sig": "", "report_box": "", "report_at": None,
+            "reset_reason": "", "keep_latest": None,
+            "older_than_days": None}
+    rules = [{**base, "id": "m1", "name": "shipping",
+              "query": "tag:shipping", "origin": "manual"},
+             {**base, "id": "b1", "name": "blocked",
+              "query": "from:news@shop.example", "origin": "block"}]
+    rulesmod._path().parent.mkdir(parents=True, exist_ok=True)
+    rulesmod._path().write_text(json.dumps({"rules": rules}))
+
+
+def test_v111_rules_file_keeps_execute_mode(bridge):
+    _v111_file(bridge)
+    loaded = {r["id"]: r for r in rulesmod.load_rules()}
+    assert loaded["m1"]["mode"] == "execute"
+    assert loaded["b1"]["mode"] == "execute"
+    assert rulesmod.purge_armed(loaded["b1"])
+    res = rulesmod.run_rule("b1", rescan=False)
+    assert res["mode"] == "execute" and res["acted"] == 1
+    wait_delete_done()
+    rulesmod.update_rule("m1", {"query": ""})     # a later edit re-arms
+    assert rulesmod.load_rules()[0]["mode"] == "report"
+
+
+def test_grandfathered_signatures_are_persisted_once(bridge, monkeypatch):
+    import json
+    _v111_file(bridge)
+    rulesmod.publish()
+    on_disk = json.loads(rulesmod._path().read_text())["rules"]
+    assert all(r["report_sig"] and r["report_box"] for r in on_disk)
+    # re-pointing the account afterwards is NOT adopted: the rule resets
+    monkeypatch.setattr(rulesmod, "mailbox_id", lambda acct: "othermailbox")
+    again = rulesmod.load_rules()
+    assert [r["mode"] for r in again] == ["report", "report"]
+    assert again[0]["reset_reason"] == "account"
+
+
+def test_edit_during_a_report_run_does_not_arm_the_edit(bridge, monkeypatch):
+    rule = rulesmod.create_rule({
+        "name": "shipping", "grouping": "sender", "query": "tag:shipping",
+        "action": "trash"})
+    real = rulesmod._record_run
+
+    def edit_then_record(rule_id, result):
+        rulesmod.update_rule(rule_id, {"query": ""})     # mid-run edit
+        real(rule_id, result)
+
+    monkeypatch.setattr(rulesmod, "_record_run", edit_then_record)
+    rulesmod.run_rule(rule["id"])
+    saved = rulesmod.load_rules()[0]
+    assert saved["report_runs"] == 1                 # a report is on record...
+    with pytest.raises(ValueError, match=mailops.RULE_REPORT_FIRST):
+        rulesmod.update_rule(rule["id"], {"mode": "execute"})  # ...not this one
+
+
 # -------------------------------------------------------------- scheduling
 
 def test_due_logic():

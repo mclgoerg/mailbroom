@@ -41,10 +41,11 @@ two in Settings keeps both credentials.
 ## Outlook / Microsoft 365: OAuth only
 
 Microsoft offers no app-password IMAP, so Outlook accounts sign in with
-OAuth. With `INBOXRAKE_MS_CLIENT_ID` set on the server the account connects
-with a **device code** and needs no registration; without it you register
-your own public client in Entra ID and use the same bring-your-own flow as
-Gmail. For work or school tenants set `INBOXRAKE_MS_TENANT`. Steps:
+OAuth, and no Microsoft app ships with Inboxrake: you register your own
+public client in Entra ID (free) and use the same bring-your-own flow as
+Gmail. Only if an administrator sets `INBOXRAKE_MS_CLIENT_ID` on the server
+with their own registration does the account connect with a **device code**
+and need no registration of yours. For work or school tenants set `INBOXRAKE_MS_TENANT`. Steps:
 [Microsoft OAuth setup](install.md#microsoft-oauth-setup).
 
 ## Proton Mail via Bridge
@@ -53,7 +54,20 @@ Proton has no IMAP endpoint of its own; Inboxrake talks to the
 [Proton Mail Bridge](https://proton.me/mail/bridge), which needs a paid
 Proton plan and runs as a second container sharing the network namespace.
 Use `deploy/docker-compose.proton.yml` and see [Install](install.md) for
-the Bridge image caveats. Proton's labels (`Starred`, `Labels/*`) are
+the Bridge image caveats. One-time Bridge setup (the compose file header
+has the full commands):
+
+1. `docker compose -f docker-compose.proton.yml run --rm -it protonbridge init`,
+   log in, then in the Bridge CLI run `change imap-security` (answer yes:
+   STARTTLS becomes SSL).
+2. `cert export` to `/root/exported-certs`. The compose file mounts
+   `exported-certs/cert.pem` into Inboxrake as `/certs/bridge-cert.pem`,
+   which is used as the CA file automatically.
+3. `info` shows the IMAP username and the Bridge-generated password.
+   Enter both in `.env` or in Inboxrake's Settings - the Bridge password,
+   not the password of the Proton account.
+
+Proton's labels (`Starred`, `Labels/*`) are
 excluded from scans because their mails also live in a real folder. The
 Sieve export is Proton-only and hidden for other presets.
 

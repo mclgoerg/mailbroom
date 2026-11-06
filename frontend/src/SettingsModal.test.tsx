@@ -1016,3 +1016,16 @@ test("German: the sign-in switch is translated", () => {
   expect(screen.getByRole("tab", { name: "App-Passwort" })).toBeTruthy();
   expect(screen.getByText("Anmeldeart", { selector: "div" })).toBeTruthy();
 });
+
+test("the client-secret placeholder is 'optional' for Outlook and " +
+  "'required' for Gmail", () => {
+  const secret = () => screen.getByLabelText("Client secret")
+    .getAttribute("placeholder");
+  render(<SettingsModal cfg={cfg} account="default" onClose={() => {}}
+    onSaved={() => {}} onAccountsChanged={() => {}} />);
+  fireEvent.change(presetSelect(), { target: { value: "outlook" } });
+  expect(secret()).toBe("optional");
+  fireEvent.change(presetSelect(), { target: { value: "gmail" } });
+  fireEvent.click(screen.getByRole("tab", { name: "OAuth" }));
+  expect(secret()).toBe("required");
+});

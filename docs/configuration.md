@@ -17,12 +17,12 @@ file ([`deploy/.env.example`](../deploy/.env.example)) or pass them with
 |---|---|---|
 | `INBOXRAKE_SECRET_KEY` | unset | Encrypts stored secrets (IMAP passwords, API keys, OIDC client secret, OAuth tokens) in `/data`. Any string works; generate one with `openssl rand -base64 32`. Unset means plaintext (a startup warning says so). Also required for the local body-search index. Keep it out of backups. |
 | `INBOXRAKE_ALLOWED_HOSTS` | unset | Without a login only `localhost` and IP addresses are answered. List extra host names here: comma separated, exact names, `*.example.org` for subdomains, `*` for any. |
-| `INBOXRAKE_MS_CLIENT_ID` | unset | Client ID of a shared Microsoft (Entra) public app. When set, Outlook accounts sign in with a device code and need no app registration of their own. |
+| `INBOXRAKE_MS_CLIENT_ID` | unset | Client ID of an administrator-provided Microsoft (Entra) public app; no such app ships with Inboxrake. When set, Outlook accounts sign in with a device code and need no app registration of their own. Leave it unset and each user registers their own app. |
 | `INBOXRAKE_MS_TENANT` | `consumers` | Microsoft tenant for sign-in: a tenant ID or domain, `organizations` or `common` for work/school accounts. |
 | `INBOXRAKE_BIND` | `127.0.0.1` | Read by the starter compose file only (not by the app): the host address the port is published on. Use `0.0.0.0` only after setting a login. |
 | `INBOXRAKE_PORT` | `8765` | Read by the starter compose file only: the host port. |
 
-**Former name.** Inboxrake was formerly Mailbroom: the formerly Mailbroom `MAILBROOM_*` names still work. Where the matching `INBOXRAKE_*` one is unset or blank, its value is used, and a startup log line suggests the rename. The formerly Mailbroom pair `MAILBROOM_BIND` / `MAILBROOM_PORT` is no longer read by the starter compose file.
+**Former name.** Inboxrake was formerly Mailbroom, and settings under the formerly Mailbroom `MAILBROOM_*` names still work: where the matching `INBOXRAKE_*` one is unset or blank, its value is used, and a startup log line suggests the rename. The starter compose file no longer reads the formerly Mailbroom pair `MAILBROOM_BIND` / `MAILBROOM_PORT`.
 
 ## First mail account (headless setups)
 
