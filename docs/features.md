@@ -89,7 +89,7 @@ the short version; [install.md](install.md) covers running it and
   across folders), grouped into sets with one click to select everything
   but the newest copy. Only mails without a usable Message-ID (missing,
   or junk such as `<>`) are matched by identical sender + subject + size
-  instead; two mails with their own, different Message-IDs (say, two
+  instead (and the identical id text, if there is one); two mails with their own, different Message-IDs (say, two
   monthly statements) are never treated as duplicates.
 - **Rules + scheduler** - save a filter query (same syntax as the filter
   box) plus an action as a rule, run it manually or daily/weekly. Rules

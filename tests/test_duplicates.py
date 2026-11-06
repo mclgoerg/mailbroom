@@ -169,3 +169,36 @@ def test_ordinary_message_ids_still_pair(monkeypatch):
         "Trash": [], "Spam": []})
     (s,) = mailops.duplicates_list()
     assert len(s["mails"]) == 2
+
+
+def _pair(monkeypatch, id1, id2):
+    _scan(monkeypatch, {
+        "INBOX": [make_msg(1, frm="bank@bank.example", subject="Statement",
+                           size=4321, msgid=id1),
+                  make_msg(2, frm="bank@bank.example", subject="Statement",
+                           size=4321, msgid=id2)],
+        "Trash": [], "Spam": []})
+    return mailops.duplicates_list()
+
+
+def test_distinct_malformed_ids_are_not_paired(monkeypatch):
+    assert _pair(monkeypatch, "stmt-09@bank.example",
+                 "stmt-10@bank.example") == []
+    assert _pair(monkeypatch, "<s09@bank.example> (x)",
+                 "<s10@bank.example> (x)") == []
+
+
+def test_identical_junk_id_pairs_only_with_same_sender_subject_size(
+        monkeypatch):
+    assert len(_pair(monkeypatch, "-", "-")) == 1
+    _scan(monkeypatch, {
+        "INBOX": [make_msg(1, frm="a@x.example", subject="One", size=1,
+                           msgid="-"),
+                  make_msg(2, frm="b@y.example", subject="Two", size=2,
+                           msgid="-")],
+        "Trash": [], "Spam": []})
+    assert mailops.duplicates_list() == []
+
+
+def test_junk_id_is_not_paired_with_no_id(monkeypatch):
+    assert _pair(monkeypatch, "-", "") == []

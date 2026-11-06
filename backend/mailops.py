@@ -3341,9 +3341,10 @@ def _usable_msgid(msgid: str) -> bool:
 def duplicates_list(limit: int = 200, acc=None) -> list[dict]:
     """Duplicate sets from the scanned index: the same Message-ID anywhere,
     or - only among mails WITHOUT a usable Message-ID (see _usable_msgid) -
-    the same exact (sender, subject, size) tuple. A mail that has its own
-    usable Message-ID is never paired by the tuple: two statements with the
-    same sender, subject and size but different ids are two mails. Newest
+    the same exact (stored id, sender, subject, size): id-less mails pair
+    with each other, a malformed id only with the identical one. A mail with
+    its own usable Message-ID is never paired by the tuple: two statements
+    with the same sender, subject and size but different ids are two mails. Newest
     mail first inside each set; 'wasted' is what deleting all but the newest
     would free."""
     acc = acc or accounts.get()
@@ -3358,8 +3359,11 @@ def duplicates_list(limit: int = 200, acc=None) -> list[dict]:
     for m in mails:
         if _usable_msgid(m["msgid"]) or not m["subject"] or not m["size"]:
             continue
-        by_tuple.setdefault((m["addr"], m["subject"], m["size"]),
-                            []).append(m)
+        # The stored id is part of the key: distinct malformed ids (no
+        # brackets, a trailing comment) never pair; identical junk ids pair
+        # only when sender, subject and size match too; "" = id-less.
+        by_tuple.setdefault((m["msgid"] or "", m["addr"], m["subject"],
+                             m["size"]), []).append(m)
     sets += [v for v in by_tuple.values() if len(v) > 1]
 
     out = []
