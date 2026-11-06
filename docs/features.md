@@ -1,3 +1,7 @@
+---
+title: "Features"
+---
+
 # Features
 
 Everything Inboxrake can do, in one list. The [README](../README.md) has
