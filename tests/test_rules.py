@@ -221,6 +221,78 @@ def test_run_errors_are_recorded(bridge):
     assert saved["last_run"]["error"]
 
 
+def _armed_rule(**over):
+    rule = rulesmod.create_rule({
+        "name": "shipping", "grouping": "sender", "query": "tag:shipping",
+        "action": "trash", **over})
+    rulesmod.run_rule(rule["id"])
+    return rulesmod.update_rule(rule["id"], {"mode": "execute"})
+
+
+@pytest.mark.parametrize("edit", [
+    {"query": ""}, {"query": "tag:shipping age:>30d"},
+    {"grouping": "domain"}, {"action": "mark_read"},
+    {"action": "move", "dest": "Archive"},
+    {"keep_latest": 2}, {"older_than_days": 30}])
+def test_editing_a_definition_field_sends_armed_mail_rule_back(bridge, edit):
+    rule = _armed_rule()
+    assert rule["mode"] == "execute"
+    edited = rulesmod.update_rule(rule["id"], edit)
+    assert edited["mode"] == "report"
+    assert edited["report_runs"] == 0 and edited["reset_reason"] == "edited"
+    with pytest.raises(ValueError, match=mailops.RULE_REPORT_FIRST):
+        rulesmod.update_rule(rule["id"], {"mode": "execute"})
+    # a report run of the NEW definition arms it again
+    rulesmod.run_rule(rule["id"], rescan=False)
+    again = rulesmod.update_rule(rule["id"], {"mode": "execute"})
+    assert again["mode"] == "execute" and again["reset_reason"] == ""
+
+
+def test_editing_the_account_sends_armed_mail_rule_back(bridge):
+    rule = _armed_rule()
+    stored = rulesmod.load_rules()
+    stored[0]["report_box"] = "someotherbox"      # another mailbox behind it
+    rulesmod._save(stored)
+    again = rulesmod.load_rules()[0]
+    assert again["mode"] == "report" and again["reset_reason"] == "account"
+    assert rule["id"] == again["id"]
+
+
+@pytest.mark.parametrize("edit", [
+    {"name": "renamed"}, {"schedule": "daily"}, {"query": "tag:shipping"}])
+def test_non_definition_edits_keep_a_mail_rule_armed(bridge, edit):
+    rule = _armed_rule()
+    edited = rulesmod.update_rule(rule["id"], edit)
+    assert edited["mode"] == "execute" and edited["report_runs"] == 1
+
+
+def test_execute_refused_without_a_report_of_the_current_definition(
+        bridge, monkeypatch):
+    rule = _armed_rule()
+    monkeypatch.setattr(rulesmod, "_normalise", lambda r: None)
+    stored = rulesmod.load_rules()
+    stored[0]["query"] = ""                 # edited behind the API's back
+    rulesmod._save(stored)
+    assert rulesmod.load_rules()[0]["mode"] == "execute"
+    with pytest.raises(RuntimeError, match=mailops.RULE_REPORT_FIRST):
+        rulesmod.run_rule(rule["id"], rescan=False)
+    assert "alice@friends.example" in mailops.STATE["groups"]["sender"]
+    assert not mailops.UNDO_LOG
+
+
+def test_pre_binding_mail_rule_file_keeps_its_mode(bridge):
+    import json
+    rule = _armed_rule()
+    stored = rulesmod.load_rules()
+    for k in ("report_sig", "report_box", "report_at", "reset_reason"):
+        stored[0].pop(k)
+    rulesmod._path().write_text(json.dumps({"rules": stored}))
+    loaded = rulesmod.load_rules()[0]
+    assert loaded["mode"] == "execute" and rulesmod.purge_armed(loaded)
+    rulesmod.update_rule(rule["id"], {"query": ""})
+    assert rulesmod.load_rules()[0]["mode"] == "report"
+
+
 # -------------------------------------------------------------- scheduling
 
 def test_due_logic():

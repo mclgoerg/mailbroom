@@ -339,18 +339,20 @@ def box_sig(rule: dict) -> str:
 
 
 def purge_armed(rule: dict) -> bool:
-    """A purge rule may execute only after a report run of its CURRENT
-    definition, on the same mailbox, with the folder(s) that report was
-    computed on on record (the report-first gate, bound to what was
-    previewed; the folders themselves are re-checked at every run)."""
+    """A rule may execute only after a report run of its CURRENT
+    definition, on the same mailbox (the report-first gate, bound to what
+    was previewed). A purge rule also needs the folder(s) that report was
+    computed on on record; the folders themselves are re-checked at every
+    run."""
     return rule.get("report_runs", 0) >= 1 \
-        and bool(rule.get("report_at")) \
+        and (rule.get("scope", "mail") == "mail"
+             or bool(rule.get("report_at"))) \
         and rule.get("report_sig") == definition_sig(rule) \
         and rule.get("report_box") == box_sig(rule)
 
 
 def _reset_to_report(rule: dict, reason: str) -> None:
-    """Send a purge rule back to report mode: no report on record, so the
+    """Send a rule back to report mode: no report on record, so the
     next execute needs a fresh one."""
     rule["mode"] = "report"
     rule["report_runs"] = 0
@@ -397,14 +399,23 @@ def _normalise(r: dict) -> None:
     r.setdefault("older_than_days", None)
     r.setdefault("origin", "manual")     # tolerate pre-block rules.json
     r.setdefault("scope", "mail")        # tolerate pre-purge rules.json
+    r.setdefault("report_at", None)
+    r.setdefault("reset_reason", "")
     if r["scope"] == "mail":
+        if "report_sig" not in r:
+            # a rules.json from before mail rules were bound to their report:
+            # the rule keeps running what it already runs; any later edit
+            # re-arms it
+            r["report_sig"], r["report_box"] = definition_sig(r), box_sig(r)
+        elif r.get("mode") == "execute" and not purge_armed(r):
+            _reset_to_report(
+                r, "account" if r.get("report_sig") == definition_sig(r)
+                and r.get("report_box") != box_sig(r) else "edited")
         return
     # A purge rule can never carry an ordinary action, and never executes
     # without a report run of its current definition on this mailbox -
     # whatever the file (a hand edit, a restored backup, a renamed or
     # re-created account) claims.
-    r.setdefault("report_at", None)
-    r.setdefault("reset_reason", "")
     if r.get("action") != PURGE_ACTION:
         r["action"] = PURGE_ACTION
         r["report_sig"] = ""
@@ -460,7 +471,6 @@ def publish() -> None:
 
 
 def _validate(body: dict, rule: dict) -> dict:
-    was_purge = rule.get("scope", "mail") in PURGE_SCOPES
     before, before_box = definition_sig(rule), box_sig(rule)
     if "name" in body:
         rule["name"] = str(body["name"]).strip()[:80]
@@ -538,8 +548,7 @@ def _validate(body: dict, rule: dict) -> dict:
         raise ValueError("bad action")       # e.g. a purge rule moved to mail
     elif rule["action"] == "move" and not rule["dest"]:
         raise ValueError("move needs a target folder")
-    if (purge or was_purge) and (definition_sig(rule) != before
-                                 or box_sig(rule) != before_box):
+    if definition_sig(rule) != before or box_sig(rule) != before_box:
         # What was previewed is what runs: a changed definition (or another
         # account) starts over in report mode, with no report run on record.
         _reset_to_report(rule, "edited" if definition_sig(rule) != before
@@ -547,11 +556,9 @@ def _validate(body: dict, rule: dict) -> dict:
     if "mode" in body:
         if body["mode"] not in ("report", "execute"):
             raise ValueError("bad mode")
-        # Safety: a rule must have produced at least one report before it
-        # may act on its own - a purge rule one of its current definition.
-        if body["mode"] == "execute" and (
-                rule.get("report_runs", 0) < 1
-                or (purge and not purge_armed(rule))):
+        # Safety: a rule must have produced a report of its CURRENT
+        # definition before it may act on its own.
+        if body["mode"] == "execute" and not purge_armed(rule):
             raise ValueError(mailops.RULE_REPORT_FIRST)
         rule["mode"] = body["mode"]
     return rule
@@ -645,14 +652,13 @@ def _record_run(rule_id: str, result: dict) -> None:
         rule["last_run"] = result
         if result.get("mode") == "report" and not result.get("error"):
             rule["report_runs"] = rule.get("report_runs", 0) + 1
-            if rule.get("scope", "mail") in PURGE_SCOPES:
-                # the definition, mailbox and folder(s) this report
-                # previewed (see purge_armed): a run that started before an
-                # edit must not arm the edit
-                rule["report_sig"] = sig or definition_sig(rule)
-                rule["report_box"] = box or box_sig(rule)
-                rule["report_at"] = at
-                rule["reset_reason"] = ""
+            # the definition, mailbox and (purge rules) folder(s) this
+            # report previewed (see purge_armed): a run that started before
+            # an edit must not arm the edit
+            rule["report_sig"] = sig or definition_sig(rule)
+            rule["report_box"] = box or box_sig(rule)
+            rule["report_at"] = at
+            rule["reset_reason"] = ""
         _save(rules)
     auditlog.record(
         f"rule_{result.get('mode', 'report')}", actor=f"rule:{rule_id}",
@@ -697,6 +703,9 @@ def run_rule(rule_id: str, rescan: bool = True) -> dict:
         if rule.get("scope", "mail") != "mail":
             _run_purge(rule, acc, result)
             return _finish_run(rule_id, result)
+        result["sig"], result["box"] = definition_sig(rule), box_sig(rule)
+        if rule["mode"] == "execute" and not purge_armed(rule):
+            raise RuntimeError(mailops.RULE_REPORT_FIRST)
         with acc.lock:
             scan_ok = acc.state["status"] == "done"
         if rescan or not scan_ok:

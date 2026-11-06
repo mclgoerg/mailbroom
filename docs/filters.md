@@ -68,7 +68,9 @@ that you mostly never opened.
 
 A saved rule is a filter plus an action and a schedule (manual, daily,
 weekly). Rules always start in **report mode** - a run only records what
-would happen - and every run is capped (`RULE_CAP`, default 500 mails).
+would happen - and editing a rule's filter, action, target, retention
+or account sends it back to report mode (it needs one report run of the
+new definition before it acts again). Every run is capped (`RULE_CAP`, default 500 mails).
 Executed trash actions are normal reversible moves.
 
 **Purge rules** are the only irreversible kind: they permanently delete
