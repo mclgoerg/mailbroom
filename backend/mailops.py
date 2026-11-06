@@ -3417,18 +3417,7 @@ def _usable_msgid(msgid: str) -> bool:
     return bool(at and local.strip() and domain.strip())
 
 
-def duplicates_list(limit: int = 200, acc=None) -> list[dict]:
-    """Duplicate sets from the scanned index: the same Message-ID anywhere,
-    or - only among mails WITHOUT a usable Message-ID (see _usable_msgid) -
-    the same exact (stored id, sender, subject, size): id-less mails pair
-    with each other, a malformed id only with the identical one. A mail with
-    its own usable Message-ID is never paired by the tuple: two statements
-    with the same sender, subject and size but different ids are two mails. Newest
-    mail first inside each set; 'wasted' is what deleting all but the newest
-    would free."""
-    acc = acc or accounts.get()
-    with acc.lock:
-        mails = list(acc.index.values())
+def _exact_dup_sets(mails: list[dict]) -> list[list[dict]]:
     by_msgid: dict[str, list] = {}
     for m in mails:
         if _usable_msgid(m["msgid"]):
@@ -3443,8 +3432,10 @@ def duplicates_list(limit: int = 200, acc=None) -> list[dict]:
         # only when sender, subject and size match too; "" = id-less.
         by_tuple.setdefault((m["msgid"] or "", m["addr"], m["subject"],
                              m["size"]), []).append(m)
-    sets += [v for v in by_tuple.values() if len(v) > 1]
+    return sets + [v for v in by_tuple.values() if len(v) > 1]
 
+
+def _dup_payload(sets: list[list[dict]], limit: int) -> list[dict]:
     out = []
     for s in sets:
         s = sorted(s, key=lambda m: -m["ts"])
@@ -3457,6 +3448,55 @@ def duplicates_list(limit: int = 200, acc=None) -> list[dict]:
                       for m in s]})
     out.sort(key=lambda x: -x["wasted"])
     return out[:limit]
+
+
+def duplicates_list(limit: int = 200, acc=None) -> list[dict]:
+    """Duplicate sets from the scanned index: the same Message-ID anywhere,
+    or - only among mails WITHOUT a usable Message-ID (see _usable_msgid) -
+    the same exact (stored id, sender, subject, size): id-less mails pair
+    with each other, a malformed id only with the identical one. A mail with
+    its own usable Message-ID is never paired by the tuple: two statements
+    with the same sender, subject and size but different ids are two mails. Newest
+    mail first inside each set; 'wasted' is what deleting all but the newest
+    would free."""
+    acc = acc or accounts.get()
+    with acc.lock:
+        mails = list(acc.index.values())
+    return _dup_payload(_exact_dup_sets(mails), limit)
+
+
+POSSIBLE_DUP_WINDOW = 600       # seconds: "sent twice within minutes"
+
+
+def possible_duplicates_list(limit: int = 200, acc=None) -> list[dict]:
+    """Likely double-sends that are NOT exact duplicates (different
+    Message-IDs): the same sender address and the same subject (whitespace
+    collapsed, case-insensitive, non-empty), each mail within 10 minutes of
+    another in its group (chained by time). Mails already in an exact
+    duplicate set are left out. Same shape as duplicates_list; the UI never
+    auto-selects these - the user compares and decides."""
+    acc = acc or accounts.get()
+    with acc.lock:
+        mails = list(acc.index.values())
+    exact = {id(m) for s in _exact_dup_sets(mails) for m in s}
+    by_key: dict[tuple, list] = {}
+    for m in mails:
+        subject = " ".join((m["subject"] or "").split()).casefold()
+        if id(m) in exact or not subject or not m["ts"] or not m["addr"]:
+            continue
+        by_key.setdefault((m["addr"], subject), []).append(m)
+    sets: list[list[dict]] = []
+    for group in by_key.values():
+        group.sort(key=lambda m: m["ts"])
+        run = [group[0]]
+        for m in group[1:] + [None]:
+            if m is not None and m["ts"] - run[-1]["ts"] <= POSSIBLE_DUP_WINDOW:
+                run.append(m)
+                continue
+            if len(run) > 1:
+                sets.append(run)
+            run = [m] if m is not None else []
+    return _dup_payload(sets, limit)
 
 
 # ----------------------------------------------------------- undo & trash
