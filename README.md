@@ -11,7 +11,7 @@ piles: it scans everything, groups mails by sender, subject or thread with
 counts and sizes, and lets you trash, unsubscribe from or block whole
 groups at once. Optional AI review (Anthropic, OpenAI, Claude on Microsoft
 Foundry, or local models via Ollama, LM Studio or vLLM) suggests what is
-safe to delete. *(Formerly Mailbroom.)*
+safe to delete.
 
 **[Website](https://inboxrake.com)** · **[Documentation](https://inboxrake.com/docs/)** · **[Try it in your browser](https://inboxrake.com/demo/)**
 

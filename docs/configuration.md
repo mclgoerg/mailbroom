@@ -22,7 +22,6 @@ file ([`deploy/.env.example`](../deploy/.env.example)) or pass them with
 | `INBOXRAKE_BIND` | `127.0.0.1` | Read by the starter compose file only (not by the app): the host address the port is published on. Use `0.0.0.0` only after setting a login. |
 | `INBOXRAKE_PORT` | `8765` | Read by the starter compose file only: the host port. |
 
-**Former name.** Inboxrake was formerly Mailbroom, and settings under the formerly Mailbroom `MAILBROOM_*` names still work: where the matching `INBOXRAKE_*` one is unset or blank, its value is used, and a startup log line suggests the rename. The starter compose file no longer reads the formerly Mailbroom pair `MAILBROOM_BIND` / `MAILBROOM_PORT`.
 
 ## First mail account (headless setups)
 
