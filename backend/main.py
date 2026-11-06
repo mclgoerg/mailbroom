@@ -373,7 +373,7 @@ async def post_login(body: LoginBody, request: Request):
     if cfg["auth"]["mode"] != "password":
         raise HTTPException(400, "password login is not enabled")
     peer = request.client.host if request.client else "?"
-    wait = authmod.login_throttle.retry_after(peer)
+    wait = authmod.login_throttle.attempt(peer)   # counts it, before the hash
     if wait:
         # No hash check at all: even the right password waits its turn.
         logging.getLogger("inboxrake.auth").warning(
@@ -384,7 +384,6 @@ async def post_login(body: LoginBody, request: Request):
     # scrypt takes ~100 ms of CPU: keep it off the event loop.
     if not await run_in_threadpool(authmod.verify_password, body.password,
                                    cfg["auth"]["password_hash"]):
-        authmod.login_throttle.failed(peer)
         logging.getLogger("inboxrake.auth").warning("failed login from %s", peer)
         await asyncio.sleep(0.5)          # soften brute force
         raise HTTPException(401, "wrong password")
@@ -588,7 +587,11 @@ def post_oauth_imap_device_poll(account: str = Query(...),
         logging.getLogger("inboxrake.oauth").info(
             "IMAP OAuth connected: account=%r provider=microsoft (device "
             "code)", account)
-    return result
+    # The tokens stay on the server: the browser only learns the outcome.
+    out = {"status": result["status"]}
+    if result.get("error"):
+        out["error"] = result["error"]
+    return out
 
 
 @app.post("/api/oauth/imap/disconnect")
@@ -1249,6 +1252,8 @@ def post_block(body: BlockBody, account: str | None = Query(None)):
     report pass and then switches the fresh rule straight to execute."""
     if body.grouping not in ("sender", "domain"):
         raise HTTPException(400, "bad grouping")
+    if not mailops.valid_block_key(body.grouping, body.key):
+        raise HTTPException(400, mailops.coded(mailops.BLOCK_KEY_INVALID))
     acc = _acc(account)
     check_addr = body.key if body.grouping == "sender" else f"@{body.key}"
     plist = cfgmod.normalize_protected(cfgmod.load_config().get("protected"))
@@ -1551,6 +1556,7 @@ def post_test_connection(account: str | None = Query(None)):
         text = mailops.error_text(exc, im["host"])
         raise HTTPException(502, text if mailops.is_coded(text)
                             else mailops.coded(mailops.CONNECT_FAILED))
+    cfgmod.mark_verified(acc.name)
     return {"ok": True, "folders": n}
 
 
@@ -1749,6 +1755,7 @@ def post_import_config(body: dict):
     mailops.rebuild_smart_all()
 
     nrules = 0
+    skipped_rules: list[str] = []
     if isinstance(body.get("rules"), list):
         for r in rulesmod.load_rules():
             rulesmod.delete_rule(r["id"])
@@ -1756,10 +1763,13 @@ def post_import_config(body: dict):
             if not isinstance(r, dict):
                 continue
             try:
-                rulesmod.create_rule(r)      # always lands in report mode
+                # always lands in report mode; a filter with mistyped parts
+                # (a backup of a flagged rule) comes in flagged, its execute
+                # runs blocked
+                rulesmod.create_rule(r, lenient_filter=True)
                 nrules += 1
             except ValueError:
-                pass
+                skipped_rules.append(str(r.get("name") or "?")[:80])
 
     def _import_groupings(entries: dict, account: str | None) -> int:
         n = 0
@@ -1816,7 +1826,8 @@ def post_import_config(body: dict):
         "%d unsubscribed senders, %d knowledge entries", nrules, nverdicts,
         nreplied, nunsub, nknowledge)
     return {"ok": True, "rules": nrules, "verdicts": nverdicts,
-            "replied": nreplied, "unsub": nunsub, "knowledge": nknowledge}
+            "replied": nreplied, "unsub": nunsub, "knowledge": nknowledge,
+            "skipped_rules": skipped_rules}
 
 
 @app.get("/api/events")

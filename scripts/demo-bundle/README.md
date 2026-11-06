@@ -8,10 +8,25 @@ a Web Worker) loads. Dev-only tooling: nothing here ships in the app image.
     node smoke.mjs dist            # boots the bundle in Pyodide, Trash + Undo
 
 `build.mjs` prints a per-file size table and exits 1 above the budget (10 MB
-estimated on the wire: brotli for wasm/js/html/json, zips and wheels as they
-are). CI (`.github/workflows/demo-bundle.yml`) runs both on PRs that touch the
-bundle's inputs, builds twice to prove the output is reproducible, and
-uploads the result as an artifact.
+estimated on the wire: brotli q9 for wasm/js/css/html/json, zips and wheels as
+they are). Pass `--ui ../../frontend/dist-demo` to count the demo UI build
+(page, scripts, worker) too: the budget is for the whole first visit, and CI
+does. The headroom is small (about 0.25 MB), and the figure assumes brotli
+level 9; check the real on-the-wire sizes once the site is live (Cloudflare may
+compress at a lower level).
+
+CI (`.github/workflows/demo-bundle.yml`) runs on every PR that touches
+backend, frontend, tests or the demo scripts, and on `main`/tags:
+
+- the backend test suite on Pyodide's Python and package versions
+  (`pyodide-pins.mjs` reads them from the pinned Pyodide's lockfile, and
+  checks `backend/requirements.in` for packages Pyodide lacks),
+- this build with the size budget, twice, to prove it is reproducible,
+- `smoke.mjs` and the headless-browser run in `../demo-e2e/`
+  (page + worker + bundle in Chromium: boot, first `/api/state`, Trash and
+  Undo through the UI, scan/delete/undo over the API; about 25 s),
+
+and uploads the bundle as an artifact.
 
 ## What comes out
 

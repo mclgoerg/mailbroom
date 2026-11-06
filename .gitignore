@@ -9,3 +9,6 @@ __pycache__/
 .env
 config.json
 ai_usage.json
+test-results/
+site-dist/
+website/.wrangler/

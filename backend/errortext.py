@@ -120,6 +120,14 @@ TEXT: dict[str, str | tuple[str, str]] = {
         'This filter is not available for Junk and Trash rules: {names}',
     'rule_purge_filter_domain':
         'This filter is not available for Junk and Trash rules: {names} (it never matches senders - use plain text such as the domain name).',
+    'rule_filter_invalid':
+        'This filter has parts Inboxrake doesn\'t understand: {names}',
+    'rule_filter_invalid_run':
+        'The filter has parts Inboxrake doesn\'t understand: {names} - edit the rule. Its execute runs are skipped until then.',
+    'rule_filter_too_long':
+        'This filter is too long (more than {max} characters).',
+    'block_key_invalid':
+        'This sender or domain cannot be blocked: it is not a plain address or domain name.',
     'no_account':
         'No mail account is set up yet - open Settings and fill in the sign-in details first.',
     'cafile_missing':

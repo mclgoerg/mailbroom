@@ -137,6 +137,8 @@ export function Wizard({ cfg, mode, initialStep, initialAccount, scan,
       const name = await saveSignIn();
       if (!name) return;
       const r = await api.testConnection(name);
+      // the account now counts as set up: pick that up for the home card
+      try { onConfig(await api.getConfig(), null); } catch { /* next load */ }
       setTested(true);
       setConnected(r.folders);
       setStep("folders");
@@ -544,7 +546,8 @@ export function Wizard({ cfg, mode, initialStep, initialAccount, scan,
             <Field label={t("oauth.client_secret")}>
               <Input className="w-full" type="password" value={f.clientSecret}
                 placeholder={saved?.oauth?.client_secret_set
-                  ? t("(unchanged)") : t("required")}
+                  ? t("(unchanged)")
+                  : t(oauthProvider === "microsoft" ? "optional" : "required")}
                 onChange={set("clientSecret")} />
             </Field>
           </div>

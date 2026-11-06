@@ -2,6 +2,8 @@
 import { cleanup, fireEvent, render } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { GroupTable, localizedSub } from "./components/GroupTable";
+import { ToastProvider } from "./components/ui";
+import { setDemo } from "./demoMode";
 import { setLang } from "./i18n";
 import type { Group } from "./types";
 
@@ -109,6 +111,38 @@ describe("unsubscribe badge", () => {
     expect(links[0].href).toBe("https://x.example/unsub");
     fireEvent.click(getAllByTitle("Mark as done")[0]);
     expect(onAckUnsub).toHaveBeenCalledWith("news@x.example");
+  });
+
+  it("in the demo the Confirm badge opens nothing and shows the hint",
+    () => {
+    const open = vi.fn();
+    vi.stubGlobal("open", open);
+    setDemo(true);
+    try {
+      const { container, getAllByText, getByText } = render(
+        <ToastProvider><GroupTable groups={withUnsub({ n: 0, of: 1,
+          status: "link", link: "https://unsub.example/u",
+          addr: "news@x.example" })} selected={new Set()} focusedKey={null}
+          onToggle={noop} onToggleAll={noop} onOpen={noop}
+          onAckUnsub={noop} sortK="count" sortDir={-1} onSort={noop}
+          groupLabel="Sender" resetSignal="a" /></ToastProvider>);
+      expect(container.querySelector('a[href*="unsub.example"]')).toBeNull();
+      expect(container.querySelector('a[target="_blank"]')).toBeNull();
+      fireEvent.click(getAllByText(/Confirm/)[0]);
+      expect(open).not.toHaveBeenCalled();
+      getByText("In your own install this opens the sender's unsubscribe page.");
+    } finally {
+      setDemo(false);
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it("outside the demo the Confirm badge stays a new-tab link", () => {
+    const { container } = renderTable({ groups: withUnsub({ n: 0, of: 1,
+      status: "link", link: "https://x.example/unsub", addr: "n@x.example" }) });
+    const a = container.querySelector(
+      'a[href="https://x.example/unsub"]') as HTMLAnchorElement;
+    expect(a.target).toBe("_blank");
   });
 
   it("shows a partial-progress badge without claiming full completion",

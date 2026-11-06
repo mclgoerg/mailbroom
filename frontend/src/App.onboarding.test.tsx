@@ -181,3 +181,34 @@ test("the profile menu's Add account opens the wizard, even with a single " +
   fireEvent.click(await screen.findByText(/Add account/));
   expect(await screen.findByText(/Where does your mail live/)).toBeTruthy();
 });
+
+test("an account whose connection was never confirmed shows a setup card, " +
+  "not 'Ready for the first scan'; Continue setup reopens the sign-in step",
+  async () => {
+    sessionStorage.clear();
+    await openRaw(mkCfg({ password_set: true, verified: false }));
+    expect(await screen.findByText("Finish setting up me@mail.example"))
+      .toBeTruthy();
+    expect(screen.queryByText(/Ready for the first scan/)).toBeNull();
+    expect(screen.queryByRole("button", { name: "Test connection" })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Continue setup" }));
+    expect(await screen.findByRole("button", { name: "Test connection" }))
+      .toBeTruthy();
+    expect(screen.queryByText(/Where does your mail live/)).toBeNull();
+  });
+
+test("the setup card falls back to the account name without an address",
+  async () => {
+    sessionStorage.clear();
+    await openRaw(mkCfg({ password_set: true, verified: false, user: "" }));
+    expect(await screen.findByText("Finish setting up proton")).toBeTruthy();
+  });
+
+test("a verified account (or an older backend without the flag) gets the " +
+  "normal first-scan card", async () => {
+  await open({ password_set: true, verified: true });
+  expect(screen.queryByText(/Finish setting up/)).toBeNull();
+  cleanup();
+  await open({ password_set: true });
+  expect(screen.queryByText(/Finish setting up/)).toBeNull();
+});

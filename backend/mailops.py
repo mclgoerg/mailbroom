@@ -138,6 +138,12 @@ RULE_PURGE_KEEP_LATEST = "rule_purge_keep_latest"
 RULE_PURGE_NEEDS_AGE = "rule_purge_needs_age"
 RULE_PURGE_FILTER = "rule_purge_filter"                  # names=
 RULE_PURGE_FILTER_DOMAIN = "rule_purge_filter_domain"    # names=
+# a rule filter with parts the parsers would silently drop (all rules)
+RULE_FILTER_INVALID = "rule_filter_invalid"              # names=
+RULE_FILTER_INVALID_RUN = "rule_filter_invalid_run"      # names=
+RULE_FILTER_TOO_LONG = "rule_filter_too_long"            # max=
+# Block: the sender / domain key is not one plain address / hostname
+BLOCK_KEY_INVALID = "block_key_invalid"
 # a List-Unsubscribe mailto: that would not be one plain mail to one address
 MAILTO_UNSAFE = "mailto_unsafe"
 # connecting (first run): no account set up yet / the CA file is missing
@@ -217,6 +223,10 @@ FOLDER_ERROR_CODES = frozenset({
     RULE_PURGE_NEEDS_AGE,
     RULE_PURGE_FILTER,
     RULE_PURGE_FILTER_DOMAIN,
+    RULE_FILTER_INVALID,
+    RULE_FILTER_INVALID_RUN,
+    RULE_FILTER_TOO_LONG,
+    BLOCK_KEY_INVALID,
     NO_ACCOUNT,
     CAFILE_MISSING,
     AUTH_FAILED,
@@ -225,6 +235,41 @@ FOLDER_ERROR_CODES = frozenset({
     CONNECT_FAILED,
     SCAN_FAILED,
     DATA_NOT_WRITABLE})
+
+
+_KEY_BAD_CHARS = frozenset('"()<>,;:\\')
+_HOST_RE = re.compile(
+    r"[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?"
+    r"(\.[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)*")
+
+
+def _plain_host(host: str) -> bool:
+    """A hostname (an IDN is checked in its punycode form)."""
+    try:
+        ascii_host = host.encode("idna").decode("ascii")
+    except UnicodeError:              # empty / over-long label, bad IDN
+        return False
+    return len(ascii_host) <= 253 and _HOST_RE.fullmatch(ascii_host) is not None
+
+
+def valid_block_key(grouping: str, key: str) -> bool:
+    """Whether `key` is safe to splice into a `from:` / `domain:` filter: a
+    sender key is ONE address token, a domain key a plain hostname (Unicode
+    IDNs allowed); neither holds whitespace, quotes, brackets, `:` or
+    control characters, and both are <= 254 chars. Anything else could
+    smuggle a second qualifier into the rule (`from:` keeps the last one,
+    so it would widen it). The key itself is used as given: the match is
+    exact."""
+    if grouping not in ("sender", "domain") or not isinstance(key, str) \
+            or not key or len(key) > 254:
+        return False
+    if any(c.isspace() or not c.isprintable() or c in _KEY_BAD_CHARS
+           for c in key):
+        return False
+    if grouping == "domain":
+        return _plain_host(key)
+    local, at, host = key.partition("@")
+    return bool(local) and bool(at) and _plain_host(host)
 
 
 def coded(code: str, **params) -> str:
@@ -2313,6 +2358,10 @@ def run_scan(acc=None) -> None:
             except Exception:
                 log.exception("could not re-derive the smart rows after "
                               "the scan")
+            try:
+                cfgmod.mark_verified(acc.name)
+            except Exception:
+                log.exception("could not mark the account verified")
             log.info("[%s] scan done: %d folders, %d mails, %d senders, "
                      "%d replied-to addrs%s in %.1fs",
                      acc.name, len(folders), len(messages),
@@ -3325,10 +3374,97 @@ def _rescan_after_restore(acc, restored: int, key: str,
     return False
 
 
+def _search_message_id(conn, msgid: str) -> list[bytes]:
+    """UIDs in the selected folder whose Message-ID is exactly `msgid`.
+    The id is mail data (a sender-controlled header), so it is sent as an
+    escaped quoted string, or as a literal when it cannot be one (non-ASCII
+    ids try CHARSET UTF-8 first, then plain). An id the server cannot be
+    asked about (NUL) or refuses (BAD) finds nothing instead of failing the
+    caller: a BAD answer, or a NO that a control search shows to be about
+    this id, means "unsearchable id"; any other failure (server trouble,
+    the verification FETCH) raises so that undo keeps its entry for a
+    retry. IMAP HEADER search
+    is a case-insensitive SUBSTRING match, so the hits are verified against
+    their fetched Message-ID header: `@` must not match every mail, nor
+    `bank.example` its neighbours."""
+    if "\0" in msgid:
+        return []
+    quoted = _quoted_id(msgid)
+    tries = [()] if msgid.isascii() else [("CHARSET", "UTF-8"), ()]
+    hits: list[bytes] = []
+    refused = False          # BAD for an id the server cannot parse
+    for charset in tries:
+        try:
+            if quoted is None:
+                conn.literal = msgid.encode("utf-8")
+                st, data = conn.uid("SEARCH", *charset, "HEADER",
+                                    "Message-ID")
+            else:
+                st, data = conn.uid("SEARCH", None, *charset, "HEADER",
+                                    "Message-ID", quoted)
+        except imaplib.IMAP4.abort:
+            raise
+        except imaplib.IMAP4.error:
+            refused = True
+            continue
+        finally:
+            conn.literal = None
+        refused = False
+        if st == "OK":
+            hits = data[0].split() if data and data[0] else []
+            break
+        if charset == tries[-1]:
+            # NO may come from the id itself (RFC 3501: "can't search that
+            # [CHARSET] or criteria") or from a server in trouble: a
+            # control search tells them apart.
+            if _search_control_ok(conn):
+                return []
+            raise imaplib.IMAP4.error(f"SEARCH failed: {st}")
+    if refused:
+        return []
+    return _exact_message_id_hits(conn, hits, msgid)
+
+
+def _search_control_ok(conn) -> bool:
+    """Does the server answer a plain Message-ID search for a harmless id?
+    False means it is the server (not one odd id) that is failing."""
+    try:
+        st, _ = conn.uid("SEARCH", None, "HEADER", "Message-ID",
+                         '"<probe@inboxrake.invalid>"')
+    except imaplib.IMAP4.abort:
+        raise
+    except imaplib.IMAP4.error:
+        return False
+    return st == "OK"
+
+
+def _exact_message_id_hits(conn, uids: list[bytes], msgid: str) -> list[bytes]:
+    """The `uids` whose Message-ID header equals `msgid`, normalised the
+    way scans store it (`header_text(...).strip()[:300]`)."""
+    exact: list[bytes] = []
+    for start in range(0, len(uids), MOVE_CHUNK):
+        chunk = uids[start:start + MOVE_CHUNK]
+        st, data = conn.uid(
+            "FETCH", b",".join(chunk).decode(),
+            "(UID BODY.PEEK[HEADER.FIELDS (MESSAGE-ID)])")
+        if st != "OK":      # the UIDs are ours, so this is a server problem
+            raise imaplib.IMAP4.error(f"FETCH failed: {st}")
+        for item in data or []:
+            if not (isinstance(item, tuple) and len(item) >= 2):
+                continue
+            um = re.search(rb"UID (\d+)", item[0])
+            mid = header_text(email.message_from_bytes(item[1]).get(
+                "Message-ID")).strip()[:300]
+            if um and mid == msgid:
+                exact.append(um.group(1))
+    return exact
+
+
 def _present_in_targets(conn, items) -> set[tuple[str, str]]:
     """The (folder, Message-ID) pairs of an undo entry whose mail already
     sits in its target folder (read-only look; a folder that cannot be
-    opened or searched counts as holding nothing)."""
+    opened counts as holding nothing; an id the server refuses to search is
+    skipped, any other search failure raises)."""
     by_folder: dict[str, list[str]] = {}
     for folder, msgid in items:
         if msgid:
@@ -3339,9 +3475,7 @@ def _present_in_targets(conn, items) -> set[tuple[str, str]]:
         if status != "OK":
             continue
         for msgid in msgids:
-            status, data = conn.uid("SEARCH", None, "HEADER", "Message-ID",
-                                    f'"{msgid}"')
-            if status == "OK" and data and data[0]:
+            if _search_message_id(conn, msgid):
                 present.add((folder, msgid))
     return present
 
@@ -3406,10 +3540,9 @@ def undo_last(index: int = -1, acc=None, ident: dict | None = None) -> dict:
         for folder, msgid in entry["items"]:
             if not msgid or (folder, msgid) in present:
                 continue
-            status, data = conn.uid("SEARCH", None, "HEADER", "Message-ID",
-                                    f'"{msgid}"')
-            if status == "OK" and data and data[0]:
-                by_target.setdefault(folder, []).extend(data[0].split())
+            found = _search_message_id(conn, msgid)
+            if found:
+                by_target.setdefault(folder, []).extend(found)
         for folder, uids in by_target.items():
             for start in range(0, len(uids), MOVE_CHUNK):
                 chunk = uids[start:start + MOVE_CHUNK]
@@ -3487,6 +3620,10 @@ ROLE_LABELS = {"trash": "Trash", "junk": "Junk"}
 ROLE_COUNTED = {"trash": "trash_count", "junk": "junk_count"}
 
 
+def _valid_in_since(v) -> bool:
+    return isinstance(v, (int, float)) and not isinstance(v, bool) and v > 0
+
+
 def refresh_role_index(conn, role: str, folder: str,
                        acc=None) -> tuple[int, list[dict]]:
     """Bring the `role` index up to date with `folder` on the server and
@@ -3510,7 +3647,14 @@ def refresh_role_index(conn, role: str, folder: str,
     messages: list = []
     scan_folder(conn, folder, messages, lambda *a: None, acc,
                 index=cache, uv=uv)
-    fresh = {ikey(m["folder"], m["uid"]): m for m in messages}
+    # "first seen in this folder" (`in_since`): a record that has none - new
+    # to the index, a UIDVALIDITY rebuild, an older snapshot - starts NOW,
+    # never earlier (purge rules wait N days from here, not from the date
+    # the mail was received)
+    seen_now = time.time()
+    fresh = {ikey(m["folder"], m["uid"]):
+             m if _valid_in_since(m.get("in_since"))
+             else {**m, "in_since": seen_now} for m in messages}
     new_uv = {folder: uv.get(folder, 0)}
     with acc.lock:
         changed = fresh != old or new_uv != old_uv
@@ -3518,7 +3662,7 @@ def refresh_role_index(conn, role: str, folder: str,
         acc.role_uv[role] = new_uv
     if changed:                  # persist only when something moved
         save_snapshot(acc)
-    return new_uv[folder], messages
+    return new_uv[folder], list(fresh.values())
 
 
 def role_state(role: str, folder: str, acc=None) -> tuple[int, list[dict]]:
@@ -4222,7 +4366,8 @@ def _purge_split(mails: list[dict], wanted, acc):
 
 def purge_preview(role: str, *, uids=None, senders=None,
                   older_than_days: int | None = None,
-                  everything: bool = False, match=None, acc=None) -> dict:
+                  everything: bool = False, match=None,
+                  in_folder_days: int | None = None, acc=None) -> dict:
     """The live count a permanent deletion of `role` would act on - read
     from a fresh listing of the server (never the cache), selected by
     exactly one of: `uids` (a selection), `senders` (every mail of those
@@ -4233,7 +4378,10 @@ def purge_preview(role: str, *, uids=None, senders=None,
     was read from; the confirm sends all of it back to `purge_mails`, which
     refuses when the role resolves to another folder now. `match` (purge
     rules) narrows the selection further: it gets the whole fresh listing
-    and returns the UIDs it accepts. Deletes nothing."""
+    and returns the UIDs it accepts. `in_folder_days` (purge rules) keeps only
+    mails Inboxrake has seen in the folder for at least that many days
+    (`in_since` of the role index; no or an invalid value = just seen), on
+    top of the selection. Deletes nothing."""
     acc = acc or accounts.get()
     if role not in PURGE_ROLES:
         raise ValueError("bad role")
@@ -4265,6 +4413,11 @@ def purge_preview(role: str, *, uids=None, senders=None,
         wanted = {m["uid"] for m in mails}
     if match is not None:
         wanted &= {int(u) for u in match(mails)}
+    if in_folder_days is not None:
+        since = time.time() - int(in_folder_days) * 86400
+        wanted &= {m["uid"] for m in mails
+                   if _valid_in_since(m.get("in_since"))
+                   and m["in_since"] <= since}
     keep, protected, pinned, _ = _purge_split(mails, wanted, acc)
     key = ROLE_COUNTED[role]
     with acc.lock:

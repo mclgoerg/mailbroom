@@ -341,6 +341,9 @@ export interface Rule {
   /** Purge rules: why an armed rule went back to report mode (shown on the
    *  card). */
   reset_reason?: "" | "edited" | "account" | "folder";
+  /** Parts of the filter Inboxrake does not understand (a rule saved before
+   *  filters were validated); its execute runs are skipped. */
+  filter_invalid?: string[];
   created: number;
   last_run: RuleRun | null;
 }
@@ -581,6 +584,9 @@ export interface ImapAccount {
   user: string;
   password: string;
   password_set: boolean;
+  /** False until a connection test, an OAuth connect or a scan succeeded
+   *  for the saved sign-in; absent from older backends (= verified). */
+  verified?: boolean;
   cafile: string;
   preset: Preset;
   /** How the account signs in; absent from older backends (derive it with

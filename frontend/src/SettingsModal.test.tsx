@@ -444,6 +444,21 @@ test("Export and Import live in General > Backup & restore", async () => {
   vi.unstubAllGlobals();
 });
 
+test("an import names the rules it could not take", async () => {
+  vi.stubGlobal("fetch", vi.fn(() => Promise.resolve({ ok: true,
+    json: () => Promise.resolve({ rules: 1, verdicts: 0, skipped_rules:
+      ["Old rule", "Other"] }) })));
+  const { container } = renderWithDialogs({ onSaved: vi.fn() });
+  fireEvent.click(screen.getByRole("tab", { name: "General" }));
+  const input = container.querySelector('input[type="file"]') as HTMLInputElement;
+  fireEvent.change(input, { target: { files: [
+    new File(['{"rules":[]}'], "backup.json", { type: "application/json" })] } });
+  await findDialog();
+  await pressDialog("Import backup");
+  await screen.findByText(/Not imported: Old rule, Other\./);
+  vi.unstubAllGlobals();
+});
+
 test("resetting AI spend and clearing verdicts need a confirmation",
   async () => {
     saveCalls.length = 0;
@@ -1015,4 +1030,17 @@ test("German: the sign-in switch is translated", () => {
     onAccountsChanged={() => {}} />);
   expect(screen.getByRole("tab", { name: "App-Passwort" })).toBeTruthy();
   expect(screen.getByText("Anmeldeart", { selector: "div" })).toBeTruthy();
+});
+
+test("the client-secret placeholder is 'optional' for Outlook and " +
+  "'required' for Gmail", () => {
+  const secret = () => screen.getByLabelText("Client secret")
+    .getAttribute("placeholder");
+  render(<SettingsModal cfg={cfg} account="default" onClose={() => {}}
+    onSaved={() => {}} onAccountsChanged={() => {}} />);
+  fireEvent.change(presetSelect(), { target: { value: "outlook" } });
+  expect(secret()).toBe("optional");
+  fireEvent.change(presetSelect(), { target: { value: "gmail" } });
+  fireEvent.click(screen.getByRole("tab", { name: "OAuth" }));
+  expect(secret()).toBe("required");
 });

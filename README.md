@@ -13,9 +13,12 @@ groups at once. Optional AI review (Anthropic, OpenAI, Claude on Microsoft
 Foundry, or local models via Ollama, LM Studio or vLLM) suggests what is
 safe to delete. *(Formerly Mailbroom.)*
 
+**[Website](https://inboxrake.com)** · **[Documentation](https://inboxrake.com/docs/)** · **[Try it in your browser](https://inboxrake.com/demo/)**
+
 **Nothing is deleted without asking, and everything is undoable** - moves
-go to Trash with an Undo - **except** the explicit "delete permanently"
-actions in Trash and Junk, which confirm with exact counts first.
+go to Trash with an Undo - **except** permanent deletion in Trash and Junk:
+the manual "delete permanently" actions confirm with exact counts, and
+opt-in purge rules only act after you have reviewed a report run.
 
 ![The group list (dark theme): senders with mail counts, sizes, AI verdicts and quick filters](docs/screenshots/groups-dark.png)
 
@@ -30,8 +33,15 @@ Bridge, ... - see [providers](#supported-providers)).
 git clone https://github.com/mclgoerg/inboxrake
 cd inboxrake/deploy
 cp .env.example .env        # optional edits - account setup happens in the UI
+# generate the key that encrypts stored passwords (before the first start)
+sed -i "s|^INBOXRAKE_SECRET_KEY=.*|INBOXRAKE_SECRET_KEY=$(openssl rand -base64 32)|" .env
 docker compose up -d
 ```
+
+`INBOXRAKE_SECRET_KEY` encrypts the IMAP passwords and API keys stored in
+`/data`; without it they are stored as plaintext and every start logs a
+warning. Keep the key safe and out of your backups - if it is lost you
+re-enter the secrets.
 
 Open <http://localhost:8765>; on a fresh install a setup wizard walks you
 through provider, sign-in, folders, an optional login password and the first
@@ -41,20 +51,24 @@ Bridge image you provide - see its header).
 **Plain `docker run`** with the published image:
 
 ```bash
-docker run -d --name inboxrake \
+echo "INBOXRAKE_SECRET_KEY=$(openssl rand -base64 32)" > inboxrake.env   # once; keep it
+docker run -d --name inboxrake --env-file inboxrake.env \
   -v inboxrake_data:/data \
   -p 127.0.0.1:8765:8765 \
   ghcr.io/mclgoerg/inboxrake:latest
 ```
 
-Pin a minor tag such as `:2.0` if you do not want surprise upgrades.
+`:latest` follows `main` - every merge, so it can be ahead of the last
+release. Pin `:2.0` (or an exact `:2.0.x`) to get release updates only.
 Guides for Synology, Unraid, TrueNAS, Portainer and Raspberry Pi, the
 host-folder ownership note (the image runs as user ID 1000) and every
 environment variable are in **[docs/install.md](docs/install.md)**.
 
 ## Try the demo
 
-A playground on fake mailboxes - no account, no network:
+The quickest look is the [live demo in your browser](https://inboxrake.com/demo/)
+(fake mailboxes, nothing leaves the page). To run the same playground
+locally - no account, no network:
 
 ```bash
 git clone https://github.com/mclgoerg/inboxrake && cd inboxrake
@@ -87,12 +101,18 @@ All screenshots show generated demo data (`scripts/demo.py`).
 ## Safety & privacy FAQ
 
 **Does it delete anything without asking?** No. Trashing is an IMAP move to
-the Trash folder, always behind a confirmation that names how many mails
-are affected, with an Undo. UIDVALIDITY is checked before every move and
+the Trash folder, always behind a confirmation (with the count of mails; a
+single protected group or pinned mail asks "anyway?" naming it instead),
+with an Undo. UIDVALIDITY is checked before every move and
 scans are read-only. Permanent deletion exists only as explicit actions in
-Trash and Junk (manual, or an opt-in purge rule that starts in report
-mode); they show exact counts first, and protected senders and mails are
-never touched. Rules also start in report mode.
+Trash and Junk: the manual ones confirm with exact counts, and an opt-in
+purge rule only acts after you have reviewed a report run (then it runs on
+its schedule within its age limit and per-run cap). Rules and the
+Folders-panel purges always skip protected senders and pinned mails. Moving
+a protected group, or a single pinned mail, to Trash asks for an extra
+confirmation; individually selected mails from a protected sender are not
+checked. **Empty Trash empties everything in Trash**, protected or not.
+Rules also start in report mode.
 
 **What leaves my machine?** Nothing, unless you turn on AI review - and then
 only metadata (addresses, counts, subject lines), never mail bodies or
@@ -111,7 +131,8 @@ mailbox uses more while it runs). Images are published for amd64 and
 arm64 (e.g. Raspberry Pi 4/5).
 
 **Backup and uninstall?** Everything lives in the `/data` volume; Settings
--> General has a backup export (sign-in tokens are left out). Stop the
+-> General has a backup export (it leaves out all passwords, tokens and API keys - you
+re-enter them after a restore). Stop the
 container and delete the volume to remove it. Your mailbox is never
 modified by installing or removing Inboxrake.
 
@@ -120,6 +141,10 @@ localhost or behind an authenticating proxy, or enable the built-in password
 or SSO login. Without a login it also answers only to `localhost` and IP
 addresses; for a host name set `INBOXRAKE_ALLOWED_HOSTS`. Details in
 [docs/security.md](docs/security.md).
+
+More answers - why it needs your IMAP password, how it differs from other
+tools, project status, Undo limits - in the
+**[full FAQ](https://inboxrake.com/docs/faq/)**.
 
 ## Supported providers
 
@@ -130,9 +155,9 @@ security; you add user and password.
 
 | Preset | IMAP host | SMTP host (unsubscribe) | Auth notes |
 |---|---|---|---|
-| **Proton Mail Bridge** | `127.0.0.1:1143` SSL | `127.0.0.1:1025` | Featured setup, see below. Paid Proton plan; use the Bridge-generated password and the exported Bridge certificate as CA file. |
+| **Proton Mail Bridge** | `127.0.0.1:1143` SSL | `127.0.0.1:1025` | Featured setup: [`deploy/docker-compose.proton.yml`](deploy/docker-compose.proton.yml) and [Proton Mail via Bridge](https://inboxrake.com/docs/providers/#proton-mail-via-bridge). Paid Proton plan; use the Bridge-generated password and the exported Bridge certificate as CA file. |
 | **Gmail** | `imap.gmail.com:993` SSL | `smtp.gmail.com:465` SSL | App password (2-Step Verification on) or OAuth - choose in Settings; see below. |
-| **Outlook / Microsoft 365** | `outlook.office365.com:993` SSL | `smtp.office365.com:587` STARTTLS | OAuth only (Microsoft offers no app-password IMAP) - see below. |
+| **Outlook / Microsoft 365** | `outlook.office365.com:993` SSL | `smtp.office365.com:587` STARTTLS | OAuth only (Microsoft offers no app-password IMAP). **You register your own Entra app** (free, no shared client ships) - [steps](docs/install.md#microsoft-oauth-setup). |
 | **iCloud Mail** | `imap.mail.me.com:993` SSL | `smtp.mail.me.com:587` STARTTLS | [App-specific password](https://account.apple.com/account/manage) required. |
 | **Fastmail** | `imap.fastmail.com:993` SSL | `smtp.fastmail.com:465` SSL | [App password](https://www.fastmail.help/hc/en-us/articles/360058752854) with IMAP scope. |
 | **GMX** | `imap.gmx.net:993` SSL | `mail.gmx.net:465` SSL | Enable IMAP in GMX mail settings first; app password if 2FA is on. |
@@ -143,7 +168,7 @@ security; you add user and password.
 - **Verified on real mailboxes:** Proton Mail (Bridge), iCloud, Gmail
   and GMX. The other presets use the same IMAP
   code and are covered by the fake-server tests; **Outlook / Microsoft 365
-  is experimental** (fake-tested only, OAuth device-code flow).
+  is experimental** (fake-tested only).
 - **Gmail OAuth** needs your own Google Cloud client. In Google's "testing"
   mode refresh tokens expire after 7 days - see
   [install.md](docs/install.md#gmail-oauth-setup); the app password avoids this.
@@ -170,7 +195,8 @@ English and German. Everything is listed in
 - With SSO every identity gets its own isolated workspace; an empty
   allow-list admits any account at the provider.
 - `INBOXRAKE_SECRET_KEY` encrypts stored secrets (IMAP passwords, API keys,
-  tokens) so volume backups are useless without it.
+  tokens), so those secrets in a copied volume backup are unreadable
+  without it.
 - The container runs as a non-root user; CI runs CodeQL and a dependency
   review.
 

@@ -195,8 +195,12 @@ the short version; [install.md](install.md) covers running it and
   Trash/Junk is ambiguous and not confirmed in Settings. Nothing is ever
   deleted without your click and the confirm.
 - **Purge rules (Trash and Junk)** - an opt-in kind of rule (Rules ->
-  "Applies to": Junk or Trash) that deletes mail older than N days (default 30,
-  weekly) **permanently, on the server**. Nothing creates one for you; a
+  "Applies to": Junk or Trash) that deletes mail that has been in that folder for more
+  than N days (default 30, weekly) **permanently, on the server**. The
+  days count from when Inboxrake first saw the mail there (so a mail you
+  trash by mistake today is safe for N days, whatever its date), and the
+  mail must also have been received more than N days ago; after an upgrade
+  or a folder reset the count starts again. Nothing creates one for you; a
   new one starts in report mode (counts and a sender-level preview, nothing
   is deleted), may only be switched to execute after a report run of its
   current definition behind a confirm, and goes back to report mode when
@@ -287,7 +291,7 @@ the short version; [install.md](install.md) covers running it and
   controls, filters and confirmations as bottom sheets, a compact list.
 - **Settings** - Mail account, General, AI, Filed senders and (for the
   admin) Server; **Backup & restore** (config and AI verdict export +
-  import; sign-in tokens are left out) is on the General tab.
+  import; all passwords, tokens and API keys are left out) is on the General tab.
 - **Polish** - installable as a PWA (manifest + icon), optional desktop
   notifications when background jobs finish, monthly AI budget cap,
   a first-run setup wizard (provider -> sign in and test -> folders ->

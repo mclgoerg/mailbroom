@@ -588,8 +588,29 @@ def setup_needed(cfg: dict) -> bool:
                    for b in cfg["accounts"].values())
 
 
+def _conn_sig(block: dict) -> tuple:
+    """What a connection test vouches for: where and how we sign in."""
+    oauth = block.get("oauth") or {}
+    return (block.get("host"), block.get("port"), block.get("security"),
+            block.get("user"), block.get("password"), block.get("auth"),
+            block.get("cafile"),
+            oauth.get("provider"), oauth.get("client_id"),
+            oauth.get("client_secret"), bool(oauth.get("refresh_token")))
+
+
 def _apply_imap(block: dict, imap_in: dict) -> None:
-    """Fold a partial imap update into one account's block (in place)."""
+    """Fold a partial imap update into one account's block (in place).
+
+    `verified` is False from the moment the sign-in changes until a test,
+    an OAuth connect or a scan succeeds; a block without the key (every
+    config from before it existed, the env bootstrap) counts as verified."""
+    before = _conn_sig(block)
+    _fold_imap(block, imap_in)
+    if _conn_sig(block) != before:
+        block["verified"] = False
+
+
+def _fold_imap(block: dict, imap_in: dict) -> None:
     if isinstance(imap_in.get("role_overrides"), dict):
         # Shape only: whether the folder is a candidate of its role needs
         # the live folder list, so it is checked where the choice is made
@@ -694,6 +715,18 @@ def _apply_imap(block: dict, imap_in: dict) -> None:
         block["auto_scan"] = auto_scan
 
 
+def mark_verified(account: str) -> None:
+    """A connection test, an OAuth connect or a scan succeeded for this
+    account: it counts as set up (see `verified` in `_apply_imap`)."""
+    with _LOCK:
+        cfg = load_config()
+        block = cfg["accounts"].get(account)
+        if block is None or block.get("verified") is not False:
+            return                      # nothing to flip, nothing to write
+        block["verified"] = True
+        _write_tenant_config(cfg)
+
+
 def save_oauth(account: str, oauth: dict, *,
                use: bool = False) -> None:
     """Persist a connected/refreshed oauth token block for one account -
@@ -708,6 +741,8 @@ def save_oauth(account: str, oauth: dict, *,
         cfg["accounts"][account]["oauth"] = {**existing, **oauth}
         if use:
             cfg["accounts"][account]["auth"] = "oauth"
+            if cfg["accounts"][account].get("verified") is False:
+                cfg["accounts"][account]["verified"] = True
         _write_tenant_config(cfg)
 
 
@@ -910,6 +945,7 @@ def masked_config(cfg: dict) -> dict:
         "accounts": {
             n: {**b, "password": "", "password_set": bool(b["password"]),
                 "auth": auth_method(b),
+                "verified": b.get("verified") is not False,
                 "oauth": _mask_oauth(b.get("oauth"))}
             for n, b in cfg["accounts"].items()},
         "default_account": next(iter(cfg["accounts"])),

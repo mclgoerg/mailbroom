@@ -486,7 +486,9 @@ export function SettingsModal({ cfg, account, onClose, onSaved,
       const r = await res.json();
       onSaved(await api.getConfig());
       setMsg(t("import.done", { rules: r.rules, verdicts: r.verdicts,
-        knowledge: r.knowledge ?? 0 }));
+        knowledge: r.knowledge ?? 0 })
+        + (r.skipped_rules?.length
+          ? t("import.skipped", { names: r.skipped_rules.join(", ") }) : ""));
     } catch (err: any) {
       setMsg(t("err.generic", { msg: err.message ?? err }));
     }
@@ -556,7 +558,8 @@ export function SettingsModal({ cfg, account, onClose, onSaved,
             <Input className="w-full" type="password"
               value={f.oauthClientSecret}
               placeholder={f.oauthClientSecretSet
-                ? t("(unchanged)") : t("required")}
+                ? t("(unchanged)")
+                : t(oauthProvider === "microsoft" ? "optional" : "required")}
               onChange={set("oauthClientSecret")} />
           </Field>
         </div>

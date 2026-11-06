@@ -51,9 +51,12 @@ word and usually matches nothing. But an invalid `age:`, `unread:` or
 `att:` value (for example `age:>2w`, `unread:high`, `att:>10mb`) is
 silently **ignored** and the rest of the filter still applies - so the
 filter matches *more* mail, not less. `tag:newsletter age:>2w` selects
-every newsletter group. Check the result list, and for a rule the report
-run, before switching it to execute. The AI filter writer validates
-strictly and retries when the filter it wrote contains a bad token.
+every newsletter group. Check the result list before you act. Saving a **rule**
+with such a part is refused with an error that names it, and a rule saved
+before that check shows a warning: its execute runs are skipped (report runs
+still run) until you edit the filter. Giving a single-value qualifier (`age:`, `unread:`, `att:`, `eng:`, `ai:`, `from:`, `domain:`, or both `is:replied` and `is:noreply-ever` / `is:unsubscribed` and `is:not-unsubscribed`) twice is refused the same way, because only the last one would count. Words that contain a colon (such as `re:` or `10:30`) are read as
+qualifiers in a rule and refused unless they are valid ones. The AI filter writer validates strictly
+and retries when the filter it wrote contains a bad token.
 
 ## Combining
 
@@ -68,7 +71,10 @@ that you mostly never opened.
 
 A saved rule is a filter plus an action and a schedule (manual, daily,
 weekly). Rules always start in **report mode** - a run only records what
-would happen - and every run is capped (`RULE_CAP`, default 500 mails).
+would happen - and editing a rule's filter, action, target, retention
+or account sends it back to report mode (it needs one report run of the
+new definition before it acts again). Every run is capped
+(`RULE_CAP`, default 500 mails).
 Executed trash actions are normal reversible moves.
 
 **Purge rules** are the only irreversible kind: they permanently delete

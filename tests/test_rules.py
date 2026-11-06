@@ -221,6 +221,241 @@ def test_run_errors_are_recorded(bridge):
     assert saved["last_run"]["error"]
 
 
+def _armed_rule(**over):
+    rule = rulesmod.create_rule({
+        "name": "shipping", "grouping": "sender", "query": "tag:shipping",
+        "action": "trash", **over})
+    rulesmod.run_rule(rule["id"])
+    return rulesmod.update_rule(rule["id"], {"mode": "execute"})
+
+
+@pytest.mark.parametrize("edit", [
+    {"query": ""}, {"query": "tag:shipping age:>2y"},
+    {"grouping": "domain"}, {"action": "mark_read"},
+    {"action": "move", "dest": "Archive"},
+    {"keep_latest": 2}, {"older_than_days": 30}])
+def test_editing_a_definition_field_sends_armed_mail_rule_back(bridge, edit):
+    rule = _armed_rule()
+    assert rule["mode"] == "execute"
+    edited = rulesmod.update_rule(rule["id"], edit)
+    assert edited["mode"] == "report"
+    assert edited["report_runs"] == 0 and edited["reset_reason"] == "edited"
+    with pytest.raises(ValueError, match=mailops.RULE_REPORT_FIRST):
+        rulesmod.update_rule(rule["id"], {"mode": "execute"})
+    # a report run of the NEW definition arms it again
+    rulesmod.run_rule(rule["id"], rescan=False)
+    again = rulesmod.update_rule(rule["id"], {"mode": "execute"})
+    assert again["mode"] == "execute" and again["reset_reason"] == ""
+
+
+def test_editing_the_account_sends_armed_mail_rule_back(bridge):
+    rule = _armed_rule()
+    stored = rulesmod.load_rules()
+    stored[0]["report_box"] = "someotherbox"      # another mailbox behind it
+    rulesmod._save(stored)
+    again = rulesmod.load_rules()[0]
+    assert again["mode"] == "report" and again["reset_reason"] == "account"
+    assert rule["id"] == again["id"]
+
+
+@pytest.mark.parametrize("edit", [
+    {"name": "renamed"}, {"schedule": "daily"}, {"query": "tag:shipping"}])
+def test_non_definition_edits_keep_a_mail_rule_armed(bridge, edit):
+    rule = _armed_rule()
+    edited = rulesmod.update_rule(rule["id"], edit)
+    assert edited["mode"] == "execute" and edited["report_runs"] == 1
+
+
+def test_execute_refused_without_a_report_of_the_current_definition(
+        bridge, monkeypatch):
+    rule = _armed_rule()
+    monkeypatch.setattr(rulesmod, "_normalise", lambda r: None)
+    stored = rulesmod.load_rules()
+    stored[0]["query"] = ""                 # edited behind the API's back
+    rulesmod._save(stored)
+    assert rulesmod.load_rules()[0]["mode"] == "execute"
+    with pytest.raises(RuntimeError, match=mailops.RULE_REPORT_FIRST):
+        rulesmod.run_rule(rule["id"], rescan=False)
+    assert "alice@friends.example" in mailops.STATE["groups"]["sender"]
+    assert not mailops.UNDO_LOG
+
+
+def _v111_file(bridge):
+    """A v1.11-shaped rules.json: report_sig "" on every rule, armed mail
+    rule plus a Block-sender rule."""
+    import json
+    base = {"scope": "mail", "grouping": "sender", "action": "trash",
+            "dest": "", "schedule": "daily", "mode": "execute",
+            "report_runs": 1, "created": 1, "last_run": None,
+            "report_sig": "", "report_box": "", "report_at": None,
+            "reset_reason": "", "keep_latest": None,
+            "older_than_days": None}
+    rules = [{**base, "id": "m1", "name": "shipping",
+              "query": "tag:shipping", "origin": "manual"},
+             {**base, "id": "b1", "name": "blocked",
+              "query": "from:news@shop.example", "origin": "block"}]
+    rulesmod._path().parent.mkdir(parents=True, exist_ok=True)
+    rulesmod._path().write_text(json.dumps({"rules": rules}))
+
+
+def test_v111_rules_file_keeps_execute_mode(bridge):
+    _v111_file(bridge)
+    loaded = {r["id"]: r for r in rulesmod.load_rules()}
+    assert loaded["m1"]["mode"] == "execute"
+    assert loaded["b1"]["mode"] == "execute"
+    assert rulesmod.purge_armed(loaded["b1"])
+    res = rulesmod.run_rule("b1", rescan=False)
+    assert res["mode"] == "execute" and res["acted"] == 1
+    wait_delete_done()
+    rulesmod.update_rule("m1", {"query": ""})     # a later edit re-arms
+    assert rulesmod.load_rules()[0]["mode"] == "report"
+
+
+def test_grandfathered_signatures_are_persisted_once(bridge, monkeypatch):
+    import json
+    _v111_file(bridge)
+    rulesmod.publish()
+    on_disk = json.loads(rulesmod._path().read_text())["rules"]
+    assert all(r["report_sig"] and r["report_box"] for r in on_disk)
+    # re-pointing the account afterwards is NOT adopted: the rule resets
+    monkeypatch.setattr(rulesmod, "mailbox_id", lambda acct: "othermailbox")
+    again = rulesmod.load_rules()
+    assert [r["mode"] for r in again] == ["report", "report"]
+    assert again[0]["reset_reason"] == "account"
+
+
+def test_edit_during_a_report_run_does_not_arm_the_edit(bridge, monkeypatch):
+    rule = rulesmod.create_rule({
+        "name": "shipping", "grouping": "sender", "query": "tag:shipping",
+        "action": "trash"})
+    real = rulesmod._record_run
+
+    def edit_then_record(rule_id, result):
+        rulesmod.update_rule(rule_id, {"query": ""})     # mid-run edit
+        real(rule_id, result)
+
+    monkeypatch.setattr(rulesmod, "_record_run", edit_then_record)
+    rulesmod.run_rule(rule["id"])
+    saved = rulesmod.load_rules()[0]
+    assert saved["report_runs"] == 1                 # a report is on record...
+    with pytest.raises(ValueError, match=mailops.RULE_REPORT_FIRST):
+        rulesmod.update_rule(rule["id"], {"mode": "execute"})  # ...not this one
+
+
+# ------------------------------------------------------- filter validation
+
+BAD_FILTERS = {
+    "age": "age:>1yr", "unread": "unread:>150", "att": "att:>10x",
+    "is": "is:unsubbed", "has": "has:pin", "eng": "eng:none",
+    "ai": "ai:maybe", "unknown": "colour:red", "mangled": "-tag:x",
+}
+
+
+@pytest.mark.parametrize("kind", sorted(BAD_FILTERS))
+def test_saving_a_mistyped_filter_is_refused_naming_it(bridge, kind):
+    bad = BAD_FILTERS[kind]
+    body = {"name": "x", "query": f"tag:shipping {bad}"}
+    r = client.post("/api/rules", json=body)
+    assert r.status_code == 400
+    assert r.json()["detail"] == mailops.coded(
+        mailops.RULE_FILTER_INVALID, names=bad)
+    ok = rulesmod.create_rule({"name": "ok", "query": "tag:shipping"})
+    r = client.post(f"/api/rules/{ok['id']}", json={"query": body["query"]})
+    assert r.status_code == 400 and "rule_filter_invalid" in r.json()["detail"]
+    assert rulesmod.load_rules()[0]["query"] == "tag:shipping"
+    # import: the rule comes in flagged, in report mode (never dropped)
+    r = client.post("/api/import_config", json={"rules": [body]})
+    assert r.json()["rules"] == 1
+    imported = rulesmod.load_rules()[0]
+    assert imported["mode"] == "report" and imported["filter_invalid"] == [bad]
+
+
+def test_over_long_filter_is_refused_not_cut(bridge):
+    q = "tag:shipping " + "x " * 140 + "age:>1yr"
+    assert len(q) > rulesmod.FILTER_MAX
+    r = client.post("/api/rules", json={"name": "long", "query": q})
+    assert r.status_code == 400
+    assert r.json()["detail"] == mailops.coded(
+        mailops.RULE_FILTER_TOO_LONG, max=rulesmod.FILTER_MAX)
+    assert not rulesmod.load_rules()
+
+
+def test_export_import_round_trip_keeps_a_flagged_rule(bridge):
+    _legacy_rule(bridge)
+    exported = client.get("/api/export_config").json()
+    assert exported["rules"][0]["query"] == "tag:shipping age:>1yr"
+    r = client.post("/api/import_config", json=exported)
+    assert r.json()["rules"] == 1 and r.json()["skipped_rules"] == []
+    rule = client.get("/api/rules").json()["rules"][0]
+    assert rule["mode"] == "report" and rule["filter_invalid"] == ["age:>1yr"]
+    with pytest.raises(ValueError, match=mailops.RULE_REPORT_FIRST):
+        rulesmod.update_rule(rule["id"], {"mode": "execute"})
+
+
+def test_import_names_the_rules_it_could_not_take(bridge):
+    r = client.post("/api/import_config", json={"rules": [
+        {"name": "fine", "query": "tag:shipping"},
+        {"name": "bad action", "action": "explode"}]})
+    assert r.json()["rules"] == 1 and r.json()["skipped_rules"] == [
+        "bad action"]
+
+
+def test_valid_filters_still_save():
+    for q in ("", "newsletter weekly", "tag:ship from:a@b.example age:>1y "
+              "unread:>80 att:>10m is:unsub has:pinned eng:low ai:safe"):
+        assert rulesmod.create_rule({"name": "ok", "query": q})["query"] == q
+
+
+def test_purge_rule_with_a_mistyped_filter_is_refused():
+    with pytest.raises(ValueError, match="^rule_filter_invalid:"):
+        rulesmod.create_rule({"name": "p", "scope": "trash",
+                              "older_than_days": 30, "query": "age:>1yr"})
+
+
+def _legacy_rule(bridge, **over):
+    import json
+    rule = {"id": "l1", "name": "legacy", "scope": "mail",
+            "grouping": "sender", "query": "tag:shipping age:>1yr",
+            "action": "trash", "dest": "", "schedule": "daily",
+            "mode": "execute", "report_runs": 1, "created": 1,
+            "last_run": None, "origin": "manual", "keep_latest": None,
+            "older_than_days": None, **over}
+    rulesmod._path().parent.mkdir(parents=True, exist_ok=True)
+    rulesmod._path().write_text(json.dumps({"rules": [rule]}))
+    return rule
+
+
+def test_legacy_invalid_rule_is_flagged_and_skips_execute(bridge):
+    import json
+    _legacy_rule(bridge)
+    listed = client.get("/api/rules").json()["rules"][0]
+    assert listed["filter_invalid"] == ["age:>1yr"]
+    with pytest.raises(RuntimeError, match=r"^rule_filter_invalid_run:"):
+        rulesmod.run_rule("l1", rescan=False)
+    saved = rulesmod.load_rules()[0]
+    assert saved["last_run"]["error"].startswith("rule_filter_invalid_run:")
+    assert not bridge.mailbox["Trash"] and not mailops.UNDO_LOG
+    # the warning flag is derived, never written to the file
+    assert "filter_invalid" not in json.loads(
+        rulesmod._path().read_text())["rules"][0]
+
+
+def test_legacy_invalid_rule_still_runs_reports(bridge):
+    _legacy_rule(bridge, mode="report")
+    res = rulesmod.run_rule("l1")
+    assert res["mode"] == "report" and not res["error"]
+
+
+def test_purge_execute_run_with_a_mistyped_filter_is_skipped(monkeypatch):
+    monkeypatch.setattr(rulesmod, "purge_armed", lambda r: True)
+    rule = {"id": "p1", "scope": "trash", "action": "purge", "mode": "execute",
+            "older_than_days": 30, "keep_latest": None,
+            "query": "age:>1yr", "account": None}
+    result = {"error": ""}
+    rulesmod._run_purge(rule, None, result)
+    assert result["error"].startswith("rule_filter_invalid_run:")
+
+
 # -------------------------------------------------------------- scheduling
 
 def test_due_logic():
@@ -268,3 +503,53 @@ def test_has_tracker_filter_parser_and_matching():
     assert rulesmod.match_group(base, rulesmod.parse_filter(""))
 
 
+
+
+# ------------------------------------------- a single-value qualifier twice
+
+REPEATED = {
+    "ai": "ai:safe ai:keep", "age": "age:>5y age:>1m",
+    "unread": "unread:>80 unread:>10", "att": "att:>10m att:>1k",
+    "eng": "eng:low eng:high", "from": "from:a@shop.example from:b@x.example",
+    "domain": "domain:shop.example domain:x.example",
+    "replied": "is:replied is:noreply-ever",
+    "unsubscribed": "is:unsubscribed is:not-unsubscribed",
+}
+
+
+def test_validate_filter_reports_the_repeat():
+    assert rulesmod.validate_filter("age:>5y age:>1m") == ["age:>1m"]
+    assert rulesmod.validate_filter("from:a@b.example from:c@d.example") \
+        == ["from:c@d.example"]
+
+
+@pytest.mark.parametrize("kind", sorted(REPEATED))
+def test_a_repeated_single_value_qualifier_is_refused(kind):
+    q = f"tag:shipping {REPEATED[kind]}"
+    with pytest.raises(ValueError, match="^rule_filter_invalid:"):
+        rulesmod.create_rule({"name": "dup", "query": q})
+    assert not rulesmod.load_rules()
+
+
+def test_repeatable_qualifiers_stay_valid():
+    for q in ("tag:a tag:b", "is:unsub is:new is:protected is:still-mailing",
+              "has:pinned has:tracker", "age:>1y unread:>5 from:a@b.example"):
+        assert rulesmod.validate_filter(q) == [], q
+
+
+def test_import_keeps_a_rule_with_a_repeat_flagged(bridge):
+    r = client.post("/api/import_config", json={"rules": [
+        {"name": "dup", "query": "age:>5y age:>1m"}]})
+    assert r.json()["rules"] == 1
+    imported = rulesmod.load_rules()[0]
+    assert imported["mode"] == "report"
+    assert imported["filter_invalid"] == ["age:>1m"]
+
+
+def test_legacy_rule_with_a_repeat_is_flagged_and_skips_execute(bridge):
+    _legacy_rule(bridge, query="tag:shipping age:>5y age:>1m")
+    assert client.get("/api/rules").json()["rules"][0]["filter_invalid"] \
+        == ["age:>1m"]
+    with pytest.raises(RuntimeError, match=r"^rule_filter_invalid_run:"):
+        rulesmod.run_rule("l1", rescan=False)
+    assert not bridge.mailbox["Trash"] and not mailops.UNDO_LOG

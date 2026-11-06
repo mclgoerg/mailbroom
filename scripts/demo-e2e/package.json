@@ -1,0 +1,15 @@
+{
+  "name": "inboxrake-demo-e2e",
+  "private": true,
+  "type": "module",
+  "description": "Headless-browser run of the built in-browser demo (see README.md). Dev-only; never shipped in the app image.",
+  "scripts": {
+    "test": "playwright test"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.63.0"
+  }
+}
