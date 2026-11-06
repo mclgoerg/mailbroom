@@ -1447,7 +1447,8 @@ export default function App() {
         + ` · ${fmtSize(size)}` + (filter ? ` ${t("(filtered)")}` : "")
         + (ago ? ` · ${t("scan.age", { ago })}` : "");
     }
-    return t("No scan yet - hit “Scan”.");
+    // the setup card is the guidance while the connection is unconfirmed
+    return unverified ? "" : t("No scan yet - hit “Scan”.");
   };
 
   const statusLine = () => {
@@ -2261,7 +2262,7 @@ export default function App() {
           ) : (
             <EmptyState>
               {state.scanned_ts ? t("status.no_mails")
-                : t("No scan yet - hit “Scan”.")}
+                : unverified ? "" : t("No scan yet - hit “Scan”.")}
             </EmptyState>
           )
         )

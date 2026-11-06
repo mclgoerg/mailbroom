@@ -104,3 +104,36 @@ def test_configs_without_the_flag_count_as_verified():
     cfgmod.config_path().write_text(json.dumps(raw))
     assert _verified() is True
     assert cfgmod.setup_needed(cfgmod.load_config()) is False
+
+
+import pytest
+
+_BASE = {"host": "imap.example", "port": 993, "security": "ssl",
+         "user": "me@mail.example", "password": "pw", "preset": "custom",
+         "auth": "password", "cafile": ""}
+_CHANGES = {"host": "other.example", "port": 1143, "security": "starttls",
+            "user": "you@mail.example", "password": "other",
+            "cafile": "/certs/ca.pem"}
+
+
+@pytest.mark.parametrize("field", sorted(_CHANGES))
+def test_every_sign_in_field_resets_verified(field):
+    cfgmod.update_config({"account": "default", "imap": dict(_BASE)})
+    cfgmod.mark_verified("default")
+    assert _verified() is True
+    cfgmod.update_config({"account": "default",
+                          "imap": {field: _CHANGES[field]}})
+    assert _verified() is False
+
+
+def test_oauth_client_and_method_reset_verified():
+    cfgmod.update_config({"account": "default", "imap": {
+        **_BASE, "preset": "custom",
+        "oauth": {"provider": "google", "client_id": "a"}}})
+    for imap in ({"oauth": {"client_id": "b"}},
+                 {"oauth": {"client_secret": "s"}},
+                 {"auth": "oauth"}):
+        cfgmod.mark_verified("default")
+        assert _verified() is True
+        cfgmod.update_config({"account": "default", "imap": imap})
+        assert _verified() is False

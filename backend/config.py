@@ -593,6 +593,7 @@ def _conn_sig(block: dict) -> tuple:
     oauth = block.get("oauth") or {}
     return (block.get("host"), block.get("port"), block.get("security"),
             block.get("user"), block.get("password"), block.get("auth"),
+            block.get("cafile"),
             oauth.get("provider"), oauth.get("client_id"),
             oauth.get("client_secret"), bool(oauth.get("refresh_token")))
 
