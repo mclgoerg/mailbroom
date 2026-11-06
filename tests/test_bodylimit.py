@@ -119,3 +119,43 @@ def test_the_demo_bridge_goes_through_the_same_stack(monkeypatch):
         "POST", "/api/presets", body={"name": "a", "query": "x" * 2000}))
     assert out["status"] == 413
     assert json.loads(out["body"])["detail"] == mailops.REQUEST_TOO_LARGE
+
+
+def _run(app, scope_extra, messages):
+    sent, reads = [], []
+
+    async def receive():
+        reads.append(1)
+        return messages.pop(0) if messages else {"type": "http.disconnect"}
+
+    async def send(m):
+        sent.append(m)
+
+    scope = {"type": "http", "path": "/api/x", **scope_extra}
+    asyncio.run(bodylimit.BodyLimit(app)(scope, receive, send))
+    return sent, reads
+
+
+def test_oversized_content_length_is_refused_without_reading_the_body():
+    async def inner(scope, receive, send):
+        raise AssertionError("the app must not run")
+
+    sent, reads = _run(inner, {"headers": [
+        (b"content-length", str(bodylimit.LIMIT_DEFAULT + 1).encode())]}, [])
+    assert sent[0]["status"] == 413 and reads == []
+
+
+def test_a_response_already_started_is_not_replaced_by_a_413():
+    async def inner(scope, receive, send):
+        await send({"type": "http.response.start", "status": 200,
+                    "headers": []})
+        await receive()                    # the late body read trips the cap
+        await receive()
+        await send({"type": "http.response.body", "body": b"ok"})
+
+    big = {"type": "http.request", "body": b"x" * (bodylimit.LIMIT_DEFAULT + 1),
+           "more_body": True}
+    sent, _ = _run(inner, {"headers": []}, [big])
+    assert [m["type"] for m in sent] == [
+        "http.response.start", "http.response.body"]
+    assert sent[0]["status"] == 200

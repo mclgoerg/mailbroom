@@ -54,7 +54,7 @@ class BodyLimit:
                 break
         seen = 0
         over = False
-        replaced = False
+        replaced = started = False
 
         async def counted() -> dict:
             nonlocal seen, over
@@ -72,8 +72,12 @@ class BodyLimit:
             return message
 
         async def watching(message) -> None:
-            nonlocal replaced
-            if not over:
+            nonlocal replaced, started
+            if message["type"] == "http.response.start" and not over:
+                started = True
+            if started or not over:
+                # a response already under way (a streaming endpoint reads
+                # the body late) cannot be swapped for a 413
                 return await send(message)
             if not replaced:
                 replaced = True
