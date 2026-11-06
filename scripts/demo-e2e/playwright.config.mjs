@@ -8,6 +8,7 @@ export default defineConfig({
   // A backend call that waits on a thread the demo never runs hangs the
   // worker for good: the per-test limit turns that into a clean failure.
   timeout: 120_000,
+  globalTimeout: 400_000,
   expect: { timeout: 30_000 },
   workers: 1,
   retries: 0,
