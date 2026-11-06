@@ -1671,6 +1671,8 @@ export const EN: Record<string, string> = {
     + "runs are skipped until you edit the rule.",
   "ferr.rule_filter_too_long":
     "This filter is too long (more than {max} characters).",
+  "ferr.request_too_large":
+    "The request is too large for the server to accept.",
   "ferr.no_account":
     "No mail account is set up yet - open Settings and fill in the "
     + "sign-in details first.",

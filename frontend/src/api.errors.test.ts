@@ -333,3 +333,11 @@ describe("the login throttle code", () => {
     expect(errorText("login_throttled:n=7")).toContain("7 Minuten");
   });
 });
+
+describe("the request size code", () => {
+  test("is translated, not shown raw", () => {
+    expect(errorText("request_too_large")).toContain("too large");
+    setLang("de");
+    expect(errorText("request_too_large")).toContain("zu groß");
+  });
+});

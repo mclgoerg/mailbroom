@@ -142,6 +142,8 @@ RULE_PURGE_FILTER_DOMAIN = "rule_purge_filter_domain"    # names=
 RULE_FILTER_INVALID = "rule_filter_invalid"              # names=
 RULE_FILTER_INVALID_RUN = "rule_filter_invalid_run"      # names=
 RULE_FILTER_TOO_LONG = "rule_filter_too_long"            # max=
+# a request body over the size cap (backend/bodylimit.py)
+REQUEST_TOO_LARGE = "request_too_large"
 # a List-Unsubscribe mailto: that would not be one plain mail to one address
 MAILTO_UNSAFE = "mailto_unsafe"
 # connecting (first run): no account set up yet / the CA file is missing
@@ -224,6 +226,7 @@ FOLDER_ERROR_CODES = frozenset({
     RULE_FILTER_INVALID,
     RULE_FILTER_INVALID_RUN,
     RULE_FILTER_TOO_LONG,
+    REQUEST_TOO_LARGE,
     NO_ACCOUNT,
     CAFILE_MISSING,
     AUTH_FAILED,
