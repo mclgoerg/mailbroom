@@ -670,3 +670,14 @@ test("an error that is not a code (an older run, a raw failure) stays as is",
     expect(screen.getByText("RuntimeError: Trash is ambiguous - choose it in "
       + "Settings first")).toBeTruthy();
   });
+
+test("the editor of an armed mail rule shows the reset note", () => {
+  renderCards([{ ...rule, mode: "execute" }]);
+  fireEvent.click(screen.getByText("Edit"));
+  expect(document.body.textContent).toContain(EN["rule.edit_reset"]);
+});
+
+test("a card says why an edited mail rule went back to report mode", () => {
+  renderCards([{ ...rule, mode: "report", reset_reason: "edited" }]);
+  expect(document.body.textContent).toContain(EN["rule.reset_edited"]);
+});

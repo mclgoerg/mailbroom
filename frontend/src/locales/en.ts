@@ -1171,6 +1171,9 @@ export const EN: Record<string, string> = {
   "rule.purge_edit_reset":
     "Changing the folder, filter or age switches this rule back to report "
     + "mode, so what you previewed is what runs.",
+  "rule.edit_reset":
+    "Changing the filter, action, target, retention or account switches "
+    + "this rule back to report mode, so what you previewed is what runs.",
   "rule.run_report_btn": "Run report",
   "rule.purge_run_report":
     "report: {n} mails would be deleted permanently · senders: {groups}",
@@ -1209,8 +1212,9 @@ export const EN: Record<string, string> = {
     "The filter is empty: this applies to ALL senders in the {folder} folder.",
   "rule.purge_all_short": "all senders",
   "rule.reset_edited":
-    "Back in report mode: the folder, filter or age was changed. Run a "
-    + "report again before switching to execute.",
+    "Back in report mode: what the rule acts on was changed (folder, "
+    + "filter, action, target or age). Run a report again before switching "
+    + "to execute.",
   "rule.reset_account":
     "Back in report mode: the account was renamed, or its server or login "
     + "changed. Run a report again before switching to execute.",

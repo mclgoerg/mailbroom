@@ -1362,6 +1362,10 @@ export const DE: Record<string, string> = {
   "rule.purge_edit_reset":
     "Wird Ordner, Filter oder Alter geändert, wechselt die Regel zurück in "
     + "den Berichtsmodus - so läuft nur, was zuvor geprüft wurde.",
+  "rule.edit_reset":
+    "Wird Filter, Aktion, Ziel, Aufbewahrung oder Konto geändert, wechselt "
+    + "die Regel zurück in den Berichtsmodus - so läuft nur, was zuvor "
+    + "geprüft wurde.",
   "rule.run_report_btn": "Bericht erstellen",
   "rule.purge_run_report":
     "Bericht: {n} Mails würden endgültig gelöscht · Absender: {groups}",
@@ -1402,8 +1406,9 @@ export const DE: Record<string, string> = {
     "Der Filter ist leer: Die Regel gilt für ALLE Absender im Ordner {folder}.",
   "rule.purge_all_short": "alle Absender",
   "rule.reset_edited":
-    "Zurück im Berichtsmodus: Ordner, Filter oder Alter wurden geändert. "
-    + "Vor dem Umschalten auf Ausführen erneut einen Bericht erstellen.",
+    "Zurück im Berichtsmodus: Was die Regel bearbeitet, wurde geändert "
+    + "(Ordner, Filter, Aktion, Ziel oder Alter). Vor dem Umschalten auf "
+    + "Ausführen erneut einen Bericht erstellen.",
   "rule.reset_account":
     "Zurück im Berichtsmodus: Das Konto wurde umbenannt, oder Server oder "
     + "Login haben sich geändert. Vor dem Umschalten auf Ausführen erneut "

@@ -263,8 +263,7 @@ export function RulesModal({ state, onClose, onChanged, initialQuery = "" }: {
                 {t("rule.purge_all_short")}
               </span>
             )}
-            {isPurge(rule.scope) && rule.mode === "report"
-              && rule.reset_reason && (
+            {rule.mode === "report" && rule.reset_reason && (
               <div className="mt-1 flex items-start gap-1 type-meta text-review-fg">
                 <TriangleAlert size={14} className="mt-0.5 shrink-0" />
                 {t(`rule.reset_${rule.reset_reason}`)}
@@ -422,9 +421,9 @@ export function RulesModal({ state, onClose, onChanged, initialQuery = "" }: {
               </div>
             )}
           </div>
-          {purge && rules.find((r) => r.id === editId)?.mode === "execute" && (
+          {rules.find((r) => r.id === editId)?.mode === "execute" && (
             <div className="mt-2 type-meta text-muted">
-              {t("rule.purge_edit_reset")}
+              {t(purge ? "rule.purge_edit_reset" : "rule.edit_reset")}
             </div>
           )}
           <div className="mt-3 flex items-center gap-3">
