@@ -634,6 +634,9 @@ export const EN: Record<string, string> = {
     "Same Message-ID. Mails without a usable one: identical sender + subject + size.",
   "dups.summary": "{n} duplicate sets · {size} reclaimable",
   "dups.summary_one": "1 duplicate set · {size} reclaimable",
+  "dups.possible_title": "Possible duplicates - same sender and subject, sent within minutes",
+  "dups.possible_hint":
+    "These have different Message-IDs and may differ in content. Open them to compare; nothing here is selected for you.",
   "dups.keep_newest": "Select all but newest",
   "dups.wasted": "{size} reclaimable",
   "dups.newest": "newest",

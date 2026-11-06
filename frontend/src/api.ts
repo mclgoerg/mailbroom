@@ -398,6 +398,7 @@ export const api = {
   startAttachments: () => req<{ ok: boolean }>("/api/attachments", {}),
   attachments: () => req<AttMail[]>("/api/attachments"),
   duplicates: () => req<DupSet[]>("/api/duplicates"),
+  possibleDuplicates: () => req<DupSet[]>("/api/duplicates/possible"),
   stats: () => req<StatsResp>("/api/stats"),
   /** `tz` = the browser's offset in minutes EAST of UTC. */
   wrapped: (year?: number) =>

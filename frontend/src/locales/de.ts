@@ -474,6 +474,9 @@ export const DE: Record<string, string> = {
     "Gleiche Message-ID. Mails ohne brauchbare Message-ID: identischer Absender + Betreff + Größe.",
   "dups.summary": "{n} Duplikat-Gruppen · {size} freigebbar",
   "dups.summary_one": "1 Duplikat-Gruppe · {size} freigebbar",
+  "dups.possible_title": "Mögliche Duplikate - gleicher Absender und Betreff, innerhalb von Minuten gesendet",
+  "dups.possible_hint":
+    "Diese haben unterschiedliche Message-IDs und können sich im Inhalt unterscheiden. Öffne sie zum Vergleichen; hier wird nichts für dich vorausgewählt.",
   "dups.keep_newest": "Alle außer der neuesten auswählen",
   "dups.wasted": "{size} freigebbar",
   "dups.newest": "neueste",

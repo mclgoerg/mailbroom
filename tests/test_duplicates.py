@@ -205,3 +205,63 @@ def test_identical_junk_id_alone_does_not_pair_unrelated_mails(monkeypatch):
 
 def test_junk_id_is_not_paired_with_no_id(monkeypatch):
     assert _pair(monkeypatch, "-", "") == []
+
+
+def _stamp(h, m):
+    return f"05-Oct-2026 {h:02d}:{m:02d}:00 +0000"
+
+
+def _possible(monkeypatch, inbox):
+    _scan(monkeypatch, {"INBOX": inbox, "Trash": [], "Spam": []})
+    return mailops.possible_duplicates_list()
+
+
+def test_double_send_within_ten_minutes_is_a_possible_duplicate(monkeypatch):
+    (s,) = _possible(monkeypatch, [
+        make_msg(1, frm="a@x.example", subject="Offer  ENDS today",
+                 date=_stamp(9, 0)),
+        make_msg(2, frm="a@x.example", subject="offer ends today",
+                 date=_stamp(9, 4))])
+    assert [m["uid"] for m in s["mails"]] == [2, 1]
+    assert mailops.duplicates_list() == []          # different Message-IDs
+
+
+def test_possible_duplicates_window_and_chaining(monkeypatch):
+    # 11 minutes apart: no; chained through a third mail: yes
+    assert _possible(monkeypatch, [
+        make_msg(1, frm="a@x.example", subject="S", date=_stamp(9, 0)),
+        make_msg(2, frm="a@x.example", subject="S", date=_stamp(9, 11))]) == []
+
+
+def test_possible_duplicates_chain_via_a_third_mail(monkeypatch):
+    (s,) = _possible(monkeypatch, [
+        make_msg(1, frm="a@x.example", subject="S", date=_stamp(9, 0)),
+        make_msg(2, frm="a@x.example", subject="S", date=_stamp(9, 8)),
+        make_msg(3, frm="a@x.example", subject="S", date=_stamp(9, 16))])
+    assert len(s["mails"]) == 3
+
+
+def test_possible_duplicates_need_same_sender_and_subject(monkeypatch):
+    assert _possible(monkeypatch, [
+        make_msg(1, frm="a@x.example", subject="S", date=_stamp(9, 0)),
+        make_msg(2, frm="b@x.example", subject="S", date=_stamp(9, 1)),
+        make_msg(3, frm="a@x.example", subject="Other", date=_stamp(9, 2)),
+        make_msg(4, frm="c@x.example", subject="", date=_stamp(9, 0)),
+        make_msg(5, frm="c@x.example", subject="", date=_stamp(9, 1))]) == []
+
+
+def test_exact_duplicates_are_left_out_of_possible(monkeypatch):
+    _scan(monkeypatch, {
+        "INBOX": [make_msg(1, frm="a@x.example", subject="S",
+                           msgid="<same@x.example>", date=_stamp(9, 0)),
+                  make_msg(2, frm="a@x.example", subject="S",
+                           msgid="<own@x.example>", date=_stamp(9, 1))],
+        "Archive": [make_msg(5, frm="a@x.example", subject="S",
+                             msgid="<same@x.example>",
+                             date=_stamp(9, 0))],
+        "Trash": [], "Spam": []})
+    assert len(mailops.duplicates_list()) == 1
+    # uids 1 and 5 are an exact set; 2 alone is not a group
+    assert mailops.possible_duplicates_list() == []
+    r = client.get("/api/duplicates/possible")
+    assert r.status_code == 200 and r.json() == []
