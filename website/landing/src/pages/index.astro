@@ -57,18 +57,15 @@ const heroAlt =
           <a class="btn" href="/docs/">Read the docs</a>
           <a class="btn" href={GITHUB}>GitHub</a>
         </p>
-        <img class="shot only-dark" src={hero.src} width={hero.width} height={hero.height} alt={heroAlt} />
-        <img class="shot only-light" src={heroLight.src} width={heroLight.width} height={heroLight.height} alt={heroAlt} />
+        <img class="shot only-dark" loading="lazy" src={hero.src} width={hero.width} height={hero.height} alt={heroAlt} />
+        <img class="shot only-light" loading="lazy" src={heroLight.src} width={heroLight.width} height={heroLight.height} alt={heroAlt} />
       </section>
 
       <section class="promise">
         <h2>Nothing is deleted without asking</h2>
         <p>
-          Everything is undoable - moves go to Trash with an Undo -
-          <strong>except</strong> the explicit "delete permanently" actions in
-          Trash and Junk, which confirm with exact counts first. Scans are
-          read-only, and nothing leaves your machine unless you turn on AI
-          review (then only metadata, never mail bodies or attachments).
+          Everything is undoable - moves go to Trash with an Undo -{" "}
+          <strong>except</strong> the explicit "delete permanently" actions in Trash and Junk (manual, or an opt-in purge rule), which show exact counts first. Scans are read-only, and nothing leaves your machine unless you turn on AI review (then only metadata, never mail bodies or attachments).
         </p>
         <p><a href="/docs/security/">Security &amp; privacy in detail</a></p>
       </section>
@@ -77,7 +74,9 @@ const heroAlt =
         <h2>Install</h2>
         <p>
           Needs Docker and an IMAP mailbox (Gmail, iCloud, Fastmail, Proton
-          via Bridge, ...).
+          via Bridge, ...). For Proton Mail use <code>docker-compose.proton.yml</code>
+          instead of the default compose file (it needs a Bridge image you
+          provide - see its header).
         </p>
         <pre><code>git clone https://github.com/mclgoerg/inboxrake
 cd inboxrake/deploy
@@ -87,8 +86,8 @@ docker compose up -d</code></pre>
           Open <code>http://localhost:8765</code>; on a fresh install a setup
           wizard walks you through provider, sign-in, folders, an optional
           login password and the first scan. Platform guides (Synology,
-          Unraid, TrueNAS, Portainer, Raspberry Pi), plain
-          <code>docker run</code> and every setting are in the
+          Unraid, TrueNAS, Portainer, Raspberry Pi), plain{" "}
+          <code>docker run</code> and every setting are in the{" "}
           <a href="/docs/install/">install guide</a>.
         </p>
       </section>
@@ -97,9 +96,9 @@ docker compose up -d</code></pre>
     <footer>
       <span>MIT licensed. <em>Formerly Mailbroom.</em></span>
       <span>
-        <a href={GITHUB + "/blob/main/LICENSE"}>License</a> ·
-        <a href="/docs/">Docs</a> ·
-        <a href={GITHUB}>GitHub</a> ·
+        <a href={GITHUB + "/blob/main/LICENSE"}>License</a> ·{" "}
+        <a href="/docs/">Docs</a> ·{" "}
+        <a href={GITHUB}>GitHub</a> ·{" "}
         Security: <a href="mailto:security@inboxrake.com">security@inboxrake.com</a>
       </span>
     </footer>
@@ -148,7 +147,7 @@ docker compose up -d</code></pre>
   h2 { font-size: 1.5rem; line-height: 1.3; margin: 0 0 0.75rem; }
   code, pre { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
   code { background: var(--code); padding: 0.1em 0.35em; border-radius: 4px; font-size: 0.9em; }
-  pre { background: var(--code); padding: 1rem; border-radius: 6px; overflow-x: auto; line-height: 1.5; }
+  pre { background: var(--code); padding: 1rem; border-radius: 6px; white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.5; }
   pre code { background: none; padding: 0; }
   .bar {
     display: flex; justify-content: space-between; align-items: center;
