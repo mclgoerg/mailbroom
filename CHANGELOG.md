@@ -1,5 +1,43 @@
 # Changelog
 
+## [2.0.0](https://github.com/mclgoerg/inboxrake/compare/v1.11.0...v2.0.0) (2026-11-06)
+
+
+### ⚠ BREAKING CHANGES
+
+* rename Mailbroom to Inboxrake ([#204](https://github.com/mclgoerg/inboxrake/issues/204))
+
+### Features
+
+* browser demo shell ([#223](https://github.com/mclgoerg/inboxrake/issues/223)) ([6509cf3](https://github.com/mclgoerg/inboxrake/commit/6509cf378736021848617996245379a537e7f840))
+* demo-mode gating in the UI ([#218](https://github.com/mclgoerg/inboxrake/issues/218)) ([1fe38d5](https://github.com/mclgoerg/inboxrake/commit/1fe38d5ccd0080fc51d824063b2e8995584919b1))
+* possible duplicates - the same mail sent twice within minutes ([#251](https://github.com/mclgoerg/inboxrake/issues/251)) ([a669a2a](https://github.com/mclgoerg/inboxrake/commit/a669a2aedb4dd9c967d461ec74a4eccecf40f0bc))
+* rename Mailbroom to Inboxrake ([#204](https://github.com/mclgoerg/inboxrake/issues/204)) ([cbae001](https://github.com/mclgoerg/inboxrake/commit/cbae001ff0723e469f10c38f982aebf29be2d5e9))
+
+
+### Bug Fixes
+
+* a failed connection test no longer counts as finished setup ([#235](https://github.com/mclgoerg/inboxrake/issues/235)) ([111c1d6](https://github.com/mclgoerg/inboxrake/commit/111c1d60811b0ac09adb41f28dd14cafb851c592))
+* a fresh install points to setup instead of Scan ([#249](https://github.com/mclgoerg/inboxrake/issues/249)) ([e803926](https://github.com/mclgoerg/inboxrake/commit/e8039267ed612b7b586ea8b2623223d3d933061d))
+* a rescan no longer forgets attachment sizes ([#252](https://github.com/mclgoerg/inboxrake/issues/252)) ([fa09a11](https://github.com/mclgoerg/inboxrake/commit/fa09a112e7dc67c0fd3eda661ab65185881d322c))
+* block rules can't be widened by a crafted sender address ([#240](https://github.com/mclgoerg/inboxrake/issues/240)) ([639e4da](https://github.com/mclgoerg/inboxrake/commit/639e4daefc38599f95e700a2973ec2e4445955c1))
+* demo unsubscribe explains instead of opening a dead page ([#228](https://github.com/mclgoerg/inboxrake/issues/228)) ([bec8a1d](https://github.com/mclgoerg/inboxrake/commit/bec8a1de9b4ac26f3919912bfaa464dacc2e5d65))
+* duplicates are only mails that really are the same ([#248](https://github.com/mclgoerg/inboxrake/issues/248)) ([de60446](https://github.com/mclgoerg/inboxrake/commit/de60446a8138b29cacce7fb1c5aa913245040f17))
+* editing an armed rule sends it back to report mode ([#233](https://github.com/mclgoerg/inboxrake/issues/233)) ([a9d2d57](https://github.com/mclgoerg/inboxrake/commit/a9d2d57ca9c78c3db8f7b8054925f359d9366b70))
+* keep the undo entry when an Undo fails ([#220](https://github.com/mclgoerg/inboxrake/issues/220)) ([b52cea8](https://github.com/mclgoerg/inboxrake/commit/b52cea821848d033bc53a0ae4bcf8e9e02045ece))
+* limit request body size ([#243](https://github.com/mclgoerg/inboxrake/issues/243)) ([b2b2efe](https://github.com/mclgoerg/inboxrake/commit/b2b2efe47e41cb1b996628df4ae67fa79f2b34fb))
+* login throttle holds under parallel attempts ([#229](https://github.com/mclgoerg/inboxrake/issues/229)) ([6cf1a88](https://github.com/mclgoerg/inboxrake/commit/6cf1a886788d762d7b7c45c03388979ad7c11645))
+* new rules no longer say they were reset ([#238](https://github.com/mclgoerg/inboxrake/issues/238)) ([fc84b8e](https://github.com/mclgoerg/inboxrake/commit/fc84b8ee397d4d1d0d0847d873b241776a045a59))
+* Outlook device sign-in no longer sends tokens to the browser ([#230](https://github.com/mclgoerg/inboxrake/issues/230)) ([5e9f69e](https://github.com/mclgoerg/inboxrake/commit/5e9f69e959f30bade6a6d0c913782fc5337678ee))
+* Outlook setup no longer calls an optional secret required ([#236](https://github.com/mclgoerg/inboxrake/issues/236)) ([3ca9ff4](https://github.com/mclgoerg/inboxrake/commit/3ca9ff4950851356a8b36b2636fe883d0089ce1f))
+* purge rules wait until mail has been in Trash or Junk for N days ([#234](https://github.com/mclgoerg/inboxrake/issues/234)) ([a9cd0d6](https://github.com/mclgoerg/inboxrake/commit/a9cd0d63d6c6f082d55d8920277471073879e0de))
+* rules refuse a qualifier given twice ([#242](https://github.com/mclgoerg/inboxrake/issues/242)) ([6004e58](https://github.com/mclgoerg/inboxrake/commit/6004e582cc28048d46b50671954ab1d15309b400))
+* rules refuse filters with mistyped parts ([#237](https://github.com/mclgoerg/inboxrake/issues/237)) ([fb0c09e](https://github.com/mclgoerg/inboxrake/commit/fb0c09e728cc76c512f6d29137d7d2845ad8cc3c))
+* the connection test gives up quickly and can be cancelled ([#246](https://github.com/mclgoerg/inboxrake/issues/246)) ([fd27d13](https://github.com/mclgoerg/inboxrake/commit/fd27d138eb53b5b8b53f0b633e017526990ce97b))
+* the setup card names the mailbox, not its internal id ([#241](https://github.com/mclgoerg/inboxrake/issues/241)) ([b422707](https://github.com/mclgoerg/inboxrake/commit/b422707ae70fdc322a1735f8d75115321c8b4110))
+* undo copes with unusual Message-IDs ([#232](https://github.com/mclgoerg/inboxrake/issues/232)) ([c9362a1](https://github.com/mclgoerg/inboxrake/commit/c9362a1b4ae7dfb9b47d078117773d9a88ef5136))
+* undo shows its result where you are ([#247](https://github.com/mclgoerg/inboxrake/issues/247)) ([1fa2051](https://github.com/mclgoerg/inboxrake/commit/1fa205144328ae2b5c1defc9e6631fd3c760aae2))
+
 ## [1.11.0](https://github.com/mclgoerg/mailbroom/compare/v1.10.0...v1.11.0) (2026-11-06)
 
 
