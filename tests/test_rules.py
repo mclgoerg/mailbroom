@@ -363,9 +363,41 @@ def test_saving_a_mistyped_filter_is_refused_naming_it(bridge, kind):
     r = client.post(f"/api/rules/{ok['id']}", json={"query": body["query"]})
     assert r.status_code == 400 and "rule_filter_invalid" in r.json()["detail"]
     assert rulesmod.load_rules()[0]["query"] == "tag:shipping"
-    # import: the rule is dropped
+    # import: the rule comes in flagged, in report mode (never dropped)
     r = client.post("/api/import_config", json={"rules": [body]})
-    assert r.json()["rules"] == 0
+    assert r.json()["rules"] == 1
+    imported = rulesmod.load_rules()[0]
+    assert imported["mode"] == "report" and imported["filter_invalid"] == [bad]
+
+
+def test_over_long_filter_is_refused_not_cut(bridge):
+    q = "tag:shipping " + "x " * 140 + "age:>1yr"
+    assert len(q) > rulesmod.FILTER_MAX
+    r = client.post("/api/rules", json={"name": "long", "query": q})
+    assert r.status_code == 400
+    assert r.json()["detail"] == mailops.coded(
+        mailops.RULE_FILTER_TOO_LONG, max=rulesmod.FILTER_MAX)
+    assert not rulesmod.load_rules()
+
+
+def test_export_import_round_trip_keeps_a_flagged_rule(bridge):
+    _legacy_rule(bridge)
+    exported = client.get("/api/export_config").json()
+    assert exported["rules"][0]["query"] == "tag:shipping age:>1yr"
+    r = client.post("/api/import_config", json=exported)
+    assert r.json()["rules"] == 1 and r.json()["skipped_rules"] == []
+    rule = client.get("/api/rules").json()["rules"][0]
+    assert rule["mode"] == "report" and rule["filter_invalid"] == ["age:>1yr"]
+    with pytest.raises(ValueError, match=mailops.RULE_REPORT_FIRST):
+        rulesmod.update_rule(rule["id"], {"mode": "execute"})
+
+
+def test_import_names_the_rules_it_could_not_take(bridge):
+    r = client.post("/api/import_config", json={"rules": [
+        {"name": "fine", "query": "tag:shipping"},
+        {"name": "bad action", "action": "explode"}]})
+    assert r.json()["rules"] == 1 and r.json()["skipped_rules"] == [
+        "bad action"]
 
 
 def test_valid_filters_still_save():

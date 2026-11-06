@@ -66,6 +66,7 @@ PURGE_DEFAULT_DAYS = 30
 RULE_GROUPINGS = tuple(g for g in mailops.GROUPINGS if g != "smart")
 _DUE_AFTER = {"daily": 24 * 3600, "weekly": 7 * 24 * 3600}
 
+FILTER_MAX = 300                 # longest rule filter (chars)
 _LOCK = threading.Lock()          # guards the rules file
 _RUN_LOCK = threading.Lock()      # one rule run at a time
 
@@ -496,7 +497,7 @@ def publish() -> None:
                 _publish(rules)
 
 
-def _validate(body: dict, rule: dict) -> dict:
+def _validate(body: dict, rule: dict, lenient_filter: bool = False) -> dict:
     before, before_box = definition_sig(rule), box_sig(rule)
     if "name" in body:
         rule["name"] = str(body["name"]).strip()[:80]
@@ -510,11 +511,17 @@ def _validate(body: dict, rule: dict) -> dict:
             raise ValueError("bad grouping")
         rule["grouping"] = body["grouping"]
     if "query" in body:
-        rule["query"] = str(body["query"]).strip()[:300]
+        query = str(body["query"]).strip()
+        if len(query) > FILTER_MAX:
+            # cutting it could drop a trailing qualifier and widen the match
+            raise ValueError(mailops.coded(
+                mailops.RULE_FILTER_TOO_LONG, max=FILTER_MAX))
+        rule["query"] = query
         # a mistyped part is silently dropped by the parsers and would widen
-        # the match: refuse it, naming the parts
+        # the match: refuse it, naming the parts (a restored backup may carry
+        # one: it comes in flagged, report mode, execute runs blocked)
         bad = validate_filter(rule["query"])
-        if bad:
+        if bad and not lenient_filter:
             raise ValueError(mailops.coded(
                 mailops.RULE_FILTER_INVALID, names=", ".join(bad)))
     if "action" in body:
@@ -624,7 +631,7 @@ def drop_account(name: str) -> None:
                      len(mine))
 
 
-def create_rule(body: dict) -> dict:
+def create_rule(body: dict, lenient_filter: bool = False) -> dict:
     rule = {"id": uuid.uuid4().hex[:8], "name": "", "scope": "mail",
             "grouping": "sender",
             "query": "", "action": "trash", "dest": "",
@@ -642,7 +649,7 @@ def create_rule(body: dict) -> dict:
         body.setdefault("action", PURGE_ACTION)
         if body.get("older_than_days") is None:
             body["older_than_days"] = PURGE_DEFAULT_DAYS
-    _validate(body, rule)
+    _validate(body, rule, lenient_filter)
     with _LOCK:
         rules = load_rules()
         rules.append(rule)

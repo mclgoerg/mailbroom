@@ -102,3 +102,12 @@ test("a saved rule with a mistyped filter shows a warning on its card", () => {
   expect(document.body.textContent).toContain(
     "The filter has parts Inboxrake doesn't understand: age:>1yr");
 });
+
+test("the inline filter error goes away when the filter text changes", async () => {
+  refuse("rule_filter_invalid:names=age%3A%3E1yr");
+  submitMailRule();
+  await screen.findByRole("alert");
+  fireEvent.change(screen.getByLabelText(t("rule.f_filter")),
+    { target: { value: "age:>1y" } });
+  expect(screen.queryByRole("alert")).toBeNull();
+});

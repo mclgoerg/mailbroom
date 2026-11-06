@@ -793,6 +793,7 @@ export const EN: Record<string, string> = {
   "import.merged": "AI verdicts, replied data and filed senders are merged.",
   "import.secrets": "Passwords and API keys are never imported.",
   "import.confirm": "Import backup",
+  "import.skipped": " Not imported: {names}.",
   "import.done": "Imported: {rules} rules, {verdicts} verdicts, {knowledge} filed senders.",
   "view.all_mails": "All mails",
   "mails.sort_date": "Date",
@@ -1654,10 +1655,12 @@ export const EN: Record<string, string> = {
     "This filter has parts Inboxrake doesn't understand: {names}",
   "ferr.rule_filter_invalid_run":
     "The filter has parts Inboxrake doesn't understand: {names} - edit the "
-    + "rule. Its automatic runs are skipped until then.",
+    + "rule. Its execute runs are skipped until then.",
   "rule.filter_invalid":
     "The filter has parts Inboxrake doesn't understand: {names}. Execute "
     + "runs are skipped until you edit the rule.",
+  "ferr.rule_filter_too_long":
+    "This filter is too long (more than {max} characters).",
   "ferr.no_account":
     "No mail account is set up yet - open Settings and fill in the "
     + "sign-in details first.",

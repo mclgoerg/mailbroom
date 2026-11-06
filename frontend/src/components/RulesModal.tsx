@@ -76,6 +76,8 @@ export function RulesModal({ state, onClose, onChanged, initialQuery = "" }: {
   const [busyId, setBusyId] = useState("");
   const [msg, setMsg] = useState("");
   const [filterErr, setFilterErr] = useState("");
+  // the refusal belongs to the filter text it was given for
+  useEffect(() => setFilterErr(""), [form.query, editId]);
   const rules = state.rules ?? [];
 
   // The effective per-run cap, from the server (purge confirms name it).
@@ -139,7 +141,8 @@ export function RulesModal({ state, onClose, onChanged, initialQuery = "" }: {
       onChanged();
     } catch (e: any) {
       // a refused filter is shown next to the filter field
-      if (e.code === "rule_filter_invalid") setFilterErr(e.message);
+      if (e.code === "rule_filter_invalid"
+          || e.code === "rule_filter_too_long") setFilterErr(e.message);
       else setMsg(t("err.generic", { msg: e.message ?? e }));
     }
   };

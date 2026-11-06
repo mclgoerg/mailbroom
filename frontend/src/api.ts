@@ -120,6 +120,7 @@ const ERROR_CODES: Record<string, string> = {
   rule_purge_filter_domain: "ferr.rule_purge_filter_domain",
   rule_filter_invalid: "ferr.rule_filter_invalid",
   rule_filter_invalid_run: "ferr.rule_filter_invalid_run",
+  rule_filter_too_long: "ferr.rule_filter_too_long",
   // List-Unsubscribe mailto: refused (backend/smtpout.py)
   mailto_unsafe: "ferr.mailto_unsafe",
   no_account: "ferr.no_account",

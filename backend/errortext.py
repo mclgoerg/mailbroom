@@ -123,7 +123,9 @@ TEXT: dict[str, str | tuple[str, str]] = {
     'rule_filter_invalid':
         'This filter has parts Inboxrake doesn\'t understand: {names}',
     'rule_filter_invalid_run':
-        'The filter has parts Inboxrake doesn\'t understand: {names} - edit the rule. Its automatic runs are skipped until then.',
+        'The filter has parts Inboxrake doesn\'t understand: {names} - edit the rule. Its execute runs are skipped until then.',
+    'rule_filter_too_long':
+        'This filter is too long (more than {max} characters).',
     'no_account':
         'No mail account is set up yet - open Settings and fill in the sign-in details first.',
     'cafile_missing':
