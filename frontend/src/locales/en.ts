@@ -867,6 +867,7 @@ export const EN: Record<string, string> = {
     + "its path under the advanced settings (usually "
     + "/certs/bridge-cert.pem).",
   "wizard.test": "Test connection",
+  "wizard.test_cancel": "Cancel test",
   "wizard.testing": "Testing the connection…",
   "wizard.test_ok": "Connected - {n} folders found.",
   "wizard.oauth_needed": "Connect your account first, then test the connection.",
@@ -1689,6 +1690,18 @@ export const EN: Record<string, string> = {
     "Could not reach {host} - check the host name, the port and your network.",
   "ferr.tls_failed":
     "The secure connection failed - check the security setting, the port and the certificate.",
+  "ferr.host_not_found":
+    "{host} was not found - check the host name for typos.",
+  "ferr.conn_refused":
+    "{host} refused the connection - check the port (IMAP is usually 993 with SSL/TLS or 143 with STARTTLS) and that the server is running.",
+  "ferr.conn_timeout":
+    "{host} did not answer in time - check the host name, the port and your network or firewall.",
+  "ferr.tls_mismatch":
+    "{host} answered, but not with the secure connection you chose - try STARTTLS on port 143 or SSL/TLS on port 993.",
+  "ferr.not_imap":
+    "{host} answered, but not like an IMAP server - check the port (IMAP uses 993 or 143).",
+  "ferr.cert_failed":
+    "The certificate of {host} is not trusted - for a self-signed certificate (e.g. Proton Bridge) enter its CA file in the certificate field of the sign-in settings.",
   "ferr.connect_failed":
     "Could not connect to the server - check the settings and try again.",
   "ferr.scan_failed":
