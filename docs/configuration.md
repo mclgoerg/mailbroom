@@ -56,6 +56,16 @@ setup that should come up configured; they bootstrap **one** account.
 
 See [Security & privacy](security.md) for what each mode protects.
 
+Behind a reverse proxy, also set uvicorn's `FORWARDED_ALLOW_IPS` (default
+`127.0.0.1,::1`; read by uvicorn, not by Inboxrake) to the proxy's address
+or its network in CIDR form (the proxy's own address is safer than a whole
+Docker subnet), so failed password logins are counted per
+visitor instead of against the proxy. Never use `*`: the visitor could then
+choose the address that is counted. Whatever is trusted must carry only the
+proxy's traffic, so keep `INBOXRAKE_BIND=127.0.0.1` (the default) or do not
+publish the port. Details in
+[Security & privacy](security.md#password-login-throttling).
+
 ## AI review
 
 | Variable | Default | What it does |
