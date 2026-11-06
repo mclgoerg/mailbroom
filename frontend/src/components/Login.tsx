@@ -40,7 +40,9 @@ export function Login({ mode, onLogin }: {
   return (
     <div className="mx-auto mt-24 max-w-xs rounded-card border border-line
       bg-panel p-4 type-body sm:p-5">
-      <div className="mb-4 text-center type-title">
+      <div className="mb-4 text-center type-title flex items-center justify-center gap-2">
+        <img src={`${import.meta.env.BASE_URL}icon.svg`} alt=""
+          width="36" height="36" className="shrink-0" />
         Inboxrake
       </div>
       {mode === "password" && (

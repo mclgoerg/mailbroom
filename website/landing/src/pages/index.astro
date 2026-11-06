@@ -2,6 +2,7 @@
 import hero from "../../../../docs/screenshots/groups-dark.png";
 import heroLight from "../../../../docs/screenshots/groups-light.png";
 import { DEMO_LIVE, GITHUB } from "../../site.mjs";
+import { VERSION, RELEASE_URL } from "../../../release.mjs";
 
 const title = "Inboxrake - self-hosted cleanup for a mailbox that piled up";
 const description =
@@ -13,6 +14,7 @@ const jsonLd = {
   name: "Inboxrake",
   description,
   url: "https://inboxrake.com/",
+  softwareVersion: VERSION,
   applicationCategory: "UtilitiesApplication",
   operatingSystem: "Linux (Docker)",
   license: `${GITHUB}/blob/main/LICENSE`,
@@ -55,7 +57,10 @@ const heroAlt =
   </head>
   <body>
     <header class="bar">
-      <a class="brand" href="/">Inboxrake</a>
+      <div class="brand-group">
+        <a class="brand" href="/"><img src="/favicon.svg" alt="" width="32" height="32" />Inboxrake</a>
+        <a class="version" href={RELEASE_URL} aria-label={`Release ${VERSION}`}>v{VERSION}</a>
+      </div>
       <nav>
         <a href="/docs/">Docs</a>
         <a href={GITHUB}>GitHub</a>
@@ -177,7 +182,10 @@ docker compose up -d</code></pre>
   }
   .bar nav { display: flex; gap: 1.25rem; }
   .bar a { text-decoration: none; }
-  .brand { color: var(--strong); font-weight: 600; font-size: 1.125rem; }
+  .brand-group { display: flex; align-items: center; gap: 0.5rem; }
+  .bar .version { color: var(--text); font-size: 0.75rem; white-space: nowrap; }
+  .bar .version:hover { text-decoration: underline; }
+  .brand { display: inline-flex; align-items: center; gap: 0.5rem; color: var(--strong); font-weight: 600; font-size: 1.125rem; }
   main { max-width: 52rem; margin: 0 auto; padding: 3rem 1.5rem 1rem; }
   section { margin-bottom: 3rem; }
   .lead { font-size: 1.125rem; }
