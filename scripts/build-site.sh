@@ -3,6 +3,7 @@
 #
 #   <out>/                landing page  (website/dist-landing, built with the demo button)
 #   <out>/_headers        Cloudflare response headers (website/public/_headers)
+#   <out>/robots.txt, sitemap.xml   crawler files (website/public/)
 #   <out>/docs/           documentation (website/dist)
 #   <out>/demo/           the in-browser demo UI (frontend/dist-demo)
 #   <out>/demo/bundle/    Pyodide + app + seed (scripts/demo-bundle output)
@@ -38,7 +39,7 @@ MAX_FILE_BYTES=$((25 * 1024 * 1024))
 
 check_tree() {
   local t="$1" f n
-  for f in index.html 404.html favicon.svg og.png _headers docs/index.html docs/404.html \
+  for f in index.html 404.html favicon.svg og.png _headers robots.txt sitemap.xml docs/index.html docs/404.html \
            demo/index.html demo/bundle/manifest.json; do
     [ -f "$t/$f" ] || die "missing $f in the assembled tree"
   done
@@ -61,6 +62,20 @@ check_tree() {
   done
   grep -q '"/demo/icon.svg"' "$t/demo/manifest.webmanifest" \
     || die "demo manifest icon is not rooted at /demo/"
+
+  # search engines: crawler files, canonical + structured data, demo title
+  grep -qx 'Sitemap: https://inboxrake.com/sitemap.xml' "$t/robots.txt" \
+    || die "robots.txt has no Sitemap line for the root sitemap"
+  grep -qx 'Sitemap: https://inboxrake.com/docs/sitemap-index.xml' "$t/robots.txt" \
+    || die "robots.txt has no Sitemap line for the docs sitemap"
+  grep -q '<loc>https://inboxrake.com/demo/</loc>' "$t/sitemap.xml" \
+    || die "sitemap.xml does not list the demo"
+  grep -q 'rel="canonical" href="https://inboxrake.com/"' "$t/index.html" \
+    || die "landing page has no canonical link"
+  grep -q 'application/ld+json' "$t/index.html" || die "landing page has no JSON-LD"
+  grep -q '<title>Inboxrake demo - try it in your browser</title>' "$t/demo/index.html" \
+    || die "demo/index.html has no descriptive title"
+  grep -q 'name="description"' "$t/demo/index.html" || die "demo/index.html has no meta description"
 
   # _headers only works at the root; one anywhere else would be a dead copy
   n=$(find "$t" -name _headers -not -path "$t/_headers" | wc -l)
@@ -122,5 +137,6 @@ cp -R "$BUNDLE/." "$OUT/demo/bundle/"
 # unknown paths outside /docs/ get the docs' (root-absolute, self-contained) 404 page
 cp "$OUT/docs/404.html" "$OUT/404.html"
 # the docs build brings its own copy of public/_headers; only the root one counts
-rm -f "$OUT/docs/_headers" "$OUT/demo/_headers"
+rm -f "$OUT/docs/_headers" "$OUT/demo/_headers" \
+  "$OUT/docs/robots.txt" "$OUT/docs/sitemap.xml" "$OUT/demo/robots.txt" "$OUT/demo/sitemap.xml"
 check_tree "$OUT"
