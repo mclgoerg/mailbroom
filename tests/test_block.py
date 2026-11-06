@@ -117,3 +117,12 @@ def test_scheduler_picks_up_block_rule(bridge):
     assert after["last_run"]["mode"] == "execute"
     assert after["last_run"]["acted"] == 1
     assert "news@shop.example" not in mailops.STATE["groups"]["sender"]
+
+
+def test_a_new_block_rule_has_no_reset_reason(bridge):
+    mailops.run_scan()
+    r = client.post("/api/block",
+                    json={"grouping": "sender", "key": "noreply@dhl.example"})
+    assert r.status_code == 200
+    assert r.json()["rule"]["reset_reason"] == ""
+    assert rulesmod.load_rules()[0]["reset_reason"] == ""
