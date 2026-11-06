@@ -6,38 +6,98 @@
 ### Features
 
 * first-run setup wizard ([#206](https://github.com/mclgoerg/mailbroom/issues/206)) ([2b8fb4e](https://github.com/mclgoerg/mailbroom/commit/2b8fb4ef3de59c25daf6eb1a57719300b36ad456))
+  <!-- release-notes:206 -->
+  New: a first-run setup wizard. A fresh install now walks you through provider, sign-in, folders, an optional password and the first scan; "Add account" in the profile menu uses the same steps. Connection problems are explained in your language (wrong password, server not reachable, certificate problem).
 * let Gmail accounts sign in with an app password again ([780e4a8](https://github.com/mclgoerg/mailbroom/commit/780e4a88ec5a57ffd44b82e01b6c915de5c37b13))
 
 
 ### Bug Fixes
 
 * a fresh install no longer fails on the first scan ([#191](https://github.com/mclgoerg/mailbroom/issues/191)) ([0e858a6](https://github.com/mclgoerg/mailbroom/commit/0e858a6c849ae0597772cb51ff754e0efb087052))
+  <!-- release-notes:191 -->
+  Fixed: a fresh install no longer fails the first scan with a raw file error. Mailbroom now tells you in your language to set up an account first, or names a missing certificate file. The welcome card stays visible after a failed scan, and choosing "Custom" no longer keeps Proton's certificate path.
+  Upgrade note: the Proton Bridge certificate path is only assumed when the file exists; set `IMAP_CAFILE` explicitly otherwise.
 * accounts connected via OAuth can test the connection and start the first scan ([780e4a8](https://github.com/mclgoerg/mailbroom/commit/780e4a88ec5a57ffd44b82e01b6c915de5c37b13))
 * changing an account's provider preset no longer keeps signing in via OAuth ([780e4a8](https://github.com/mclgoerg/mailbroom/commit/780e4a88ec5a57ffd44b82e01b6c915de5c37b13))
 * forbid embedding Mailbroom in other sites' frames ([#184](https://github.com/mclgoerg/mailbroom/issues/184)) ([026510d](https://github.com/mclgoerg/mailbroom/commit/026510d921f242e0123a177983cc7db7c960fa4a))
+  <!-- release-notes:184 -->
+  Other websites can no longer embed Mailbroom in a frame (clickjacking protection); browsers also stop guessing content types and send no referrer to other sites.
 * group the Tools menu ([#186](https://github.com/mclgoerg/mailbroom/issues/186)) ([282ce66](https://github.com/mclgoerg/mailbroom/commit/282ce666d17af949d7496638ff7d6bd303f495dd))
+  <!-- release-notes:186 -->
+  - The Tools menu is now sorted into three sections: Clean up, Insights, and AI & export.
 * health checks no longer fill the log ([#192](https://github.com/mclgoerg/mailbroom/issues/192)) ([734bfb6](https://github.com/mclgoerg/mailbroom/commit/734bfb69a8fdd2cae41daa8fc080826a305d9337))
+  <!-- release-notes:192 -->
+  The container log no longer gets a line every minute from the built-in health check.
 * hide folders that can't hold mail, like Gmail's [Gmail] parent ([#196](https://github.com/mclgoerg/mailbroom/issues/196)) ([f43fcff](https://github.com/mclgoerg/mailbroom/commit/f43fcff59f42812a322ded111a063709e9e98a04))
+  <!-- release-notes:196 -->
+  Folders that only group other folders and can't hold mail (like Gmail's "[Gmail]") no longer show up under Folders to scan and are never scanned or used as a move target.
 * keep sign-in tokens out of the settings backup ([#180](https://github.com/mclgoerg/mailbroom/issues/180)) ([310c1a1](https://github.com/mclgoerg/mailbroom/commit/310c1a1e03cd7da4b5e6181e56d1dcd148551932))
+  <!-- release-notes:180 -->
+  - Settings backups no longer contain sign-in (OAuth) tokens or client secrets.
+  - Backup files made by earlier versions may contain such tokens: delete them or keep them private. Importing a backup never changes the sign-in tokens or passwords already on the instance.
 * label the Junk and Trash counts in the header ([#181](https://github.com/mclgoerg/mailbroom/issues/181)) ([700fdac](https://github.com/mclgoerg/mailbroom/commit/700fdac4c4630305605d94cad4d2a4de3b427a0b))
+  <!-- release-notes:181 -->
+  - The Junk and Trash counts in the header now say what they are ("Junk 11", "Trash 70") on tablets and desktops.
 * less clutter above the group list ([#203](https://github.com/mclgoerg/mailbroom/issues/203)) ([fad4032](https://github.com/mclgoerg/mailbroom/commit/fad4032ef42d0dc8bbec65ad050d1a00cbb72a0b))
+  <!-- release-notes:203 -->
+  - The "cached AI verdicts" message is now a small note at the end of the status line instead of a banner.
+  - Quick wins remembers per account whether you collapsed it, and a collapsed strip is a single slim line.
+  - On phones the quick-filter chips sit on one scrollable line, so more groups fit on the first screen.
 * mailto unsubscribe can no longer add mail headers ([#189](https://github.com/mclgoerg/mailbroom/issues/189)) ([f47e4d8](https://github.com/mclgoerg/mailbroom/commit/f47e4d892e5e178be8f9db06cea06a8b452a2b93))
+  <!-- release-notes:189 -->
+  - Unsubscribing by e-mail now refuses addresses or texts that would add extra recipients or headers to the unsubscribe mail; the sender is then shown as failed.
 * never purge other apps' deleted mails while moving ([#199](https://github.com/mclgoerg/mailbroom/issues/199)) ([ca3d9b3](https://github.com/mclgoerg/mailbroom/commit/ca3d9b3080d748e924df58f03af1db68024d2168))
+  <!-- release-notes:199 -->
+  - On mail servers without the MOVE extension, deleting or restoring mail can no longer permanently remove mails that another mail program had only marked for deletion; the move now stops with a clear message instead.
 * refuse requests from other websites when no login is set ([#179](https://github.com/mclgoerg/mailbroom/issues/179)) ([54e5a09](https://github.com/mclgoerg/mailbroom/commit/54e5a0903ea3d0a6b4323b5029be95b588e7e552))
+  <!-- release-notes:179 -->
+  - Mailbroom now refuses requests that other websites try to make through your browser (DNS rebinding and cross-site form posts).
+  - **Upgrade caveat:** if you run without a login and open Mailbroom under a host name (not localhost or an IP address), add `MAILBROOM_ALLOWED_HOSTS=<that name>` to the container environment.
 * refuse single sign-on with an unverified email ([759d23e](https://github.com/mclgoerg/mailbroom/commit/759d23ef96d41ea9b36b4a6c2a1b74b1e25c8217))
 * save the scan snapshot before a delete job reports done ([#209](https://github.com/mclgoerg/mailbroom/issues/209)) ([6557221](https://github.com/mclgoerg/mailbroom/commit/6557221ff1cbd779aecfcb8ee0c815178a720e2e))
+  <!-- release-notes:209 -->
+  - A restart right after a delete or move no longer risks bringing back the cleaned-up groups from an older cached scan.
 * say clearly when the data folder is not writable ([#194](https://github.com/mclgoerg/mailbroom/issues/194)) ([04bdf61](https://github.com/mclgoerg/mailbroom/commit/04bdf6110e172631b86f8ed3490cb75ab5fcc166))
+  <!-- release-notes:194 -->
+  - If the data folder is not writable (typically a new host folder mounted at `/data`), Mailbroom now logs the exact fix at startup and the UI says so in plain words instead of showing a raw permission error.
+  - The install guide explains the folder ownership (user ID 1000) for Synology, Unraid and TrueNAS.
 * send "Describe a filter" with Ctrl+Enter ([#198](https://github.com/mclgoerg/mailbroom/issues/198)) ([c4517f5](https://github.com/mclgoerg/mailbroom/commit/c4517f5e4cea56e16ce6b04475bcde5da44a9b12))
+  <!-- release-notes:198 -->
+  - "Describe a filter": a hint now says you can send your sentence with Ctrl+Enter (⌘+Enter on a Mac), and the shortcut no longer adds a stray new line.
 * show Unsubscribe in a group's view on phones ([#182](https://github.com/mclgoerg/mailbroom/issues/182)) ([5e8b2a5](https://github.com/mclgoerg/mailbroom/commit/5e8b2a52ad69c9a372d9bdbf3a6df45cd157bd69))
+  <!-- release-notes:182 -->
+  - On phones, the Unsubscribe button is now visible in a sender's view instead of being hidden in the "..." menu.
 * sign everyone out when the login changes ([#205](https://github.com/mclgoerg/mailbroom/issues/205)) ([bcfa037](https://github.com/mclgoerg/mailbroom/commit/bcfa037b845aec4e9c157add10ff43ffeb591cf9))
+  <!-- release-notes:205 -->
+  - Changing the login password, the login method, the allowed SSO users or the admin now signs every other browser out; new "Sign out all sessions" button in Settings -> Server.
+  - **Upgrade caveat:** sessions from before this update are refused once - everyone signs in again after updating.
 * slow down password guessing on the login page ([#208](https://github.com/mclgoerg/mailbroom/issues/208)) ([b91ea9a](https://github.com/mclgoerg/mailbroom/commit/b91ea9aa51c05e1dac1a95866785927cd8df46c2))
+  <!-- release-notes:208 -->
+  After 5 wrong passwords within 15 minutes the login page asks you to wait (the message says how long). Behind a reverse proxy all visitors share the proxy's address, so the wait applies to them together.
 * Smart rows of a single sender show its AI verdict ([#200](https://github.com/mclgoerg/mailbroom/issues/200)) ([9e8cb7d](https://github.com/mclgoerg/mailbroom/commit/9e8cb7dd3aedbf7dfc012661eb9b67238a4dea52))
+  <!-- release-notes:200 -->
+  - On the Smart tab, rows that are a single sender now show the AI verdict that sender already has on the Sender tab (pooled company/kind rows are unchanged).
 * tell status badges and category tags apart in the group list ([#190](https://github.com/mclgoerg/mailbroom/issues/190)) ([bc250ab](https://github.com/mclgoerg/mailbroom/commit/bc250abf9cbc4e0351964c266eada48891b343d4))
+  <!-- release-notes:190 -->
+  - In the group list, category tags (newsletter, shopping...) are now outlined and listed after the status badges, so the two are easy to tell apart. The column header reads "Status & tags".
 * the deploy starter kit works out of the box ([#178](https://github.com/mclgoerg/mailbroom/issues/178)) ([96348c4](https://github.com/mclgoerg/mailbroom/commit/96348c4a69e9a270b040765e22b896a119d528df))
+  <!-- release-notes:178 -->
+  - Single sign-on set up through the starter `.env` was broken by stray comment text being read as the issuer, allow-list and redirect values - fixed.
+  - The Proton starter kit now needs `BRIDGE_IMAGE` set in `.env` (Mailbroom ships no Bridge image); compose says so if it is missing.
 * the trash confirmation names what is moved ([#193](https://github.com/mclgoerg/mailbroom/issues/193)) ([19f500f](https://github.com/mclgoerg/mailbroom/commit/19f500f292ffcbc6ecba9812e383e8d8b52f5bb1))
+  <!-- release-notes:193 -->
+  - The "Move to Trash" confirmation now names the senders or groups being moved (e.g. "120 mails from Gadget Weekly") and reminds you that the move can be undone from the result message.
 * unknown API paths answer 404 ([#188](https://github.com/mclgoerg/mailbroom/issues/188)) ([c17eac6](https://github.com/mclgoerg/mailbroom/commit/c17eac6e5a8477da19840713c10d635df0100155))
+  <!-- release-notes:188 -->
+  Requests to API addresses that do not exist now get a proper 404 instead of the web page, so scripts and monitors no longer mistake them for success.
 * unsubscribe failures say what went wrong in plain words ([#207](https://github.com/mclgoerg/mailbroom/issues/207)) ([e5a0390](https://github.com/mclgoerg/mailbroom/commit/e5a03900499b2386f5e11f549a4434c18deefa78))
+  <!-- release-notes:207 -->
+  - When an unsubscribe fails, the message now says what went wrong in plain words (and in German), e.g. the sender's page refused, could not be reached, or the link points to an internal address.
 * unsubscribe links can no longer reach internal addresses ([#185](https://github.com/mclgoerg/mailbroom/issues/185)) ([790c1a8](https://github.com/mclgoerg/mailbroom/commit/790c1a8f10514e6c5255517d25d8f2a200a44ca0))
+  <!-- release-notes:185 -->
+  - One-click unsubscribe now refuses links that point at internal or private network addresses, and no longer follows redirects.
+  - Unsubscribe links using plain `http` are now handed to you to open yourself instead of being posted automatically.
+  - One-click unsubscribe no longer goes through an `HTTPS_PROXY` (it connects straight to the validated address; a proxy would resolve the name again).
 * warn when any account at the identity provider may sign in ([759d23e](https://github.com/mclgoerg/mailbroom/commit/759d23ef96d41ea9b36b4a6c2a1b74b1e25c8217))
 
 ## [1.10.0](https://github.com/mclgoerg/mailbroom/compare/v1.9.0...v1.10.0) (2026-11-01)
