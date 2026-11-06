@@ -204,15 +204,17 @@ Inboxrake connects to Outlook/Microsoft 365 via OAuth only (Microsoft
 has no app-password option for IMAP). Select the **Outlook / Microsoft
 365** preset for the account, then:
 
-- If the maintainer's shared app is configured
-  (`INBOXRAKE_MS_CLIENT_ID` set on the server), no registration is
-  needed - click **Connect with a device code**, then enter the shown
-  code at microsoft.com/devicelogin.
-- Otherwise, register your own public client in
-  [Entra ID](https://entra.microsoft.com/) (App registrations -> New
-  registration, no redirect URI needed, enable "Allow public client
-  flows" under Authentication), paste its client ID under "Connect via
-  OAuth", then click **Connect**.
+Inboxrake does not ship a Microsoft app: you need your own (free) app
+registration in Microsoft Entra ID.
+
+- Register a public client in [Entra ID](https://entra.microsoft.com/)
+  (App registrations -> New registration, no redirect URI needed, enable
+  "Allow public client flows" under Authentication), paste its client ID
+  under "Connect via OAuth", then click **Connect**.
+- If an administrator runs the server with their own registration
+  (`INBOXRAKE_MS_CLIENT_ID`), no registration is needed on your side:
+  click **Connect with a device code**, then enter the shown code at
+  microsoft.com/devicelogin.
 
 ## After the first start
 

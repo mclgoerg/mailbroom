@@ -41,10 +41,11 @@ two in Settings keeps both credentials.
 ## Outlook / Microsoft 365: OAuth only
 
 Microsoft offers no app-password IMAP, so Outlook accounts sign in with
-OAuth. With `INBOXRAKE_MS_CLIENT_ID` set on the server the account connects
-with a **device code** and needs no registration; without it you register
-your own public client in Entra ID and use the same bring-your-own flow as
-Gmail. For work or school tenants set `INBOXRAKE_MS_TENANT`. Steps:
+OAuth, and no Microsoft app ships with Inboxrake: you register your own
+public client in Entra ID (free) and use the same bring-your-own flow as
+Gmail. Only if an administrator sets `INBOXRAKE_MS_CLIENT_ID` on the server
+with their own registration does the account connect with a **device code**
+and need no registration of yours. For work or school tenants set `INBOXRAKE_MS_TENANT`. Steps:
 [Microsoft OAuth setup](install.md#microsoft-oauth-setup).
 
 ## Proton Mail via Bridge
