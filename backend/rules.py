@@ -39,6 +39,7 @@ from pathlib import Path
 from . import accounts
 from . import auditlog
 from . import config as cfgmod
+from . import demo
 from . import mailops
 from . import pinstore
 from . import tenants
@@ -699,6 +700,10 @@ def run_rule(rule_id: str, rescan: bool = True) -> dict:
         with acc.lock:
             scan_ok = acc.state["status"] == "done"
         if rescan or not scan_ok:
+            if demo.enabled():
+                # the demo's scan runs only after the handler returned, so
+                # waiting for it here would block the one thread for good
+                raise demo.refusal()
             try:
                 mailops.start_scan(acc)
             except RuntimeError as exc:      # busy with user-triggered work

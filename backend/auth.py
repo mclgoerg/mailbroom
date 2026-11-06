@@ -20,9 +20,12 @@ import re
 import secrets
 import threading
 import time
+import urllib.error
 import urllib.parse
 import urllib.request
 from pathlib import Path
+
+from . import demo
 
 log = logging.getLogger("inboxrake.auth")
 
@@ -290,8 +293,13 @@ _discovery_cache: dict[str, dict] = {}
 def _http_json(url: str, data: bytes | None = None,
                headers: dict | None = None) -> dict:
     req = urllib.request.Request(url, data=data, headers=headers or {})
-    with urllib.request.urlopen(req, timeout=15) as res:
-        return json.loads(res.read())
+    try:
+        with urllib.request.urlopen(req, timeout=15) as res:
+            return json.loads(res.read())
+    except urllib.error.URLError as exc:
+        if demo.denied(exc):
+            raise demo.refusal() from exc
+        raise
 
 
 def discovery(issuer: str) -> dict:

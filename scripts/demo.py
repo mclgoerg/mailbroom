@@ -6,6 +6,11 @@ For screenshots and local poking without any real IMAP server:
       -v "$PWD":/repo ghcr.io/mclgoerg/inboxrake:latest \
       python /repo/scripts/demo.py
 
+`--build-seed DIR` generates and scans everything once and writes it to DIR
+(see scripts/demo_seed.py); `--from-seed DIR` serves such a seed without
+generating anything. `DEMO_NOW` (epoch seconds) pins the clock the mail
+dates derive from.
+
 `--empty` starts a fresh install with no account instead (first-run wizard;
 any host works, the password "demo" signs in).
 
@@ -30,6 +35,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / "tests"))
+sys.path.insert(0, str(ROOT / "scripts"))
 
 # Isolated storage - set BEFORE importing the backend (paths bind at import).
 DATA = Path(tempfile.mkdtemp(prefix="inboxrake-demo-"))
@@ -70,7 +76,7 @@ def _fixture(*a, **k):
 sys.modules.setdefault("pytest", types.SimpleNamespace(fixture=_fixture))
 
 from conftest import FakeIMAP, make_msg          # noqa: E402
-from backend import (accounts, aihelper, bodyindex, knowledgestore, mailops,   # noqa: E402
+from backend import (accounts, aihelper, bodyindex, demo, knowledgestore, mailops,   # noqa: E402
                      rules, unsubstore, verdictstore)
 
 
@@ -106,8 +112,108 @@ if "--empty" in sys.argv:
     _run_empty()
     raise SystemExit(0)
 
+# "Describe a filter" without a provider: a canned stand-in for the AI client
+# that knows three sentences (English + German) and answers everything else
+# with "not expressible". It sees exactly what a real provider would see (the
+# prompt and the sentence), so the panel behaves like the real thing.
+_FILTER_ANSWERS = [
+    (("never read", "nie lese"),
+     {"query": "tag:newsletter unread:>90 age:>1y", "unsupported": [],
+      "explanation": "Newsletters, which you hardly ever open, with no mail "
+                     "for over a year."}),
+    (("shipping", "versand"),
+     {"query": "tag:shipping ai:safe", "unsupported": [],
+      "explanation": "Shipping notifications the AI rated safe to delete."}),
+    (("never answered", "nie geantwortet"),
+     {"query": "att:>5m is:noreply-ever",
+      "unsupported": ["only mails from last week"],
+      "explanation": "Senders with large attachments that you never wrote "
+                     "to."}),
+]
+_FILTER_ANSWERS_DE = {
+    "tag:newsletter unread:>90 age:>1y":
+        "Newsletter, die Sie kaum öffnen, ohne Mail seit über einem Jahr.",
+    "tag:shipping ai:safe":
+        "Versandmeldungen, die die KI als harmlos einstuft.",
+    "att:>5m is:noreply-ever":
+        "Absender mit großen Anhängen, denen Sie nie geschrieben haben.",
+}
+
+
+_real_ai_client = aihelper.ai_client
+
+
+def _demo_ai_client(cfg):
+
+    def create(**kw):
+        ask = json.loads(kw["messages"][0]["content"])
+        if "sentence" not in ask:            # not a filter request
+            return _real_ai_client(cfg).messages.create(**kw)
+        sentence = ask["sentence"].lower()
+        out = {"query": "", "unsupported": [ask["sentence"][:80]],
+               "explanation": "The demo AI only knows three example "
+                              "sentences."}
+        for needles, answer in _FILTER_ANSWERS:
+            if any(n in sentence for n in needles):
+                out = dict(answer)
+                if ask["language"] == "German":
+                    out["explanation"] = _FILTER_ANSWERS_DE[out["query"]]
+                    out["unsupported"] = [u.replace(
+                        "only mails from last week", "nur Mails der letzten Woche")
+                        for u in out["unsupported"]]
+        return types.SimpleNamespace(
+            stop_reason="end_turn",
+            content=[types.SimpleNamespace(type="text",
+                                           text=json.dumps(out))],
+            usage=types.SimpleNamespace(input_tokens=900, output_tokens=80))
+    return types.SimpleNamespace(messages=types.SimpleNamespace(create=create))
+
+
+aihelper.ai_client = _demo_ai_client
+
+def _flag(name: str) -> str | None:
+    """The value after `--name` on the command line, if given."""
+    if name in sys.argv:
+        try:
+            return sys.argv[sys.argv.index(name) + 1]
+        except IndexError:
+            raise SystemExit(f"demo: {name} needs a directory") from None
+    return None
+
+
+BUILD_SEED = _flag("--build-seed")
+FROM_SEED = _flag("--from-seed")
+
+
+def _serve() -> None:
+    import uvicorn
+    from backend.main import app
+    uvicorn.run(app, host="0.0.0.0", port=int(os.environ.get("DEMO_PORT", "8765")), log_level="warning")
+
+
+if FROM_SEED:
+    # Serve a seed written by --build-seed: nothing is generated or scanned.
+    import demo_seed
+    try:
+        FAKES, _runtime = demo_seed.load(FROM_SEED, DATA)
+    except demo_seed.SeedError as e:
+        raise SystemExit(f"demo: {e}") from None
+    mailops.connect = lambda im, name=None: FAKES[im["host"]]
+    for _name in accounts.names():
+        _acc = accounts.get(_name)
+        # the Gmail demo accounts are never scanned: no snapshot, no error
+        if not mailops.load_snapshot(_acc) and _name in _runtime:
+            raise SystemExit(f"demo: the scan snapshot of {_name!r} in the "
+                             "seed is unusable; rebuild it with --build-seed")
+        _acc.state.update(_runtime.get(_name, {}))
+    rules.publish()          # the lifespan does this too; it is idempotent
+    if __name__ == "__main__":
+        _serve()
+    raise SystemExit(0)
+
+
 random.seed(7)
-NOW = time.time()
+NOW = float(os.environ.get("DEMO_NOW") or time.time())
 
 
 def _date(days_ago: float) -> str:
@@ -442,7 +548,7 @@ ICLOUD = FakeIMAP({
     "Sent Messages": ICLOUD_TAIL_SENT + [make_msg(
         next(_UID), frm="Demo <demo@icloud.example>",
         subject="Re: Sonntag bei Oma?",
-        to="lisa@familienpost.example", seen=True)],
+        to="lisa@familienpost.example", seen=True, date=_date(3))],
     "Deleted Messages": [],
     # a client-made look-alike of the server's Trash (Settings can move it)
     "Gelöschte Elemente": mails('"Cloud Photos" <no-reply@cloudphotos.example>',
@@ -450,7 +556,15 @@ ICLOUD = FakeIMAP({
 }, flags={"Deleted Messages": "\\Trash"})
 
 FAKES = {"demo-proton": PROTON, "demo-icloud": ICLOUD}
-mailops.connect = lambda im, name=None: FAKES[im["host"]]
+
+
+def _connect(im, name=None):
+    if im.get("host") not in FAKES:
+        raise demo.refusal()          # "Add account" with a real server
+    return FAKES[im["host"]]
+
+
+mailops.connect = _connect
 
 # Two configured accounts (hosts route to the fakes above).
 Path(os.environ["CONFIG_PATH"]).write_text(json.dumps({
@@ -607,65 +721,6 @@ knowledgestore.modify(lambda entries: entries.update({
         "note": "left the mailbox"},
 }))
 
-# "Describe a filter" without a provider: a canned stand-in for the AI client
-# that knows three sentences (English + German) and answers everything else
-# with "not expressible". It sees exactly what a real provider would see (the
-# prompt and the sentence), so the panel behaves like the real thing.
-_FILTER_ANSWERS = [
-    (("never read", "nie lese"),
-     {"query": "tag:newsletter unread:>90 age:>1y", "unsupported": [],
-      "explanation": "Newsletters, which you hardly ever open, with no mail "
-                     "for over a year."}),
-    (("shipping", "versand"),
-     {"query": "tag:shipping ai:safe", "unsupported": [],
-      "explanation": "Shipping notifications the AI rated safe to delete."}),
-    (("never answered", "nie geantwortet"),
-     {"query": "att:>5m is:noreply-ever",
-      "unsupported": ["only mails from last week"],
-      "explanation": "Senders with large attachments that you never wrote "
-                     "to."}),
-]
-_FILTER_ANSWERS_DE = {
-    "tag:newsletter unread:>90 age:>1y":
-        "Newsletter, die Sie kaum öffnen, ohne Mail seit über einem Jahr.",
-    "tag:shipping ai:safe":
-        "Versandmeldungen, die die KI als harmlos einstuft.",
-    "att:>5m is:noreply-ever":
-        "Absender mit großen Anhängen, denen Sie nie geschrieben haben.",
-}
-
-
-_real_ai_client = aihelper.ai_client
-
-
-def _demo_ai_client(cfg):
-
-    def create(**kw):
-        ask = json.loads(kw["messages"][0]["content"])
-        if "sentence" not in ask:            # not a filter request
-            return _real_ai_client(cfg).messages.create(**kw)
-        sentence = ask["sentence"].lower()
-        out = {"query": "", "unsupported": [ask["sentence"][:80]],
-               "explanation": "The demo AI only knows three example "
-                              "sentences."}
-        for needles, answer in _FILTER_ANSWERS:
-            if any(n in sentence for n in needles):
-                out = dict(answer)
-                if ask["language"] == "German":
-                    out["explanation"] = _FILTER_ANSWERS_DE[out["query"]]
-                    out["unsupported"] = [u.replace(
-                        "only mails from last week", "nur Mails der letzten Woche")
-                        for u in out["unsupported"]]
-        return types.SimpleNamespace(
-            stop_reason="end_turn",
-            content=[types.SimpleNamespace(type="text",
-                                           text=json.dumps(out))],
-            usage=types.SimpleNamespace(input_tokens=900, output_tokens=80))
-    return types.SimpleNamespace(messages=types.SimpleNamespace(create=create))
-
-
-aihelper.ai_client = _demo_ai_client
-
 # Pre-scan both accounts (incl. attachments) so screenshots are instant. The
 # Proton demo also builds its local body index, which is where the tracker
 # report (Tools -> Trackers) comes from; iCloud stays without one (empty state).
@@ -679,7 +734,18 @@ for name in ("proton", "icloud"):
     print(f"[demo] {name}: {len(st['groups']['sender'])} senders, "
           f"{sum(g['count'] for g in st['groups']['sender'].values())} mails")
 
+if BUILD_SEED:
+    import demo_seed
+    try:
+        demo_seed.write(BUILD_SEED, DATA, FAKES, {
+            n: {k: accounts.get(n).state[k]
+                for k in ("atts", "index", "notice")
+                if k in accounts.get(n).state}
+            for n in ("proton", "icloud")})
+    except demo_seed.SeedError as e:
+        raise SystemExit(f"demo: {e}") from None
+    print(f"[demo] seed written to {BUILD_SEED}")
+    raise SystemExit(0)
+
 if __name__ == "__main__":
-    import uvicorn
-    from backend.main import app
-    uvicorn.run(app, host="0.0.0.0", port=int(os.environ.get("DEMO_PORT", "8765")), log_level="warning")
+    _serve()

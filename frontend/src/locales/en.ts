@@ -1605,6 +1605,7 @@ export const EN: Record<string, string> = {
   "ferr.unsub_pooled": "A combined row has no single sender to unsubscribe from - open one of its senders.",
   "ferr.unsub_unknown_group": "That group no longer exists - rescan and try again.",
   "ferr.unsub_failed": "Unsubscribing failed unexpectedly. The server log has the details.",
+  "ferr.not_in_demo": "Not available in the demo.",
   "ferr.cannot_flag":
     "The server did not accept marking the mails for deletion.",
   "ferr.cannot_expunge": "The server did not remove the marked mails.",

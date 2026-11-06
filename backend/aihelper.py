@@ -15,6 +15,7 @@ import time
 
 from . import accounts
 from . import config as cfgmod
+from . import demo
 from . import mailops
 from . import pinstore
 from . import tenants
@@ -133,6 +134,8 @@ AI_GROUP_SCHEMA = {
 
 def ai_client(cfg: dict):
     """Anthropic-family client (first-party API or Microsoft Foundry)."""
+    if demo.enabled():
+        raise demo.refusal()
     import anthropic
     ai = cfg["ai"]
     if ai["provider"] == "foundry":
@@ -146,6 +149,8 @@ def ai_client(cfg: dict):
 
 def _openai_client(cfg: dict):
     """OpenAI, or any OpenAI-compatible endpoint (Ollama, LM Studio, vLLM)."""
+    if demo.enabled():
+        raise demo.refusal()
     import openai
     ai = cfg["ai"]
     if ai["provider"] == "ollama":
