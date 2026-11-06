@@ -25,7 +25,7 @@ def unwritable(tmp_path, monkeypatch):
 
 def test_a_writable_data_folder_is_fine(caplog):
     assert mailops.data_dir_problem() is None
-    with caplog.at_level(logging.ERROR, logger="pmc.data"):
+    with caplog.at_level(logging.ERROR, logger="inboxrake.data"):
         main._check_data_dir()
     assert caplog.records == []
 
@@ -42,7 +42,7 @@ def test_a_read_only_config_folder_is_found(tmp_path, monkeypatch):
 
 
 def test_startup_logs_one_error_with_the_fix(unwritable, caplog):
-    with caplog.at_level(logging.ERROR, logger="pmc.data"):
+    with caplog.at_level(logging.ERROR, logger="inboxrake.data"):
         main._check_data_dir()
     assert len(caplog.records) == 1
     text = caplog.records[0].getMessage()

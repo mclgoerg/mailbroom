@@ -43,7 +43,7 @@ from . import mailops
 from . import pinstore
 from . import tenants
 
-log = logging.getLogger("pmc.rules")
+log = logging.getLogger("inboxrake.rules")
 
 RULES_PATH = Path(os.environ.get("RULES_PATH", "/data/rules.json"))
 

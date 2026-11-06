@@ -81,7 +81,7 @@ CATEGORY_RULES: list[tuple[str, list[str]]] = [
 ]
 AUTOMATED_RE = smartkinds.AUTOMATED_RE
 
-log = logging.getLogger("pmc.mail")
+log = logging.getLogger("inboxrake.mail")
 
 ACTIONS = ("trash", "archive", "move", "mark_read")
 # Stable error codes of the pin feature: the UI maps them to translated

@@ -27,7 +27,7 @@ from . import config as cfgmod
 from . import mailops
 from . import tenants
 
-log = logging.getLogger("pmc.autoscan")
+log = logging.getLogger("inboxrake.autoscan")
 
 AUTOSCAN_PATH = Path(os.environ.get("AUTOSCAN_PATH", "/data/autoscan.json"))
 CHECK_INTERVAL = int(os.environ.get("AUTOSCAN_INTERVAL", "60"))  # seconds

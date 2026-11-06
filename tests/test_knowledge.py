@@ -1044,7 +1044,7 @@ def test_nothing_about_the_knowledge_is_logged(mailbox, caplog, monkeypatch):
     assert quiet.put("/api/knowledge", json={
         "key": "a:mystery@one.example", "kind": "support"}).status_code == 500
     text = "\n".join(f"{r.getMessage()} {r.exc_text or ''}"
-                     for r in caplog.records if r.name.startswith("pmc.knowledge")
+                     for r in caplog.records if r.name.startswith("inboxrake.knowledge")
                      or "knowledge" in r.getMessage().lower())
     assert "sender knowledge" in text                           # counts are logged
     for secret in secrets:

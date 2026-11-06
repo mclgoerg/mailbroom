@@ -26,7 +26,7 @@ from pathlib import Path
 from . import accounts
 from . import tenants
 
-log = logging.getLogger("pmc.auditlog")
+log = logging.getLogger("inboxrake.auditlog")
 
 AUDIT_PATH = Path(os.environ.get("AUDIT_LOG_PATH", "/data/audit_log.jsonl"))
 MAX_ENTRIES = 10_000

@@ -140,11 +140,11 @@ def test_cross_site_guard_applies_with_a_login(no_extra):
 def test_startup_logs_accepted_hosts_only_without_a_login(caplog, monkeypatch):
     from backend import main
     monkeypatch.setenv("INBOXRAKE_ALLOWED_HOSTS", "nas.lan")
-    with caplog.at_level("INFO", logger="pmc.auth"):
+    with caplog.at_level("INFO", logger="inboxrake.auth"):
         main._log_accepted_hosts()
     assert "nas.lan" in caplog.text and "accepting requests" in caplog.text
     caplog.clear()
     _set_password()
-    with caplog.at_level("INFO", logger="pmc.auth"):
+    with caplog.at_level("INFO", logger="inboxrake.auth"):
         main._log_accepted_hosts()
     assert "accepting requests" not in caplog.text

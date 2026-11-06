@@ -25,7 +25,7 @@ from pathlib import Path
 
 from . import tenants
 
-log = logging.getLogger("pmc.knownsenders")
+log = logging.getLogger("inboxrake.knownsenders")
 
 KNOWN_SENDERS_PATH = Path(
     os.environ.get("KNOWN_SENDERS_PATH", "/data/known_senders.json"))
