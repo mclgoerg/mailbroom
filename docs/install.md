@@ -5,7 +5,7 @@ down to the same four things:
 
 | What | Value |
 |---|---|
-| Image | `ghcr.io/mclgoerg/inboxrake:latest` (or pin a minor tag such as `:1.10`, so updates within it stay
+| Image | `ghcr.io/mclgoerg/inboxrake:latest` (or pin a minor tag such as `:2.0`, so updates within it stay
 backward compatible) |
 | Port | `8765` (HTTP web UI + API) |
 | Volume | `/data` - all settings, scan caches and stats live here |

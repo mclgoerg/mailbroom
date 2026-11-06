@@ -47,7 +47,7 @@ docker run -d --name inboxrake \
   ghcr.io/mclgoerg/inboxrake:latest
 ```
 
-Pin a minor tag such as `:1.10` if you do not want surprise upgrades.
+Pin a minor tag such as `:2.0` if you do not want surprise upgrades.
 Guides for Synology, Unraid, TrueNAS, Portainer and Raspberry Pi, the
 host-folder ownership note (the image runs as user ID 1000) and every
 environment variable are in **[docs/install.md](docs/install.md)**.
@@ -62,8 +62,8 @@ docker run --rm -p 127.0.0.1:8765:8765 -v "$PWD":/repo \
   ghcr.io/mclgoerg/inboxrake:latest python /repo/scripts/demo.py
 ```
 
-Add `--empty` to see the first-run wizard instead (any host works, the
-password "demo" signs in).
+Add `--empty` to see the first-run wizard instead (in the wizard any mail
+server name works and the password `demo` signs in).
 
 **In action** - click a filter together, select the matches, confirm the
 move to Trash (with the count spelled out), undo from the result toast, open
@@ -97,8 +97,8 @@ never touched. Rules also start in report mode.
 **What leaves my machine?** Nothing, unless you turn on AI review - and then
 only metadata (addresses, counts, subject lines), never mail bodies or
 attachments. Pick a cloud provider or a local model (Ollama, LM Studio, vLLM)
-and nothing leaves your network at all. The AI is optional and has a
-monthly budget cap. The UI loads no external assets.
+and nothing leaves your network at all. The AI is optional, and you can set a
+monthly budget in Settings -> AI. The UI loads no external assets.
 
 **Why not just use filters or Sieve?** Filters work forward in time. Inboxrake
 shows what already piled up - which senders, how many mails, how much space,
@@ -107,7 +107,8 @@ sender, unsubscribe or export a Sieve rule so it stays gone.
 
 **How heavy is it?** One container: about 80 MB to download and roughly
 55 MB of RAM while idle (measured on amd64 with the demo; a scan of a large
-mailbox uses more while it runs). It runs on a Raspberry Pi 4/5.
+mailbox uses more while it runs). Images are published for amd64 and
+arm64 (e.g. Raspberry Pi 4/5).
 
 **Backup and uninstall?** Everything lives in the `/data` volume; Settings
 -> General has a backup export (sign-in tokens are left out). Stop the
@@ -140,7 +141,7 @@ security; you add user and password.
 | **Custom** | anything | anything | Any IMAP server with SSL or STARTTLS (Dovecot, Courier, …). |
 
 - **Verified on real mailboxes:** Proton Mail (Bridge), iCloud, Gmail
-  (app password and OAuth) and GMX. The other presets use the same IMAP
+  and GMX. The other presets use the same IMAP
   code and are covered by the fake-server tests; **Outlook / Microsoft 365
   is experimental** (fake-tested only, OAuth device-code flow).
 - **Gmail OAuth** needs your own Google Cloud client. In Google's "testing"
