@@ -28,9 +28,17 @@ for p in /docs/ /demo/; do
   [ "$code" = 200 ] || fail "$p answered $code"
   ok "$p is 200"
 done
-code=$(curl -sS -o /dev/null -w '%{http_code}' "$BASE/docs/no-such-page-$$/")
-[ "$code" = 404 ] || fail "an unknown docs path answered $code, expected 404"
-ok "unknown path is 404"
+for p in /docs/no-such-page-$$/ /no-such-page-$$/; do
+  code=$(curl -sS -o /tmp/smoke-404.$$ -w '%{http_code}' "$BASE$p")
+  [ "$code" = 404 ] || fail "unknown path $p answered $code, expected 404"
+  [ -s /tmp/smoke-404.$$ ] || fail "the 404 for $p has an empty body"
+done
+rm -f /tmp/smoke-404.$$
+ok "unknown paths are 404 with a page"
+
+cc=$(header cache-control <<<"$(head_of /demo/)")
+[ "$cc" = "no-cache" ] || fail "/demo/ Cache-Control is \"$cc\", expected exactly \"no-cache\""
+ok "/demo/: Cache-Control: no-cache"
 
 # --- the demo bundle's headers ---------------------------------------------
 h=$(head_of /demo/bundle/manifest.json)
@@ -67,6 +75,12 @@ asset=$(curl -sS "$BASE/demo/" | grep -o '/demo/assets/[^"]*\.js' | head -1)
 cc=$(header cache-control <<<"$(head_of "$asset")")
 [[ "$cc" == *immutable* ]] || fail "$asset Cache-Control is \"$cc\", expected immutable"
 ok "$asset: $cc"
+
+doc=$(curl -sS "$BASE/docs/" | grep -o '/docs/_astro/[^"]*\.\(js\|css\)' | head -1)
+[ -n "$doc" ] || fail "/docs/ references no /docs/_astro/ asset"
+cc=$(header cache-control <<<"$(head_of "$doc")")
+[[ "$cc" == *immutable* ]] || fail "$doc Cache-Control is \"$cc\", expected immutable"
+ok "$doc: $cc"
 
 # --- sizes on the wire (brotli, as a browser asks) --------------------------
 echo "wire sizes (Accept-Encoding: br, gzip):"

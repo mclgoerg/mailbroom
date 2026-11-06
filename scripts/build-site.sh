@@ -38,7 +38,7 @@ MAX_FILE_BYTES=$((25 * 1024 * 1024))
 
 check_tree() {
   local t="$1" f n
-  for f in index.html favicon.svg _headers docs/index.html docs/404.html \
+  for f in index.html 404.html favicon.svg _headers docs/index.html docs/404.html \
            demo/index.html demo/bundle/manifest.json; do
     [ -f "$t/$f" ] || die "missing $f in the assembled tree"
   done
@@ -56,7 +56,7 @@ check_tree() {
   # _headers only works at the root; one anywhere else would be a dead copy
   n=$(find "$t" -name _headers -not -path "$t/_headers" | wc -l)
   [ "$n" -eq 0 ] || die "stray _headers file(s) below the root"
-  for f in "/demo/bundle/*" "/demo/assets/*" "/demo/bundle/manifest.json"; do
+  for f in "/demo/bundle/*" "/demo/assets/*" "/docs/_astro/*" "/demo/bundle/manifest.json"; do
     grep -qxF "$f" "$t/_headers" || die "_headers has no rule for $f"
   done
   [ "$(grep -c '^/' "$t/_headers")" -le 100 ] || die "_headers has over 100 rules"
@@ -110,6 +110,8 @@ cp -R "$REPO/website/dist-landing/." "$OUT/"
 cp -R "$REPO/website/dist/." "$OUT/docs/"
 cp -R "$REPO/frontend/dist-demo/." "$OUT/demo/"
 cp -R "$BUNDLE/." "$OUT/demo/bundle/"
+# unknown paths outside /docs/ get the docs' (root-absolute, self-contained) 404 page
+cp "$OUT/docs/404.html" "$OUT/404.html"
 # the docs build brings its own copy of public/_headers; only the root one counts
 rm -f "$OUT/docs/_headers" "$OUT/demo/_headers"
 check_tree "$OUT"

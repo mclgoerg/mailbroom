@@ -28,11 +28,13 @@ docs, the demo UI and the demo bundle and lays them out as one tree in
 `site-dist/` (`/`, `/docs/`, `/demo/`, `/demo/bundle/`, `_headers` at the
 root), then checks it. `wrangler.jsonc` publishes that tree as Cloudflare
 Workers static assets (wrangler is pinned in `package.json`). The
-`deploy-site` workflow does both on every release tag and on a manual run,
-then `scripts/smoke-site.sh` checks the live site (pages, and the cache
+`deploy-site` workflow does both on every release tag and on a manual run
+(only from `main` or a `v*` tag): a `build` job without secrets uploads the
+tree, a `deploy` job in the `production` environment installs only wrangler
+and publishes it, then `scripts/smoke-site.sh` checks the live site (pages, and the cache
 headers and MIME types the demo depends on). Pull requests only build and
-dry-run. It needs the repository secrets `CLOUDFLARE_API_TOKEN` and
-`CLOUDFLARE_ACCOUNT_ID`; without them it fails up front saying so.
+dry-run. It needs `CLOUDFLARE_API_TOKEN` and
+`CLOUDFLARE_ACCOUNT_ID` as secrets of the `production` environment; without them it fails up front saying so.
 
 ## Landing page
 

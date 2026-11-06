@@ -10,8 +10,14 @@ name: Deploy site
 #   - a pull request touching what goes into the site: build + check only,
 #     never deploys (and needs no secrets, so forks work)
 #
-# Deploying needs the repository secrets CLOUDFLARE_API_TOKEN and
-# CLOUDFLARE_ACCOUNT_ID; without them the run fails up front with a message.
+# Two jobs, so the token never meets build-time code: "build" runs all the
+# project's (and its dependencies') code with no secrets and hands over the
+# finished tree as an artifact; "deploy" only installs website/ (for the
+# pinned wrangler) and runs in the "production" environment, which holds
+# CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID. Deploys are only allowed
+# from main or a v* tag; the maintainer can also restrict the environment
+# itself to those (Settings > Environments > production > Deployment
+# branches and tags). Without the secrets the deploy job fails up front.
 
 on:
   push:
@@ -42,23 +48,9 @@ env:
   WRANGLER_SEND_METRICS: "false"
 
 jobs:
-  site:
+  build:
     runs-on: ubuntu-latest
     steps:
-      - name: Check the Cloudflare secrets
-        if: github.event_name != 'pull_request'
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-        run: |
-          missing=""
-          [ -n "$CLOUDFLARE_API_TOKEN" ] || missing="$missing CLOUDFLARE_API_TOKEN"
-          [ -n "$CLOUDFLARE_ACCOUNT_ID" ] || missing="$missing CLOUDFLARE_ACCOUNT_ID"
-          if [ -n "$missing" ]; then
-            echo "::error title=Cannot deploy the site::Repository secret(s) not set:$missing. Add them under Settings > Secrets and variables > Actions (a token limited to editing Workers, plus the account ID) and re-run. Forks and installs without a Cloudflare account are expected to land here."
-            exit 1
-          fi
-
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           persist-credentials: false
@@ -89,17 +81,69 @@ jobs:
         working-directory: website
         run: npx wrangler deploy --dry-run
 
-      - name: Deploy
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: github.event_name != 'pull_request'
+        with:
+          name: site-dist
+          path: site-dist
+          if-no-files-found: error
+          retention-days: 7
+
+  deploy:
+    needs: build
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    environment:
+      name: production
+      url: https://inboxrake.com
+    steps:
+      # A manual run can pick any ref; only main and release tags may deploy.
+      - name: Only main and release tags deploy
+        run: |
+          case "$GITHUB_REF" in
+            refs/heads/main | refs/tags/v*) ;;
+            *) echo "::error title=Refusing to deploy::$GITHUB_REF is not main or a v* tag."; exit 1 ;;
+          esac
+
+      - name: Check the Cloudflare secrets
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          missing=""
+          [ -n "$CLOUDFLARE_API_TOKEN" ] || missing="$missing CLOUDFLARE_API_TOKEN"
+          [ -n "$CLOUDFLARE_ACCOUNT_ID" ] || missing="$missing CLOUDFLARE_ACCOUNT_ID"
+          if [ -n "$missing" ]; then
+            echo "::error title=Cannot deploy the site::Secret(s) not set:$missing. Add them as secrets of the \"production\" environment (Settings > Environments > production; a token limited to editing Workers, plus the account ID) and re-run. Forks and installs without a Cloudflare account are expected to land here."
+            exit 1
+          fi
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
+        with:
+          node-version: 26
+
+      # Only wrangler (pinned and locked), no install scripts.
+      - name: Install wrangler
+        run: npm ci --no-audit --no-fund --ignore-scripts --prefix website
+
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: site-dist
+          path: site-dist
+
+      - name: Deploy
         working-directory: website
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: npx wrangler deploy
 
       # The custom domain's certificate can take a minute on the first deploy.
       - name: Wait for the site
-        if: github.event_name != 'pull_request'
         run: |
           for i in $(seq 1 30); do
             code=$(curl -s -o /dev/null -w '%{http_code}' https://inboxrake.com/ || true)
@@ -111,5 +155,4 @@ jobs:
           exit 1
 
       - name: Smoke test the live site
-        if: github.event_name != 'pull_request'
         run: scripts/smoke-site.sh https://inboxrake.com
