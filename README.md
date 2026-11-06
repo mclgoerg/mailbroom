@@ -39,7 +39,7 @@ docker compose up -d
 ```
 
 `INBOXRAKE_SECRET_KEY` encrypts the IMAP passwords and API keys stored in
-`/data`; without it they are stored as plaintext and the first boot logs a
+`/data`; without it they are stored as plaintext and every start logs a
 warning. Keep the key safe and out of your backups - if it is lost you
 re-enter the secrets.
 
@@ -101,8 +101,9 @@ All screenshots show generated demo data (`scripts/demo.py`).
 ## Safety & privacy FAQ
 
 **Does it delete anything without asking?** No. Trashing is an IMAP move to
-the Trash folder, always behind a confirmation (with the count of mails, or
-for a single protected group a warning naming that group), with an Undo. UIDVALIDITY is checked before every move and
+the Trash folder, always behind a confirmation (with the count of mails; a
+single protected group or pinned mail asks "anyway?" naming it instead),
+with an Undo. UIDVALIDITY is checked before every move and
 scans are read-only. Permanent deletion exists only as explicit actions in
 Trash and Junk: the manual ones confirm with exact counts, and an opt-in
 purge rule only acts after you have reviewed a report run (then it runs on
@@ -194,7 +195,8 @@ English and German. Everything is listed in
 - With SSO every identity gets its own isolated workspace; an empty
   allow-list admits any account at the provider.
 - `INBOXRAKE_SECRET_KEY` encrypts stored secrets (IMAP passwords, API keys,
-  tokens) so volume backups are useless without it.
+  tokens), so those secrets in a copied volume backup are unreadable
+  without it.
 - The container runs as a non-root user; CI runs CodeQL and a dependency
   review.
 

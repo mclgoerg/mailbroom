@@ -27,9 +27,10 @@ Everything set via env can also be configured later in the settings UI
   (comma list, `*.example.org` for subdomains).
 - **Secrets encryption:** set `INBOXRAKE_SECRET_KEY` (generate with
   `openssl rand -base64 32`) **before the first start**, so IMAP
-  passwords, API keys and OAuth tokens are encrypted inside `/data` and a
-  copied volume backup is useless without it. Without it they are stored
-  as plaintext and the first boot logs a warning. Keep the key out of
+  passwords, API keys and OAuth tokens are encrypted inside `/data` and the
+  stored secrets in a copied volume backup are unreadable without the
+  key (mail metadata, verdicts and stats are not encrypted). Without it
+  the secrets are stored as plaintext and every start logs a warning. Keep the key out of
   your backups; if it is lost you re-enter the secrets.
 
 **Proton Mail users:** Inboxrake talks to Proton through the
