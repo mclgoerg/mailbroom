@@ -14,18 +14,12 @@ name: Demo bundle
 # Pyodide's version is pinned in ONE place, scripts/demo-bundle/package.json;
 # both jobs read it from there.
 
+# No `paths:` filter on purpose: a workflow that is skipped by one leaves its
+# jobs "expected" forever, so they could never be required checks. Instead
+# every run starts with `changes`, and the two jobs are skipped at job level
+# (which counts as passing) when nothing that goes into the demo changed.
 on:
   pull_request:
-    paths:
-      - "backend/**"
-      - "frontend/**"
-      - "tests/**"
-      - "scripts/demo.py"
-      - "scripts/demo_*.py"
-      - "scripts/demo-bundle/**"
-      - "scripts/demo-e2e/**"
-      - "version.txt"
-      - ".github/workflows/demo-bundle.yml"
   push:
     branches: [main]
     tags: ["v*"]
@@ -38,7 +32,36 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  changes:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      relevant: ${{ steps.diff.outputs.relevant }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+
+      # Pushes to main and tags always run everything.
+      - name: Does the change touch what goes into the demo?
+        id: diff
+        env:
+          EVENT: ${{ github.event_name }}
+          BASE: ${{ github.event.pull_request.base.sha }}
+        run: |
+          relevant=true
+          if [ "$EVENT" = pull_request ]; then
+            relevant=false
+            if git diff --name-only "$BASE"...HEAD | grep -E -q \
+              '^(backend/|frontend/|tests/|scripts/demo\.py$|scripts/demo_|scripts/demo-bundle/|scripts/demo-e2e/|version\.txt$|\.github/workflows/demo-bundle\.yml$)'; then
+              relevant=true
+            fi
+          fi
+          echo "relevant=$relevant" | tee -a "$GITHUB_OUTPUT"
+
   pyodide-versions:
+    needs: changes
+    if: needs.changes.outputs.relevant == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -69,12 +92,19 @@ jobs:
           pip install --require-hashes -r backend/requirements-dev.txt
           pip install --no-deps -r "$RUNNER_TEMP/pyodide-pins.txt"
 
-      # test_other_hosts_denied builds malformed Host headers in the test
-      # client; starlette 1.0.0's TestClient (Pyodide's) raises inside urllib
-      # before the request is sent for these, so there they exercise the
-      # client, not the backend. (--deselect matches by prefix: this also
-      # skips two `[::1]:...` cases that do pass.) The main CI job runs all of
-      # them on the locked versions.
+      # The Pyodide-version pins (10 packages) install from PyPI WITHOUT hash
+      # checks: a test-only job, exact `==` pins, --no-deps. Accepted.
+      #
+      # test_other_hosts_denied sends malformed Host headers. On starlette
+      # 1.0.0, `request.url.path` in our own host-guard middleware
+      # (backend/main.py, _cross_site_guard) parses the Host header and raises
+      # ValueError for the bracketed ones ([], [evil.example], [::1]evil.example,
+      # ...), and for `localhost/x` the guard answers 403 HTML instead of the
+      # JSON host_not_allowed. Every case is still refused, and the demo always
+      # sends `Host: localhost`, so skipping them here is safe. The proper fix
+      # (read request.scope["path"]) is a separate change. (--deselect matches
+      # by prefix: this also skips two `[::1]:...` cases that do pass.) The main
+      # CI job runs all of them on the locked versions.
       - name: Backend tests on Pyodide's Python and packages
         run: |
           python -m pytest tests/ -q \
@@ -84,6 +114,8 @@ jobs:
             --deselect "tests/test_webguard.py::test_other_hosts_denied[localhost/x]"
 
   bundle:
+    needs: changes
+    if: needs.changes.outputs.relevant == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -121,6 +153,27 @@ jobs:
       - name: The bundle boots and serves
         run: node scripts/demo-bundle/smoke.mjs demo-bundle
 
+      # Own step and limit: the browser download / system packages can stall
+      # on the runner's mirrors and must not eat the budget of the run itself.
+      - name: Install the browser
+        timeout-minutes: 10
+        working-directory: scripts/demo-e2e
+        run: |
+          npm ci --no-audit --no-fund
+          echo "pw=$(node -p "require('@playwright/test/package.json').version")" >> "$GITHUB_ENV"
+
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        id: browsers
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ env.pw }}
+
+      - name: Download Chromium
+        if: steps.browsers.outputs.cache-hit != 'true'
+        timeout-minutes: 10
+        working-directory: scripts/demo-e2e
+        run: npx playwright install chromium
+
       # The page, the worker and the bundle in headless Chromium, laid out
       # like the deploy (/demo/ and /demo/bundle/). ~30 s, so every run does
       # the whole thing.
@@ -130,10 +183,7 @@ jobs:
         env:
           DEMO_UI: ${{ github.workspace }}/frontend/dist-demo
           DEMO_BUNDLE: ${{ github.workspace }}/demo-bundle
-        run: |
-          npm ci --no-audit --no-fund
-          npx playwright install --with-deps chromium
-          npx playwright test
+        run: npx playwright test
 
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:

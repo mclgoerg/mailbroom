@@ -118,6 +118,26 @@ test("job endpoints: scan, delete, undo all come back", async () => {
   expect(key in await senders()).toBe(true);
 });
 
+// The other thread users: attachment analysis, a rule run, bulk unsubscribe.
+// Each only has to come back (a wait on a missing thread would hang).
+test("job endpoints: attachment scan, rule run, bulk unsubscribe come back", async () => {
+  const att = await api("POST", "/api/attachments?account=proton");
+  expect(att.status).toBe(200);
+  await expect.poll(async () => (await api("GET", "/api/attachments?account=proton")).status,
+    { timeout: 60_000 }).toBe(200);
+
+  const rule = await api("POST", "/api/rules?account=proton",
+    { name: "e2e", query: "text:no-such-word-e2e", schedule: "manual" });
+  expect(rule.status).toBe(200);
+  expect((await api("POST", `/api/rules/${rule.json.id}/run`)).status).toBe(200);
+  await api("DELETE", `/api/rules/${rule.json.id}`);
+
+  const [key] = Object.entries(await senders()).find(([, g]) => !g.protected && g.count > 5);
+  const unsub = await api("POST", "/api/unsubscribe_bulk?account=proton",
+    { grouping: "sender", keys: [key] });
+  expect(unsub.status).toBe(200);
+});
+
 test("no console errors, page errors or failed requests", async () => {
   expect(problems).toEqual([]);
 });

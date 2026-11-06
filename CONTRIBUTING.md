@@ -114,10 +114,13 @@ the visitor's browser on Pyodide (Python on
 WebAssembly). Nothing is forked for it, so it can break with ordinary
 changes. What does:
 
-- **A new runtime dependency** that Pyodide does not ship (it has fastapi,
-  starlette, pydantic, anyio; not uvicorn, cryptography, anthropic or
-  openai - the demo stubs those in `backend/demo.py`). Add one and the
-  bundle cannot import it.
+- **A new runtime dependency** outside the demo's package set (what
+  Pyodide's fastapi and pydantic pull in: starlette, anyio, ...). Anything
+  else cannot be imported in the browser, even if Pyodide ships it
+  (`requests`, `PyYAML`, `cryptography` are in Pyodide but not loaded). The
+  demo copes with uvicorn, anthropic, openai and cryptography
+  (`backend/demo.py` stubs or replaces them); a new one needs the same
+  treatment first. `pyodide-pins.mjs` checks `backend/requirements.in`.
 - **A Python feature newer than Pyodide's Python** (3.14 while the app
   targets 3.15): syntax or stdlib that only exists in the newest release.
 - **Threads that are waited on.** The browser has no threads; the demo

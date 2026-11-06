@@ -33,6 +33,7 @@ import path from "node:path";
 import zlib from "node:zlib";
 import { fileURLToPath } from "node:url";
 import { loadPyodide } from "pyodide";
+import { OMIT, ROOTS } from "./pyodide-pins.mjs";   // the demo's package set
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const REPO = path.resolve(here, "..", "..");
@@ -42,11 +43,6 @@ const BUDGET_MB = 10;                // fail above this, estimated on the wire
 const SEED_NOW = 1790000000;         // the instant the demo's dates derive from
 // (a fixed one keeps the bundle reproducible; loading shifts the clock to it,
 // see scripts/demo_seed.py)
-const ROOTS = ["fastapi", "pydantic"];      // what the worker loadPackage()s
-// what the roots depend on in Pyodide's lockfile but the demo never uses:
-// httpx is the test client's, jinja2 is for templates. Anything else
-// dropped fails the build.
-const OMIT = new Set(["httpx", "jinja2"]);
 const RUNTIME = ["pyodide.mjs", "pyodide.asm.mjs", "pyodide.asm.wasm", "python_stdlib.zip"];
 // the code the browser runs, copied from the repo at build time (never forked)
 const APP_FILES = ["version.txt", "tests/conftest.py", "scripts/demo.py",

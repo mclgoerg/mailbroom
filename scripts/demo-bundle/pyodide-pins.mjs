@@ -11,16 +11,21 @@
 // Needs `npm ci` in this directory first.
 import fs from "node:fs";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const REPO = path.resolve(here, "..", "..");
-const ROOTS = ["fastapi", "pydantic"];   // keep in step with build.mjs
-const OMIT = new Set(["httpx", "jinja2"]);
-// Requirements Pyodide does not ship that the demo does not need: uvicorn
-// (no sockets), anthropic/openai (stubbed, backend/demo.py), cryptography
-// (Fernet stand-in). Anything else new in requirements.in would break the
-// bundle's imports, so it must be dealt with in backend/demo.py first.
+// What the worker loadPackage()s, and what those depend on in Pyodide's
+// lockfile but the demo never uses: httpx is the test client's, jinja2 is for
+// templates (build.mjs imports both).
+export const ROOTS = ["fastapi", "pydantic"];
+export const OMIT = new Set(["httpx", "jinja2"]);
+// requirements.in packages outside the demo's package set (Pyodide's
+// fastapi/pydantic closure) that the demo copes with: uvicorn (no sockets),
+// anthropic/openai (not in Pyodide; stubbed, backend/demo.py), cryptography
+// (Pyodide has it, the demo leaves it out for a Fernet stand-in). Any other
+// new one would break the bundle's imports, so it must be dealt with in
+// backend/demo.py first.
 const ALLOWED = new Set(["uvicorn", "anthropic", "openai", "cryptography"]);
 
 const norm = (n) => n.toLowerCase().replace(/_/g, "-");
@@ -38,8 +43,10 @@ const walk = (name) => {
 };
 ROOTS.forEach(walk);
 
-const mode = process.argv[2];
-if (mode === "python") {
+const mode = import.meta.url === pathToFileURL(process.argv[1]).href ? process.argv[2] : null;
+if (mode === null) {
+  // imported for ROOTS / OMIT
+} else if (mode === "python") {
   console.log(lock.info.python);
 } else if (mode === "constraints") {
   for (const [n, v] of [...closure].sort()) console.log(`${n}==${v}`);
@@ -49,7 +56,7 @@ if (mode === "python") {
     .map((l) => norm(l.match(/^[A-Za-z0-9._-]+/)[0]));
   const bad = names.filter((n) => !closure.has(n) && !ALLOWED.has(n));
   if (bad.length) {
-    console.error(`backend/requirements.in names ${bad.join(", ")}: not in Pyodide ${pin} and not stubbed in the demo.\n`
+    console.error(`backend/requirements.in names ${bad.join(", ")}: not in the demo's package set (Pyodide ${pin}'s fastapi + pydantic and what they need) and not handled in backend/demo.py.\n`
       + "See \"The browser demo runs this code too\" in CONTRIBUTING.md.");
     process.exit(1);
   }
