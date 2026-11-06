@@ -581,6 +581,9 @@ export interface ImapAccount {
   user: string;
   password: string;
   password_set: boolean;
+  /** False until a connection test, an OAuth connect or a scan succeeded
+   *  for the saved sign-in; absent from older backends (= verified). */
+  verified?: boolean;
   cafile: string;
   preset: Preset;
   /** How the account signs in; absent from older backends (derive it with

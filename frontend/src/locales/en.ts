@@ -893,6 +893,11 @@ export const EN: Record<string, string> = {
     + "folders, then a first scan.",
   "wizard.setup_btn": "Set up your mailbox",
   "onboard.ready": "Ready for the first scan",
+  "onboard.unverified": "Finish setting up {account}",
+  "onboard.unverified_text":
+    "The connection to this account hasn't worked yet. Check the sign-in "
+    + "and test it again before the first scan.",
+  "onboard.unverified_btn": "Continue setup",
   "onboard.step_scan":
     "Hit Scan - nothing is ever deleted without your confirmation, and "
     + "deletions go to Trash first.",

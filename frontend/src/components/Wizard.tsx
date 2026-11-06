@@ -137,6 +137,8 @@ export function Wizard({ cfg, mode, initialStep, initialAccount, scan,
       const name = await saveSignIn();
       if (!name) return;
       const r = await api.testConnection(name);
+      // the account now counts as set up: pick that up for the home card
+      try { onConfig(await api.getConfig(), null); } catch { /* next load */ }
       setTested(true);
       setConnected(r.folders);
       setStep("folders");
