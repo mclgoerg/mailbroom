@@ -264,8 +264,7 @@ def load(seed_dir) -> dict:
     mailops.connect = connect
     for name in accounts.names():
         acc = accounts.get(name)
-        # the Gmail demo accounts are never scanned: no snapshot, no error
-        if not mailops.load_snapshot(acc) and name in seed.runtime:
+        if not mailops.load_snapshot(acc):
             raise DemoError(f"the scan snapshot of {name!r} in the seed is "
                             "unusable; rebuild it with --build-seed")
         acc.state.update(seed.runtime.get(name, {}))

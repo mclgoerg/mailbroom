@@ -42,7 +42,7 @@ def newsletter_html(pixel: str | None = None, click: str | None = None):
     other senders stays exactly as it was."""
     def build(i: int) -> str:
         tok = f"d{i:04d}x7k2m9q4w8e6r1t5y"
-        parts = ["<p>Hello from the demo newsletter.</p>",
+        parts = ["<p>Hi there - here are this week's highlights.</p>",
                  '<img src="https://cdn.demo.example/banner.jpg" '
                  'width="600" height="300" alt="">',
                  '<a href="https://shop.demo.example/offers">See offers</a>']
@@ -59,9 +59,56 @@ PIXEL_HOST = "px.beacons-demo.example"
 CLICK_HOST = "r.linkhop-demo.example"
 
 
+_BODIES: dict[str, str] = {}
+
+
+def _body(frm: str) -> str:
+    """A short plain-text body per sender, so a mail opened in the viewer
+    isn't the test double's stock line. Only the mails that ask for one
+    (`text=True`) get it: every body of the Proton account also lands in its
+    local search index, which is part of the seed's size budget. No random
+    draws."""
+    if frm not in _BODIES:
+        name = frm.split("<")[0].strip(' "') or "us"
+        _BODIES[frm] = ("Hello,\n\nthere is something new in your account. "
+                        "All the details are on our website; if you have "
+                        f"questions, just reply to this mail.\n\nBest "
+                        f"regards,\n{name}")
+    return _BODIES[frm]
+
+
+def thread_chains(msgs: list[dict], seed: int = 23) -> list[dict]:
+    """Turn runs of 2-5 neighbouring mails (newest first, as `mails` makes
+    them) into reply chains: the oldest of a run starts the conversation,
+    each later one answers the one before (In-Reply-To / References, `Re:`
+    subject), so the Thread view has real conversations. Own random
+    stream: nothing else in the demo shifts."""
+    rng = random.Random(seed)
+    i = 0
+    while i < len(msgs):
+        run = msgs[i:i + rng.randint(2, 5)]
+        root = run[-1]
+        refs = [root["msgid"]]
+        for m in reversed(run[:-1]):
+            m["irt"] = refs[-1]
+            m["refs"] = " ".join(refs)
+            m["subject"] = "Re: " + root["subject"].removeprefix("Re: ")
+            refs.append(m["msgid"])
+        i += len(run)
+    return msgs
+
+
+def _atts_for(i: int, atts, att_n: int):
+    """The attachments of mail `i`: only the `att_n` newest carry them; a
+    list of lists is cycled through (a mix of file types)."""
+    if not atts or i >= att_n:
+        return None
+    return atts[i % len(atts)] if isinstance(atts[0], list) else atts
+
+
 def mails(frm: str, subjects: list[str], n: int, *, newest_days=1.0,
           span_days=700.0, unread=0.7, size=(9000, 60000), unsub=False,
-          atts=None, html=None) -> list[dict]:
+          atts=None, att_n=3, html=None, chain=False, text=False) -> list[dict]:
     out = []
     for i in range(n):
         days = newest_days + (span_days - newest_days) * (i / max(1, n - 1)) \
@@ -76,9 +123,26 @@ def mails(frm: str, subjects: list[str], n: int, *, newest_days=1.0,
             size=random.randint(*size),
             seen=random.random() > unread,
             date=_date(days),
-            atts=atts if (atts and i < 3) else None,
-            html=html(i) if html else None))
-    return out
+            atts=_atts_for(i, atts, att_n),
+            html=html(i) if html else None,
+            body=_body(frm) if text else None))
+    return thread_chains(out) if chain else out
+
+
+def with_text(box: list[dict]) -> list[dict]:
+    """Give the plain-text mails of a folder a body (see `_body`)."""
+    for m in box:
+        if m["body"] is None and m["html"] is None:
+            m["body"] = _body(m["from"])
+    return box
+
+
+def copies(msgs: list[dict], *, seen=None) -> list[dict]:
+    """Copies of `msgs` under fresh UIDs but the same Message-ID, date and
+    size: the same mail filed twice (another folder, or the mailbox
+    delivered it twice)."""
+    return [{**m, "uid": next(_UID),
+             "seen": m["seen"] if seen is None else seen} for m in msgs]
 
 
 # One real conversation (Anna writes, the user replies from Sent, Anna answers
@@ -132,22 +196,23 @@ PROTON_INBOX = WANDER + (
             ["Your statement is available", "Security notice about your "
              "account", "Payment of ${n}.00 completed",
              "Offer: 3% cashback on your next card purchase"],
-            42, unread=0.3, size=(14000, 40000))
+            42, unread=0.3, size=(14000, 40000), text=True)
     + mails('"CloudBox" <billing@cloudbox.example>',
             ["Invoice CB-{n}", "Payment receipt CB-{n}"],
             24, unread=0.2, size=(220000, 480000),
-            atts=[("invoice.pdf", 310000)])
+            atts=[("invoice.pdf", 310000)], text=True)
     + mails('"JobPortal" <jobs@jobportal.example>',
             ["12 new jobs matching your profile", "Someone viewed your "
              "profile"], 33, unsub=True)
     + mails('"GreenEnergy AG" <kundenservice@greenenergy.example>',
             ["Ihre Rechnung {n}", "Abschlagsänderung ab August"],
             18, unread=0.25, size=(90000, 200000),
-            atts=[("rechnung.pdf", 150000)])
+            atts=[[("rechnung.pdf", 150000)],
+                  [("Vertragsbedingungen.docx", 85000)]], text=True)
     + mails('"Anna Weber" <anna.weber@mailfox.example>',
-            ["Re: Wanderung am Samstag?", "Fotos vom Wochenende",
-             "Re: Geschenk für Papa"], 12, unread=0.05,
-            size=(4000, 30000))
+            ["Kletterhalle am Freitag", "Fotos vom Wochenende",
+             "Geschenk für Papa"], 12, unread=0.05,
+            size=(4000, 30000), chain=True, text=True)
     + mails('"Photo Club" <hello@photoclub.example>',
             ["March meetup - RAW files inside", "Contest results 🎉"],
             9, unread=0.1, size=(2000000, 6000000),
@@ -167,9 +232,10 @@ PROTON_INBOX = WANDER + (
     + mails('"Mailfox Photos" <photos@mailfox.example>',
             ["Your album is ready", "New photos from the trip"],
             14, unread=0.2, size=(800000, 2500000),
-            atts=[("album.zip", 1900000)])
+            atts=[[("album.zip", 1900000)], [("beach.png", 1400000)]])
     + mails('"Dr. Meier Praxis" <praxis@dr-meier.example>',
-            ["Terminbestätigung", "Ihr Laborbefund ist da"], 5, unread=0.1)
+            ["Terminbestätigung", "Ihr Laborbefund ist da"], 5, unread=0.1,
+          chain=True, text=True)
     # Quick wins (F5): senders that have gone quiet, so the strip has cards
     # - old unread newsletters, a low-engagement sender, an unsubscribed one
     # still holding mail, and old big attachments.
@@ -280,17 +346,20 @@ def long_tail(scale: float = 1.0) -> tuple[list[dict], list[dict]]:
     inbox += _tail("hr", "{b}-karriere.example", w[18:18 + k(4)],
                    ["Your application at {b}", "Interview invitation"])
     inbox += _tail("help", "{b}-desk.example", w[24:24 + k(6)],
-                   ["Re: Your inquiry", "Ticket-ID {n} updated"])
+                   ["Your inquiry", "Ticket-ID {n} updated"], chain=True, text=True)
     people = [f"demo.person{i:02d}@{d}" for i, d in enumerate(
         ["gmail.com", "gmx.de", "web.de", "gmail.com", "outlook.com",
          "gmx.de", "gmail.com", "web.de", "gmail.com", "gmx.de"][:k(10)])]
-    for addr in people:
-        inbox += mails(f'"{addr.split("@")[0].replace(".", " ").title()}" '
-                       f"<{addr}>", ["Hallo!", "Foto vom Sonntag", "Bis bald"],
-                       random.randint(1, 3), newest_days=random.uniform(1, 90))
+    names = ["Mia Becker", "Jonas Keller", "Sofia Lang", "Ben Hartmann",
+             "Clara Neumann", "Lukas Vogel", "Emma Roth", "Paul Fischer",
+             "Hannah Wolf", "Felix Brandt"]
+    for addr, name in zip(people, names):
+        inbox += mails(f'"{name}" <{addr}>', ["Hallo!", "Foto vom Sonntag", "Bis bald"],
+                       random.randint(1, 3), newest_days=random.uniform(1, 90),
+                       chain=True, text=True)
     inbox += _tail("m.schulz", "{b}-gmbh.example", w[20:20 + k(16)],
                    ["Ihr Angebot", "Quarterly update", "Terminerinnerung"],
-                   (1, 2), unread=0.4)
+                   (1, 2), unread=0.4, chain=True, text=True)
     # People you write to: small senders that also got a mail from the user.
     wrote = [f"{n}@{d}.example" for n, d in (
         ("tobi", "kletterhalle"), ("nina.k", "mietverein"),
@@ -300,7 +369,7 @@ def long_tail(scale: float = 1.0) -> tuple[list[dict], list[dict]]:
     for addr in wrote:
         inbox += mails(f"<{addr}>", ["Re: Termin", "Kurze Frage"],
                        random.randint(2, 4), newest_days=random.uniform(3, 60),
-                       unread=0.2)
+                       unread=0.2, chain=True, text=True)
         sent.append(make_msg(next(_UID), frm="Demo <demo@example.com>",
                              subject="Re: Termin", to=addr, seen=True,
                              date=_date(random.uniform(2, 50))))
@@ -312,8 +381,74 @@ PROTON_TAIL, PROTON_TAIL_SENT = long_tail()
 ICLOUD_TAIL, ICLOUD_TAIL_SENT = long_tail(0.4)
 
 
-PROTON = FakeIMAP({
-    "INBOX": PROTON_INBOX + PROTON_TAIL,
+# Duplicates and the Archive folder, from their own random stream. The same
+# mail filed twice has the same Message-ID (Inbox + Archive); a mail the
+# server delivered twice is an exact copy in the same folder. Mails that
+# merely look alike (two monthly statements) keep their own ids.
+_state = random.getstate()
+random.seed(31)
+_by = lambda inbox, key: [m for m in inbox if key in m["from"]]   # noqa: E731
+PROTON_COPIES = copies(_by(PROTON_INBOX, "paybank")[:3])
+PROTON_ARCHIVE = (
+    copies(_by(PROTON_INBOX, "cloudbox")[:6])
+    + copies(_by(PROTON_INBOX, "greenenergy")[:4])
+    + mails('"Finanzamt Musterstadt" <bescheid@finanzamt-musterstadt.example>',
+            ["Steuerbescheid {n}", "Ihre Steuererklärung ist eingegangen"],
+            5, newest_days=400, span_days=1100, unread=0.0,
+            size=(300000, 900000), atts=[("Steuerbescheid.pdf", 420000)],
+            att_n=5)
+    + mails('"Dr. Meier Praxis" <praxis@dr-meier.example>',
+            ["Ihr Laborbefund ist da"], 3, newest_days=200, span_days=600,
+            unread=0.0))
+
+# iCloud: a busy inbox with a few big senders, old photo and document
+# attachments, a full Trash, a Junk folder with one false alarm, an Archive.
+ICLOUD_INBOX = (
+    mails('"Fruit Store" <receipts@fruitstore.example>',
+          ["Your receipt #{n}", "Pre-order now", "Your order #{n} has shipped"],
+          120, unread=0.5, size=(30000, 90000),
+          atts=[("receipt.pdf", 60000)], att_n=30)
+    + mails('"Quick Bite" <deals@quickbite.example>',
+            ["Your voucher expires tonight", "Free delivery this weekend",
+             "New in your area"], 140, unsub=True, unread=0.85)
+    + mails('"Cloud Photos" <no-reply@cloudphotos.example>',
+            ["Your storage is 80% full", "Memories from last year"],
+            90, unsub=True)
+    + mails('"Reisefieber" <news@reisefieber.example>',
+            ["Last-Minute: Städtetrips ab 49 €", "Ihr Urlaubsmagazin",
+             "Sommer-Highlights"], 55, unsub=True, unread=0.8)
+    + mails('"Fit Club" <hello@fitclub.example>',
+            ["Your trial week is over", "Come back for 50% off"], 48,
+            newest_days=200, span_days=600, unread=0.97, unsub=True)
+    + mails('"Kino Zentral" <programm@kino-zentral.example>',
+            ["Das Programm der Woche", "Vorpremiere: Karten sichern"], 40,
+            unsub=True, unread=0.9)
+    + mails('"Family Chat" <lisa@familienpost.example>',
+            ["Sonntag bei Oma?", "Urlaubsfotos!", "Geburtstag am Samstag"],
+            14, unread=0.1, size=(3000000, 5500000), chain=True,
+            atts=[[("IMG_3310.jpg", 3400000)],
+                  [("Oma-Geburtstag.png", 2100000)],
+                  [("Urlaub.zip", 5200000)]], att_n=9)
+    + mails('"Verwaltung Nord" <post@hausverwaltung-nord.example>',
+            ["Nebenkostenabrechnung {n}", "Mietvertrag: Nachtrag"], 9,
+            newest_days=800, span_days=1150, unread=0.3,
+            size=(6000000, 9000000),
+            atts=[[("Nebenkostenabrechnung.pdf", 7000000)],
+                  [("Mietvertrag.docx", 900000), ("Anlage.zip", 6000000)]],
+            att_n=9)
+    + ICLOUD_TAIL)
+ICLOUD_COPIES = copies(_by(ICLOUD_INBOX, "cloudphotos")[:3])
+ICLOUD_ARCHIVE = (copies(_by(ICLOUD_INBOX, "fruitstore")[:3])
+                  + copies(_by(ICLOUD_INBOX, "hausverwaltung-nord")[:2]))
+random.setstate(_state)
+
+
+def _server(mailbox: dict, **kw) -> FakeIMAP:
+    return FakeIMAP(mailbox, date_header=True, **kw)
+
+
+PROTON = _server({
+    "INBOX": PROTON_INBOX + PROTON_COPIES + PROTON_TAIL,
     "Sent": PROTON_TAIL_SENT + [make_msg(
         next(_UID), frm="Demo <demo@example.com>",
         subject="Re: Wanderung am Samstag?", msgid=WANDER_R1,
@@ -341,30 +476,39 @@ PROTON = FakeIMAP({
     # a client-made second Junk folder: Settings > Folders asks which one
     "Junk Email": mails('"Old Newsletter" <bye@gone.example>',
                         ["Special offer"], 3, unread=0.9),
-    "Archive": [],
+    "Archive": PROTON_ARCHIVE,
     "Drafts": [],
 })
 
-ICLOUD = FakeIMAP({
-    "INBOX": (
-        mails('"Fruit Store" <receipts@fruitstore.example>',
-              ["Your receipt #{n}", "Pre-order now"], 40, unread=0.5)
-        + mails('"Family Chat" <lisa@familienpost.example>',
-                ["Re: Sonntag bei Oma?", "Urlaubsfotos!"], 8, unread=0.1)
-        + mails('"Cloud Photos" <no-reply@cloudphotos.example>',
-                ["Your storage is 80% full", "Memories from last year"],
-                22, unsub=True)
-        + ICLOUD_TAIL
-    ),
+ICLOUD = _server({
+    "INBOX": ICLOUD_INBOX + ICLOUD_COPIES,
     "Sent Messages": ICLOUD_TAIL_SENT + [make_msg(
         next(_UID), frm="Demo <demo@icloud.example>",
         subject="Re: Sonntag bei Oma?",
         to="lisa@familienpost.example", seen=True, date=_date(3))],
-    "Deleted Messages": [],
+    "Deleted Messages": (
+        mails('"Quick Bite" <deals@quickbite.example>',
+              ["Your voucher expired", "Order #{n} delivered"], 26,
+              unread=0.9)
+        + mails('"Fit Club" <hello@fitclub.example>',
+                ["Membership offer"], 12, unread=0.9)
+        + mails('"Fruit Store" <receipts@fruitstore.example>',
+                ["Your receipt #{n}"], 9, unread=0.2)),
+    "Junk": mails('"Lotto Winner" <claim@lotto-prize.example>',
+                  ["You are our lucky winner {n}", "Claim your prize"], 5,
+                  newest_days=0.5, span_days=15, unread=0.9)
+    + mails('"Crypto Gains" <invest@coin-boost.example>',
+            ["Double your savings {n}"], 4, newest_days=1, span_days=20,
+            unread=0.9)
+    + mails('"Family Chat" <lisa@familienpost.example>',
+            ["Fwd: Fotos von Oma"], 1, newest_days=2, unread=1.0),
+    "Archive": ICLOUD_ARCHIVE,
     # a client-made look-alike of the server's Trash (Settings can move it)
     "Gelöschte Elemente": mails('"Cloud Photos" <no-reply@cloudphotos.example>',
                                 ["Storage reminder"], 5, unread=0.5),
-}, flags={"Deleted Messages": "\\Trash"})
+}, flags={"Deleted Messages": "\\Trash", "Junk": "\\Junk"})
+for _box in ICLOUD.mailbox.values():     # no search index here: bodies are cheap
+    with_text(_box)
 
 FAKES = {"demo-proton": PROTON, "demo-icloud": ICLOUD}
 
@@ -379,7 +523,7 @@ def generate() -> dict:
 
     mailops.connect = _connect
 
-    # Two configured accounts (hosts route to the fakes above).
+    # Two configured, fully scanned accounts (hosts route to the fakes above).
     Path(os.environ["CONFIG_PATH"]).write_text(json.dumps({
         "accounts": {
             "proton": {"host": "demo-proton", "user": "demo@example.com",
@@ -387,25 +531,6 @@ def generate() -> dict:
                        "body_search": "local"},
             "icloud": {"host": "demo-icloud", "user": "demo@icloud.example",
                        "password": "demo", "preset": "icloud", "cafile": ""},
-            # Never scanned: Gmail with both credentials stored (signs in with
-            # the app password) and one connected via OAuth only - the Settings
-            # sign-in switch and the welcome card's Test/Scan buttons.
-            "gmail-app": {"host": "demo-icloud", "user": "demo@gmail.example",
-                          "password": "abcdefghijklmnop", "preset": "gmail",
-                          "auth": "password", "cafile": "",
-                          "oauth": {"provider": "google", "client_id": "demo-id",
-                                    "client_secret": "demo-secret",
-                                    "refresh_token": "demo-rt",
-                                    "access_token": "demo-at", "expires_at": 0}},
-            "gmail-oauth": {"host": "demo-icloud", "user": "demo2@gmail.example",
-                            "password": "", "preset": "gmail", "auth": "oauth",
-                            "cafile": "",
-                            "oauth": {"provider": "google",
-                                      "client_id": "demo-id",
-                                      "client_secret": "demo-secret",
-                                      "refresh_token": "demo-rt",
-                                      "access_token": "demo-at",
-                                      "expires_at": 0}},
         },
         "protected": ["anna.weber@mailfox.example", "@dr-meier.example"],
         "ai": {"provider": "anthropic", "api_key": "demo-key",
@@ -429,6 +554,19 @@ def generate() -> dict:
     ]:
         verdictstore.save("sender", {key: {"verdict": verdict, "reason": reason}},
                           "proton")
+
+    for key, verdict, reason in [
+        ("deals@quickbite.example", "delete_safe", "Food delivery promotions"),
+        ("news@reisefieber.example", "delete_safe", "Travel newsletter, never opened"),
+        ("hello@fitclub.example", "delete_safe", "Gym marketing after the trial"),
+        ("programm@kino-zentral.example", "delete_safe", "Weekly cinema programme"),
+        ("no-reply@cloudphotos.example", "review", "Storage notices and memories"),
+        ("receipts@fruitstore.example", "review", "Receipts you may need for returns"),
+        ("post@hausverwaltung-nord.example", "keep", "Rental contract and utility statements"),
+        ("lisa@familienpost.example", "keep", "Family, photos from relatives"),
+    ]:
+        verdictstore.save("sender", {key: {"verdict": verdict, "reason": reason}},
+                          "icloud")
 
     # Unsubscribe records for the watchdog: three "done" senders whose mail kept
     # arriving (flagged "Still mailing"), one that went quiet (just a tick), and
@@ -455,6 +593,18 @@ def generate() -> dict:
     unsubstore.record("offers@couponclub.example", "done", "one-click",
                       account="proton")
 
+    # iCloud: one done (and quiet since), one that kept mailing, one that
+    # needs a confirmation page.
+    unsubstore.save({
+        "deals@quickbite.example": {"status": "done", "method": "one-click",
+            "detail": "", "error": "", "ts": _UN_NOW - 4 * 86400},
+        "hello@fitclub.example": {"status": "done", "method": "mailto",
+            "detail": "", "error": "", "ts": _UN_NOW - 400 * 86400},
+        "programm@kino-zentral.example": {"status": "link", "method": "",
+            "detail": "https://kino-zentral.example/abmelden", "error": "",
+            "ts": _UN_NOW - 30 * 86400},
+    }, "icloud")
+
     # Per-mail ratings on the PayBank group -> rating chips. Plausible ones:
     # statements and payments are worth a look, security notices are kept,
     # only the promotional mails are safe to delete.
@@ -472,6 +622,16 @@ def generate() -> dict:
     sweep = rules.create_rule({"name": "Sweep old newsletters",
                                "query": "is:unsub age:>1y", "action": "trash",
                                "schedule": "weekly", "account": "proton"})
+    parcels = rules.create_rule({"name": "Archive old parcel mails",
+                                 "query": "tag:shipping age:>1y",
+                                 "action": "archive", "schedule": "weekly",
+                                 "account": "proton"})
+    lapsed = rules.create_rule({"name": "Sweep lapsed promotions",
+                                "query": "is:unsub age:>1y unread:>90",
+                                "action": "trash", "schedule": "weekly",
+                                "account": "icloud"})
+    _ic = ICLOUD.mailbox["INBOX"]
+    _icn, _icb = len(_ic), sum(m["size"] for m in _ic)
     history = {"accounts": {"proton": {
         "scans": [{"ts": int(NOW - d * 86400), "mails": m, "size": s,
                    "senders": g}
@@ -494,21 +654,38 @@ def generate() -> dict:
                 {"trash": 284, "archive": 25, "move": 0, "mark_read": 66,
                  "freed": 96_000_000},
         }}}}
+    history["accounts"]["icloud"] = {
+        "scans": [{"ts": int(NOW - d * 86400), "mails": int(_icn * f),
+                   "size": int(_icb * f), "senders": g}
+                  for d, f, g in [(21, 0.86, 70), (14, 0.9, 74), (7, 0.95, 77),
+                                  (1, 1.0, 80)]],
+        "actions": {
+            time.strftime("%Y-%m", time.gmtime(NOW - 31 * 86400)):
+                {"trash": 96, "archive": 20, "move": 0, "mark_read": 40,
+                 "freed": 22_000_000},
+            time.strftime("%Y-%m", time.gmtime(NOW)):
+                {"trash": 61, "archive": 5, "move": 0, "mark_read": 12,
+                 "freed": 15_000_000},
+        }}
     Path(os.environ["STATS_HISTORY_PATH"]).write_text(json.dumps(history))
     # Audit entries (the cleanup card of Your year in mail): unsubscribes and
-    # rule runs in 2026 + 2025, one run by a rule that was deleted since.
-    _au = [("unsubscribe", 40, 1, "ok", "user"), ("unsubscribe", 120, 1, "ok",
-           "user"), ("unsubscribe", 300, 1, "ok", "user"),
-           ("unsubscribe", 30, 1, "failed", "user"),
-           ("unsubscribe", 420, 1, "ok", "user"),
-           ("rule_execute", 21, 150, "ok", f"rule:{sweep['id']}"),
-           ("rule_execute", 14, 60, "ok", "rule:deleted1")]
+    # rule runs in 2026 + 2025, by rules that exist in the demo.
+    _au = [("proton", "unsubscribe", 40, 1, "ok", "user"),
+           ("proton", "unsubscribe", 120, 1, "ok", "user"),
+           ("proton", "unsubscribe", 300, 1, "ok", "user"),
+           ("proton", "unsubscribe", 30, 1, "failed", "user"),
+           ("proton", "unsubscribe", 420, 1, "ok", "user"),
+           ("proton", "rule_execute", 21, 150, "ok", f"rule:{sweep['id']}"),
+           ("proton", "rule_execute", 14, 60, "ok", f"rule:{parcels['id']}"),
+           ("icloud", "unsubscribe", 4, 1, "ok", "user"),
+           ("icloud", "unsubscribe", 400, 1, "ok", "user"),
+           ("icloud", "rule_execute", 9, 48, "ok", f"rule:{lapsed['id']}")]
     Path(os.environ["AUDIT_LOG_PATH"]).write_text("".join(
-        json.dumps({"ts": int(NOW - d * 86400), "account": "proton",
+        json.dumps({"ts": int(NOW - d * 86400), "account": acct,
                     "actor": actor, "action": action, "count": count,
                     "bytes": 0, "label": "", "outcome": outcome,
                     "error": ""}) + "\n"
-        for action, d, count, outcome, actor in _au))
+        for acct, action, d, count, outcome, actor in _au))
     Path(os.environ["STATS_PATH"]).write_text(json.dumps(
         {"input_tokens": 412_331, "output_tokens": 60_112, "cost": 1.43,
          "runs": 9, "months": {time.strftime("%Y-%m"): 0.38}}))
