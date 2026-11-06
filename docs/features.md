@@ -291,7 +291,7 @@ the short version; [install.md](install.md) covers running it and
   controls, filters and confirmations as bottom sheets, a compact list.
 - **Settings** - Mail account, General, AI, Filed senders and (for the
   admin) Server; **Backup & restore** (config and AI verdict export +
-  import; sign-in tokens are left out) is on the General tab.
+  import; all passwords, tokens and API keys are left out) is on the General tab.
 - **Polish** - installable as a PWA (manifest + icon), optional desktop
   notifications when background jobs finish, monthly AI budget cap,
   a first-run setup wizard (provider -> sign in and test -> folders ->

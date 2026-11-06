@@ -33,8 +33,15 @@ Bridge, ... - see [providers](#supported-providers)).
 git clone https://github.com/mclgoerg/inboxrake
 cd inboxrake/deploy
 cp .env.example .env        # optional edits - account setup happens in the UI
+# generate the key that encrypts stored passwords (before the first start)
+sed -i "s|^INBOXRAKE_SECRET_KEY=.*|INBOXRAKE_SECRET_KEY=$(openssl rand -base64 32)|" .env
 docker compose up -d
 ```
+
+`INBOXRAKE_SECRET_KEY` encrypts the IMAP passwords and API keys stored in
+`/data`; without it they are stored as plaintext and the first boot logs a
+warning. Keep the key safe and out of your backups - if it is lost you
+re-enter the secrets.
 
 Open <http://localhost:8765>; on a fresh install a setup wizard walks you
 through provider, sign-in, folders, an optional login password and the first
@@ -44,13 +51,15 @@ Bridge image you provide - see its header).
 **Plain `docker run`** with the published image:
 
 ```bash
-docker run -d --name inboxrake \
+echo "INBOXRAKE_SECRET_KEY=$(openssl rand -base64 32)" > inboxrake.env   # once; keep it
+docker run -d --name inboxrake --env-file inboxrake.env \
   -v inboxrake_data:/data \
   -p 127.0.0.1:8765:8765 \
   ghcr.io/mclgoerg/inboxrake:latest
 ```
 
-Pin a minor tag such as `:2.0` if you do not want surprise upgrades.
+`:latest` follows `main` - every merge, so it can be ahead of the last
+release. Pin `:2.0` (or an exact `:2.0.x`) to get release updates only.
 Guides for Synology, Unraid, TrueNAS, Portainer and Raspberry Pi, the
 host-folder ownership note (the image runs as user ID 1000) and every
 environment variable are in **[docs/install.md](docs/install.md)**.
@@ -92,8 +101,8 @@ All screenshots show generated demo data (`scripts/demo.py`).
 ## Safety & privacy FAQ
 
 **Does it delete anything without asking?** No. Trashing is an IMAP move to
-the Trash folder, always behind a confirmation that names how many mails
-are affected, with an Undo. UIDVALIDITY is checked before every move and
+the Trash folder, always behind a confirmation (with the count of mails, or
+for a single protected group a warning naming that group), with an Undo. UIDVALIDITY is checked before every move and
 scans are read-only. Permanent deletion exists only as explicit actions in
 Trash and Junk: the manual ones confirm with exact counts, and an opt-in
 purge rule only acts after you have reviewed a report run (then it runs on
@@ -121,7 +130,8 @@ mailbox uses more while it runs). Images are published for amd64 and
 arm64 (e.g. Raspberry Pi 4/5).
 
 **Backup and uninstall?** Everything lives in the `/data` volume; Settings
--> General has a backup export (sign-in tokens are left out). Stop the
+-> General has a backup export (it leaves out all passwords, tokens and API keys - you
+re-enter them after a restore). Stop the
 container and delete the volume to remove it. Your mailbox is never
 modified by installing or removing Inboxrake.
 
@@ -130,6 +140,10 @@ localhost or behind an authenticating proxy, or enable the built-in password
 or SSO login. Without a login it also answers only to `localhost` and IP
 addresses; for a host name set `INBOXRAKE_ALLOWED_HOSTS`. Details in
 [docs/security.md](docs/security.md).
+
+More answers - why it needs your IMAP password, how it differs from other
+tools, project status, Undo limits - in the
+**[full FAQ](https://inboxrake.com/docs/faq/)**.
 
 ## Supported providers
 
