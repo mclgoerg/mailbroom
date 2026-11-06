@@ -59,6 +59,11 @@ os.environ.update(
     SERVER_PATH=str(DATA / "server.json"),
     TENANTS_DIR=str(DATA / "tenants"),
     SESSION_SECRET_PATH=str(DATA / "session_secret"),
+    PINS_PATH=str(DATA / "pinned_mails.json"),
+    KNOWN_SENDERS_PATH=str(DATA / "known_senders.json"),
+    PRESETS_PATH=str(DATA / "presets.json"),
+    AUTOSCAN_PATH=str(DATA / "autoscan.json"),
+    DIGEST_PATH=str(DATA / "digest.json"),
     IMAP_CAFILE="", IMAP_USER="demo@example.com", IMAP_PASSWORD="demo",
     LOG_LEVEL="INFO",
     # the local body index (Tools -> Trackers) needs a key
@@ -81,7 +86,7 @@ def _fixture(*a, **k):
 sys.modules.setdefault("pytest", types.SimpleNamespace(fixture=_fixture))
 
 from conftest import FakeIMAP, make_msg          # noqa: E402
-from backend import accounts, aihelper, mailops, rules      # noqa: E402
+from backend import accounts, aihelper, demo, mailops, rules      # noqa: E402
 
 
 
@@ -163,8 +168,6 @@ def _demo_ai_client(cfg):
     return types.SimpleNamespace(messages=types.SimpleNamespace(create=create))
 
 
-aihelper.ai_client = _demo_ai_client
-
 
 def _install_ai() -> None:
     aihelper.ai_client = _demo_ai_client
@@ -224,6 +227,20 @@ def build(seed_dir) -> None:
     print(f"[demo] seed written to {seed_dir}")
 
 
+def _forget_the_last_visitor() -> None:
+    """What a "Reset demo" must not keep: files the seed does not have
+    (pins, known senders, ...) and the stores' in-memory copies of them."""
+    import shutil
+    from backend import pinstore, unsubstore, verdictstore
+    for p in DATA.iterdir():
+        if p.name == "session_secret":
+            continue
+        shutil.rmtree(p) if p.is_dir() else p.unlink()
+    pinstore._cache.clear()
+    unsubstore._cache.clear()
+    verdictstore._mails_cache.clear()
+
+
 def load(seed_dir) -> dict:
     """Serve the seed in `seed_dir`: nothing is generated or scanned. Also
     moves the clock to the seed's build time (see demo_seed.set_clock), so
@@ -231,13 +248,19 @@ def load(seed_dir) -> dict:
     host; safe to call again (a reset)."""
     import demo_seed
     _install_ai()
+    _forget_the_last_visitor()
     try:
         seed = demo_seed.load(seed_dir, DATA)
     except demo_seed.SeedError as e:
         raise DemoError(str(e)) from None
     demo_seed.set_clock(seed.built_at)
     accounts.reset()          # a reset: forget what the last visitor did
-    mailops.connect = lambda im, name=None: seed.fakes[im["host"]]
+
+    def connect(im, name=None):
+        if im.get("host") not in seed.fakes:
+            raise demo.refusal()  # "Add account" with a real server
+        return seed.fakes[im["host"]]
+    mailops.connect = connect
     for name in accounts.names():
         acc = accounts.get(name)
         # the Gmail demo accounts are never scanned: no snapshot, no error

@@ -23,7 +23,25 @@ import asyncio, json, sys, time
 sys.path.insert(0, sys.argv[1] + "/scripts")
 import demo_glue
 marks = demo_glue.boot(sys.argv[2])
-marks2 = demo_glue.boot(sys.argv[2])                  # "Reset demo"
+import os
+from backend import mailops
+refused = ""
+try:
+    mailops.connect({"host": "imap.other.example"})
+except Exception as e:
+    refused = str(e)
+
+async def pin():
+    r = await demo_glue.request("POST", "/api/pin", "account=proton",
+                                {"folder": "INBOX", "uid": 1})
+    return r["status"], os.path.exists(os.environ["PINS_PATH"]), \
+        os.environ["PINS_PATH"]
+
+pinned = asyncio.run(pin())
+demo_glue.boot(sys.argv[2])                           # "Reset demo"
+from backend import pinstore
+left = (os.path.exists(os.environ["PINS_PATH"]),
+        sorted(pinstore.load_account("proton")))
 
 async def go():
     out = {}
@@ -42,6 +60,7 @@ async def go():
 
 out = asyncio.run(go())
 out["marks"] = sorted(marks)
+out["refused"], out["pinned"], out["left"] = refused, pinned, left
 out["clock"] = time.time()
 print(json.dumps(out))
 """
@@ -69,5 +88,9 @@ def test_boot_serves_the_seed_and_trash_and_undo_work(seed):
     assert key not in out["after"][1]["groups"]["sender"]
     assert out["undo"][0] == 200
     assert key in out["back"][1]["groups"]["sender"]
+    assert "not_in_demo" in out["refused"]        # not a raw KeyError
+    assert out["pinned"][:2] == [200, True]       # in the demo's own data dir
+    assert not out["pinned"][2].startswith("/data")
+    assert out["left"] == [False, []]             # a reset forgets the pin
     # the 90 day old seed runs on its own build day (see demo_seed.set_clock)
     assert 0 <= out["clock"] - BUILT < 600

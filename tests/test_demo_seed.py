@@ -21,7 +21,10 @@ import pytest
 ROOT = Path(__file__).resolve().parent.parent
 DEMO = ROOT / "scripts" / "demo.py"
 # fixed clock: mail dates and scan stamps derive from it
-ENV = {**os.environ, "DEMO_NOW": "1790000000", "LOG_LEVEL": "WARNING"}
+# (PYTHONHASHSEED: a few data files list set members, so byte-for-byte
+# reproducible seeds - what the bundle build makes - need a fixed hash seed)
+ENV = {**os.environ, "DEMO_NOW": "1790000000", "LOG_LEVEL": "WARNING",
+       "PYTHONHASHSEED": "0"}
 
 # Runs demo.py's main() in-process (without the server) and dumps what the UI
 # reads. A bad seed makes main() exit with "demo: <why>".
