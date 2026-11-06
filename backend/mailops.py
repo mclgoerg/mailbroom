@@ -3325,6 +3325,32 @@ def _rescan_after_restore(acc, restored: int, key: str,
     return False
 
 
+def _search_message_id(conn, msgid: str) -> list[bytes]:
+    """UIDs in the selected folder whose Message-ID header matches `msgid`.
+    The id comes from mail data, so it is sent as an escaped quoted string,
+    or as a literal when it cannot be one. An id the server cannot be asked
+    about safely (NUL) or refuses (BAD) finds nothing instead of failing
+    the caller."""
+    if "\0" in msgid:
+        return []
+    quoted = _quoted_id(msgid)
+    if quoted is None:
+        conn.literal = msgid.encode("utf-8")
+    try:
+        if quoted is None:
+            st, data = conn.uid("SEARCH", None, "HEADER", "Message-ID")
+        else:
+            st, data = conn.uid("SEARCH", None, "HEADER", "Message-ID",
+                                quoted)
+    except imaplib.IMAP4.abort:
+        raise
+    except imaplib.IMAP4.error:
+        return []
+    finally:
+        conn.literal = None
+    return data[0].split() if st == "OK" and data and data[0] else []
+
+
 def _present_in_targets(conn, items) -> set[tuple[str, str]]:
     """The (folder, Message-ID) pairs of an undo entry whose mail already
     sits in its target folder (read-only look; a folder that cannot be
@@ -3339,9 +3365,7 @@ def _present_in_targets(conn, items) -> set[tuple[str, str]]:
         if status != "OK":
             continue
         for msgid in msgids:
-            status, data = conn.uid("SEARCH", None, "HEADER", "Message-ID",
-                                    f'"{msgid}"')
-            if status == "OK" and data and data[0]:
+            if _search_message_id(conn, msgid):
                 present.add((folder, msgid))
     return present
 
@@ -3406,10 +3430,9 @@ def undo_last(index: int = -1, acc=None, ident: dict | None = None) -> dict:
         for folder, msgid in entry["items"]:
             if not msgid or (folder, msgid) in present:
                 continue
-            status, data = conn.uid("SEARCH", None, "HEADER", "Message-ID",
-                                    f'"{msgid}"')
-            if status == "OK" and data and data[0]:
-                by_target.setdefault(folder, []).extend(data[0].split())
+            found = _search_message_id(conn, msgid)
+            if found:
+                by_target.setdefault(folder, []).extend(found)
         for folder, uids in by_target.items():
             for start in range(0, len(uids), MOVE_CHUNK):
                 chunk = uids[start:start + MOVE_CHUNK]

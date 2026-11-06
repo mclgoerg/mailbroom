@@ -120,6 +120,38 @@ def make_msg(uid, frm='"Shop News" <news@shop.example>',
             "atts": atts or []}     # [(filename, size)] for BODYSTRUCTURE
 
 
+def _imap_tokens(line: str) -> list[str]:
+    """Split an IMAP command tail into atoms and unescaped quoted strings;
+    an unterminated quote is a BAD, as on a real server."""
+    out: list[str] = []
+    i = 0
+    while i < len(line):
+        if line[i] == " ":
+            i += 1
+        elif line[i] == '"':
+            i += 1
+            buf = []
+            while True:
+                if i >= len(line):
+                    raise imaplib.IMAP4.error("SEARCH BAD unterminated quote")
+                if line[i] == "\\" and i + 1 < len(line):
+                    buf.append(line[i + 1])
+                    i += 2
+                elif line[i] == '"':
+                    i += 1
+                    break
+                else:
+                    buf.append(line[i])
+                    i += 1
+            out.append("".join(buf))
+        else:
+            j = line.find(" ", i)
+            j = len(line) if j < 0 else j
+            out.append(line[i:j])
+            i = j
+    return out
+
+
 class FakeIMAP:
     """In-memory IMAP double producing imaplib-shaped responses.
 
@@ -339,17 +371,25 @@ class FakeIMAP:
             elif "HEADER" in args:
                 # `HEADER Message-ID <id>` (id as literal or quoted string),
                 # also OR-chained: OR HEADER Message-ID a OR HEADER ... z
-                if self.literal:
-                    targets = {self.literal.decode("utf-8")}
-                else:
-                    targets = {args[i + 2].strip('"')
-                               for i in range(len(args) - 2)
-                               if args[i] == "HEADER"
-                               and args[i + 1] == "Message-ID"}
+                # The command line is tokenised like a server would: an
+                # id that breaks out of its quotes is BAD or changes the
+                # query, and an empty HEADER value matches every mail.
                 self.message_id_searches.append(args)
+                if self.literal:
+                    targets = [self.literal.decode("utf-8")]
+                else:
+                    toks = _imap_tokens(" ".join(a for a in args if a))
+                    targets = [toks[i + 2] for i in range(len(toks) - 2)
+                               if toks[i] == "HEADER"
+                               and toks[i + 1] == "Message-ID"]
                 if self.reject_or and "OR" in args:
                     raise imaplib.IMAP4.error("SEARCH BAD OR not supported")
-                hits = [m for m in msgs if m["msgid"] in targets]
+                if "OR" in args:
+                    hits = [m for m in msgs if m["msgid"] in set(targets)]
+                else:
+                    hits = [m for m in msgs
+                            if all(t == "" or m["msgid"] == t
+                                   for t in targets)]
             else:
                 raise AssertionError(f"unexpected SEARCH {args!r}")
             return "OK", [b" ".join(str(m["uid"]).encode() for m in hits)]
