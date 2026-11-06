@@ -72,7 +72,7 @@ def test_bulk_failure_is_recorded_not_raised(bridge, monkeypatch):
     assert st["failed"] == 1 and st["status"] == "done"     # job itself ok
 
     entry = unsubstore.load_account("default")["news@shop.example"]
-    assert entry["status"] == "failed" and "endpoint down" in entry["error"]
+    assert entry["status"] == "failed" and entry["error"] == "unsub_failed"
 
     group = mailops.public_state()["groups"]["sender"]["news@shop.example"]
     assert group["unsubscribed"]["status"] == "failed"

@@ -154,8 +154,25 @@ DATA_NOT_WRITABLE = "data_not_writable"
 # in the source folder: not purged; folder= the source (copies in the
 # destination remain)
 MOVE_FOREIGN_DELETED = "move_foreign_deleted"
+# the other unsubscribe failures (backend/unsub.py classifies; status= is an
+# HTTP status)
+UNSUB_BLOCKED = "unsub_blocked"          # link resolves to a non-public address
+UNSUB_HTTP = "unsub_http"                # status=: the sender's server said no
+UNSUB_TLS = "unsub_tls"
+UNSUB_UNREACHABLE = "unsub_unreachable"
+UNSUB_TIMEOUT = "unsub_timeout"
+UNSUB_BAD_URL = "unsub_bad_url"
+UNSUB_NO_METHOD = "unsub_no_method"
+UNSUB_MAIL_FAILED = "unsub_mail_failed"  # the unsubscribe mail was not sent
+UNSUB_POOLED = "unsub_pooled"
+UNSUB_UNKNOWN_GROUP = "unsub_unknown_group"
+UNSUB_FAILED = "unsub_failed"            # anything unexpected (see the log)
+UNSUB_CODES = (UNSUB_BLOCKED, UNSUB_HTTP, UNSUB_TLS, UNSUB_UNREACHABLE,
+               UNSUB_TIMEOUT, UNSUB_BAD_URL, UNSUB_NO_METHOD,
+               UNSUB_MAIL_FAILED, UNSUB_POOLED, UNSUB_UNKNOWN_GROUP,
+               UNSUB_FAILED)
 FOLDER_ERROR_CODES = frozenset({
-    MAILTO_UNSAFE, MOVE_FOREIGN_DELETED,
+    MAILTO_UNSAFE, MOVE_FOREIGN_DELETED, *UNSUB_CODES,
     NO_MESSAGE_ID, PINNED_MAILS, PROTECTED_MAILS, ALL_PINNED,
     ROLE_NOT_CANDIDATE, ROLE_AMBIGUOUS, NOT_LOOKALIKE, MOVE_UNSAFE,
     BUSY_ACTION,

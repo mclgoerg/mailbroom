@@ -1807,6 +1807,28 @@ export const DE: Record<string, string> = {
     + "bleiben. Lösche zuerst die markierten Mails im anderen Mailprogramm "
     + "endgültig (Ordner komprimieren / „Gelöschte entfernen“) und versuche "
     + "es dann erneut.",
+  "ferr.unsub_blocked":
+    "Der Abbestell-Link zeigt auf eine private oder interne Netzwerkadresse und wurde deshalb nicht aufgerufen.",
+  "ferr.unsub_http":
+    "Die Abbestellseite des Absenders hat mit Fehler {status} geantwortet.",
+  "ferr.unsub_tls":
+    "Die sichere Verbindung zur Abbestellseite des Absenders konnte nicht geprüft werden (Zertifikats- oder TLS-Problem).",
+  "ferr.unsub_unreachable":
+    "Die Abbestellseite des Absenders ist nicht erreichbar.",
+  "ferr.unsub_timeout":
+    "Die Abbestellseite des Absenders hat nicht rechtzeitig geantwortet.",
+  "ferr.unsub_bad_url":
+    "Der Abbestell-Link in dieser Mail ist keine gültige Webadresse.",
+  "ferr.unsub_no_method":
+    "Diese Mail enthält keinen brauchbaren Abbestell-Link und keine Abbestell-Adresse.",
+  "ferr.unsub_mail_failed":
+    "Die Abbestell-Mail konnte nicht gesendet werden - prüfe die Versand-Einstellungen (SMTP) des Kontos.",
+  "ferr.unsub_pooled":
+    "Eine zusammengefasste Zeile hat keinen einzelnen Absender zum Abbestellen - öffne einen ihrer Absender.",
+  "ferr.unsub_unknown_group":
+    "Diese Gruppe gibt es nicht mehr - scanne neu und versuche es erneut.",
+  "ferr.unsub_failed":
+    "Das Abbestellen ist unerwartet fehlgeschlagen. Details stehen im Server-Log.",
   "ferr.cannot_flag":
     "Der Server hat das Markieren der Mails zum Löschen nicht "
     + "akzeptiert.",

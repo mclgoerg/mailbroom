@@ -1466,7 +1466,7 @@ def test_single_group_unsubscribe_refuses_a_pooled_row(unsubbable):
     from backend import unsubstore
     r = client.post("/api/unsubscribe", json={"grouping": "smart",
                                               "key": "o:acme.example"})
-    assert r.status_code == 500 and "pooled" in r.json()["detail"]
+    assert r.status_code == 400 and r.json()["detail"] == "unsub_pooled"
     assert not unsubstore.load_account("default") and not unsubbable
     # an own row (one sender) and the sender's own detail still work
     r = client.post("/api/unsubscribe", json={"grouping": "smart",

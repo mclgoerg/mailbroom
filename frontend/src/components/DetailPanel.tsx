@@ -248,7 +248,7 @@ export function DetailPanel({ grouping, group, aiEnabled, protectedNow,
       }
       onDeleted();   // refresh App's state so the persisted status shows up
     } catch (e: any) {
-      setNote(`Unsubscribe error: ${e.message ?? e}`);
+      setNote(t("err.unsub", { msg: e.message ?? String(e) }));
     }
     setBusy(false);
   };

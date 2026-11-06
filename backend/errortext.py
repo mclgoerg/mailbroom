@@ -52,6 +52,28 @@ TEXT: dict[str, str | tuple[str, str]] = {
         'the destination folder, and trying again would add another set '
         'while those marks remain. First empty the deleted mails in the other '
         'mail program (expunge), then try again.',
+    'unsub_blocked':
+        "The unsubscribe link points to a private or internal network address, so it was not called.",
+    'unsub_http':
+        "The sender's unsubscribe page answered with error {status}.",
+    'unsub_tls':
+        "The secure connection to the sender's unsubscribe page could not be verified (certificate or TLS problem).",
+    'unsub_unreachable':
+        "The sender's unsubscribe page could not be reached.",
+    'unsub_timeout':
+        "The sender's unsubscribe page did not answer in time.",
+    'unsub_bad_url':
+        "The unsubscribe link in this mail is not a valid web address.",
+    'unsub_no_method':
+        "This mail has no usable unsubscribe link or address.",
+    'unsub_mail_failed':
+        "The unsubscribe mail could not be sent - check the account's mail-sending (SMTP) settings.",
+    'unsub_pooled':
+        "A combined row has no single sender to unsubscribe from - open one of its senders.",
+    'unsub_unknown_group':
+        "That group no longer exists - rescan and try again.",
+    'unsub_failed':
+        "Unsubscribing failed unexpectedly. The server log has the details.",
     'cannot_flag':
         'The server did not accept marking the mails for deletion.',
     'cannot_expunge':

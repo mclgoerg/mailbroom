@@ -211,12 +211,12 @@ def test_unsubscribe_dispatch(bridge, monkeypatch):
     assert r["detail"].startswith("https://dhl.example/")
 
     # alice: no header at all
-    with pytest.raises(RuntimeError, match="List-Unsubscribe"):
+    with pytest.raises(RuntimeError, match="unsub_no_method"):
         unsub.unsubscribe("sender", "alice@friends.example")
 
 
 def test_ssrf_guard(monkeypatch):
     monkeypatch.setattr(unsub.socket, "getaddrinfo",
                         lambda *a, **k: [(2, 1, 6, "", ("10.0.0.5", 0))])
-    with pytest.raises(RuntimeError, match="non-public"):
+    with pytest.raises(RuntimeError, match="unsub_blocked"):
         unsub._post_one_click("https://internal.example/u")
