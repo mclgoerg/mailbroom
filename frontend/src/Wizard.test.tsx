@@ -477,6 +477,7 @@ test("after a successful test the config is re-read so the account " +
   await screen.findByText("Connected - 7 folders found.");
   const last = onConfig.mock.calls.at(-1)![0] as Config;
   expect(last.accounts.default.verified).toBe(true);
+});
 
 test("the client-secret placeholder says optional for Microsoft, required " +
   "for Google", () => {
