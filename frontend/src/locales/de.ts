@@ -4,6 +4,7 @@
 export const DE: Record<string, string> = {
   "notice.scan_cancelled": "Scan abgebrochen.",
   "notice.action_cancelled": "Aktion abgebrochen.",
+  "status.cached_verdicts": "{n} KI-Bewertungen aus dem Cache",
   "notice.cached_verdicts":
     "{n} zwischengespeicherte KI-Bewertungen übernommen (die KI-Prüfung bewertet nur neue Gruppen).",
   "notice.restored":
@@ -166,6 +167,7 @@ export const DE: Record<string, string> = {
   "tools.group_cleanup": "Aufräumen",
   "tools.group_insights": "Einblicke",
   "tools.group_ai": "KI & Export",
+  "col.status_tags": "Status & Tags",
   "tracker.title": "Tracker",
   "tracker.sub": "Wer deine Öffnungen und Klicks verfolgt",
   "tracker.explainer":
@@ -290,7 +292,6 @@ export const DE: Record<string, string> = {
   "Mails": "Mails",
   "Size": "Größe",
   "Last": "Zuletzt",
-  "Type": "Typ",
   "AI": "KI",
   "unread": "ungelesen",
   "(filtered)": "(gefiltert)",
@@ -961,6 +962,16 @@ export const DE: Record<string, string> = {
     "Leere Liste = jedes Konto, das der Identity Provider anmeldet, darf "
     + "die App nutzen. Mit Einträgen kommen nur diese E-Mails/Subjects "
     + "hinein.",
+  "login.oidc_open_warn":
+    "Die Liste erlaubter Nutzer ist leer: Jeder mit einem Konto bei deinem "
+    + "Identity Provider kann sich anmelden und bekommt einen eigenen "
+    + "Arbeitsbereich.",
+  "login.oidc_noadmin_warn":
+    "Es ist kein Admin gesetzt: Die erste Identität, die sich anmeldet, "
+    + "wird Admin und verwaltet die Server-Einstellungen.",
+  "login.err.email_unverified":
+    "Anmeldung abgelehnt: Dein Identity Provider hat diese E-Mail-Adresse "
+    + "nicht bestätigt.",
   "login.submit": "Anmelden",
   "login.sso": "Mit SSO anmelden",
   "login.logout": "Abmelden",

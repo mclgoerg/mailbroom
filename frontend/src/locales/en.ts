@@ -4,6 +4,7 @@
 export const EN: Record<string, string> = {
   "notice.scan_cancelled": "Scan cancelled.",
   "notice.action_cancelled": "Action cancelled.",
+  "status.cached_verdicts": "{n} cached AI verdicts",
   "notice.cached_verdicts":
     "{n} cached AI verdicts applied (AI review only evaluates new groups).",
   "notice.restored":
@@ -91,6 +92,15 @@ export const EN: Record<string, string> = {
   "login.oidc_allowed_help":
     "Empty list = every account your identity provider signs in may use "
     + "the app. With entries, only those emails/subjects get in.",
+  "login.oidc_open_warn":
+    "The allowed-users list is empty: anyone with an account at your "
+    + "identity provider can sign in and gets their own workspace.",
+  "login.oidc_noadmin_warn":
+    "No admin is set: the first identity to sign in becomes the admin and "
+    + "owns the server settings.",
+  "login.err.email_unverified":
+    "Sign-in refused: your identity provider has not verified this email "
+    + "address.",
   "login.submit": "Sign in",
   "login.sso": "Sign in with SSO",
   "login.logout": "Logout",
@@ -389,6 +399,7 @@ export const EN: Record<string, string> = {
   "tools.group_cleanup": "Clean up",
   "tools.group_insights": "Insights",
   "tools.group_ai": "AI & export",
+  "col.status_tags": "Status & tags",
   "tracker.title": "Trackers",
   "tracker.sub": "Who tracks your opens and clicks",
   "tracker.explainer":

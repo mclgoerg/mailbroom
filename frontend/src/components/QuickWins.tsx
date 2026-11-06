@@ -8,7 +8,12 @@ import { computeQuickWins, isDismissed, loadDismissed, saveDismissed,
 import type { Group } from "../types";
 import { Button } from "./ui";
 
+// Collapsed state is remembered per account (`<key>:<account>`); the old
+// global key still applies to an account that has no entry of its own.
 const COLLAPSED_KEY = "pmc_qw_collapsed";
+const loadCollapsed = (account: string): boolean =>
+  (localStorage.getItem(`${COLLAPSED_KEY}:${account}`)
+    ?? localStorage.getItem(COLLAPSED_KEY)) === "1";
 
 /** The "Quick wins" strip above the Sender list: a few ready-made cleanups
  *  with what each frees. Review shows the list, Clean up goes through the
@@ -21,10 +26,12 @@ export function QuickWins({ groups, account, onReview, onCleanUp }: {
 }) {
   const [dismissed, setDismissed] = useState<Dismissed>(
     () => loadDismissed(account));
-  const [collapsed, setCollapsed] = useState(
-    () => localStorage.getItem(COLLAPSED_KEY) === "1");
+  const [collapsed, setCollapsed] = useState(() => loadCollapsed(account));
   const [more, setMore] = useState(false);
-  useEffect(() => setDismissed(loadDismissed(account)), [account]);
+  useEffect(() => {
+    setDismissed(loadDismissed(account));
+    setCollapsed(loadCollapsed(account));
+  }, [account]);
 
   const cards = useMemo(
     () => computeQuickWins(groups)
@@ -35,7 +42,7 @@ export function QuickWins({ groups, account, onReview, onCleanUp }: {
   const shown = more ? cards : cards.slice(0, TOP_CARDS);
   const total = unionTotals(shown, groups);
   const toggle = () => {
-    localStorage.setItem(COLLAPSED_KEY, collapsed ? "0" : "1");
+    localStorage.setItem(`${COLLAPSED_KEY}:${account}`, collapsed ? "0" : "1");
     setCollapsed(!collapsed);
   };
   const moreToggle = cards.length > TOP_CARDS
@@ -53,7 +60,8 @@ export function QuickWins({ groups, account, onReview, onCleanUp }: {
 
   return (
     <section aria-label={t("qw.title")}
-      className="mb-3 rounded-card border border-line bg-panel p-3">
+      className={`rounded-card border border-line bg-panel
+        ${collapsed ? "mb-1 p-1.5" : "mb-3 p-3"}`}>
       <div className="flex items-center gap-2">
         <Zap size={16} className="shrink-0 text-accent" aria-hidden />
         <h2 className="min-w-0 flex-1 type-heading">

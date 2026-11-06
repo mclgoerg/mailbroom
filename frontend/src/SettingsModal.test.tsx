@@ -516,6 +516,35 @@ test("the admin sees and saves the shared AI section", async () => {
   expect(saveCalls[0].shared_ai.default_tenant_budget_usd).toBe(5);
 });
 
+test("SSO warnings: open allow-list and missing admin", () => {
+  const mk = (admin: string, allowed: string[]): Config => ({
+    ...cfg,
+    auth: { ...cfg.auth, mode: "oidc", is_admin: true, admin,
+      oidc: { issuer: "", client_id: "", client_secret_set: false,
+        redirect_base: "", allowed } },
+  });
+  const show = (c: Config) => {
+    render(<SettingsModal cfg={c} account="default" onClose={() => {}}
+      onSaved={() => {}} onAccountsChanged={() => {}} />);
+    fireEvent.click(screen.getByRole("tab", { name: /Server/ }));
+  };
+  show(mk("me@x.example", ["me@x.example"]));
+  expect(screen.queryByText(/allowed-users list is empty/)).toBeNull();
+  expect(screen.queryByText(/No admin is set/)).toBeNull();
+  cleanup();
+  show(mk("me@x.example", []));
+  expect(screen.getByText(/allowed-users list is empty/)).toBeTruthy();
+  expect(screen.queryByText(/No admin is set/)).toBeNull();
+  cleanup();
+  show(mk("", ["me@x.example"]));
+  expect(screen.queryByText(/allowed-users list is empty/)).toBeNull();
+  expect(screen.getByText(/No admin is set/)).toBeTruthy();
+  cleanup();
+  show(mk("", []));
+  expect(screen.getByText(/allowed-users list is empty.*No admin is set/))
+    .toBeTruthy();
+});
+
 test("tab switches keep unsaved edits and Save persists every tab", () => {
   saveCalls.length = 0;
   render(<SettingsModal cfg={cfg} account="default" onClose={() => {}}
