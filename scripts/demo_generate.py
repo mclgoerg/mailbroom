@@ -9,9 +9,11 @@ the FakeIMAP servers by host. `NOW` is the instant the mail dates derive from
 
 from __future__ import annotations
 
+import datetime
 import json
 import os
 import random
+import re
 import time
 from pathlib import Path
 
@@ -59,43 +61,132 @@ PIXEL_HOST = "px.beacons-demo.example"
 CLICK_HOST = "r.linkhop-demo.example"
 
 
-_BODIES: dict[str, str] = {}
+ME = "Demo <demo@example.com>"
+FREEMAIL = ("@gmail.com", "@gmx.de", "@web.de", "@outlook.com")
+_DE = re.compile(r"\b(Ihr|Ihre|Ihren|Ihrem|ist|wurde|am|für|der|die|das|und|"
+                 r"Termin\w*|Foto\w*|Hallo|bald|Geschenk|Neu\w*|Angebot|"
+                 r"Frage|Wanderung|Sendung|Zustellung|Paket|Rechnung|Befund|"
+                 r"Kletterhalle|Wochenend\w*|Urlaub\w*|Sonntag|Geburtstag|"
+                 r"Nebenkosten\w*|Mietvertrag|Steuer\w*|Programm|Vorpremiere)"
+                 r"\b")
 
 
-def _body(frm: str) -> str:
-    """A short plain-text body per sender, so a mail opened in the viewer
-    isn't the test double's stock line. Only the mails that ask for one
-    (`text=True`) get it: every body of the Proton account also lands in its
-    local search index, which is part of the seed's size budget. No random
-    draws."""
-    if frm not in _BODIES:
-        name = frm.split("<")[0].strip(' "') or "us"
-        _BODIES[frm] = ("Hello,\n\nthere is something new in your account. "
-                        "All the details are on our website; if you have "
-                        f"questions, just reply to this mail.\n\nBest "
-                        f"regards,\n{name}")
-    return _BODIES[frm]
+def _kind(m: dict) -> str:
+    """What sort of sender a mail came from, to pick a body for it."""
+    addr = m["from"].rsplit("<", 1)[-1].rstrip(">").lower()
+    subj = m["subject"].lower()
+    if addr.startswith("demo@"):
+        return "me"
+    if "praxis" in addr:
+        return "practice"
+    if (addr.endswith(FREEMAIL) or "anna.weber@" in addr
+            or addr.split("@")[1].startswith(("familienpost", "kletterhalle",
+                                              "mietverein", "kanzlei"))):
+        return "person"
+    if any(w in subj for w in ("sendung", "paket", "shipped", "delivery",
+                               "zustellung", "unterwegs", "bestellung")):
+        return "parcel"
+    return "newsletter" if m["unsub"] else "service"
 
 
-def thread_chains(msgs: list[dict], seed: int = 23) -> list[dict]:
-    """Turn runs of 2-5 neighbouring mails (newest first, as `mails` makes
-    them) into reply chains: the oldest of a run starts the conversation,
-    each later one answers the one before (In-Reply-To / References, `Re:`
-    subject), so the Thread view has real conversations. Own random
-    stream: nothing else in the demo shifts."""
+_BODY = {
+    "person": ("Hallo!\n\n{subj} - melde dich einfach, wenn es dir "
+               "passt. Ich freue mich!\n\nLG {name}",
+               "Hi!\n\n{subj} - let me know what works for you.\n\n"
+               "Cheers,\n{name}"),
+    "me": ("Hallo {first},\n\n{subj} - passt für mich, danke dir!\n\n"
+           "Viele Grüße\nDemo",
+           "Hi {first},\n\n{subj} - works for me, thanks!\n\nBest,\nDemo"),
+    "practice": ("Guten Tag,\n\n{subj}. Bitte bringen Sie Ihre "
+                 "Versichertenkarte mit.\n\nFreundliche Grüße\n{name}",
+                 "Hello,\n\n{subj}. Please bring your insurance card.\n\n"
+                 "Kind regards,\n{name}"),
+    "parcel": ("Hallo,\n\n{subj}. Den aktuellen Status sehen Sie jederzeit "
+               "in der Sendungsverfolgung.\n\n{name}",
+               "Hello,\n\n{subj}. You can follow the delivery any time in "
+               "your account.\n\n{name}"),
+    "service": ("Guten Tag,\n\n{subj}. Die Details finden Sie in Ihrem "
+                "Konto.\n\nDies ist eine automatische Nachricht.\n{name}",
+                "Hello,\n\n{subj}. The details are in your account.\n\n"
+                "This is an automated message.\n{name}"),
+    "newsletter": ("Hallo,\n\n{subj}\n\nDas gibt es diese Woche Neues. "
+                   "Kein Interesse mehr? Abmelden geht ganz unten.\n\n{name}",
+                   "Hi,\n\n{subj}\n\nHere is what is new this week. Not "
+                   "interested any more? Unsubscribe at the bottom.\n\n{name}"),
+}
+
+
+def _who(addr: str) -> str:
+    """The display name of an address header, else its local part."""
+    name = addr.split("<")[0].strip(' "')
+    return name or addr.strip("<>").split("@")[0].split(".")[0].title() or "Demo"
+
+
+def body_for(m: dict) -> str:
+    """A short plain-text body fitting the sender: friendly for people, terse
+    for services, a pitch for newsletters; German or English by subject."""
+    kind = _kind(m)
+    disp = _who(m["from"])
+    first = _who(m.get("to") or "").split()[0] if kind == "me" \
+        else disp.split()[0]
+    subj = re.sub(r"^(re|fwd): *", "", m["subject"], flags=re.I).rstrip("?!.")
+    de = bool(_DE.search(m["subject"]))
+    return _BODY[kind][0 if de else 1].format(
+        first=first, subj=subj, name=disp)
+
+
+def fill_bodies(box: list[dict]) -> list[dict]:
+    """Give every plain-text mail without a body one (see `body_for`). Run
+    AFTER the Proton body index was built: that index keeps every body it
+    sees (encrypted, so it does not compress) and is part of the seed's
+    size budget; the viewer reads the mail from the server, not the index."""
+    for m in box:
+        if m["body"] is None and m["html"] is None:
+            m["body"] = body_for(m)
+    return box
+
+
+def _when(date: str) -> float:
+    return datetime.datetime.strptime(date, "%d-%b-%Y %H:%M:%S %z").timestamp()
+
+
+def thread_chains(msgs: list[dict], sent: list[dict], me: str = ME,
+                  seed: int = 23) -> list[dict]:
+    """Turn runs of 3-7 neighbouring mails (newest first, as `mails` makes
+    them) into conversations: the sender writes, the demo user answers (the
+    answer moves to `sent`), the sender replies again, ... Each reply follows
+    the mail before it by a few hours to a day or two, with In-Reply-To /
+    References and a `Re:` subject. Own random stream: nothing else in the
+    demo shifts. Returns the mails that stay in the folder."""
     rng = random.Random(seed)
+    keep: list[dict] = []
     i = 0
     while i < len(msgs):
-        run = msgs[i:i + rng.randint(2, 5)]
-        root = run[-1]
-        refs = [root["msgid"]]
-        for m in reversed(run[:-1]):
-            m["irt"] = refs[-1]
-            m["refs"] = " ".join(refs)
-            m["subject"] = "Re: " + root["subject"].removeprefix("Re: ")
-            refs.append(m["msgid"])
+        run = msgs[i:i + rng.randint(3, 7)]
         i += len(run)
-    return msgs
+        run.reverse()                       # oldest first, the sender starts
+        person = run[0]["from"]
+        t = _when(run[-1]["date"])
+        stamps = [t]
+        for _ in run[:-1]:                  # walk back from the newest
+            t -= rng.uniform(3, 40) * 3600
+            stamps.append(t)
+        stamps.reverse()
+        refs: list[str] = []
+        for k, m in enumerate(run):
+            m["date"] = time.strftime("%d-%b-%Y %H:%M:%S +0000",
+                                      time.gmtime(stamps[k]))
+            if refs:
+                m["irt"], m["refs"] = refs[-1], " ".join(refs)
+                m["subject"] = "Re: " + run[0]["subject"].removeprefix("Re: ")
+            refs.append(m["msgid"])
+            if k % 2:                       # the user's turn
+                m.update(to=person, atts=[], unsub=None, seen=True, size=2500)
+                m["from"] = me
+                sent.append(m)
+            else:
+                keep.append(m)
+    return keep
 
 
 def _atts_for(i: int, atts, att_n: int):
@@ -108,7 +199,8 @@ def _atts_for(i: int, atts, att_n: int):
 
 def mails(frm: str, subjects: list[str], n: int, *, newest_days=1.0,
           span_days=700.0, unread=0.7, size=(9000, 60000), unsub=False,
-          atts=None, att_n=3, html=None, chain=False, text=False) -> list[dict]:
+          atts=None, att_n=3, html=None, chain: list | None = None,
+          me: str = ME) -> list[dict]:
     out = []
     for i in range(n):
         days = newest_days + (span_days - newest_days) * (i / max(1, n - 1)) \
@@ -125,16 +217,8 @@ def mails(frm: str, subjects: list[str], n: int, *, newest_days=1.0,
             date=_date(days),
             atts=_atts_for(i, atts, att_n),
             html=html(i) if html else None,
-            body=_body(frm) if text else None))
-    return thread_chains(out) if chain else out
-
-
-def with_text(box: list[dict]) -> list[dict]:
-    """Give the plain-text mails of a folder a body (see `_body`)."""
-    for m in box:
-        if m["body"] is None and m["html"] is None:
-            m["body"] = _body(m["from"])
-    return box
+            body=None))
+    return out if chain is None else thread_chains(out, chain, me)
 
 
 def copies(msgs: list[dict], *, seen=None) -> list[dict]:
@@ -167,6 +251,8 @@ WANDER = [
                   ">> Hi! Hast du am Samstag Zeit für eine Wanderung?\n"),
 ]
 
+PROTON_SENT: list[dict] = []       # the user's side of the Proton conversations
+
 PROTON_INBOX = WANDER + (
     mails('"ACME Store" <news@acme-store.example>',
           ["Weekend SALE - up to 70% off ✨", "Your points expire soon",
@@ -196,11 +282,11 @@ PROTON_INBOX = WANDER + (
             ["Your statement is available", "Security notice about your "
              "account", "Payment of ${n}.00 completed",
              "Offer: 3% cashback on your next card purchase"],
-            42, unread=0.3, size=(14000, 40000), text=True)
+            42, unread=0.3, size=(14000, 40000))
     + mails('"CloudBox" <billing@cloudbox.example>',
             ["Invoice CB-{n}", "Payment receipt CB-{n}"],
             24, unread=0.2, size=(220000, 480000),
-            atts=[("invoice.pdf", 310000)], text=True)
+            atts=[("invoice.pdf", 310000)])
     + mails('"JobPortal" <jobs@jobportal.example>',
             ["12 new jobs matching your profile", "Someone viewed your "
              "profile"], 33, unsub=True)
@@ -208,11 +294,11 @@ PROTON_INBOX = WANDER + (
             ["Ihre Rechnung {n}", "Abschlagsänderung ab August"],
             18, unread=0.25, size=(90000, 200000),
             atts=[[("rechnung.pdf", 150000)],
-                  [("Vertragsbedingungen.docx", 85000)]], text=True)
+                  [("Vertragsbedingungen.docx", 85000)]])
     + mails('"Anna Weber" <anna.weber@mailfox.example>',
             ["Kletterhalle am Freitag", "Fotos vom Wochenende",
              "Geschenk für Papa"], 12, unread=0.05,
-            size=(4000, 30000), chain=True, text=True)
+            size=(4000, 30000), chain=PROTON_SENT)
     + mails('"Photo Club" <hello@photoclub.example>',
             ["March meetup - RAW files inside", "Contest results 🎉"],
             9, unread=0.1, size=(2000000, 6000000),
@@ -235,7 +321,7 @@ PROTON_INBOX = WANDER + (
             atts=[[("album.zip", 1900000)], [("beach.png", 1400000)]])
     + mails('"Dr. Meier Praxis" <praxis@dr-meier.example>',
             ["Terminbestätigung", "Ihr Laborbefund ist da"], 5, unread=0.1,
-          chain=True, text=True)
+          chain=PROTON_SENT)
     # Quick wins (F5): senders that have gone quiet, so the strip has cards
     # - old unread newsletters, a low-engagement sender, an unsubscribed one
     # still holding mail, and old big attachments.
@@ -307,13 +393,14 @@ def _tail(local: str, domain: str, brands: list[str], subjects: list[str],
     return out
 
 
-def long_tail(scale: float = 1.0) -> tuple[list[dict], list[dict]]:
+def long_tail(scale: float = 1.0, me: str = ME) -> tuple[list[dict], list[dict]]:
     """(inbox mails, sent mails): ~100 small senders spread over every kind
     Smart pools - companies, sign-ups, newsletters, orders, appointments,
     applications, support, private addresses, people you write to, the
     rest."""
     state = random.getstate()
     random.seed(11)
+    sent: list[dict] = []                # the user's side of the conversations
     w = _WORDS
     k = lambda n: max(1, round(n * scale))          # noqa: E731
     inbox: list[dict] = []
@@ -346,7 +433,8 @@ def long_tail(scale: float = 1.0) -> tuple[list[dict], list[dict]]:
     inbox += _tail("hr", "{b}-karriere.example", w[18:18 + k(4)],
                    ["Your application at {b}", "Interview invitation"])
     inbox += _tail("help", "{b}-desk.example", w[24:24 + k(6)],
-                   ["Your inquiry", "Ticket-ID {n} updated"], chain=True, text=True)
+                   ["Your inquiry", "Ticket-ID {n} updated"], chain=sent,
+                   me=me)
     people = [f"demo.person{i:02d}@{d}" for i, d in enumerate(
         ["gmail.com", "gmx.de", "web.de", "gmail.com", "outlook.com",
          "gmx.de", "gmail.com", "web.de", "gmail.com", "gmx.de"][:k(10)])]
@@ -356,29 +444,27 @@ def long_tail(scale: float = 1.0) -> tuple[list[dict], list[dict]]:
     for addr, name in zip(people, names):
         inbox += mails(f'"{name}" <{addr}>', ["Hallo!", "Foto vom Sonntag", "Bis bald"],
                        random.randint(1, 3), newest_days=random.uniform(1, 90),
-                       chain=True, text=True)
+                       chain=sent, me=me)
     inbox += _tail("m.schulz", "{b}-gmbh.example", w[20:20 + k(16)],
                    ["Ihr Angebot", "Quarterly update", "Terminerinnerung"],
-                   (1, 2), unread=0.4, chain=True, text=True)
+                   (1, 2), unread=0.4, chain=sent, me=me)
     # People you write to: small senders that also got a mail from the user.
     wrote = [f"{n}@{d}.example" for n, d in (
         ("tobi", "kletterhalle"), ("nina.k", "mietverein"),
         ("vermieter", "hausverwaltung-nord"), ("opa", "familienpost"),
         ("steuerberater", "kanzlei-brandt"))]
-    sent: list[dict] = []
     for addr in wrote:
-        inbox += mails(f"<{addr}>", ["Re: Termin", "Kurze Frage"],
+        inbox += mails(f"<{addr}>", ["Termin am Donnerstag", "Kurze Frage"],
                        random.randint(2, 4), newest_days=random.uniform(3, 60),
-                       unread=0.2, chain=True, text=True)
-        sent.append(make_msg(next(_UID), frm="Demo <demo@example.com>",
-                             subject="Re: Termin", to=addr, seen=True,
-                             date=_date(random.uniform(2, 50))))
+                       unread=0.2, chain=sent, me=me)
     random.setstate(state)
     return inbox, sent
 
 
 PROTON_TAIL, PROTON_TAIL_SENT = long_tail()
-ICLOUD_TAIL, ICLOUD_TAIL_SENT = long_tail(0.4)
+ICLOUD_ME = "Demo <demo@icloud.example>"
+ICLOUD_TAIL, ICLOUD_TAIL_SENT = long_tail(0.4, ICLOUD_ME)
+ICLOUD_SENT = ICLOUD_TAIL_SENT
 
 
 # Duplicates and the Archive folder, from their own random stream. The same
@@ -425,7 +511,8 @@ ICLOUD_INBOX = (
             unsub=True, unread=0.9)
     + mails('"Family Chat" <lisa@familienpost.example>',
             ["Sonntag bei Oma?", "Urlaubsfotos!", "Geburtstag am Samstag"],
-            14, unread=0.1, size=(3000000, 5500000), chain=True,
+            14, unread=0.1, size=(3000000, 5500000), chain=ICLOUD_SENT,
+            me=ICLOUD_ME,
             atts=[[("IMG_3310.jpg", 3400000)],
                   [("Oma-Geburtstag.png", 2100000)],
                   [("Urlaub.zip", 5200000)]], att_n=9)
@@ -449,7 +536,7 @@ def _server(mailbox: dict, **kw) -> FakeIMAP:
 
 PROTON = _server({
     "INBOX": PROTON_INBOX + PROTON_COPIES + PROTON_TAIL,
-    "Sent": PROTON_TAIL_SENT + [make_msg(
+    "Sent": PROTON_TAIL_SENT + PROTON_SENT + [make_msg(
         next(_UID), frm="Demo <demo@example.com>",
         subject="Re: Wanderung am Samstag?", msgid=WANDER_R1,
         irt=WANDER_1, refs=WANDER_1, to="anna.weber@mailfox.example",
@@ -482,10 +569,7 @@ PROTON = _server({
 
 ICLOUD = _server({
     "INBOX": ICLOUD_INBOX + ICLOUD_COPIES,
-    "Sent Messages": ICLOUD_TAIL_SENT + [make_msg(
-        next(_UID), frm="Demo <demo@icloud.example>",
-        subject="Re: Sonntag bei Oma?",
-        to="lisa@familienpost.example", seen=True, date=_date(3))],
+    "Sent Messages": ICLOUD_SENT,
     "Deleted Messages": (
         mails('"Quick Bite" <deals@quickbite.example>',
               ["Your voucher expired", "Order #{n} delivered"], 26,
@@ -507,8 +591,6 @@ ICLOUD = _server({
     "Gelöschte Elemente": mails('"Cloud Photos" <no-reply@cloudphotos.example>',
                                 ["Storage reminder"], 5, unread=0.5),
 }, flags={"Deleted Messages": "\\Trash", "Junk": "\\Junk"})
-for _box in ICLOUD.mailbox.values():     # no search index here: bodies are cheap
-    with_text(_box)
 
 FAKES = {"demo-proton": PROTON, "demo-icloud": ICLOUD}
 
@@ -621,14 +703,14 @@ def generate() -> dict:
     # A saved rule + cleanup history for the stats panel.
     sweep = rules.create_rule({"name": "Sweep old newsletters",
                                "query": "is:unsub age:>1y", "action": "trash",
-                               "schedule": "weekly", "account": "proton"})
+                               "schedule": "manual", "account": "proton"})
     parcels = rules.create_rule({"name": "Archive old parcel mails",
                                  "query": "tag:shipping age:>1y",
-                                 "action": "archive", "schedule": "weekly",
+                                 "action": "archive", "schedule": "manual",
                                  "account": "proton"})
     lapsed = rules.create_rule({"name": "Sweep lapsed promotions",
                                 "query": "is:unsub age:>1y unread:>90",
-                                "action": "trash", "schedule": "weekly",
+                                "action": "trash", "schedule": "manual",
                                 "account": "icloud"})
     _ic = ICLOUD.mailbox["INBOX"]
     _icn, _icb = len(_ic), sum(m["size"] for m in _ic)
@@ -669,23 +751,42 @@ def generate() -> dict:
         }}
     Path(os.environ["STATS_HISTORY_PATH"]).write_text(json.dumps(history))
     # Audit entries (the cleanup card of Your year in mail): unsubscribes and
-    # rule runs in 2026 + 2025, by rules that exist in the demo.
-    _au = [("proton", "unsubscribe", 40, 1, "ok", "user"),
-           ("proton", "unsubscribe", 120, 1, "ok", "user"),
-           ("proton", "unsubscribe", 300, 1, "ok", "user"),
-           ("proton", "unsubscribe", 30, 1, "failed", "user"),
-           ("proton", "unsubscribe", 420, 1, "ok", "user"),
-           ("proton", "rule_execute", 21, 150, "ok", f"rule:{sweep['id']}"),
-           ("proton", "rule_execute", 14, 60, "ok", f"rule:{parcels['id']}"),
-           ("icloud", "unsubscribe", 4, 1, "ok", "user"),
-           ("icloud", "unsubscribe", 400, 1, "ok", "user"),
-           ("icloud", "rule_execute", 9, 48, "ok", f"rule:{lapsed['id']}")]
+    # rule runs in 2026 + 2025, at varied times of day, in date order. The
+    # rules that ran carry the same run as their last run (Rules panel).
+    _hours = random.Random(5)
+
+    def _t(days_ago: float) -> int:
+        return int(NOW - days_ago * 86400 - _hours.uniform(0, 23) * 3600)
+
+    _au = [("proton", "unsubscribe", _t(40), 1, "ok", "user", ""),
+           ("proton", "unsubscribe", _t(120), 1, "ok", "user", ""),
+           ("proton", "unsubscribe", _t(300), 1, "ok", "user", ""),
+           ("proton", "unsubscribe", _t(30), 1, "failed", "user", ""),
+           ("proton", "unsubscribe", _t(420), 1, "ok", "user", ""),
+           ("icloud", "unsubscribe", _t(4), 1, "ok", "user", ""),
+           ("icloud", "unsubscribe", _t(400), 1, "ok", "user", "")]
+    for rule, d, count in ((sweep, 21, 150), (parcels, 14, 60),
+                           (lapsed, 9, 48)):
+        ts = _t(d)
+        _au.append((rule["account"], "rule_execute", ts, count, "ok",
+                    f"rule:{rule['id']}", rule["name"]))
+        with rules._LOCK:
+            stored = rules.load_rules()
+            r = next(x for x in stored if x["id"] == rule["id"])
+            r.update(mode="execute", created=ts - 30 * 86400, report_runs=1,
+                     report_sig=rules.definition_sig(r),
+                     report_box=rules.box_sig(r), report_at=ts - 86400,
+                     last_run={"ts": ts, "mode": "execute", "groups": 4,
+                               "mails": count, "acted": count, "capped": 0,
+                               "skipped_protected": 0, "skipped_pinned": 0,
+                               "preview": [], "error": ""})
+            rules._save(stored)
+    _au.sort(key=lambda e: e[2])
     Path(os.environ["AUDIT_LOG_PATH"]).write_text("".join(
-        json.dumps({"ts": int(NOW - d * 86400), "account": acct,
-                    "actor": actor, "action": action, "count": count,
-                    "bytes": 0, "label": "", "outcome": outcome,
-                    "error": ""}) + "\n"
-        for acct, action, d, count, outcome, actor in _au))
+        json.dumps({"ts": ts, "account": acct, "actor": actor,
+                    "action": action, "count": count, "bytes": 0,
+                    "label": label, "outcome": outcome, "error": ""}) + "\n"
+        for acct, action, ts, count, outcome, actor, label in _au))
     Path(os.environ["STATS_PATH"]).write_text(json.dumps(
         {"input_tokens": 412_331, "output_tokens": 60_112, "cost": 1.43,
          "runs": 9, "months": {time.strftime("%Y-%m"): 0.38}}))
@@ -723,4 +824,9 @@ def generate() -> dict:
         st = mailops.public_state(acc)
         print(f"[demo] {name}: {len(st['groups']['sender'])} senders, "
               f"{sum(g['count'] for g in st['groups']['sender'].values())} mails")
+    # Bodies come last: the Proton body index above must not hold them (see
+    # fill_bodies).
+    for fake in FAKES.values():
+        for box in fake.mailbox.values():
+            fill_bodies(box)
     return FAKES
