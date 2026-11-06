@@ -2599,22 +2599,41 @@ def _record_undo(label: str, meta: dict, action: str, dest: str,
 
 
 def _delete_worker(acc) -> None:
+    persisted = False     # the snapshot already reflects every finished job
     while True:
         with acc.lock:
-            done_persist = None      # None = queue not empty, keep working
+            save_first = False
+            finished = False
             if not acc.delete_pending:
                 st = acc.state["delete"]
-                st["status"] = ("error" if st["error"] and not st["moved"]
-                                else "done")
-                st["progress"] = ""
-                acc.inflight = {}
-                done_persist = st["status"] == "done" and st["moved"] > 0
+                if st["moved"] > 0 and not persisted:
+                    # groups/index changed - cache them BEFORE reporting
+                    # done, so whoever waits for "done" (a client, a restart
+                    # right after) finds the post-delete snapshot. The write
+                    # happens outside the lock; the status stays "running"
+                    # and the queue is re-checked afterwards.
+                    save_first = True
+                else:
+                    st["status"] = ("error" if st["error"] and not st["moved"]
+                                    else "done")
+                    st["progress"] = ""
+                    acc.inflight = {}
+                    finished = True
             else:
                 job = acc.delete_pending.pop(0)
                 acc.inflight = job["by_folder"]
-        if done_persist is not None:
-            if done_persist:         # groups/index changed - cache them
+                persisted = False
+        if save_first:
+            try:
                 save_snapshot(acc)
+            except Exception:
+                # Never let a failed cache write strand the job as "running"
+                # (new jobs would queue forever): report done regardless.
+                log.exception("[%s] could not persist the snapshot after a "
+                              "delete job", acc.name)
+            persisted = True
+            continue
+        if finished:
             return
         by_folder, label = job["by_folder"], job["label"]
         action, dest = job["action"], job["dest"]
