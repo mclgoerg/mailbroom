@@ -207,13 +207,26 @@ has no app-password option for IMAP). Select the **Outlook / Microsoft
 Inboxrake does not ship a Microsoft app: you need your own (free) app
 registration in Microsoft Entra ID.
 
-- Register a public client in [Entra ID](https://entra.microsoft.com/)
-  (App registrations -> New registration, no redirect URI needed, enable
-  "Allow public client flows" under Authentication), paste its client ID
-  under "Connect via OAuth", then click **Connect**.
+- Register an app in [Entra ID](https://entra.microsoft.com/) (App
+  registrations -> New registration; for personal Outlook.com/Hotmail
+  accounts choose a supported account type that includes personal
+  Microsoft accounts). Under Authentication add a platform **Mobile and
+  desktop applications** with the redirect URI
+  `https://your-inboxrake-domain/api/oauth/imap/callback` (for local use
+  `http://localhost:8765/api/oauth/imap/callback`; Microsoft accepts
+  `http` only for localhost) and set "Allow public client flows" to Yes.
+  Do not use the Web platform (it needs a client secret) or the
+  single-page-application platform. Then paste the Application (client)
+  ID under "Connect your Outlook account via OAuth" and click
+  **Connect account**.
+  The redirect URI must match exactly what Inboxrake sends: its address
+  as your browser sees it (the `X-Forwarded-Proto` / `X-Forwarded-Host`
+  headers behind a reverse proxy), or the "Redirect base URL" under
+  Settings -> Server -> Login if you set one. Inboxrake does not display
+  it, and a mismatch makes Microsoft refuse with AADSTS50011.
 - If an administrator runs the server with their own registration
-  (`INBOXRAKE_MS_CLIENT_ID`), no registration is needed on your side:
-  click **Connect with a device code**, then enter the shown code at
+  (`INBOXRAKE_MS_CLIENT_ID`), no registration or redirect URI is needed
+  on your side: click **Connect with a device code**, then enter the shown code at
   microsoft.com/devicelogin.
 
 ## After the first start

@@ -54,7 +54,19 @@ Proton has no IMAP endpoint of its own; Inboxrake talks to the
 [Proton Mail Bridge](https://proton.me/mail/bridge), which needs a paid
 Proton plan and runs as a second container sharing the network namespace.
 Use `deploy/docker-compose.proton.yml` and see [Install](install.md) for
-the Bridge image caveats. Proton's labels (`Starred`, `Labels/*`) are
+the Bridge image caveats. One-time Bridge setup (the compose file header
+has the full commands):
+
+1. `docker compose -f docker-compose.proton.yml run --rm -it protonbridge init`,
+   log in, then in the Bridge CLI run `change imap-security` (answer yes:
+   STARTTLS becomes SSL).
+2. `cert export` to `/root/exported-certs`. The compose file mounts
+   `exported-certs/cert.pem` into Inboxrake as `/certs/bridge-cert.pem`,
+   which is used as the CA file automatically.
+3. `info` shows the IMAP username and the Bridge-generated password; put
+   them into `.env` or the settings UI (not your Proton password).
+
+Proton's labels (`Starred`, `Labels/*`) are
 excluded from scans because their mails also live in a real folder. The
 Sieve export is Proton-only and hidden for other presets.
 
