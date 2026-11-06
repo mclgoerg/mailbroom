@@ -6,6 +6,7 @@ import { createContext, useCallback, useContext, useEffect, useId,
   useLayoutEffect, useMemo, useRef, useState, type ComponentProps,
   type KeyboardEvent as ReactKeyboardEvent, type ReactNode, type RefObject }
   from "react";
+import { demoHint, useDemo } from "../demoMode";
 import { getLang, t } from "../i18n";
 import { engagementTier, fmtDate } from "../lib";
 import type { GroupAi, GroupTrackers, StillMailing } from "../types";
@@ -1152,6 +1153,13 @@ export function Notice({ children, icon, onClose, tone = "neutral",
       )}
     </div>
   );
+}
+
+/** The "not available in the demo" reason, visible (not just a tooltip, which
+ *  touch screens lack). Renders nothing outside demo mode. */
+export function DemoHint({ className = "" }: { className?: string }) {
+  if (!useDemo()) return null;
+  return <p className={`type-meta text-muted ${className}`}>{demoHint()}</p>;
 }
 
 /* --------------------------------- toasts --------------------------------- */

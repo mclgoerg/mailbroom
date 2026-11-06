@@ -11,7 +11,8 @@ import type { AdminTenantStats, AuthMethod, AuthMode, AutoScanUnit, BodySearchMo
 import { FolderSettings } from "./FolderSettings";
 import { IndexPanel } from "./IndexPanel";
 import { KnowledgeSettings } from "./KnowledgeSettings";
-import { Button, Checkbox, confirmDialog, Field, Input, LINK_ACCENT, Loading,
+import { demoHint, useDemo } from "../demoMode";
+import { Button, Checkbox, confirmDialog, DemoHint, Field, Input, LINK_ACCENT, Loading,
   Modal, Notice, PanelHeader, promptDialog, SectionLabel, Segmented, Select, Spinner,
   Tag, tabPanelProps, TextArea, useMediaQuery } from "./ui";
 
@@ -378,6 +379,7 @@ export function SettingsModal({ cfg, account, onClose, onSaved,
   } | null>(null);
   const [oauthMsg, setOauthMsg] = useState("");
 
+  const demo = useDemo();
   const connectOauth = async () => {
     const next = await save();
     if (!next) return;
@@ -560,22 +562,24 @@ export function SettingsModal({ cfg, account, onClose, onSaved,
         </div>
       )}
 
+      <DemoHint className="mt-2" />
       <div className="mt-3 flex flex-wrap items-center gap-2">
         {f.oauthConnected ? (<>
           <span className="inline-flex items-center gap-1.5 type-body
             text-safe-fg">
             <Check size={16} /> {t("oauth.connected")}
           </span>
-          <Button variant="secondary" onClick={disconnectOauth}>
+          <Button variant="secondary" onClick={disconnectOauth}
+            disabled={demo}>
             {t("oauth.disconnect")}
           </Button>
         </>) : oauthProvider === "microsoft"
           && cfg.oauth_ms_device_available ? (
-          <Button onClick={startDeviceConnect}>
+          <Button onClick={startDeviceConnect} disabled={demo}>
             {t("oauth.connect_device")}
           </Button>
         ) : (
-          <Button onClick={connectOauth} disabled={!f.oauthClientId}>
+          <Button onClick={connectOauth} disabled={demo || !f.oauthClientId}>
             {t("oauth.connect")}
           </Button>
         )}
@@ -659,7 +663,8 @@ export function SettingsModal({ cfg, account, onClose, onSaved,
                 </Select>
               </Field>
             </div>
-            <Button variant="secondary" onClick={newAccount}>
+            <Button variant="secondary" onClick={newAccount} disabled={demo}
+              title={demo ? demoHint() : undefined}>
               {t("account.add")}
             </Button>
             <Button variant="secondary" onClick={renameAccount}>
@@ -784,6 +789,7 @@ export function SettingsModal({ cfg, account, onClose, onSaved,
         <div className="sm:col-span-2 rounded-card border border-line
           bg-panel2 p-3">
           <SectionLabel className="mb-2">{t("digest.title")}</SectionLabel>
+          <fieldset disabled={demo} className="contents">
           <div className="grid gap-3 sm:grid-cols-2">
             <Field label={t("digest.schedule")}>
               <Select className="w-full" value={f.digestSchedule}
@@ -809,13 +815,15 @@ export function SettingsModal({ cfg, account, onClose, onSaved,
           <p className="mt-1 type-meta text-muted">{t("digest.help")}</p>
           <div className="mt-3 flex flex-wrap items-center gap-2">
             <Button variant="secondary" size="sm"
-              onClick={sendTestDigest} disabled={digestTesting}>
+              onClick={sendTestDigest} disabled={demo || digestTesting}>
               {digestTesting ? <Spinner /> : t("digest.send_test")}
             </Button>
             {digestTestMsg && (
               <span className="type-meta text-muted">{digestTestMsg}</span>
             )}
           </div>
+          </fieldset>
+          <DemoHint className="mt-2" />
         </div>
 
         <div className="sm:col-span-2 rounded-card border border-line
@@ -1190,6 +1198,8 @@ export function SettingsModal({ cfg, account, onClose, onSaved,
         <p className="sm:col-span-2 -mt-2 type-meta text-muted">
           {t("ai.data_note")}
         </p>
+        <DemoHint className="sm:col-span-2 -mt-2" />
+        <fieldset disabled={demo} className="contents">
         <Field label={t("Provider")}>
           <Select className="w-full" value={f.provider}
             onChange={set("provider")}>
@@ -1262,6 +1272,7 @@ export function SettingsModal({ cfg, account, onClose, onSaved,
             {t("ai.sort_instructions_help")}
           </p>
         </div>
+        </fieldset>
 
         <div className="sm:col-span-2 rounded-card border border-line
           bg-panel2 p-3">
