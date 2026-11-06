@@ -4,6 +4,7 @@
 export const EN: Record<string, string> = {
   "notice.scan_cancelled": "Scan cancelled.",
   "notice.action_cancelled": "Action cancelled.",
+  "status.cached_verdicts": "{n} cached AI verdicts",
   "notice.cached_verdicts":
     "{n} cached AI verdicts applied (AI review only evaluates new groups).",
   "notice.restored":
