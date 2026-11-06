@@ -239,6 +239,7 @@ def _forget_the_last_visitor() -> None:
     pinstore._cache.clear()
     unsubstore._cache.clear()
     verdictstore._mails_cache.clear()
+    mailops._SENT_CACHE.clear()
 
 
 def load(seed_dir) -> dict:

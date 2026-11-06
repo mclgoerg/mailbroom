@@ -38,6 +38,7 @@ async def pin():
         os.environ["PINS_PATH"]
 
 pinned = asyncio.run(pin())
+mailops._SENT_CACHE[("stale",)] = (time.time(), [])
 demo_glue.boot(sys.argv[2])                           # "Reset demo"
 from backend import pinstore
 left = (os.path.exists(os.environ["PINS_PATH"]),
@@ -61,6 +62,7 @@ async def go():
 out = asyncio.run(go())
 out["marks"] = sorted(marks)
 out["refused"], out["pinned"], out["left"] = refused, pinned, left
+out["sent_cache"] = len(mailops._SENT_CACHE)
 out["clock"] = time.time()
 print(json.dumps(out))
 """
@@ -92,5 +94,6 @@ def test_boot_serves_the_seed_and_trash_and_undo_work(seed):
     assert out["pinned"][:2] == [200, True]       # in the demo's own data dir
     assert not out["pinned"][2].startswith("/data")
     assert out["left"] == [False, []]             # a reset forgets the pin
+    assert out["sent_cache"] == 0                 # and the Sent lookup cache
     # the 90 day old seed runs on its own build day (see demo_seed.set_clock)
     assert 0 <= out["clock"] - BUILT < 600
