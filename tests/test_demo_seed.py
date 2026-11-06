@@ -64,28 +64,26 @@ def seed(tmp_path_factory) -> Path:
     return path
 
 
-# What differs between two starts whatever the data: ids and creation stamp
-# of rules, wall-clock
-# stamps of the scan and of the delete queue, the scan's revision counter and
-# its one-time "cached verdicts" notice (the seed is loaded, not scanned).
-VOLATILE = {"id", "created", "scanned_ts", "seq", "groups_rev", "notice"}
-
-
-def scrub(obj):
-    if isinstance(obj, dict):
-        return {k: scrub(v) for k, v in obj.items() if k not in VOLATILE}
-    if isinstance(obj, list):
-        return [scrub(v) for v in obj]
-    return obj
+# What differs between two starts whatever the data: the creation stamp and
+# id of rules, the scan's wall-clock stamps and its revision counter. Scoped
+# to these paths so anything else that goes missing is caught.
+def scrub(d: dict) -> dict:
+    for acct in ("proton", "icloud"):
+        st = d[acct]["state"]
+        for k in ("scanned_ts", "groups_rev"):
+            st.pop(k)
+        st["delete"].pop("seq")
+        for r in st["rules"]:
+            r.pop("id")
+            r.pop("created")
+        d[acct]["stats"]["scans"][-1].pop("ts")
+    return d
 
 
 def test_the_seed_serves_the_same_state_and_stats(seed):
     generated = dump(run_demo())
     served = dump(run_demo("--from-seed", str(seed)))
-    for acct in ("proton", "icloud"):
-        # the scan history's last stamp is the scan's own wall clock
-        for d in (generated, served):
-            d[acct]["stats"]["scans"][-1].pop("ts")
+    assert generated["proton"]["state"]["notice"]            # not vacuous
     assert scrub(served) == scrub(generated)
     assert generated["proton"]["state"]["groups"]["sender"]   # not vacuous
 
@@ -143,3 +141,30 @@ def test_a_bad_seed_fails_with_a_clear_message(seed, tmp_path, damage, message):
     p = run_demo("--from-seed", str(bad), check=False)
     assert p.returncode != 0
     assert "demo: " in p.stderr and message in p.stderr
+
+
+def test_build_seed_refuses_a_directory_that_is_not_a_seed(tmp_path):
+    keep = tmp_path / "project"
+    keep.mkdir()
+    (keep / "precious.txt").write_text("x")
+    p = run_demo("--build-seed", str(keep), check=False)
+    assert p.returncode != 0 and "not a demo seed" in p.stderr
+    assert (keep / "precious.txt").read_text() == "x"
+    empty = tmp_path / "empty"
+    empty.mkdir()
+    run_demo("--build-seed", str(empty))             # empty: fine
+    run_demo("--build-seed", str(empty))             # an earlier seed: fine
+
+
+def test_an_unusable_snapshot_in_the_seed_fails_loudly(seed, tmp_path):
+    import hashlib
+    import shutil
+    bad = tmp_path / "bad"
+    shutil.copytree(seed, bad)
+    snap = next((bad / "data").glob("scan_*.json"))
+    snap.write_text("{}")
+    m = json.loads((bad / "seed.json").read_text())
+    m["files"][f"data/{snap.name}"] = hashlib.sha256(b"{}").hexdigest()
+    (bad / "seed.json").write_text(json.dumps(m))
+    p = run_demo("--from-seed", str(bad), check=False)
+    assert p.returncode != 0 and "snapshot" in p.stderr

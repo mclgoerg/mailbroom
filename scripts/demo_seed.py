@@ -9,8 +9,8 @@ A seed directory holds:
 
     seed.json    manifest: format version + sha256 of every other file
     fakes.pkl    the FakeIMAP servers, as they stand after the scans
-    runtime.json per-account job state a restart would not restore (the
-                 attachment analysis and body index statuses)
+    runtime.json per-account state a restart would not restore (the
+                 attachment analysis and body index statuses, the notice)
     data/        the backend's data dir (config, scan snapshots, body index,
                  verdicts, ...), copied as it stands
 
@@ -58,6 +58,11 @@ def write(seed_dir: Path | str, data_dir: Path | str, fakes: dict,
     `seed_dir`."""
     seed, data = Path(seed_dir), Path(data_dir)
     if seed.exists():
+        # only ever replace an earlier seed; never wipe an arbitrary directory
+        if not seed.is_dir() or (any(seed.iterdir())
+                                 and not (seed / MANIFEST).is_file()):
+            raise SeedError(f"{seed} exists and is not a demo seed; give "
+                            "--build-seed a new or empty directory")
         shutil.rmtree(seed)
     (seed / DATA).mkdir(parents=True)
     for src in _files(data):

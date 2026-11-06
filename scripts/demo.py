@@ -201,7 +201,10 @@ if FROM_SEED:
     mailops.connect = lambda im, name=None: FAKES[im["host"]]
     for _name in accounts.names():
         _acc = accounts.get(_name)
-        mailops.load_snapshot(_acc)
+        # the Gmail demo accounts are never scanned: no snapshot, no error
+        if not mailops.load_snapshot(_acc) and _name in _runtime:
+            raise SystemExit(f"demo: the scan snapshot of {_name!r} in the "
+                             "seed is unusable; rebuild it with --build-seed")
         _acc.state.update(_runtime.get(_name, {}))
     rules.publish()          # the lifespan does this too; it is idempotent
     if __name__ == "__main__":
@@ -545,7 +548,7 @@ ICLOUD = FakeIMAP({
     "Sent Messages": ICLOUD_TAIL_SENT + [make_msg(
         next(_UID), frm="Demo <demo@icloud.example>",
         subject="Re: Sonntag bei Oma?",
-        to="lisa@familienpost.example", seen=True, date=_date(0))],
+        to="lisa@familienpost.example", seen=True, date=_date(3))],
     "Deleted Messages": [],
     # a client-made look-alike of the server's Trash (Settings can move it)
     "Gelöschte Elemente": mails('"Cloud Photos" <no-reply@cloudphotos.example>',
@@ -725,9 +728,14 @@ for name in ("proton", "icloud"):
 
 if BUILD_SEED:
     import demo_seed
-    demo_seed.write(BUILD_SEED, DATA, FAKES, {
-        n: {k: accounts.get(n).state[k] for k in ("atts", "index")}
-        for n in ("proton", "icloud")})
+    try:
+        demo_seed.write(BUILD_SEED, DATA, FAKES, {
+            n: {k: accounts.get(n).state[k]
+                for k in ("atts", "index", "notice")
+                if k in accounts.get(n).state}
+            for n in ("proton", "icloud")})
+    except demo_seed.SeedError as e:
+        raise SystemExit(f"demo: {e}") from None
     print(f"[demo] seed written to {BUILD_SEED}")
     raise SystemExit(0)
 
