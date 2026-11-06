@@ -6,37 +6,97 @@
 ### ⚠ BREAKING CHANGES
 
 * rename Mailbroom to Inboxrake ([#204](https://github.com/mclgoerg/inboxrake/issues/204))
+  <!-- release-notes:204 -->
+  Mailbroom is now **Inboxrake**, because another email app already uses the old name.
+  - **Upgrading:** in your compose file, change the image to `ghcr.io/mclgoerg/inboxrake:latest`; the old image gets no more updates. Keep your volume, `.env` and the rest of the compose file as they are. The old `MAILBROOM_*` settings still work, and the log tells you which ones to rename to `INBOXRAKE_*`. `MAILBROOM_BIND`/`MAILBROOM_PORT` belong to your compose file's `ports:` line - rename them only together with it.
+  - If you turned on the local mail-text index, Settings shows it as built with a different key after the upgrade - your key is fine, click **Rebuild** once.
 
 ### Features
 
 * browser demo shell ([#223](https://github.com/mclgoerg/inboxrake/issues/223)) ([6509cf3](https://github.com/mclgoerg/inboxrake/commit/6509cf378736021848617996245379a537e7f840))
+  <!-- release-notes:223 -->
+  Inboxrake now has a try-it-in-your-browser demo. It runs entirely in your browser tab with invented mailboxes: no account, no mailbox, nothing leaves your browser.
 * demo-mode gating in the UI ([#218](https://github.com/mclgoerg/inboxrake/issues/218)) ([1fe38d5](https://github.com/mclgoerg/inboxrake/commit/1fe38d5ccd0080fc51d824063b2e8995584919b1))
+  <!-- release-notes:218 -->
+  Inboxrake can now run as the public in-browser demo: controls that need a network (adding accounts, AI, OAuth sign-in, digests, connection tests) are shown greyed out with a "Not available in the demo" note. Normal installs are unchanged.
 * possible duplicates - the same mail sent twice within minutes ([#251](https://github.com/mclgoerg/inboxrake/issues/251)) ([a669a2a](https://github.com/mclgoerg/inboxrake/commit/a669a2aedb4dd9c967d461ec74a4eccecf40f0bc))
+  <!-- release-notes:251 -->
+  - The Duplicates panel now also lists possible duplicates: the same sender and subject sent twice within ten minutes (different Message-IDs). Nothing there is selected for you - open the mails, compare, and tick what to trash.
 * rename Mailbroom to Inboxrake ([#204](https://github.com/mclgoerg/inboxrake/issues/204)) ([cbae001](https://github.com/mclgoerg/inboxrake/commit/cbae001ff0723e469f10c38f982aebf29be2d5e9))
 
 
 ### Bug Fixes
 
 * a failed connection test no longer counts as finished setup ([#235](https://github.com/mclgoerg/inboxrake/issues/235)) ([111c1d6](https://github.com/mclgoerg/inboxrake/commit/111c1d60811b0ac09adb41f28dd14cafb851c592))
+  <!-- release-notes:235 -->
+  If the connection test fails during setup, the home screen now says the account still needs setting up and offers to continue, instead of inviting a scan that hangs. Existing accounts are unaffected.
 * a fresh install points to setup instead of Scan ([#249](https://github.com/mclgoerg/inboxrake/issues/249)) ([e803926](https://github.com/mclgoerg/inboxrake/commit/e8039267ed612b7b586ea8b2623223d3d933061d))
+  <!-- release-notes:249 -->
+  - On a fresh install the main button now says "Set up your mailbox" and opens the setup wizard, instead of offering a Scan that could only fail.
 * a rescan no longer forgets attachment sizes ([#252](https://github.com/mclgoerg/inboxrake/issues/252)) ([fa09a11](https://github.com/mclgoerg/inboxrake/commit/fa09a112e7dc67c0fd3eda661ab65185881d322c))
+  <!-- release-notes:252 -->
+  - Rescanning (including after "Not junk" or Undo) no longer resets attachment sizes, so the attachment-based quick wins stay.
 * block rules can't be widened by a crafted sender address ([#240](https://github.com/mclgoerg/inboxrake/issues/240)) ([639e4da](https://github.com/mclgoerg/inboxrake/commit/639e4daefc38599f95e700a2973ec2e4445955c1))
+  <!-- release-notes:240 -->
+  - Blocking a sender or domain now refuses unusual addresses instead of creating a rule that could match a different sender.
 * demo unsubscribe explains instead of opening a dead page ([#228](https://github.com/mclgoerg/inboxrake/issues/228)) ([bec8a1d](https://github.com/mclgoerg/inboxrake/commit/bec8a1de9b4ac26f3919912bfaa464dacc2e5d65))
+  <!-- release-notes:228 -->
+  The website demo no longer opens a dead page on Unsubscribe; it explains what happens in a real install.
 * duplicates are only mails that really are the same ([#248](https://github.com/mclgoerg/inboxrake/issues/248)) ([de60446](https://github.com/mclgoerg/inboxrake/commit/de60446a8138b29cacce7fb1c5aa913245040f17))
+  <!-- release-notes:248 -->
+  - The duplicate finder now only lists mails that really are the same: the same Message-ID, in any folder. Two different mails from the same sender with the same subject and size (say, monthly statements) are no longer treated as duplicates, so "Select all but newest" can't pick the older one.
+  - Mails without a usable Message-ID (missing, or junk such as `<>` / `@` / `-`, or cut off) are still matched by identical sender + subject + size, but only with each other.
 * editing an armed rule sends it back to report mode ([#233](https://github.com/mclgoerg/inboxrake/issues/233)) ([a9d2d57](https://github.com/mclgoerg/inboxrake/commit/a9d2d57ca9c78c3db8f7b8054925f359d9366b70))
+  <!-- release-notes:233 -->
+  - Editing a rule's filter, action, target folder, retention or account now sends it back to report mode. It needs one report run of the new definition before it acts again.
+  - Renaming a rule, changing its schedule or enabling/disabling it does not reset it.
+  - Existing armed rules keep running as they are until their next edit.
 * keep the undo entry when an Undo fails ([#220](https://github.com/mclgoerg/inboxrake/issues/220)) ([b52cea8](https://github.com/mclgoerg/inboxrake/commit/b52cea821848d033bc53a0ae4bcf8e9e02045ece))
+  <!-- release-notes:220 -->
+  - A failed Undo (server unreachable, Trash cannot be opened, connection dropped halfway) no longer throws the undo entry away: it stays in the list, in the same place, and you can retry. Mails that were already restored are not restored twice.
 * limit request body size ([#243](https://github.com/mclgoerg/inboxrake/issues/243)) ([b2b2efe](https://github.com/mclgoerg/inboxrake/commit/b2b2efe47e41cb1b996628df4ae67fa79f2b34fb))
+  <!-- release-notes:243 -->
+  - The server now refuses oversized requests (HTTP 413) instead of reading them into memory. A settings backup up to 64 MiB can still be imported.
 * login throttle holds under parallel attempts ([#229](https://github.com/mclgoerg/inboxrake/issues/229)) ([6cf1a88](https://github.com/mclgoerg/inboxrake/commit/6cf1a886788d762d7b7c45c03388979ad7c11645))
+  <!-- release-notes:229 -->
+  - Login throttling now also holds against parallel attempts: the 6th attempt within 15 minutes is refused even when many arrive at once.
+  - IPv6 clients are counted per /64 network.
+  - Behind a reverse proxy, set `FORWARDED_ALLOW_IPS` to the proxy's address (never `*`) so attempts are counted per visitor; without it, 5 wrong passwords from anyone lock everyone out for 15 minutes.
 * new rules no longer say they were reset ([#238](https://github.com/mclgoerg/inboxrake/issues/238)) ([fc84b8e](https://github.com/mclgoerg/inboxrake/commit/fc84b8ee397d4d1d0d0847d873b241776a045a59))
+  <!-- release-notes:238 -->
+  A newly created rule (including Block rules and imported rules) no longer shows "Back in report mode: what the rule acts on was changed".
 * Outlook device sign-in no longer sends tokens to the browser ([#230](https://github.com/mclgoerg/inboxrake/issues/230)) ([5e9f69e](https://github.com/mclgoerg/inboxrake/commit/5e9f69e959f30bade6a6d0c913782fc5337678ee))
+  <!-- release-notes:230 -->
+  - Outlook device-code sign-in no longer sends the access and refresh tokens to the browser; they stay on the server, where they were already saved.
 * Outlook setup no longer calls an optional secret required ([#236](https://github.com/mclgoerg/inboxrake/issues/236)) ([3ca9ff4](https://github.com/mclgoerg/inboxrake/commit/3ca9ff4950851356a8b36b2636fe883d0089ce1f))
+  <!-- release-notes:236 -->
+  The Outlook / Microsoft 365 setup no longer marks the client secret as required; a public client doesn't need one.
 * purge rules wait until mail has been in Trash or Junk for N days ([#234](https://github.com/mclgoerg/inboxrake/issues/234)) ([a9cd0d6](https://github.com/mclgoerg/inboxrake/commit/a9cd0d63d6c6f082d55d8920277471073879e0de))
+  <!-- release-notes:234 -->
+  - Purge rules (Trash/Junk) now delete a mail only once it has been in that folder for more than N days, counted from when Inboxrake first saw it there - a mail you trash by mistake today is no longer deleted on the next run just because it is old.
+  - The received-date condition still applies on top.
+  - Upgrade note: Inboxrake has no "first seen" time for mail already in Trash/Junk, so after upgrading armed purge rules delete nothing for their first N days. Manual purges in the Folders panel are unchanged.
 * rules refuse a qualifier given twice ([#242](https://github.com/mclgoerg/inboxrake/issues/242)) ([6004e58](https://github.com/mclgoerg/inboxrake/commit/6004e582cc28048d46b50671954ab1d15309b400))
+  <!-- release-notes:242 -->
+  - A rule filter that names the same qualifier twice (for example two `age:` parts) is now refused when saved; before, only the last one counted and the rule could match more mail than intended. Existing rules like that are flagged and don't execute until edited.
 * rules refuse filters with mistyped parts ([#237](https://github.com/mclgoerg/inboxrake/issues/237)) ([fb0c09e](https://github.com/mclgoerg/inboxrake/commit/fb0c09e728cc76c512f6d29137d7d2845ad8cc3c))
+  <!-- release-notes:237 -->
+  - Saving a rule (create or edit) whose filter has a part Inboxrake doesn't understand is refused, with an error naming the part. The editor shows it next to the filter field.
+  - Rules saved earlier with such a filter stay saved and show a warning on their card; their execute runs are skipped until you edit the filter. Report runs still work.
 * the connection test gives up quickly and can be cancelled ([#246](https://github.com/mclgoerg/inboxrake/issues/246)) ([fd27d13](https://github.com/mclgoerg/inboxrake/commit/fd27d138eb53b5b8b53f0b633e017526990ce97b))
+  <!-- release-notes:246 -->
+  - Testing a mail connection now gives up after 15 seconds instead of spinning for minutes, and can be cancelled (button, X or Esc).
+  - Connection errors say what is wrong: host not found, port closed, no answer, wrong security setting for the port (try STARTTLS on 143 / SSL/TLS on 993), not an IMAP server, or an untrusted certificate.
 * the setup card names the mailbox, not its internal id ([#241](https://github.com/mclgoerg/inboxrake/issues/241)) ([b422707](https://github.com/mclgoerg/inboxrake/commit/b422707ae70fdc322a1735f8d75115321c8b4110))
+  <!-- release-notes:241 -->
+  The "Finish setting up" card now names your mailbox address instead of the internal account name (for example "default").
 * undo copes with unusual Message-IDs ([#232](https://github.com/mclgoerg/inboxrake/issues/232)) ([c9362a1](https://github.com/mclgoerg/inboxrake/commit/c9362a1b4ae7dfb9b47d078117773d9a88ef5136))
+  <!-- release-notes:232 -->
+  - Undo no longer fails, or restores the wrong mails, when a mail's Message-ID contains quotes or other unusual characters.
 * undo shows its result where you are ([#247](https://github.com/mclgoerg/inboxrake/issues/247)) ([1fa2051](https://github.com/mclgoerg/inboxrake/commit/1fa205144328ae2b5c1defc9e6631fd3c760aae2))
+  <!-- release-notes:247 -->
+  - Undo now confirms in a toast where you are ("Restored 120 mails (ACME Store)", or how many came back if only some did) instead of a notice above the list that was often out of view.
+  - The page no longer jumps to the top of the list after you confirm an Undo.
 
 ## [1.11.0](https://github.com/mclgoerg/mailbroom/compare/v1.10.0...v1.11.0) (2026-11-06)
 
