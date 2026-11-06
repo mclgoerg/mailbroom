@@ -97,9 +97,9 @@ are affected, with an Undo. UIDVALIDITY is checked before every move and
 scans are read-only. Permanent deletion exists only as explicit actions in
 Trash and Junk: the manual ones confirm with exact counts, and an opt-in
 purge rule only acts after you have reviewed a report run (then it runs on
-its schedule within its age limit and per-run cap). Rules and the Folders-
-panel purges always skip protected senders and pinned mails. Moving a
-protected group, or a single pinned mail, to Trash asks for an extra
+its schedule within its age limit and per-run cap). Rules and the
+Folders-panel purges always skip protected senders and pinned mails. Moving
+a protected group, or a single pinned mail, to Trash asks for an extra
 confirmation; individually selected mails from a protected sender are not
 checked. **Empty Trash empties everything in Trash**, protected or not.
 Rules also start in report mode.
