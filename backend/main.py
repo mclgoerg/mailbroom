@@ -1752,6 +1752,7 @@ def post_import_config(body: dict):
     mailops.rebuild_smart_all()
 
     nrules = 0
+    skipped_rules: list[str] = []
     if isinstance(body.get("rules"), list):
         for r in rulesmod.load_rules():
             rulesmod.delete_rule(r["id"])
@@ -1759,10 +1760,13 @@ def post_import_config(body: dict):
             if not isinstance(r, dict):
                 continue
             try:
-                rulesmod.create_rule(r)      # always lands in report mode
+                # always lands in report mode; a filter with mistyped parts
+                # (a backup of a flagged rule) comes in flagged, its execute
+                # runs blocked
+                rulesmod.create_rule(r, lenient_filter=True)
                 nrules += 1
             except ValueError:
-                pass
+                skipped_rules.append(str(r.get("name") or "?")[:80])
 
     def _import_groupings(entries: dict, account: str | None) -> int:
         n = 0
@@ -1819,7 +1823,8 @@ def post_import_config(body: dict):
         "%d unsubscribed senders, %d knowledge entries", nrules, nverdicts,
         nreplied, nunsub, nknowledge)
     return {"ok": True, "rules": nrules, "verdicts": nverdicts,
-            "replied": nreplied, "unsub": nunsub, "knowledge": nknowledge}
+            "replied": nreplied, "unsub": nunsub, "knowledge": nknowledge,
+            "skipped_rules": skipped_rules}
 
 
 @app.get("/api/events")

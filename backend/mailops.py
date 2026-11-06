@@ -138,6 +138,10 @@ RULE_PURGE_KEEP_LATEST = "rule_purge_keep_latest"
 RULE_PURGE_NEEDS_AGE = "rule_purge_needs_age"
 RULE_PURGE_FILTER = "rule_purge_filter"                  # names=
 RULE_PURGE_FILTER_DOMAIN = "rule_purge_filter_domain"    # names=
+# a rule filter with parts the parsers would silently drop (all rules)
+RULE_FILTER_INVALID = "rule_filter_invalid"              # names=
+RULE_FILTER_INVALID_RUN = "rule_filter_invalid_run"      # names=
+RULE_FILTER_TOO_LONG = "rule_filter_too_long"            # max=
 # a List-Unsubscribe mailto: that would not be one plain mail to one address
 MAILTO_UNSAFE = "mailto_unsafe"
 # connecting (first run): no account set up yet / the CA file is missing
@@ -217,6 +221,9 @@ FOLDER_ERROR_CODES = frozenset({
     RULE_PURGE_NEEDS_AGE,
     RULE_PURGE_FILTER,
     RULE_PURGE_FILTER_DOMAIN,
+    RULE_FILTER_INVALID,
+    RULE_FILTER_INVALID_RUN,
+    RULE_FILTER_TOO_LONG,
     NO_ACCOUNT,
     CAFILE_MISSING,
     AUTH_FAILED,

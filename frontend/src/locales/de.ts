@@ -647,6 +647,7 @@ export const DE: Record<string, string> = {
   "import.merged": "Bewertungen, Antwortdaten und eingeordnete Absender werden zusammengeführt.",
   "import.secrets": "Passwörter und API-Schlüssel werden nie importiert.",
   "import.confirm": "Backup importieren",
+  "import.skipped": " Nicht importiert: {names}.",
   "import.done": "Importiert: {rules} Regeln, {verdicts} Bewertungen, {knowledge} eingeordnete Absender.",
   "view.all_mails": "Alle Mails",
   "mails.sort_date": "Datum",
@@ -1899,6 +1900,17 @@ export const DE: Record<string, string> = {
     "Dieser Filter ist für Spam- und Papierkorb-Regeln nicht "
     + "verfügbar: {names} (er trifft nie auf Absender – nutze "
     + "stattdessen Freitext wie den Domainnamen).",
+  "ferr.rule_filter_invalid":
+    "Dieser Filter enthält Teile, die Inboxrake nicht versteht: {names}",
+  "ferr.rule_filter_invalid_run":
+    "Der Filter enthält Teile, die Inboxrake nicht versteht: {names} – "
+    + "bearbeite die Regel. Ausführungsläufe werden bis dahin "
+    + "übersprungen.",
+  "rule.filter_invalid":
+    "Der Filter enthält Teile, die Inboxrake nicht versteht: {names}. "
+    + "Ausführungsläufe werden übersprungen, bis du die Regel bearbeitest.",
+  "ferr.rule_filter_too_long":
+    "Dieser Filter ist zu lang (mehr als {max} Zeichen).",
   "ferr.no_account":
     "Es ist noch kein Mail-Konto eingerichtet – trage zuerst in den "
     + "Einstellungen die Zugangsdaten ein.",

@@ -51,9 +51,12 @@ word and usually matches nothing. But an invalid `age:`, `unread:` or
 `att:` value (for example `age:>2w`, `unread:high`, `att:>10mb`) is
 silently **ignored** and the rest of the filter still applies - so the
 filter matches *more* mail, not less. `tag:newsletter age:>2w` selects
-every newsletter group. Check the result list, and for a rule the report
-run, before switching it to execute. The AI filter writer validates
-strictly and retries when the filter it wrote contains a bad token.
+every newsletter group. Check the result list before you act. Saving a **rule**
+with such a part is refused with an error that names it, and a rule saved
+before that check shows a warning: its execute runs are skipped (report runs
+still run) until you edit the filter. Words that contain a colon (such as `re:` or `10:30`) are read as
+qualifiers in a rule and refused unless they are valid ones. The AI filter writer validates strictly
+and retries when the filter it wrote contains a bad token.
 
 ## Combining
 
