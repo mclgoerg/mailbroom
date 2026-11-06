@@ -246,7 +246,8 @@ export function RulesModal({ state, onClose, onChanged, initialQuery = "" }: {
                 <Tag>{t("retention.tag_keep_latest", { n: rule.keep_latest })}</Tag>
               )}
               {rule.older_than_days != null && (
-                <Tag>{t("retention.tag_older_than_days",
+                <Tag>{t(isPurge(rule.scope) ? "rule.purge_age_tag"
+                  : "retention.tag_older_than_days",
                   { n: rule.older_than_days })}</Tag>
               )}
               <Tag tone={rule.mode === "execute" ? "keep" : "safe"}>
@@ -383,7 +384,7 @@ export function RulesModal({ state, onClose, onChanged, initialQuery = "" }: {
               </Select>
             </Field>
             {purge ? (
-              <Field label={t("fp.older_label")}>
+              <Field label={t("rule.purge_age_label")}>
                 <Input className="w-full" type="number" min={1}
                   max={36500} placeholder={t("retention.n_placeholder")}
                   value={form.retentionN} onChange={set("retentionN")} />

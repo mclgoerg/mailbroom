@@ -1162,8 +1162,12 @@ export const EN: Record<string, string> = {
     "Matches the senders in this folder: free text, from:, age: (the "
     + "sender's newest mail) and unread:. An empty filter means ALL senders. "
     + "Not available here: tag:, ai:, eng:, att:, is:, has: and domain: filters. "
-    + "\"Received more than N days ago\" applies to each mail. Run it in "
-    + "report mode to preview what it would delete.",
+    + "A mail is only deleted once it has been in this folder for more than "
+    + "N days (counted from when Inboxrake first saw it there, and it must "
+    + "also have been received more than N days ago). Run it in report mode "
+    + "to preview what it would delete.",
+  "rule.purge_age_label": "In Trash/Junk for more than this many days",
+  "rule.purge_age_tag": "in Trash/Junk > {n}d",
   "rule.purge_edit_reset":
     "Changing the folder, filter or age switches this rule back to report "
     + "mode, so what you previewed is what runs.",
