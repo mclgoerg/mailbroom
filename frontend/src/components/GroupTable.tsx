@@ -68,24 +68,28 @@ const KIND_ICON: Record<Exclude<SmartKind, "sender">, LucideIcon> = {
  *  first letter says nothing - so thread rows show their first sender, or a
  *  neutral icon avatar when there is none. A Smart company / bucket row
  *  shows its kind's icon. */
-function RowAvatar({ g, grouping }: { g: Group; grouping?: Grouping }) {
+export function RowAvatar({ g, grouping, size = "md" }: {
+  g: Group; grouping?: Grouping; size?: "md" | "lg";
+}) {
+  const disc = size === "lg" ? "size-16" : "size-8";
+  const glyph = (I: LucideIcon) =>
+    size === "lg" ? <I size={18} /> : <I size={16} />;
   if (grouping === "smart" && g.kind && g.kind !== "sender") {
-    const Icon = KIND_ICON[g.kind];
     return (
-      <span aria-hidden className="inline-flex size-8 shrink-0 items-center
-        justify-center rounded-full bg-chip text-muted">
-        <Icon size={16} />
+      <span aria-hidden className={`inline-flex ${disc} shrink-0 items-center
+        justify-center rounded-full bg-chip text-muted`}>
+        {glyph(KIND_ICON[g.kind])}
       </span>
     );
   }
   if (grouping !== "thread") {
-    return <Avatar name={g.label || g.key} size="md" />;
+    return <Avatar name={g.label || g.key} size={size} />;
   }
   const first = g.samples[0];
-  return first ? <Avatar name={first} size="md" /> : (
-    <span aria-hidden className="inline-flex size-8 shrink-0 items-center
-      justify-center rounded-full bg-chip text-faint">
-      <MessagesSquare size={16} />
+  return first ? <Avatar name={first} size={size} /> : (
+    <span aria-hidden className={`inline-flex ${disc} shrink-0 items-center
+      justify-center rounded-full bg-chip text-faint`}>
+      {glyph(MessagesSquare)}
     </span>
   );
 }

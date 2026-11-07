@@ -1101,6 +1101,14 @@ export const EN: Record<string, string> = {
   "Cancel": "Cancel",
   "detail.n_selected": "{n} selected",
   "detail.region": "Details: {label}",
+  "detail.mails": "Mails",
+  "detail.size": "Size",
+  "detail.opened": "Opened",
+  "detail.since": "since {date}",
+  "detail.block": "Block",
+  "detail.move": "Move",
+  "detail.trash_all": "Move {n} mails to Trash",
+  "detail.trash_all_one": "Move 1 mail to Trash",
   "Dismiss": "Dismiss",
   "Refresh": "Refresh",
   "OK": "OK",
@@ -1170,8 +1178,6 @@ export const EN: Record<string, string> = {
   "rule.enable_body":
     "Scheduled runs will then act on matching mails (cap 500 per run, "
     + "protected senders skipped, undo available).",
-  "trash_all.btn": "Trash all {n}",
-  "trash_all.btn_one": "Trash 1 mail",
   "trash_all.tip": "Move all {n} mails of this group to Trash",
   "trash_all.tip_one": "Move the 1 mail of this group to Trash",
   "trash_this.btn": "Trash this mail",

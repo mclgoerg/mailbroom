@@ -1290,6 +1290,14 @@ export const DE: Record<string, string> = {
   "Cancel": "Abbrechen",
   "detail.n_selected": "{n} ausgewählt",
   "detail.region": "Details: {label}",
+  "detail.mails": "Mails",
+  "detail.size": "Größe",
+  "detail.opened": "Geöffnet",
+  "detail.since": "seit {date}",
+  "detail.block": "Blockieren",
+  "detail.move": "Verschieben",
+  "detail.trash_all": "{n} Mails in den Papierkorb verschieben",
+  "detail.trash_all_one": "1 Mail in den Papierkorb verschieben",
   "Dismiss": "Schließen",
   "Refresh": "Aktualisieren",
   "OK": "OK",
@@ -1361,8 +1369,6 @@ export const DE: Record<string, string> = {
   "rule.enable_body":
     "Geplante Läufe verarbeiten dann passende Mails (max. 500 pro Lauf, "
     + "geschützte Absender übersprungen, Undo verfügbar).",
-  "trash_all.btn": "Alle {n} in den Papierkorb",
-  "trash_all.btn_one": "1 Mail in den Papierkorb",
   "trash_all.tip": "Alle {n} Mails dieser Gruppe in den Papierkorb verschieben",
   "trash_all.tip_one": "Die 1 Mail dieser Gruppe in den Papierkorb verschieben",
   "trash_this.btn": "Diese Mail in den Papierkorb",

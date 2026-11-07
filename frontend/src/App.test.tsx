@@ -347,7 +347,7 @@ test("a blocked group shows Unblock (not Block), which confirms and " +
   "deletes the rule", async () => {
   renderWithOneBlockedSenderGroup();
   await openDetail();
-  expect(screen.queryAllByText("Block sender").length).toBe(0);
+  expect(screen.queryAllByRole("button", { name: "Block sender" }).length).toBe(0);
   fireEvent.click(screen.getAllByText("Unblock")[0]);
   expect((await findDialog()).textContent).toContain("DHL Paket");
   await pressDialog("Unblock");
@@ -368,14 +368,14 @@ test("the detail panel's Trash button confirms, trashes the whole group " +
   "and closes the panel", async () => {
   renderWithOneSenderGroup();
   await openDetail();
-  fireEvent.click(screen.getByRole("button", { name: "Trash all 3" }));
+  fireEvent.click(screen.getByRole("button", { name: "Move 3 mails to Trash" }));
   const dlg = await findDialog();
   expect(dlg.textContent).toContain("3 mails from DHL Paket");
   await pressDialog("Move to Trash (3)");
   await waitFor(() => expect(deleteGroups).toHaveBeenCalledWith(
     "sender", [groupFixture.key], "trash", "", false, null, null));
   // the panel closed: its Block action (detail-only) is gone again
-  await waitFor(() => expect(screen.queryAllByText("Block sender").length)
+  await waitFor(() => expect(screen.queryAllByRole("button", { name: "Block sender" }).length)
     .toBe(0));
 });
 
@@ -383,11 +383,11 @@ test("declining the detail panel's Trash confirmation leaves it open and " +
   "never calls api.deleteGroups", async () => {
   renderWithOneSenderGroup();
   await openDetail();
-  fireEvent.click(screen.getByRole("button", { name: "Trash all 3" }));
+  fireEvent.click(screen.getByRole("button", { name: "Move 3 mails to Trash" }));
   await cancelDialog();
   await expectNoDialog();
   expect(deleteGroups).not.toHaveBeenCalled();
-  expect(screen.getAllByText("Block sender").length).toBeGreaterThan(0);
+  expect(screen.getAllByRole("button", { name: "Block sender" }).length).toBeGreaterThan(0);
 });
 
 // The contextual bulk-action bar: the ONLY bulk-action chrome in the app -
