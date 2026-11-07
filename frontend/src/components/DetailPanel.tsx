@@ -439,6 +439,25 @@ export function DetailPanel({ grouping, group, aiEnabled, protectedNow,
   const hasMore = (aiEnabled && busy) || aiRate || canRead || canPinAll
     || pinnedCount > 0 || canSieve;
 
+  // Unsubscribe state as a quiet header signal where no action says it: a
+  // partial result ("2 of 5") has no button at all, done / failed show up
+  // here when the actions are not offered (an own row has the disabled
+  // "Unsubscribed" / "Retry" button; a pooled row never shows a status).
+  const unsubStatus = (() => {
+    const u = unsubscribedNow;
+    if (!u) return null;
+    if (u.status === "pending") {
+      return { text: t("unsub.badge_pending", { n: u.n, of: u.of }),
+        failed: false };
+    }
+    if (canUnsub || isPooled(group)) return null;
+    if (u.status === "done") return { text: t("Unsubscribed"), failed: false };
+    if (u.status === "failed") {
+      return { text: t("unsub.badge_failed"), failed: true };
+    }
+    return null;
+  })();
+
   // Header: who this is, then the quiet signals the rows no longer carry.
   const header = (
     <div className="px-4 pt-4">
@@ -495,6 +514,12 @@ export function DetailPanel({ grouping, group, aiEnabled, protectedNow,
           <Tag tone="keep" className="inline-flex items-center gap-1">
             <Ban size={14} aria-hidden /> {t("Blocked")}
           </Tag>
+        )}
+        {unsubStatus && (
+          <span className={`inline-flex items-center gap-1 type-meta
+            ${unsubStatus.failed ? "text-danger-fg" : "text-muted"}`}>
+            <BellOff size={14} aria-hidden /> {unsubStatus.text}
+          </span>
         )}
       </div>
     </div>

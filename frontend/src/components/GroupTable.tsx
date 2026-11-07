@@ -107,6 +107,9 @@ const unreadPct = (g: Group) =>
 /* One status pill per row: the first thing that applies, in this priority
    (the detail header shows all the rest). The unsubscribe page to confirm is
    only a hint here - the link and "Mark as done" live in the detail. */
+/** Pill labels read in sentence case in every language. */
+const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+
 function rowPill(g: Group, blocked: boolean): ReactNode {
   const u = g.unsubscribed;
   if (g.still_mailing) return <StillMailingBadge sm={g.still_mailing} />;
@@ -120,14 +123,14 @@ function rowPill(g: Group, blocked: boolean): ReactNode {
   if (g.new) return pill("new", t("New"), t("new_sender.tip"));
   if (g.ai) {
     return pill(VERDICT_PILL[g.ai.verdict] ?? "neutral",
-      g.ai.verdict.replace("_", " "), g.ai.reason);
+      cap(t(`v.${g.ai.verdict}`)), g.ai.reason);
   }
   if (u?.status === "done") return pill("info", t("Unsubscribed"));
-  if (u?.status === "failed") return pill("keep", t("unsub.badge_failed"));
+  if (u?.status === "failed") return pill("keep", cap(t("unsub.badge_failed")));
   if (u?.status === "pending") {
     return pill("review", t("unsub.badge_pending", { n: u.n, of: u.of }));
   }
-  if (g.replied) return pill("info", t("replied"), t("replied.tip"));
+  if (g.replied) return pill("info", cap(t("replied")), t("replied.tip"));
   return null;
 }
 
@@ -255,7 +258,8 @@ function DesktopTable({ slice, baseIdx, selected, focusedKey, openKey, compact, 
               ? "shadow-open-edge" : ""}`}
               {...(showChecks ? { "data-no-open": true } : {})}>
               <Checkbox checked={selected.has(g.key)}
-                className={`-mx-2 -my-1 ${showChecks ? "" : `${hiddenCls}
+                className={`-mx-2 -my-1 ${showChecks
+                  || g.key === focusedKey ? "" : `${hiddenCls}
                   hoverable:group-hover/row:opacity-100`}`}
                 aria-label={t("Select {label}", { label: g.label || g.key })}
                 onChange={() => onToggle(g.key)} />

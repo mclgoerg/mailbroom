@@ -79,7 +79,7 @@ const VERDICT_TONE: Record<string, TagTone> = {
 export function AiTag({ ai }: { ai: GroupAi }) {
   return (
     <Tag tone={VERDICT_TONE[ai.verdict]}>
-      <span title={ai.reason}>{ai.verdict.replace("_", " ")}</span>
+      <span title={ai.reason}>{t(`v.${ai.verdict}`)}</span>
     </Tag>
   );
 }

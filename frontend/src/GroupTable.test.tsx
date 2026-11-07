@@ -140,7 +140,7 @@ describe("unsubscribe pill", () => {
   it("shows a failed pill", () => {
     const { getAllByText } = renderTable({ groups: withUnsub(
       { n: 0, of: 1, status: "failed", link: "", addr: "" }) });
-    expect(getAllByText(/unsubscribe failed/).length).toBe(2);
+    expect(getAllByText("Unsubscribe failed").length).toBe(2);
   });
 
   it("shows nothing when never attempted", () => {
@@ -461,6 +461,14 @@ describe("GroupTable select mode", () => {
     expect(hidden(headBox(mode.container))).toBe(false);
   });
 
+  it("the j/k-focused row shows its checkbox, so x has a visible target", () => {
+    const { container } = renderTable({ groups: [mk(0), mk(1)],
+      focusedKey: mk(1).key });
+    const boxes = [...container.querySelectorAll("tbody tr td:first-child label")];
+    expect(hidden(boxes[0])).toBe(true);
+    expect(hidden(boxes[1])).toBe(false);
+  });
+
   it("a hidden checkbox is inert on touch (the tap opens the row)", () => {
     const { container } = renderTable({ groups: [mk(0)] });
     expect(rowBox(container).className).toContain("coarse:pointer-events-none");
@@ -620,20 +628,28 @@ describe("GroupTable status pill (one per row, first match wins)", () => {
     ["Blocked", { ...everything, still_mailing: null, unsubscribed: done },
       blocked],
     ["New", { ...everything, still_mailing: null, unsubscribed: done }, undefined],
-    ["delete safe", { ...everything, still_mailing: null, new: false,
+    ["Safe to delete", { ...everything, still_mailing: null, new: false,
       unsubscribed: done }, undefined],
     ["Unsubscribed", { ...everything, still_mailing: null, new: false,
       ai: null, unsubscribed: done }, undefined],
-    ["replied", { ...everything, still_mailing: null, new: false,
+    ["Replied", { ...everything, still_mailing: null, new: false,
       ai: null, unsubscribed: null }, undefined],
   ] as [string, Group, Map<string, string> | undefined][])(
     "%s outranks everything below it", (want, g, b) => {
     const { text, pills, cardPills } = pillOf(g, b);
     expect(text).toContain(want);
     expect(pills).toBeGreaterThanOrEqual(1);
-    expect(text!.match(/Still mailing|Confirm on page|Blocked|New|delete safe|Unsubscribed|replied/g))
+    expect(text!.match(/Still mailing|Confirm on page|Blocked|New|Safe to delete|Unsubscribed|Replied/g))
       .toHaveLength(1);
     expect(cardPills).toBe(pills);
+  });
+
+  it("verdict pills are translated (German too)", () => {
+    setLang("de");
+    const { container } = renderTable({ groups: [{ ...mk(0),
+      ai: { verdict: "delete_safe", reason: "r" } as Group["ai"] }] });
+    expect(container.querySelector("tbody tr td:nth-child(4)")!.textContent)
+      .toBe("Sicher löschbar");
   });
 
   it("an AI review / keep verdict gets its own tone", () => {

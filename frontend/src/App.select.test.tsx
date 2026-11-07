@@ -14,6 +14,7 @@ vi.mock("./api", () => ({
     authProbe: () => Promise.resolve({ mode: "none", authed: true }),
     getConfig: () => Promise.resolve(cfg),
     state: () => Promise.resolve(state),
+    mails: () => new Promise(() => {}),   // All mail view: never answers
     version: () => Promise.resolve({ build: "v1" }),
   },
   downloadFile: () => Promise.resolve(),
@@ -128,7 +129,8 @@ test("a selection reveals the checkboxes without select mode, and the x key togg
   expect([...boxes()].filter((b) => (b as HTMLInputElement).checked).length)
     .toBe(1);
   fireEvent.keyDown(window, { key: "x" });
-  expect(hiddenBoxes().length).toBe(2);
+  // the focused row keeps its box (x has a visible target), the other waits
+  expect(hiddenBoxes().length).toBe(1);
 });
 
 test("changing the grouping ends select mode", async () => {
@@ -137,4 +139,19 @@ test("changing the grouping ends select mode", async () => {
   fireEvent.click(screen.getByRole("tab", { name: "Subject" }));
   expect(screen.getByRole("button", { name: "Select" })
     .getAttribute("aria-pressed")).toBe("false");
+});
+
+test("Back / Forward (a page change from the URL) ends select mode", async () => {
+  await boot();
+  fireEvent.click(screen.getByRole("button", { name: "Select" }));
+  expect(screen.getByRole("button", { name: "Done" })).toBeTruthy();
+  window.location.hash = "#/all";
+  window.dispatchEvent(new HashChangeEvent("hashchange"));
+  await waitFor(() => expect(screen.queryByRole("button", { name: "Done" }))
+    .toBeNull());
+  window.location.hash = "#/senders";
+  window.dispatchEvent(new HashChangeEvent("hashchange"));
+  await waitFor(() => expect(screen.getByRole("button", { name: "Select" })
+    .getAttribute("aria-pressed")).toBe("false"));
+  window.location.hash = "";
 });
