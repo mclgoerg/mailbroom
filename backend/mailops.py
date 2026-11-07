@@ -196,6 +196,8 @@ NOT_IN_DEMO = "not_in_demo"
 # password login (backend/auth.py LoginThrottle): n= minutes to wait
 LOGIN_THROTTLED = "login_throttled"
 FOLDER_ERROR_CODES = frozenset({
+    "action_cancelled",
+    "undo_copy_unknown", "protected_sender_selected",
     MAILTO_UNSAFE, MOVE_FOREIGN_DELETED, *UNSUB_CODES, LOGIN_THROTTLED,
     NOT_IN_DEMO,
     NO_MESSAGE_ID, PINNED_MAILS, PROTECTED_MAILS, ALL_PINNED,
@@ -649,6 +651,7 @@ def cancel_requested(target: str, acc=None) -> bool:
 
 def _undo_summaries(acc) -> list[dict]:
     return [{"ts": u["ts"], "label": u["label"], "count": u["count"],
+             **({"id": u["id"]} if u.get("id") else {}),
              "action": u.get("action", "trash"),
              # the Folders panel toasts these itself; absent = ordinary
              **({"quiet": True} if u.get("quiet") else {}),
@@ -1077,17 +1080,26 @@ def _supports_move(conn) -> bool:
                for c in caps)
 
 
-def _uid_move(conn, uidstr: str, dest: str, src: str = "") -> bool:
+def _uid_move(conn, uidstr: str, dest: str, src: str = "",
+              receipt: dict | None = None) -> bool:
     """UID MOVE `uidstr` into raw folder `dest` (`src`: the selected folder,
     for the refusal's text); falls back to COPY + \\Deleted + EXPUNGE for
     servers without the MOVE capability."""
+    if receipt is not None:
+        conn.response("COPYUID")
     if _supports_move(conn):
         status, _ = conn.uid("MOVE", uidstr, quote_folder(dest))
+        if status == "OK" and receipt is not None:
+            receipt["copyuid"] = conn.response("COPYUID")[1]
         return status == "OK"
     status, _ = conn.uid("COPY", uidstr, quote_folder(dest))
     if status != "OK":
         return False
-    conn.uid("STORE", uidstr, "+FLAGS", r"(\Deleted)")
+    if receipt is not None:
+        receipt["copyuid"] = conn.response("COPYUID")[1]
+    status, _ = conn.uid("STORE", uidstr, "+FLAGS", r"(\Deleted)")
+    if status != "OK":
+        raise RuntimeError(CANNOT_FLAG)
     try:
         status, _ = conn.uid("EXPUNGE", uidstr)  # UIDPLUS: only our UIDs
     except Exception:
@@ -1101,7 +1113,9 @@ def _uid_move(conn, uidstr: str, dest: str, src: str = "") -> bool:
     # trip); only UID EXPUNGE (UIDPLUS) closes it, and this path exists for
     # servers that have neither that nor MOVE.
     if _only_ours_deleted(conn, uidstr):
-        conn.expunge()
+        status, _ = conn.expunge()
+        if status != "OK":
+            raise RuntimeError(CANNOT_EXPUNGE)
         return True
     conn.uid("STORE", uidstr, "-FLAGS", r"(\Deleted)")      # un-flag ours
     # The copies already made in `dest` cannot be told apart from mail that
@@ -2628,6 +2642,7 @@ def _resolve_dest(conn, action: str, dest: str, acc=None) -> str:
 def _move_uids(by_folder: dict[str, set[int]], action: str, dest: str,
                acc, progress_cb=None,
                moved_uids: dict[str, set[int]] | None = None,
+               copies: list[dict] | None = None,
                ) -> tuple[int, dict, str]:
     """Move UIDs into the action's target folder. `moved_uids` (if given) is
     mutated in place so a mid-run failure still tells the caller what WAS
@@ -2664,10 +2679,23 @@ def _move_uids(by_folder: dict[str, set[int]], action: str, dest: str,
                 if cancel_requested("delete", acc):
                     raise Cancelled()
                 chunk = uids[start:start + MOVE_CHUNK]
-                if _uid_move(conn, ",".join(str(u) for u in chunk), trash,
-                             folder):
-                    moved += len(chunk)
-                    moved_uids.setdefault(folder, set()).update(chunk)
+                if copies is None:
+                    did_move = _uid_move(conn, ",".join(map(str, chunk)), trash, folder)
+                    if did_move:
+                        moved += len(chunk)
+                        moved_uids.setdefault(folder, set()).update(chunk)
+                    else:
+                        raise RuntimeError(CANNOT_MOVE)
+                else:
+                    before = len(copies)
+                    try:
+                        if not _move_with_receipt(conn, folder, trash, chunk, uv, copies):
+                            raise RuntimeError(CANNOT_MOVE)
+                    finally:
+                        landed = copies[before:]
+                        moved += len(landed)
+                        if landed:
+                            moved_uids.setdefault(folder, set()).update(c["source_uid"] for c in landed)
                 if progress_cb:
                     progress_cb(moved, total)
     finally:
@@ -2676,6 +2704,47 @@ def _move_uids(by_folder: dict[str, set[int]], action: str, dest: str,
         except Exception:
             pass
     return moved, moved_uids, trash
+
+
+def _move_with_receipt(conn, folder: str, target: str, chunk: list[int],
+                       source_uv: int, copies: list[dict]) -> bool:
+    """Track only copies created by this move, never older matching IDs."""
+    sources = _fetch_msgid_map(conn, chunk)
+    status, _ = conn.select(quote_folder(target), readonly=True)
+    if status != "OK":
+        raise RuntimeError(coded(CANNOT_OPEN, folder=decode_mutf7(target)))
+    target_uv = uidvalidity(conn)
+    if source_uv <= 0 or target_uv <= 0:
+        raise RuntimeError(coded(UV_UNREADABLE, folder=decode_mutf7(
+            folder if source_uv <= 0 else target)))
+    before = set(_list_uids(conn))
+    status, _ = conn.select(quote_folder(folder), readonly=False)
+    if status != "OK" or uidvalidity(conn) != source_uv:
+        raise RuntimeError(coded(FOLDER_CHANGED, folder=decode_mutf7(folder)))
+    receipt: dict = {}
+    if not _uid_move(conn, ",".join(map(str, chunk)), target, folder, receipt=receipt):
+        return False
+    records = [{"folder": folder, "source_uid": u, "msgid": sources.get(u, ""),
+                "uid": None, "uv": target_uv, "in": target} for u in chunk]
+    copies.extend(records)
+    mapping = _parse_copyuid(receipt.get("copyuid"), target_uv, chunk)
+    if mapping is None:
+        mapping = {}
+        status, _ = conn.select(quote_folder(target), readonly=True)
+        if status == "OK" and uidvalidity(conn) == target_uv:
+            new = sorted(set(_list_uids(conn)) - before)
+            ids = _fetch_msgid_map(conn, new)
+            for mid in set(sources.values()) - {""}:
+                src = [u for u in chunk if sources.get(u) == mid]
+                dst = [u for u in new if ids.get(u) == mid]
+                if len(src) == len(dst):
+                    mapping.update(zip(src, dst))
+    for record in records:
+        record["uid"] = mapping.get(record["source_uid"])
+    status, _ = conn.select(quote_folder(folder), readonly=False)
+    if status != "OK" or uidvalidity(conn) != source_uv:
+        raise RuntimeError(coded(FOLDER_CHANGED, folder=decode_mutf7(folder)))
+    return True
 
 
 def _mark_read(by_folder: dict[str, set[int]], acc,
@@ -2747,19 +2816,25 @@ def _from_role_label(n: int, role: str) -> tuple[str, dict]:
 
 def _record_undo(label: str, meta: dict, action: str, dest: str,
                  acc, quiet: bool = False,
-                 label_fields: dict | None = None) -> None:
+                 label_fields: dict | None = None,
+                 copies: list[dict] | None = None) -> None:
     """Append a move job to the undo log (acc.lock held). `quiet` = the
     caller shows its own toast (Folders panel), so the UI's generic "moved
     N" toast for new undo entries stays silent. `label_fields`: optional
     structured label (see `_from_role_label`)."""
     items = [(folder, m["msgid"])
              for folder, by_uid in meta.items()
-             for m in by_uid.values() if m.get("msgid")]
+             for m in by_uid.values() if copies is not None or m.get("msgid")]
     if not items:
         return
-    acc.undo_log.append({"ts": int(time.time()), "label": label,
+    if copies is not None:
+        for copy in copies:
+            copy.setdefault("msgid", meta.get(copy["folder"], {}).get(
+                copy["source_uid"], {}).get("msgid", ""))
+    acc.undo_log.append({"id": f"{time.time_ns():x}", "ts": int(time.time()), "label": label,
                          "action": action, "count": len(items),
-                         "items": items, "in": dest, "quiet": quiet,
+                         "items": items, "in": copies[0]["in"] if copies else dest, "quiet": quiet,
+                         **({"copies": copies} if copies is not None else {}),
                          **(label_fields or {})})
     del acc.undo_log[:-UNDO_MAX]
     acc.state["undo"] = _undo_summaries(acc)
@@ -2815,6 +2890,7 @@ def _delete_worker(acc) -> None:
                     + (f" (+{queued} job(s) queued)" if queued else ""))
 
         moved_uids: dict[str, set[int]] = {}
+        copies: list[dict] = []
         done = 0
         t0 = time.time()
         log.info("action %r started: %d mails (%s)", action,
@@ -2825,7 +2901,7 @@ def _delete_worker(acc) -> None:
             if not moved_uids:
                 return
             meta = _apply_removal(moved_uids, acc)
-            _record_undo(label, meta, action, resolved[0], acc)
+            _record_undo(label, meta, action, resolved[0], acc, copies=copies)
             n = sum(len(s) for s in moved_uids.values())
             acc.state["delete"]["moved"] += n
             freed[0] += sum(m["size"] for by_uid in meta.values()
@@ -2844,7 +2920,7 @@ def _delete_worker(acc) -> None:
                 statsmod.record_action("mark_read", done, 0, acc.name)
             else:
                 moved, _, resolved[0] = _move_uids(
-                    by_folder, action, dest, acc, progress_cb, moved_uids)
+                    by_folder, action, dest, acc, progress_cb, moved_uids, copies)
                 with acc.lock:
                     apply_partial()
             log.info("action %r done: %d mails in %.1fs", action,
@@ -2854,6 +2930,9 @@ def _delete_worker(acc) -> None:
             cancelled = True
             with acc.lock:
                 apply_partial()
+                for pending in acc.delete_pending:
+                    if pending.get("completion") is not None:
+                        pending["completion"].update(done=True, moved=0, error="action_cancelled")
                 acc.delete_pending.clear()
                 acc.state["notice"] = {"key": "action_cancelled", "params": {}}
         except Exception as exc:
@@ -2873,11 +2952,14 @@ def _delete_worker(acc) -> None:
             size=0 if action == "mark_read" else freed[0], label=label,
             outcome="error" if error else ("cancelled" if cancelled else "ok"),
             error=error)
+        if job.get("completion") is not None:
+            job["completion"].update(moved=done if action == "mark_read" else freed[1],
+                                     error=error or ("action_cancelled" if cancelled else ""), done=True)
 
 
 def _start_delete(by_folder: dict[str, set[int]], label: str, acc,
                   action: str = "trash", dest: str = "",
-                  actor: str = "user") -> None:
+                  actor: str = "user", completion: dict | None = None) -> None:
     """Enqueue a background mail action (acc.lock held by caller)."""
     if action not in ACTIONS:
         raise ValueError("bad action")
@@ -2895,9 +2977,12 @@ def _start_delete(by_folder: dict[str, set[int]], label: str, acc,
     by_folder = {f: s - queued.get(f, set()) for f, s in by_folder.items()}
     by_folder = {f: s for f, s in by_folder.items() if s}
     if not by_folder:
+        if completion is not None:
+            completion.update(done=True, moved=0, error="")
         return
     acc.delete_pending.append({"by_folder": by_folder, "label": label,
-                            "action": action, "dest": dest, "actor": actor})
+                            "action": action, "dest": dest, "actor": actor,
+                            "completion": completion})
     if acc.state["delete"]["status"] != "running":
         # `seq` identifies the job: the UI compares it to the value it saw
         # at start, so a stale "done" tick of an earlier job is not mistaken
@@ -2962,7 +3047,7 @@ def delete_groups(grouping: str, keys: list[str],
                   action: str = "trash", dest: str = "",
                   force: bool = False, keep_latest: int | None = None,
                   older_than_days: int | None = None, acc=None,
-                  actor: str = "user") -> dict:
+                  actor: str = "user", completion: dict | None = None) -> dict:
     acc = acc or accounts.get()
     if keep_latest is not None and older_than_days is not None:
         raise ValueError(
@@ -3016,7 +3101,7 @@ def delete_groups(grouping: str, keys: list[str],
             raise RuntimeError("no known groups selected")
         labels = [jobs[k]["label"] for k in list(jobs)[:3]]
         label = ", ".join(labels) + ("…" if len(jobs) > 3 else "")
-        _start_delete(by_folder, label, acc, action, dest, actor)
+        _start_delete(by_folder, label, acc, action, dest, actor, completion)
     return {"ok": True, "queued": sum(len(s) for s in by_folder.values()),
             "skipped": skipped, "skipped_pinned": skipped_pinned}
 
@@ -3076,6 +3161,7 @@ def delete_messages(items: list, action: str = "trash",
     acc = acc or accounts.get()
     guard = (pinstore.load_account(acc.name)
              if action != "mark_read" and not force else set())
+    protected = cfgmod.normalize_protected(cfgmod.load_config().get("protected"))
     with acc.lock:
         if acc.state["status"] != "done":
             raise RuntimeError("No completed scan")
@@ -3086,6 +3172,8 @@ def delete_messages(items: list, action: str = "trash",
             folder, uid = str(it[0]), int(it[1])
             m = acc.index.get(ikey(folder, uid))
             if m:                       # only messages we know about
+                if action != "mark_read" and cfgmod.is_protected(m["addr"], protected):
+                    raise ValueError("protected_sender_selected")
                 if m["msgid"] in guard:
                     raise ValueError(PINNED_MAILS)
                 by_folder.setdefault(folder, set()).add(uid)
@@ -3648,16 +3736,17 @@ def _reinsert_undo(acc, entry: dict, pos: int) -> None:
 
 
 def undo_last(index: int = -1, acc=None, ident: dict | None = None) -> dict:
-    """Restore a recorded move job (found by Message-ID in its target).
+    """Restore a recorded move job by exact destination copies where available.
     `ident` ({ts, label, count} of the entry, as returned when it was
     recorded) picks the entry by identity instead of by position."""
     acc = acc or accounts.get()
     with acc.lock:
         if ident is not None:
             index = next((i for i, u in enumerate(acc.undo_log)
-                          if (u["ts"], u["label"], u["count"]) ==
+                          if (u.get("id") == ident["id"] if ident.get("id") else
+                              (u["ts"], u["label"], u["count"]) ==
                           (ident.get("ts"), ident.get("label"),
-                           ident.get("count"))), len(acc.undo_log))
+                           ident.get("count")))), len(acc.undo_log))
         if not acc.undo_log:
             raise RuntimeError(NOTHING_TO_UNDO)
         if not -len(acc.undo_log) <= index < len(acc.undo_log):
@@ -3685,13 +3774,46 @@ def undo_last(index: int = -1, acc=None, ident: dict | None = None) -> dict:
         # without MOVE a dropped connection can leave the copies at their
         # target with the originals still in Trash. What the target already
         # holds by Message-ID counts as restored.
-        present = _present_in_targets(conn, entry["items"])
+        exact_copies = entry.get("copies")
+        present = (_present_in_targets(conn, entry["items"])
+                   if exact_copies is None else set())
         status, _ = conn.select(quote_folder(trash), readonly=False)
         if status != "OK":
             raise RuntimeError(coded(CANNOT_OPEN, folder=decode_mutf7(trash)))
         # Find each message in Trash by Message-ID, batch moves per target.
         by_target: dict[str, list[bytes]] = {}
-        for folder, msgid in entry["items"]:
+        unresolved = False
+        if exact_copies is not None:
+            current_uv = uidvalidity(conn)
+            live = set(_list_uids(conn))
+            for copy in exact_copies:
+                if copy.get("restored"):
+                    continue
+                if not copy.get("uid") or copy["uv"] != current_uv:
+                    unresolved = True
+                    continue
+                if copy["uid"] not in live:
+                    continue
+                attempt = copy.get("attempt")
+                if attempt:
+                    status, _ = conn.select(quote_folder(copy["folder"]), readonly=True)
+                    if status != "OK" or uidvalidity(conn) != attempt["uv"]:
+                        unresolved = True
+                    else:
+                        new = sorted(set(_list_uids(conn)) - set(attempt["before"]))
+                        ids = _fetch_msgid_map(conn, new)
+                        hits = [u for u, mid in ids.items() if mid == copy.get("msgid")]
+                        if copy.get("msgid") and len(hits) == 1:
+                            copy["restored"] = True
+                        elif not hits and not new:
+                            copy.pop("attempt", None)  # failure before any copy arrived
+                        else:
+                            unresolved = True
+                    conn.select(quote_folder(trash), readonly=False)
+                    if copy.get("restored") or copy.get("attempt"):
+                        continue
+                by_target.setdefault(copy["folder"], []).append(str(copy["uid"]).encode())
+        for folder, msgid in entry["items"] if exact_copies is None else []:
             if not msgid or (folder, msgid) in present:
                 continue
             found = _search_message_id(conn, msgid)
@@ -3700,10 +3822,25 @@ def undo_last(index: int = -1, acc=None, ident: dict | None = None) -> dict:
         for folder, uids in by_target.items():
             for start in range(0, len(uids), MOVE_CHUNK):
                 chunk = uids[start:start + MOVE_CHUNK]
+                if exact_copies is not None:
+                    status, _ = conn.select(quote_folder(folder), readonly=True)
+                    if status != "OK":
+                        raise RuntimeError(coded(CANNOT_OPEN, folder=decode_mutf7(folder)))
+                    attempt = {"uv": uidvalidity(conn), "before": _list_uids(conn)}
+                    for copy in exact_copies:
+                        if copy["folder"] == folder and copy.get("uid") in {int(u) for u in chunk}:
+                            copy["attempt"] = attempt
+                    conn.select(quote_folder(trash), readonly=False)
                 if _uid_move(conn, b",".join(chunk).decode(), folder,
                              trash):
                     restored += len(chunk)
                     moved.extend(int(u) for u in chunk)
+                    if exact_copies is not None:
+                        for copy in exact_copies:
+                            if copy["folder"] == folder and copy.get("uid") in {int(u) for u in chunk}:
+                                copy["restored"] = True
+        if unresolved:
+            raise RuntimeError("undo_copy_unknown")
     except Exception as exc:
         # Whatever went wrong (a refusal because another program flagged
         # mails \Deleted, a failed connect, an unopenable or missing
@@ -4014,10 +4151,11 @@ def role_move(role: str, action: str, uids: list[int], uv: int = 0,
                          for u in clean):
             raise ValueError(PROTECTED_MAILS)
     moved_uids: dict[str, set[int]] = {}
+    copies: list[dict] = []
     error: Exception | None = None
     try:
         _move_uids({src: set(clean)}, move_action, dest, acc,
-                   moved_uids=moved_uids)
+                   moved_uids=moved_uids, copies=copies)
     except Exception as exc:            # fold in what DID move, then raise
         error = exc
     moved = moved_uids.get(src, set())
@@ -4028,7 +4166,7 @@ def role_move(role: str, action: str, uids: list[int], uv: int = 0,
         label, fields = _from_role_label(len(moved), role)
         with acc.lock:
             _record_undo(label, meta, move_action, dest, acc, quiet=True,
-                         label_fields=fields)
+                         label_fields=fields, copies=copies)
             key = ROLE_COUNTED.get(role)
             if key and acc.state[key] is not None:
                 acc.state[key] = max(0, acc.state[key] - len(moved))
@@ -4212,7 +4350,7 @@ def move_lookalike(folder: str, uv: int, max_uid: int, acc=None) -> dict:
     """MOVE the mail of a look-alike folder (UIDs <= `max_uid`, the highest
     the confirm counted, after a UIDVALIDITY check against `uv`) into the
     role folder it looks like. Reversible, never permanent: chunked UID
-    MOVEs, one undo entry (found again by Message-ID in the target) and an
+    MOVEs, one undo entry tracking the destination copies, and an
     audit entry for what really moved, even when a chunk fails part-way
     (the failure is then raised). Mail that arrived later stays."""
     acc = acc or accounts.get()
@@ -4225,6 +4363,7 @@ def move_lookalike(folder: str, uv: int, max_uid: int, acc=None) -> dict:
         return {"moved": 0, "undo": None}
     conn = connect(cfgmod.account_imap(acc.name), acc.name)
     items: list[tuple[str, str]] = []
+    copies: list[dict] = []
     moved = 0
     failure: Exception | None = None
     role = target = ""
@@ -4239,12 +4378,14 @@ def move_lookalike(folder: str, uv: int, max_uid: int, acc=None) -> dict:
         chosen = [u for u in _all_uids(conn) if u <= max_uid]
         for start in range(0, len(chosen), MOVE_CHUNK):
             chunk = chosen[start:start + MOVE_CHUNK]
-            uidstr = ",".join(str(u) for u in chunk)
-            ids = _fetch_msgids(conn, chunk)
-            if not _uid_move(conn, uidstr, target, folder):
-                raise RuntimeError(CANNOT_MOVE)
-            moved += len(chunk)
-            items.extend((folder, mid) for mid in sorted(ids))
+            before = len(copies)
+            try:
+                if not _move_with_receipt(conn, folder, target, chunk, uv, copies):
+                    raise RuntimeError(CANNOT_MOVE)
+            finally:
+                landed = copies[before:]
+                moved += len(landed)
+                items.extend((folder, c.get("msgid", "")) for c in landed)
     except Exception as exc:
         failure = exc
     finally:
@@ -4258,9 +4399,10 @@ def move_lookalike(folder: str, uv: int, max_uid: int, acc=None) -> dict:
         with acc.lock:
             if items:
                 acc.undo_log.append({
+                    "id": f"{time.time_ns():x}",
                     "ts": int(time.time()), "label": label,
                     "action": "move_contents", "count": len(items),
-                    "items": items, "in": target})
+                    "items": items, "in": target, "copies": copies})
                 del acc.undo_log[:-UNDO_MAX]
                 acc.state["undo"] = _undo_summaries(acc)
                 undo = {"ts": acc.undo_log[-1]["ts"], "label": label,
@@ -4304,12 +4446,22 @@ def _fetch_msgids(conn, uids: list[int]) -> set[str]:
     return out
 
 
-def _prune_undo(acc, trash: str, purged: set[str]) -> None:
+def _prune_undo(acc, trash: str, purged: set[str], uids: set[int] | None = None) -> None:
     """Drop purged Message-IDs from the undo entries that restore out of
     Trash; an entry left without items disappears."""
     with acc.lock:
         kept = []
         for e in acc.undo_log:
+            if e.get("copies") is not None:
+                # IDs are not copy identities. Another mail with the same ID
+                # may have been purged; don't discard an exact, still-live copy.
+                remaining = [c for c in e["copies"]
+                             if (e.get("in") or trash) != trash or c.get("uid") not in (uids or set())]
+                if remaining:
+                    kept.append({**e, "copies": remaining,
+                                 "items": [(c["folder"], c.get("msgid", "")) for c in remaining],
+                                 "count": len(remaining)})
+                continue
             if (e.get("in") or trash) != trash:
                 kept.append(e)
                 continue
@@ -4419,7 +4571,7 @@ def _empty_trash(acc, uv: int, max_uid: int) -> dict:
         freed = sum(sizes.get(u, 0) for u in gone)
         statsmod.record_action("purge", deleted, freed, acc.name)
         if purged:
-            _prune_undo(acc, trash, purged)
+            _prune_undo(acc, trash, purged, set(gone))
         log.info("emptied Trash: %d mails permanently deleted%s", deleted,
                  "" if failure is None else " (then failed)")
         with acc.lock:
@@ -4771,6 +4923,7 @@ class _Ledger:
         self.freed = 0
         self.ids: set[str] = set()
         self.gone: list[int] = []
+        self.trash_gone: list[int] = []
         self.stranded: list[dict] = []
         self.total = 0               # mails the role folder held when read
 
@@ -4799,6 +4952,7 @@ def _purge_in_trash(conn, src: str, uv: int, keep: list[dict], uidplus: bool,
 
     def done(chunk: list[int]) -> None:
         led.gone.extend(chunk)
+        led.trash_gone.extend(chunk)
         led.book([by_uid[u] for u in chunk])
 
     _expunge_uids(conn, chosen, uidplus, done)
@@ -4833,10 +4987,19 @@ def _purge_junk_via_trash(conn, src: str, trash: str, uv: int,
         dst = _identify_moved(conn, trash, trash_uv, pre_max, metas, mapping)
         if dst is None:
             raise _Unverified()
+        ids = _fetch_msgid_map(conn, dst)
+        for mid in {m.get("msgid", "") for m in metas}:
+            source = [m for m in metas if m.get("msgid", "") == mid]
+            target = [u for u in dst if ids.get(u) == mid]
+            if len(source) == len(target):
+                for m, u in zip(source, target):
+                    m["undo_uid"], m["undo_uv"] = u, trash_uv
         present_t = set(_list_uids(conn))       # Trash is selected (rw)
         gone_t: list[int] = []
-        _expunge_uids(conn, [u for u in dst if u in present_t], True,
-                      gone_t.extend)
+        def gone(chunk):
+            gone_t.extend(chunk)
+            led.trash_gone.extend(chunk)
+        _expunge_uids(conn, [u for u in dst if u in present_t], True, gone)
         del led.stranded[-len(metas):]          # these are gone, not stranded
         led.book(metas, deleted=len(gone_t))
 
@@ -4934,9 +5097,9 @@ def _purge_run(role: str, wanted: list[int], uv: int, folder: str,
     res["deleted"] = led.deleted
     res["unverified"] = len(stranded) if unverified else 0
     if led.ids:
-        _prune_undo(acc, trash, led.ids)
+        _prune_undo(acc, trash, led.ids, set(led.trash_gone))
         if role == "junk":       # entries that moved mail INTO Junk, too
-            _prune_undo(acc, src, led.ids)
+            _prune_undo(acc, src, led.ids, set(led.gone))
     with acc.lock:
         # counts from the listing just read (not the post-scan numbers)
         if led.total and role == "trash":
@@ -4950,8 +5113,11 @@ def _purge_run(role: str, wanted: list[int], uv: int, folder: str,
         if stranded:
             meta = {src: {m["uid"]: m for m in stranded}}
             stranded_label, fields = _from_role_label(len(stranded), role)
+            copies = [{"folder": src, "source_uid": m["uid"],
+                       "msgid": m.get("msgid", ""), "uid": m.get("undo_uid"),
+                       "uv": m.get("undo_uv", 0), "in": trash} for m in stranded]
             _record_undo(stranded_label, meta, "trash", trash, acc,
-                         quiet=True, label_fields=fields)
+                         quiet=True, label_fields=fields, copies=copies)
             last = acc.undo_log[-1] if acc.undo_log else None
             if last and last["label"] == stranded_label:
                 res["undo"] = {"ts": last["ts"], "label": last["label"],

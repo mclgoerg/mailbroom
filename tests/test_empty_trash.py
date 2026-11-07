@@ -274,6 +274,7 @@ def test_undo_entries_of_purged_mail_are_pruned_others_kept(bridge):
     assert mailops.UNDO_LOG == keep and len(keep) == 1
     assert mailops.STATE["undo"] == [
         {"ts": keep[0]["ts"], "label": keep[0]["label"],
+         "id": keep[0]["id"],
          "count": keep[0]["count"], "action": keep[0].get("action", "trash")}]
 
 

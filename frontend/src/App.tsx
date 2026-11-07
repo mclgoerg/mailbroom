@@ -92,8 +92,8 @@ const sortValue = (g: Group, k: SortKey): number | string => {
 };
 
 const RESTORE_NOTICES = ["restored", "restored_rescan"];
-const undoId = (u: { ts: number; count: number; label: string }) =>
-  `${u.ts}|${u.count}|${u.label}`;
+const undoId = (u: { id?: string; ts: number; count: number; label: string }) =>
+  u.id ?? `${u.ts}|${u.count}|${u.label}`;
 
 const actionVerb = (a: string): string =>
   ({ trash: t("Move to Trash"), archive: t("Archive"), move: t("Move"),
@@ -200,19 +200,23 @@ export default function App() {
     notify(t(key, { msg: e.message ?? e }), "error");
   const connToast = useRef<number | null>(null);   // one lost-connection toast
   const [theme, setTheme] = useState<"dark" | "light">(currentTheme());
+  const [smartHelp, setSmartHelp] = useState(() => localStorage.getItem("pmc_smart_help_seen") !== "1");
   const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
   const sse = useRef<EventSource | null>(null);
   const filterRef = useRef<HTMLInputElement>(null);
 
   const fetching = useRef(false);   // one full-state fetch at a time
   const stateRef = useRef<AppState | null>(null);
+  const accountGeneration = useRef(0);
 
   const refresh = useCallback(async () => {
     clearTimeout(timer.current);
     if (fetching.current) return;
     fetching.current = true;
+    const generation = accountGeneration.current;
     try {
       const st = await api.state();
+      if (generation !== accountGeneration.current) return;
       stateRef.current = st;
       setState(st);
       if (connToast.current != null) {
@@ -227,6 +231,7 @@ export default function App() {
         timer.current = setTimeout(refresh, 1200);
       }
     } catch (e: any) {
+      if (generation !== accountGeneration.current) return;
       // Polling retries every few seconds: show the error once, not per try.
       if (connToast.current == null) {
         connToast.current = toast.show(
@@ -234,7 +239,7 @@ export default function App() {
       }
       if (!sse.current) timer.current = setTimeout(refresh, 4000);
     } finally {
-      fetching.current = false;
+      if (generation === accountGeneration.current) fetching.current = false;
     }
   }, [toast]);
 
@@ -247,11 +252,15 @@ export default function App() {
   }, [cfg]);
 
   const switchAccount = (name: string) => {
+    accountGeneration.current++;
+    fetching.current = false;
+    clearTimeout(timer.current);
     localStorage.setItem("pmc_account", name);
     apiSetAccount(name);
     // Switching swaps the ENTIRE view: no state may leak across accounts.
     stateRef.current = null;
     setState(null);
+    setPending("");
     setSelected(new Set());
     setDetail(null);
     setSpaceOpen(false);
@@ -273,10 +282,12 @@ export default function App() {
     api.getConfig().then(setCfg).catch(() => {});
     // Prefer server-sent events; fall back to polling if they fail.
     try {
+      const generation = accountGeneration.current;
       const es = new EventSource(withAccount("/api/events"));
       // The stream carries only the slim status (a few KB); the big group
       // lists are fetched once and again whenever groups_rev moves.
       es.onmessage = (ev) => {
+        if (generation !== accountGeneration.current) return;
         const slim = JSON.parse(ev.data) as StatusMsg;
         const merged = applyStatus(stateRef.current, slim);
         if (merged) {
@@ -287,6 +298,7 @@ export default function App() {
         }
       };
       es.onerror = () => {
+        if (generation !== accountGeneration.current) return;
         es.close();
         if (sse.current === es) sse.current = null;
         refresh();
@@ -389,7 +401,7 @@ export default function App() {
           action: entry ? { label: t("Undo"), onClick: () => {
             const i = stateRef.current?.undo.findIndex(
               (u) => undoId(u) === undoId(entry)) ?? -1;
-            if (i >= 0) undo(i);
+            if (i >= 0) undo(i, false);
           } } : undefined,
         });
         if (del.error) notify(t("err.generic", { msg: errorText(del.error) }), "error");
@@ -826,17 +838,23 @@ export default function App() {
     try { await api.clearNotice(RESTORE_NOTICES); } catch { /* cosmetic */ }
   };
 
-  const undo = async (index: number) => {
+  const undo = async (index: number, ask = true) => {
     const entry = stateRef.current?.undo[index];
     if (!entry) return;
+    const generation = accountGeneration.current;
+    const undoAccount = stateRef.current?.account;
+    const identity = { ts: entry.ts, label: entry.label, count: entry.count,
+      ...(entry.id ? { id: entry.id } : {}) };
     setUndoOpen(false);
-    if (!await confirmDialog({
+    if (ask && !await confirmDialog({
       title: t("confirm.restore",
         { count: entry.count, label: undoLabel(entry) }),
       confirmLabel: t("confirm.restore_btn") })) return;
+    if (generation !== accountGeneration.current) return;
     setPending(t("Restoring…"));
     try {
-      const r = await api.undo(index);
+      const r = await api.undo(-1, identity, undoAccount);
+      if (generation !== accountGeneration.current) return;
       // The result is a toast, where the user is: the backend's notice for
       // it sits above the list (see the filter at the Notice) and would
       // move the page.
@@ -878,7 +896,7 @@ export default function App() {
       .findIndex((u) => undoId(u) === undoId(e)) ?? -1;
     if (find() < 0) await refresh();
     const i = find();
-    if (i >= 0) undo(i);
+    if (i >= 0) undo(i, false);
   };
 
   // Shared by the profile menu and the Trash panel; resolves whether the
@@ -905,6 +923,7 @@ export default function App() {
     }
     if (!await confirmDialog({ title: t("confirm.empty_trash_title"),
       body: t("confirm.empty_trash_body", { n }),
+      bullets: [t("confirm.empty_trash_protection")],
       tone: "danger",
       confirmLabel: t("confirm.empty_trash_btn", { n }) })) return false;
     setPending(t("Emptying Trash…"));
@@ -1046,6 +1065,7 @@ export default function App() {
       olderThanDays: number | null = null,
       noun: "groups" | "senders" = "groups",
       confirmed = false): Promise<boolean> => {
+    const generation = accountGeneration.current;
     let force = false;
     let effective = keys;
     if (action === "trash") {
@@ -1091,6 +1111,7 @@ export default function App() {
     if (pins) bullets.push(t("confirm.b_pinned_kept", { n: pins }));
     // Moves are reversible from the result message; mark-as-read is not a move.
     if (action !== "mark_read") bullets.push(t("confirm.b_undo"));
+    if (action === "trash") bullets.push(t("confirm.b_space"));
     // `confirmed`: the caller's own dialog already named these counts
     // (Triage's one summary confirm) - everything above still applies.
     if (!force && !confirmed && !await confirmDialog({ title: verb, bullets,
@@ -1098,8 +1119,10 @@ export default function App() {
       confirmLabel: t("confirm.btn_n", { verb, n }) }))
       return false;
     try {
+      if (generation !== accountGeneration.current) return false;
       await api.deleteGroups(grouping, effective, action, dest, force,
         keepLatest, olderThanDays);
+      if (generation !== accountGeneration.current) return false;
       if (seenJobs.current) seenJobs.current.d = "running";   // see effect
       refresh();   // runs in the background; SSE/polling follows it
       return true;
@@ -1751,6 +1774,11 @@ export default function App() {
           </Button>
         </div>
       )}
+
+      {mode === "smart" && !flat && smartHelp && <Notice className="mb-2"
+        onClose={() => { setSmartHelp(false); localStorage.setItem("pmc_smart_help_seen", "1"); }}>
+        {t("smart.first_use")}
+      </Notice>}
 
       {/* Row A: Scan (the one solid-accent element) · grouping segments ·
           Search · Tools. On phones the segments take their own full-width

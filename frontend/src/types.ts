@@ -210,6 +210,7 @@ export type FolderRole = "junk" | "trash";
  *  count) its identity; `label_key` + `label_params` (when present) let the
  *  UI word the label itself in the user's language - see `undoLabel`. */
 export interface UndoEntry {
+  id?: string;
   ts: number;
   label: string;
   count: number;
@@ -306,6 +307,8 @@ export interface AuditResp {
 }
 
 export interface RuleRun {
+  pending?: boolean;
+  queued?: number;
   ts: number;
   mode: "report" | "execute";
   groups: number;
@@ -420,7 +423,7 @@ export interface LookalikeCount {
   max_uid: number;
 }
 
-export interface UndoIdent { ts: number; label: string; count: number }
+export interface UndoIdent { id?: string; ts: number; label: string; count: number }
 
 export interface Mail {
   uid: number;

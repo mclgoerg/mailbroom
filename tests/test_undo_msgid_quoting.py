@@ -137,6 +137,9 @@ def test_a_no_for_one_id_skips_only_that_id(bridge):
     mailops.delete_groups("sender", ["noreply@dhl.example",
                                      "news@shop.example"])
     assert wait_delete_done()["moved"] == 4
+    # Exercise legacy entries; new entries restore by destination UID.
+    from backend import accounts
+    accounts.get().undo_log[-1].pop("copies", None)
     _no_for(bridge, {"<odd1@x.example>"})
     r = mailops.undo_last()
     assert r["restored"] == 3 and r["of"] == 4, r

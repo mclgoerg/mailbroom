@@ -88,13 +88,9 @@ test("Trash and Undo through the UI", async () => {
   await dialog.getByRole("button", { name: /^Move to Trash \(\d+\)$/ }).click();
   const toast = page.getByText(/Moved \d+ mails? to Trash/);
   await expect(toast).toBeVisible();
-  await toast.locator("xpath=..").getByRole("button", { name: "Undo" }).click();
-  // the sender is really gone, until the Undo is confirmed
+  // Verify the move before restoring immediately from the result toast.
   expect(Object.keys(await senders()).length).toBeLessThan(Object.keys(before).length);
-  const restore = page.getByRole("dialog", { name: /^Restore \d+ mails?/ });
-  await expect(restore).toBeVisible();
-  await page.waitForTimeout(700);
-  await restore.getByRole("button", { name: "Restore" }).click();
+  await toast.locator("xpath=..").getByRole("button", { name: "Undo" }).click();
   await expect(page.getByText(/Restored \d+ mails? \(/)).toBeVisible();
   expect(Object.keys(await senders()).length).toBe(Object.keys(before).length);
 });
@@ -139,7 +135,14 @@ test("job endpoints: attachment scan, rule run, bulk unsubscribe come back", asy
   expect((await api("POST", `/api/rules/${id}`, { mode: "execute" })).status).toBe(200);
   const run = await api("POST", `/api/rules/${id}/run`);
   expect(run.status).toBe(200);
-  expect(run.json.acted).toBeGreaterThan(0);
+  // The single-threaded demo runs queued work after the handler returns.
+  // Its response must distinguish queued work from a completed action.
+  expect(run.json.pending).toBe(true);
+  expect(run.json.queued).toBeGreaterThan(0);
+  expect(run.json.acted).toBe(0);
+  const completed = await api("GET", "/api/state?account=proton");
+  expect(completed.json.delete.status).toBe("done");
+  expect(completed.json.delete.moved).toBeGreaterThan(0);
   expect(key in await senders()).toBe(false);
   expect((await api("POST", "/api/undo?account=proton", {})).status).toBe(200);
   expect(key in await senders()).toBe(true);

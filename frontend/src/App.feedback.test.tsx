@@ -134,8 +134,8 @@ test("a finished move shows a toast whose Undo restores the latest entry",
     const msg = await screen.findByText("Moved 12 mails to Trash");
     const bar = msg.parentElement!;
     fireEvent.click(within(bar).getByRole("button", { name: "Undo" }));
-    await pressDialog("Restore");
-    await waitFor(() => expect(undoApi).toHaveBeenCalledWith(0));
+    await waitFor(() => expect(undoApi).toHaveBeenCalledWith(-1,
+      { ts: 7, label: "Shop News", count: 12 }, "proton"));
     // The toast closes after its action.
     expect(screen.queryByText("Moved 12 mails to Trash")).toBeNull();
     // Reloading onto an already-finished job stays quiet (see below).
@@ -254,8 +254,8 @@ test("Undo targets its own entry after the list shifted", async () => {
   tick({ undo: [entry(2, 10)] });                  // the older one was undone
   fireEvent.click(within(msg.parentElement!)
     .getByRole("button", { name: "Undo" }));
-  await pressDialog("Restore");
-  await waitFor(() => expect(undoApi).toHaveBeenCalledWith(0));
+  await waitFor(() => expect(undoApi).toHaveBeenCalledWith(-1,
+    { ts: 2, label: "Shop News", count: 10 }, "proton"));
 });
 
 test("a partly failed move also shows its error", async () => {

@@ -107,7 +107,7 @@ def test_oidc_mode_flow(monkeypatch):
     # a user NOT on the allow-list is rejected
     monkeypatch.setattr(authmod, "exchange_code",
                         lambda cfg, redirect, code, verifier="":
-                        {"email": "evil@other.example", "sub": "e1"})
+                        {"email": "evil@other.example", "sub": "e1", "email_verified": True})
     import urllib.parse
     q = urllib.parse.quote(state)
     assert c.get(f"/api/oidc/callback?code=abc&state={q}").status_code == 403
@@ -118,7 +118,7 @@ def test_oidc_mode_flow(monkeypatch):
 
     def fake_exchange(cfg, redirect, code, verifier=""):
         seen["verifier"] = verifier
-        return {"email": "me@corp.example", "sub": "u1"}
+        return {"email": "me@corp.example", "sub": "u1", "email_verified": True}
 
     monkeypatch.setattr(authmod, "exchange_code", fake_exchange)
     r = c.get(f"/api/oidc/callback?code=abc&state={q}",
@@ -130,11 +130,11 @@ def test_oidc_mode_flow(monkeypatch):
 
 
 def test_allowed_subject_rules():
-    assert authmod.allowed_subject({"email": "A@B.c"}, []) == "a@b.c"
+    assert authmod.allowed_subject({"email": "A@B.c", "email_verified": True}, []) == "a@b.c"
     assert authmod.allowed_subject({"sub": "u1"}, []) == "u1"
     assert authmod.allowed_subject({}, []) is None
     assert authmod.allowed_subject({"email": "a@b.c"}, ["x@y.z"]) is None
-    assert authmod.allowed_subject({"email": "a@b.c", "sub": "u1"},
+    assert authmod.allowed_subject({"email": "a@b.c", "sub": "u1", "email_verified": True},
                                    ["u1"]) == "a@b.c"
 
 
@@ -202,7 +202,7 @@ def test_env_bootstrap_password_mode(monkeypatch):
 def test_unverified_email_is_refused():
     ok = {"email": "a@b.c", "sub": "u1"}
     assert authmod.allowed_subject({**ok, "email_verified": True}, []) == "a@b.c"
-    assert authmod.allowed_subject(ok, []) == "a@b.c"          # claim missing
+    assert authmod.allowed_subject(ok, []) is None             # claim missing
     assert authmod.allowed_subject({**ok, "email_verified": False}, []) is None
     assert authmod.allowed_subject({**ok, "email_verified": "false"}, []) is None
     assert authmod.allowed_subject({**ok, "email_verified": "FALSE"}, []) is None
@@ -241,10 +241,11 @@ def test_oidc_callback_unverified_email_lands_on_login_page(monkeypatch):
 
 def test_startup_warns_about_open_oidc(caplog):
     from backend import main
-    client.post("/api/config", json={"auth": {
-        "mode": "oidc",
-        "oidc": {"issuer": "https://idp.example", "client_id": "app",
-                 "client_secret": "sst", "allowed": []}}})
+    server = cfgmod.load_server()
+    server["auth"].update(mode="oidc", oidc={
+        "issuer": "https://idp.example", "client_id": "app",
+        "client_secret": "sst", "allowed": []})
+    cfgmod.save_server(server)  # legacy/env bootstrapping is checked at startup
     with caplog.at_level("WARNING", logger="inboxrake.auth"):
         main._warn_open_oidc()
     text = caplog.text

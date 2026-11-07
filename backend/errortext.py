@@ -10,6 +10,9 @@ from urllib.parse import unquote
 
 # code -> English text, or (text, text for n == 1)
 TEXT: dict[str, str | tuple[str, str]] = {
+    'action_cancelled': 'The action was cancelled; queued mails were not moved.',
+    'protected_sender_selected': 'Some selected mails belong to a protected sender. Unprotect that sender in its group before moving these mails.',
+    'undo_copy_unknown': 'Some moved copies could not be identified safely. The Undo entry is kept; open the destination folder to restore those mails manually.',
     'login_throttled': (
         'Too many failed attempts. Try again in {n} minutes.',
         'Too many failed attempts. Try again in 1 minute.'),

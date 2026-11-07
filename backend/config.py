@@ -182,9 +182,9 @@ def auth_fingerprint(acfg: dict) -> str:
     pw = os.environ.get("AUTH_PASSWORD", "") \
         if stored == _env_auth()["password_hash"] else stored
     return authmod.keyed_digest(json.dumps([
-        acfg.get("mode"), pw, acfg.get("admin"),
+        acfg.get("mode"), pw, acfg.get("admin"), acfg.get("admin_subject"),
         sorted(oidc.get("allowed") or []), oidc.get("issuer"),
-        oidc.get("client_id")]).encode())
+        oidc.get("client_id"), "oidc-identity-v2" if acfg.get("mode") == "oidc" else None]).encode())
 
 
 def _default_server() -> dict:
@@ -267,6 +267,21 @@ def claim_admin(subject: str) -> bool:
         server["auth"]["admin"] = subject
         _write_server(server)
         return True
+
+
+def bind_oidc_admin(identity: str, admitted: str, provider_sub: str = "") -> None:
+    """Bind the configured administrator once; a recycled email cannot take it."""
+    with _LOCK:
+        server = load_server()
+        auth = server["auth"]
+        auth.setdefault("identity_labels", {})[identity] = admitted
+        expected = (auth.get("admin") or "").strip().lower()
+        allowed = auth.get("oidc", {}).get("allowed") or []
+        if not expected and len(allowed) == 1:
+            expected = str(allowed[0]).strip().lower()
+        if expected in {admitted.strip().lower(), provider_sub.strip().lower()} and not auth.get("admin_subject"):
+            auth["admin_subject"] = identity
+        _write_server(server)
 
 
 DEFAULT_CONFIG = {
@@ -767,7 +782,7 @@ def _mask_oauth(oauth: dict | None) -> dict | None:
             "connected": bool(oauth.get("refresh_token"))}
 
 
-def update_config(body: dict) -> dict:
+def update_config(body: dict, *, safe_import: bool = False) -> dict:
     """Apply a partial update from the UI; empty secrets keep old values."""
     with _LOCK:
         cfg = load_config()
@@ -817,7 +832,18 @@ def update_config(body: dict) -> dict:
                 if not name:
                     continue
                 block = cfg["accounts"].setdefault(name, dict(NEUTRAL_IMAP))
+                previous_endpoint = tuple(block.get(k) for k in (
+                    "host", "port", "security", "user", "cafile",
+                    "smtp_host", "smtp_port", "smtp_security"))
                 _apply_imap(block, imap_in)
+                if safe_import and previous_endpoint != tuple(block.get(k) for k in (
+                        "host", "port", "security", "user", "cafile",
+                        "smtp_host", "smtp_port", "smtp_security")):
+                    block["password"] = ""
+                    if block.get("oauth"):
+                        for k in OAUTH_SECRET_FIELDS:
+                            block["oauth"].pop(k, None)
+                    block["verified"] = False
 
         # Folder exclusions are per account; top-level stays accepted for
         # old clients/backups and targets body["account"] (default: first).
@@ -856,10 +882,15 @@ def update_config(body: dict) -> dict:
                 acfg["password_hash"] = authmod.hash_password(
                     str(auth_in["password"]))
             if "admin" in auth_in:
-                acfg["admin"] = str(auth_in["admin"]).strip().lower()
+                new_admin = str(auth_in["admin"]).strip().lower()
+                if new_admin != acfg.get("admin"):
+                    acfg.pop("admin_subject", None)
+                acfg["admin"] = new_admin
             oidc_in = auth_in.get("oidc") or {}
             for key in ("issuer", "client_id", "redirect_base"):
                 if key in oidc_in:
+                    if key in ("issuer", "client_id") and str(oidc_in[key]).strip().rstrip("/") != acfg["oidc"].get(key):
+                        acfg.pop("admin_subject", None)
                     acfg["oidc"][key] = str(oidc_in[key]).strip().rstrip("/")
             if oidc_in.get("client_secret"):
                 acfg["oidc"]["client_secret"] = str(oidc_in["client_secret"])
@@ -878,6 +909,8 @@ def update_config(body: dict) -> dict:
                     raise ValueError("OIDC needs issuer, client ID and "
                                      "client secret")
                 acfg["mode"] = mode
+            if acfg["mode"] == "oidc" and not acfg.get("admin") and len(acfg["oidc"].get("allowed") or []) != 1:
+                raise ValueError("Set the SSO administrator, or restrict allowed users to exactly one identity for bootstrap.")
         if shared_in:
             scfg = server["shared_ai"]
             if "enabled" in shared_in:
@@ -902,6 +935,8 @@ def update_config(body: dict) -> dict:
                     server["auth"])):
                 _SESSIONS_RENEWED.set(True)
         ai_in = body.get("ai") or {}
+        old_ai_endpoint = (cfg["ai"].get("provider"),
+                           cfg["ai"].get("foundry_endpoint"))
         if ai_in.get("provider") in AI_PROVIDERS:
             cfg["ai"]["provider"] = ai_in["provider"]
         for key in ("model", "foundry_endpoint"):
@@ -918,6 +953,9 @@ def update_config(body: dict) -> dict:
                 ai_in["sort_instructions"])
         if ai_in.get("api_key"):
             cfg["ai"]["api_key"] = str(ai_in["api_key"])
+        if safe_import and old_ai_endpoint != (
+                cfg["ai"].get("provider"), cfg["ai"].get("foundry_endpoint")):
+            cfg["ai"]["api_key"] = ""
         _write_tenant_config(cfg)
         return cfg
 

@@ -286,9 +286,9 @@ def test_a_failing_chunk_books_what_moved_and_raises(monkeypatch):
     real = mailops._uid_move
     calls = []
 
-    def flaky(conn, uidstr, dest, src=""):
+    def flaky(conn, uidstr, dest, src="", receipt=None):
         calls.append(uidstr)
-        return real(conn, uidstr, dest, src) if len(calls) < 2 else False
+        return real(conn, uidstr, dest, src, receipt=receipt) if len(calls) < 2 else False
     monkeypatch.setattr(mailops, "_uid_move", flaky)
     r = client.post("/api/folders/move_contents", json={
         "folder": "Deleted Items", "uv": 1, "max_uid": 5})

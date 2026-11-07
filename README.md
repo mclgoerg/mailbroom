@@ -15,8 +15,10 @@ safe to delete.
 
 **[Website](https://inboxrake.com)** · **[Documentation](https://inboxrake.com/docs/)** · **[Try it in your browser](https://inboxrake.com/demo/)**
 
-**Nothing is deleted without asking, and everything is undoable** - moves
-go to Trash with an Undo - **except** permanent deletion in Trash and Junk:
+**Nothing is deleted without asking.** Moves to Trash normally offer Undo
+(the last 10 actions until restart). If the server cannot identify the moved
+copies safely, restore them manually from Trash. **Permanent deletion** in Trash and Junk
+cannot be undone:
 the manual "delete permanently" actions confirm with exact counts, and
 opt-in purge rules only act after you have reviewed a report run.
 
@@ -110,14 +112,15 @@ purge rule only acts after you have reviewed a report run (then it runs on
 its schedule within its age limit and per-run cap). Rules and the
 Folders-panel purges always skip protected senders and pinned mails. Moving
 a protected group, or a single pinned mail, to Trash asks for an extra
-confirmation; individually selected mails from a protected sender are not
-checked. **Empty Trash empties everything in Trash**, protected or not.
+confirmation; individual-message moves refuse protected senders until you
+unprotect them in their group. **Empty Trash empties everything in Trash**, protected or not.
 Rules also start in report mode.
 
-**What leaves my machine?** Nothing, unless you turn on AI review - and then
-only metadata (addresses, counts, subject lines), never mail bodies or
-attachments. Pick a cloud provider or a local model (Ollama, LM Studio, vLLM)
-and nothing leaves your network at all. The AI is optional, and you can set a
+**What leaves my machine?** Mailbox access goes to your configured mail
+provider; unsubscribe actions contact the sender, and SSO contacts your
+identity provider. Optional AI review sends only metadata (addresses, counts,
+subject lines), never mail bodies or attachments. A local AI model (Ollama,
+LM Studio, vLLM) keeps that AI traffic on your own network. The AI is optional, and you can set a
 monthly budget in Settings -> AI. The UI loads no external assets.
 
 **Why not just use filters or Sieve?** Filters work forward in time. Inboxrake

@@ -22,6 +22,8 @@ def _enable_oidc(admin: str | None = ADMIN):
                      "client_secret": "sst"}}
     if admin is not None:
         body["admin"] = admin
+    else:
+        body["oidc"]["allowed"] = ["first@x.example"]
     cfgmod.update_config({"auth": body})
 
 
@@ -138,14 +140,15 @@ def test_non_admin_cannot_touch_server_settings():
 
 
 def test_first_oidc_login_claims_admin(monkeypatch):
-    _enable_oidc(admin=None)      # no OIDC_ADMIN, no configured admin
+    _enable_oidc(admin=None)      # admission restricted for safe bootstrap
+    cfgmod.update_config({"auth": {"oidc": {"allowed": ["first@x.example"]}}})
     monkeypatch.setattr(authmod, "discovery", lambda issuer: {
         "authorization_endpoint": "https://idp.example/authorize",
         "token_endpoint": "https://idp.example/token",
         "userinfo_endpoint": "https://idp.example/userinfo"})
     monkeypatch.setattr(authmod, "exchange_code",
                         lambda cfg, redirect, code, verifier="":
-                        {"email": "first@x.example", "sub": "u1"})
+                        {"email": "first@x.example", "sub": "u1", "email_verified": True})
     c = TestClient(app)
     state = authmod.make_state()
     import urllib.parse
@@ -154,10 +157,12 @@ def test_first_oidc_login_claims_admin(monkeypatch):
     assert r.status_code in (302, 307)
     assert cfgmod.load_server()["auth"]["admin"] == "first@x.example"
     assert c.get("/api/auth").json()["is_admin"] is True
+    # Admit another identity after the bootstrap is complete.
+    cfgmod.update_config({"auth": {"oidc": {"allowed": ["first@x.example", "second@x.example"]}}})
     # The second identity does NOT become admin.
     monkeypatch.setattr(authmod, "exchange_code",
                         lambda cfg, redirect, code, verifier="":
-                        {"email": "second@x.example", "sub": "u2"})
+                        {"email": "second@x.example", "sub": "u2", "email_verified": True})
     c2 = TestClient(app)
     state = authmod.make_state()
     c2.get(f"/api/oidc/callback?code=abc&state={urllib.parse.quote(state)}",

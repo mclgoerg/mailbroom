@@ -68,7 +68,7 @@ def test_import_applies_and_stays_safe():
     cfg = cfgmod.load_config()
     im = cfg["accounts"]["default"]
     assert im["user"] == "new@pm.example"
-    assert im["password"] == "keep-me"                 # secret untouched
+    assert im["password"] == ""                        # changed identity requires reconnect
     assert cfg["ai"]["api_key"] == "keep-key"
     assert cfg["ai"]["model"] == "claude-haiku-4-5"
     assert cfg["protected"] == ["@bank.example"]

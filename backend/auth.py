@@ -388,13 +388,23 @@ def exchange_code(oidc_cfg: dict, redirect_uri: str, code: str,
 
 def email_unverified(claims: dict) -> bool:
     """True when the IdP says the email is NOT verified (bool False or the
-    string "false"). A missing claim counts as verified: some IdPs omit it."""
+    string "false"). An email requires an explicit true verification claim."""
     v = claims.get("email_verified")
-    return v is False or (isinstance(v, str) and v.strip().lower() == "false")
+    return bool(claims.get("email")) and not (
+        v is True or (isinstance(v, str) and v.strip().lower() == "true"))
+
+
+def oidc_identity(claims: dict, issuer: str) -> str:
+    """Immutable, case-sensitive issuer + provider subject, never email."""
+    sub = claims.get("sub")
+    if not isinstance(sub, str) or not sub:
+        raise ValueError("the identity provider did not return a subject")
+    return "oidc:" + hashlib.sha256(json.dumps(
+        [issuer.rstrip("/"), sub], ensure_ascii=False).encode()).hexdigest()
 
 
 def allowed_subject(claims: dict, allowed: list[str]) -> str | None:
-    """The session subject if the claims pass the allow-list (an empty
+    """The admitted email/sub label if the claims pass the allow-list (an empty
     list admits ANY user the IdP authenticates). An email the IdP marks
     as unverified is refused: anyone could register it there."""
     if email_unverified(claims):
