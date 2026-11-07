@@ -161,7 +161,7 @@ test("Review sets the filter and selects exactly the card's groups",
   expect((screen.getByPlaceholderText("filter groups…") as HTMLInputElement)
     .value).toBe("eng:low age:>1y");
   // exactly the one non-protected match is selected (bar: groups + mails)
-  await waitFor(() => expect(screen.getByText("1 group · 30 mails"))
+  await waitFor(() => expect(screen.getByText(/^1 group · 30 mails( · .+)?$/))
     .toBeTruthy());
   expect(strip()).toBeNull();                 // list no longer untouched
   expect(deleteGroups).not.toHaveBeenCalled();

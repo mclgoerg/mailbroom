@@ -1,4 +1,4 @@
-import { X } from "lucide-react";
+import { Archive, FolderInput, MailOpen, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { api, mailKey } from "../api";
@@ -7,7 +7,7 @@ import { actionVerb, itemsOf, planMailAction } from "../mailActions";
 import type { AppState, Mail } from "../types";
 import { MailRows, MessageView } from "./MailList";
 import { SortControl } from "./SortControl";
-import { BulkBar, Button, EmptyState, FILTER_ROW, Input, LINK, Loading, Modal, Select,
+import { BarButton, BulkBar, Button, EmptyState, FILTER_ROW, Input, LINK, Loading, Modal, Select,
   useToast }
   from "./ui";
 
@@ -243,40 +243,47 @@ export function AllMailsView({ state, onChanged, toolbarSlot }: {
         <BulkBar
           summary={t("detail.n_selected", { n: sel.size })}
           onClear={() => setSel(new Set())}
-          /* Action… stays mounted when "Move to folder…" is picked; the
-             folder picker is a separate control (see DetailPanel). */
-          action={<>
-            <Select value=""
-              className="min-w-36 flex-1 md:w-44 xl:w-56 md:min-w-0 md:flex-none"
-              disabled={busy} onChange={(e) => onAction(e.target.value)}>
-              <option value="" disabled>{t("Action…")}</option>
-              <option value="archive">{t("Archive")}</option>
-              <option value="move">{t("Move to folder…")}</option>
-              <option value="mark_read">{t("Mark read")}</option>
-            </Select>
-            {moveDest === "?" && (
-              <>
-                <Select value=""
-                  className="min-w-36 flex-1 md:w-44 xl:w-56 md:min-w-0 md:flex-none"
-                  onChange={(e) => {
-                    if (e.target.value) act("move", e.target.value);
-                    setMoveDest("");
-                  }}>
-                  <option value="" disabled>{t("Move to folder…")}</option>
-                  {(state.folders_raw ?? []).map((f, i) => (
-                    <option key={f} value={f}>{state.folders[i] ?? f}</option>
-                  ))}
-                </Select>
-                <Button variant="secondary" size="icon" label={t("Cancel")}
-                  className="shrink-0" onClick={() => setMoveDest("")}>
-                  <X size={18} />
-                </Button>
-              </>
-            )}
-          </>}
+          swap={moveDest === "?" ? "move" : null}
+          actions={moveDest === "?" ? (
+            <>
+              <Select value="" data-bar-field=""
+                className="min-w-0 flex-1 md:w-44 md:flex-none xl:w-56"
+                onChange={(e) => {
+                  if (e.target.value) act("move", e.target.value);
+                  setMoveDest("");
+                }}>
+                <option value="" disabled>{t("Move to folder…")}</option>
+                {(state.folders_raw ?? []).map((f, i) => (
+                  <option key={f} value={f}>{state.folders[i] ?? f}</option>
+                ))}
+              </Select>
+              <Button variant="secondary" size="icon" label={t("Cancel")}
+                data-bar-cancel="" className="shrink-0 rounded-full"
+                onClick={() => setMoveDest("")}>
+                <X size={18} />
+              </Button>
+            </>
+          ) : (
+            <>
+              <BarButton icon={<Archive size={16} aria-hidden />}
+                disabled={busy} onClick={() => onAction("archive")}>
+                {t("Archive")}
+              </BarButton>
+              <BarButton icon={<FolderInput size={16} aria-hidden />}
+                disabled={busy} data-bar-move=""
+                onClick={() => onAction("move")}>
+                {t("bar.move")}
+              </BarButton>
+              <BarButton icon={<MailOpen size={16} aria-hidden />}
+                disabled={busy} onClick={() => onAction("mark_read")}>
+                {t("Mark read")}
+              </BarButton>
+            </>
+          )}
           primary={
-            <Button variant="danger" disabled={busy}
-              className="whitespace-nowrap" onClick={() => act("trash")}>
+            <Button variant="danger" size="sm" disabled={busy}
+              className="min-h-9 whitespace-nowrap rounded-full"
+              onClick={() => act("trash")}>
               {t("Trash selected")} ({sel.size})
             </Button>
           } />

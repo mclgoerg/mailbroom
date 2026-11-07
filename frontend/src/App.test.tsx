@@ -4,6 +4,7 @@
  * (frontend/src/App.tsx header) - see ai-workspaces/proton-mail-cleaner
  * PLAN.md "header redesign + account switcher". */
 
+import { barAction, barMore, openLimit } from "./barTestUtil";
 import { cleanup, fireEvent, render, screen, waitFor } from
   "@testing-library/react";
 import { afterEach, expect, test, vi } from "vitest";
@@ -526,7 +527,7 @@ test("the Tools menu exposes CSV export without requiring a selection",
 // folder…" was picked there was no way back to Action… short of
 // reloading the whole app (not even deselecting helped, since it
 // reappeared pre-selected on the next selection).
-test("the Move-to-folder picker has an explicit Cancel back to Action…, " +
+test("the Move-to-folder picker has an explicit Cancel back to the actions, " +
   "and clearing the selection also resets it", async () => {
   renderWithOneSenderGroup();
   await waitFor(() => expect(screen.getAllByText("DHL Paket").length)
@@ -534,34 +535,34 @@ test("the Move-to-folder picker has an explicit Cancel back to Action…, " +
   await selectRowCheckbox();
   await waitFor(() => expect(screen.getByText(/^Trash \d+$/)).toBeTruthy());
 
-  fireEvent.change(screen.getByDisplayValue("Action…"),
-    { target: { value: "move" } });
-  await waitFor(() => expect(screen.getAllByText("Move to folder…").length)
-    .toBeGreaterThan(1));   // the Action… option AND the picker's own placeholder
+  barAction("move");
+  await waitFor(() => expect(screen.getByDisplayValue("Move to folder…"))
+    .toBeTruthy());
 
-  // Cancel goes back to a plain Action… select, not stuck mid-move.
+  // Cancel goes back to the plain action buttons, not stuck mid-move.
   fireEvent.click(screen.getByTitle("Cancel"));
-  await waitFor(() => expect(screen.getByDisplayValue("Action…")).toBeTruthy());
+  await waitFor(() => expect(screen.getByRole("button", { name: "Move" }))
+    .toBeTruthy());
 
   // Re-enter the picker, then clear the selection entirely instead of
   // cancelling - the bar disappears, and selecting again must NOT reopen
   // mid-move.
-  fireEvent.change(screen.getByDisplayValue("Action…"),
-    { target: { value: "move" } });
-  await waitFor(() => expect(screen.getAllByText("Move to folder…").length)
-    .toBeGreaterThan(1));
+  barAction("move");
+  await waitFor(() => expect(screen.getByDisplayValue("Move to folder…"))
+    .toBeTruthy());
   fireEvent.click(screen.getByText("Clear selection"));
   await waitFor(() => expect(screen.queryByText(/^Trash \d+$/)).toBeNull());
 
   await selectRowCheckbox();
   await waitFor(() => expect(screen.getByText(/^Trash \d+$/)).toBeTruthy());
-  expect(screen.getByDisplayValue("Action…")).toBeTruthy();
+  expect(screen.getByRole("button", { name: "Move" })).toBeTruthy();
+  expect(screen.queryByDisplayValue("Move to folder…")).toBeNull();
 });
 
 // Selection-scoped AI review + CSV export: the overflow menu's versions
 // (nothing selected) act on everything, like before; the bar's versions
 // (something selected) scope to just the selected groups.
-test("the bar's Action… offers AI review (only when AI is enabled) and " +
+test("the bar's More menu offers AI review (only when AI is enabled) and " +
   "runs it scoped to the current selection", async () => {
   cfg = { ...singleCfg, ai: { ...singleCfg.ai, available: true } };
   localStorage.setItem("pmc_account", "proton");
@@ -575,8 +576,7 @@ test("the bar's Action… offers AI review (only when AI is enabled) and " +
   await selectRowCheckbox();
   await waitFor(() => expect(screen.getByText(/^Trash \d+$/)).toBeTruthy());
 
-  fireEvent.change(screen.getByDisplayValue("Action…"),
-    { target: { value: "ai_review" } });
+  barAction("ai_review");
   await waitFor(() => expect(aiReview).toHaveBeenCalledWith(
     "sender", [groupFixture.key], false));
 });
@@ -621,24 +621,77 @@ test("the trash confirm names the groups and points to Undo", async () => {
 test("mark as read is no move: its confirm has no undo line", async () => {
   await mixed();
   await selectAll();
-  fireEvent.change(screen.getByDisplayValue("Action…"),
-    { target: { value: "mark_read" } });
+  barAction("mark_read");
   const dlg = (await findDialog()).textContent!;
   expect(dlg).toContain("mails from DHL Paket, Shop News");
   expect(dlg).not.toContain("undo");
 });
 
-test("the Action menu has no separate re-rate entry", async () => {
+test("the More menu has no separate re-rate entry", async () => {
   await mixed();
   await selectAll();
-  expect(screen.queryByRole("option", { name: /re-rate/i })).toBeNull();
+  fireEvent.click(screen.getByRole("button", { name: "More" }));
+  const items = screen.getAllByRole("menuitem").map((i) => i.textContent);
+  expect(items.some((x) => /^Mark read/.test(x!))).toBe(true);
+  expect(items.some((x) => /^Export CSV/.test(x!))).toBe(true);
+  expect(items.some((x) => /re-rate/i.test(x!))).toBe(false);
+});
+
+// Focus must not drop to <body> when a control swaps in or out of the bar.
+test("the folder picker takes focus, and Cancel hands it back to Move",
+  async () => {
+  renderWithOneSenderGroup();
+  await waitFor(() => expect(screen.getAllByText("DHL Paket").length)
+    .toBeGreaterThan(0));
+  await selectRowCheckbox();
+  await waitFor(() => expect(screen.getByText(/^Trash \d+$/)).toBeTruthy());
+  barAction("move");
+  await waitFor(() => expect(document.activeElement)
+    .toBe(screen.getByDisplayValue("Move to folder…")));
+  fireEvent.click(screen.getByTitle("Cancel"));
+  await waitFor(() => expect(document.activeElement)
+    .toBe(screen.getByRole("button", { name: "Move" })));
+});
+
+test("on a touch device the picker's Cancel takes focus, not the select " +
+  "(focusing a select opens its picker there)", async () => {
+  const mm = vi.fn().mockReturnValue({ matches: true,
+    addEventListener() {}, removeEventListener() {} });
+  vi.stubGlobal("matchMedia", mm);
+  try {
+    renderWithOneSenderGroup();
+    await waitFor(() => expect(screen.getAllByText("DHL Paket").length)
+      .toBeGreaterThan(0));
+    await selectRowCheckbox();
+    await waitFor(() => expect(screen.getByText(/^Trash \d+$/)).toBeTruthy());
+    barAction("move");
+    await waitFor(() => expect(document.activeElement)
+      .toBe(screen.getByTitle("Cancel")));
+  } finally { vi.unstubAllGlobals(); }
+});
+
+test("Limit to… focuses its select; Done returns to More; a cancelled " +
+  "confirm from a More item returns to More", async () => {
+  await mixed();
+  await selectAll();
+  openLimit();
+  await waitFor(() => expect(document.activeElement)
+    .toBe(screen.getByTitle(/^Restrict this action/)));
+  fireEvent.click(screen.getByRole("button", { name: "Done" }));
+  const more = screen.getByRole("button", { name: "More" });
+  await waitFor(() => expect(document.activeElement).toBe(more));
+
+  barAction("mark_read");
+  await findDialog();
+  await cancelDialog();
+  await expectNoDialog();
+  expect(document.activeElement).toBe(more);
 });
 
 test("AI review of a mixed selection asks: new only, or re-rate all", async () => {
   await mixed();
   await selectAll();
-  fireEvent.change(screen.getByDisplayValue("Action…"),
-    { target: { value: "ai_review" } });
+  barAction("ai_review");
   expect((await findDialog()).textContent).toContain("Already rated: 1 of 2");
   expect(aiReview).not.toHaveBeenCalled();            // nothing before choosing
   await pressDialog("Review new only (1)");
@@ -650,8 +703,7 @@ test("choosing Re-rate all sends every group in scope with rerate=true",
   async () => {
   await mixed();
   await selectAll();
-  fireEvent.change(screen.getByDisplayValue("Action…"),
-    { target: { value: "ai_review" } });
+  barAction("ai_review");
   await findDialog();
   await pressDialog("Re-rate all (2)");
   await waitFor(() => expect(aiReview).toHaveBeenCalledWith(
@@ -661,8 +713,7 @@ test("choosing Re-rate all sends every group in scope with rerate=true",
 test("cancelling the AI review question starts nothing", async () => {
   await mixed();
   await selectAll();
-  fireEvent.change(screen.getByDisplayValue("Action…"),
-    { target: { value: "ai_review" } });
+  barAction("ai_review");
   await findDialog();
   await cancelDialog();
   await expectNoDialog();
@@ -673,8 +724,7 @@ test("when every group is rated only re-rating is offered", async () => {
   await renderAiScope({ [groupFixture.key]: { ...groupFixture, ai: ratedAi } });
   await selectRowCheckbox();
   await waitFor(() => expect(screen.getByText(/^Trash \d+$/)).toBeTruthy());
-  fireEvent.change(screen.getByDisplayValue("Action…"),
-    { target: { value: "ai_review" } });
+  barAction("ai_review");
   await findDialog();
   expect(screen.queryByRole("button", { name: /Review new only/ })).toBeNull();
   await pressDialog("Re-rate all (1)");
@@ -710,7 +760,7 @@ test("the bar's CSV export link is scoped to the current selection", async () =>
   await selectRowCheckbox();
   await waitFor(() => expect(screen.getByText(/^Trash \d+$/)).toBeTruthy());
 
-  fireEvent.click(screen.getByText("Export CSV"));
+  barMore(/^Export CSV/);
   expect(downloadFile).toHaveBeenCalledWith(
     `/api/export?grouping=sender&keys=${groupFixture.key}`);
 });

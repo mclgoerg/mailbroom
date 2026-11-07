@@ -1,5 +1,5 @@
-import { BarChart3, BookmarkPlus, ChevronDown, ChevronsUpDown, ClipboardList,
-  Copy, Download, Eye, Info, Layers, LayoutGrid, Mail, Monitor, Moon, Paperclip, Pencil, Plus,
+import { Archive, BarChart3, BellOff, BookmarkPlus, ChevronDown, ChevronsUpDown, ClipboardList,
+  Copy, Download, Eye, FolderInput, Info, Layers, LayoutGrid, Mail, Monitor, Moon, Paperclip, Pencil, Plus,
   MoreHorizontal, Power,
   ScrollText, Search, Settings as SettingsIcon, ShieldAlert, Sparkles, Star, Sun,
   Trash2, User, Wand2, Wrench, X }
@@ -32,7 +32,7 @@ import { QueryBuilder } from "./components/QueryBuilder";
 import { QuickWins } from "./components/QuickWins";
 import type { QuickWinCard } from "./quickwins";
 import { FoldersPanel } from "./components/FoldersPanel";
-import { AccountAvatar, BAR_ICON_BTN, BulkBar, Button, Chip, ChipGroup, ChipSegment,
+import { AccountAvatar, BarButton, BulkBar, Button, Chip, ChipGroup, ChipSegment,
   choiceDialog, confirmDialog, EmptyState, ensureAiAck, FILTER_ROW, Input, isModalOpen, LINK,
   Menu, MenuDivider, MenuGroup, MenuHeading, MenuItem, Notice, ProgressBar,
   promptDialog, Segmented, Select, Spinner, useAppearance, useToast,
@@ -192,12 +192,14 @@ export default function App() {
   const [foldersOpen, setFoldersOpen] = useState<FolderRole | null>(null);
   const [undoOpen, setUndoOpen] = useState(false);
   const [moveDest, setMoveDest] = useState("");
+  // The "Limit to…" editor swapped into the capsule (Done closes it).
+  const [limitOpen, setLimitOpen] = useState(false);
   // The folder picker must never be a dead end: clearing the selection
   // (the bar disappearing entirely) also resets it, so re-selecting
   // something always starts back at the plain Action… control instead of
   // reopening mid-move with no way back short of reloading.
   useEffect(() => {
-    if (!selected.size) setMoveDest("");
+    if (!selected.size) { setMoveDest(""); setLimitOpen(false); }
   }, [selected.size]);
   // Retention restriction for bulk group actions: act on everything beyond
   // a keep-window instead of the whole group (mutually exclusive variants).
@@ -600,6 +602,18 @@ export default function App() {
   }, [state?.groups_rev, state?.account, mode, selected, retention,
       retentionN]);
 
+  // Total size of the selected groups where every one is known (not under a
+  // limit, which acts on only part of each group).
+  const selSize = useMemo(() => {
+    if (retentionParams().some(Boolean)) return null;
+    let total = 0;
+    for (const k of selected) {
+      const g = allGroups.find((x) => x.key === k);
+      if (!g) return null;
+      total += g.size;
+    }
+    return selected.size ? total : null;
+  }, [selected, allGroups, retention, retentionN]);
   // Everything in the selection is pinned: nothing would move. Shown in
   // the bar itself, right where the user just acted.
   const selAllPinned = !selCountPending && selected.size > 0 && selCount === 0
@@ -2226,10 +2240,10 @@ export default function App() {
 
       {/* Contextual bulk-action bar: the ONLY bulk-action chrome in the
           app - it does not exist at all until something is selected.
-          Slots (see BulkBar): what's selected + Clear + Export, the
-          retention limit - a modifier that applies to WHICHEVER action
-          runs - labelled instead of relying on a hover-only title (useless
-          on touch), then the action select and the Trash button. */}
+          Slots (see BulkBar): what's selected + Clear, the active retention
+          limit as a visible token (a modifier that applies to WHICHEVER
+          action runs), the action buttons (Move and Limit swap in their
+          own picker with Cancel/Done) and the Trash button. */}
       {selected.size > 0 && (
         <BulkBar
           summary={<>
@@ -2238,87 +2252,129 @@ export default function App() {
               : selected.size === 1 && selCount === 1
                 ? t("bar.selected_one_mail")
                 : t("bar.selected", { n: selected.size, mails: selCount })}
+            {selSize != null && ` · ${fmtSize(selSize)}`}
             {selAllPinned && (
               <span className="text-accent"> · {t("bar.all_pinned")}</span>
             )}
           </>}
           onClear={() => setSelected(new Set())}
-          secondary={
-            <Button variant="quiet" size="sm"
-              className={BAR_ICON_BTN}
-              title={t("export.csv_tip")}
-              onClick={() => downloadFile(api.exportUrl(mode, [...selected]))}>
-              <Download size={16} aria-hidden />
-              <span className="sr-only md:not-sr-only md:ml-1.5">
-                {t("bar.export")}
-              </span>
-            </Button>
-          }
-          modifiers={<>
-            <span className="shrink-0">{t("bar.limit_to")}</span>
-            <Select value={retention} title={t("retention.help")}
-              className="min-w-0 flex-1 md:w-44 xl:w-56 md:flex-none"
-              onChange={(e) =>
-                setRetention(e.target.value as typeof retention)}>
-              <option value="none">{t("retention.none")}</option>
-              <option value="keep_latest">{t("retention.keep_latest")}</option>
-              <option value="older_than_days">
-                {t("retention.older_than_days")}
-              </option>
-            </Select>
-            {retention !== "none" && (
-              <Input type="number" min={1} className="w-16 shrink-0"
-                placeholder={t("retention.n_placeholder")}
-                value={retentionN}
-                onChange={(e) => setRetentionN(e.target.value)} />
-            )}
-          </>}
-          action={<>
-            <Select value=""
-              className="min-w-36 flex-1 md:w-44 xl:w-56 md:min-w-0 md:flex-none"
-              onChange={(e) => onAction(e.target.value)}>
-              <option value="" disabled>{t("Action…")}</option>
-              <option value="archive">{t("Archive")}</option>
-              <option value="move">{t("Move to folder…")}</option>
-              <option value="mark_read">{t("Mark read")}</option>
-              <option value="unsubscribe"
-                disabled={!unsubKeys([...selected]).length}>
-                {t("Unsubscribe")}
-              </option>
-              {(aiEnabled || demo) && (
-                <option value="ai_review" disabled={demo}>
-                  {t("AI review")}{demo ? ` - ${demoHint()}` : ""}
-                </option>
-              )}
-            </Select>
-            {moveDest === "?" && (
-              <>
-                <Select value=""
-                  className="min-w-36 flex-1 md:w-44 xl:w-56 md:min-w-0 md:flex-none"
-                  onChange={(e) => {
-                    if (e.target.value) act([...selected], "move",
-                      e.target.value, ...retentionParams());
-                    setMoveDest("");
-                  }}>
-                  <option value="" disabled>{t("Move to folder…")}</option>
-                  {(state?.folders_raw ?? []).map((f, i) => (
-                    <option key={f} value={f}>
-                      {state?.folders[i] ?? f}
-                    </option>
-                  ))}
+          swap={moveDest === "?" ? "move" : limitOpen ? "limit" : null}
+          token={retention !== "none" && retentionParams().some(Boolean) && (
+            <span className="inline-flex shrink-0 items-center gap-0.5
+              rounded-full bg-accent-tint py-0.5 pl-2.5 pr-0.5 type-meta
+              font-medium text-accent">
+              {retention === "keep_latest"
+                ? t("bar.token_keep_latest", { n: Number(retentionN) })
+                : t("bar.token_older", { n: Number(retentionN) })}
+              {/* 24 px visual, the ::after extends the hit area */}
+              <button type="button" aria-label={t("bar.limit_remove")}
+                title={t("bar.limit_remove")}
+                className="relative inline-flex size-6 items-center
+                  justify-center rounded-full hover:bg-accent-tint
+                  after:absolute after:-inset-2.5 after:content-['']"
+                onClick={() => { setRetention("none"); setRetentionN(""); }}>
+                <X size={14} aria-hidden />
+              </button>
+            </span>
+          )}
+          actions={moveDest === "?" ? (
+            <>
+              <Select value="" data-bar-field=""
+                className="min-w-0 flex-1 md:w-44 md:flex-none xl:w-56"
+                onChange={(e) => {
+                  if (e.target.value) act([...selected], "move",
+                    e.target.value, ...retentionParams());
+                  setMoveDest("");
+                }}>
+                <option value="" disabled>{t("Move to folder…")}</option>
+                {(state?.folders_raw ?? []).map((f, i) => (
+                  <option key={f} value={f}>
+                    {state?.folders[i] ?? f}
+                  </option>
+                ))}
+              </Select>
+              <Button variant="secondary" size="icon" label={t("Cancel")}
+                data-bar-cancel="" className="shrink-0 rounded-full"
+                onClick={() => setMoveDest("")}>
+                <X size={18} />
+              </Button>
+            </>
+          ) : limitOpen ? (
+            <div className="flex w-full flex-wrap items-center gap-1.5
+              md:w-auto md:flex-nowrap md:gap-2">
+              <div className="flex w-full min-w-0 items-center gap-1.5
+                md:w-auto md:gap-2">
+                <span className="shrink-0 type-meta text-muted">
+                  {t("bar.limit_to")}</span>
+                <Select value={retention} title={t("retention.help")}
+                  data-bar-field=""
+                  className="min-w-0 flex-1 md:w-44 md:flex-none xl:w-56"
+                  onChange={(e) =>
+                    setRetention(e.target.value as typeof retention)}>
+                  <option value="none">{t("retention.none")}</option>
+                  <option value="keep_latest">
+                    {t("retention.keep_latest")}</option>
+                  <option value="older_than_days">
+                    {t("retention.older_than_days")}
+                  </option>
                 </Select>
-                <Button variant="secondary" size="icon" label={t("Cancel")}
-                  className="shrink-0" onClick={() => setMoveDest("")}>
-                  <X size={18} />
-                </Button>
-              </>
-            )}
-          </>}
+              </div>
+              {retention !== "none" && (
+                <Input type="number" min={1} className="w-16 shrink-0"
+                  placeholder={t("retention.n_placeholder")}
+                  value={retentionN}
+                  onChange={(e) => setRetentionN(e.target.value)} />
+              )}
+              <Button variant="tinted" data-bar-cancel=""
+                className="shrink-0 rounded-full"
+                onClick={() => setLimitOpen(false)}>
+                {t("bar.limit_done")}
+              </Button>
+            </div>
+          ) : (
+            <>
+              <BarButton icon={<BellOff size={16} aria-hidden />}
+                disabled={!unsubKeys([...selected]).length}
+                onClick={() => onAction("unsubscribe")}>
+                {t("Unsubscribe")}
+              </BarButton>
+              <BarButton icon={<Archive size={16} aria-hidden />}
+                onClick={() => onAction("archive")}>
+                {t("Archive")}
+              </BarButton>
+              <BarButton icon={<FolderInput size={16} aria-hidden />}
+                data-bar-move="" onClick={() => onAction("move")}>
+                {t("bar.move")}
+              </BarButton>
+              <Menu variant="secondary" up triggerSize="sm"
+                triggerClass="rounded-full"
+                trigger={<>{t("menu.more")}
+                  <ChevronDown size={14} aria-hidden /></>}>
+                <MenuItem onClick={() => onAction("mark_read")}>
+                  {t("Mark read")}
+                </MenuItem>
+                {(aiEnabled || demo) && (
+                  <MenuItem disabled={demo}
+                    onClick={() => onAction("ai_review")}>
+                    {t("AI review")}{demo ? ` - ${demoHint()}` : ""}
+                  </MenuItem>
+                )}
+                <MenuItem onClick={() =>
+                    downloadFile(api.exportUrl(mode, [...selected]))}>
+                  {t("bar.export")}
+                </MenuItem>
+                <MenuItem sub={t("bar.limit_hint")}
+                  onClick={() => setLimitOpen(true)}>
+                  {t("bar.limit_open")}
+                </MenuItem>
+              </Menu>
+            </>
+          )}
           primary={
-            <Button variant="danger"
+            <Button variant="danger" size="sm"
               disabled={selCountPending || selAllPinned}
               title={selAllPinned ? t("bar.all_pinned") : undefined}
-              className="whitespace-nowrap"
+              className="min-h-9 whitespace-nowrap rounded-full"
               onClick={() =>
                 act([...selected], "trash", "", ...retentionParams())}>
               {selCountPending

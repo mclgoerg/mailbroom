@@ -2,6 +2,7 @@
 /* Destructive flows that confirm through in-app dialogs: Empty Trash from
  * both entry points (profile menu + Trash panel), AI consent, restore. */
 
+import { barAction } from "./barTestUtil";
 import { cleanup, fireEvent, render, screen, waitFor } from
   "@testing-library/react";
 import { afterEach, expect, test, vi } from "vitest";
@@ -259,8 +260,7 @@ const selectAndRateWithAi = async () => {
   await waitFor(() => expect(screen.getAllByRole("checkbox").length)
     .toBeGreaterThan(1));
   fireEvent.click(screen.getAllByRole("checkbox")[1]);
-  fireEvent.change(await screen.findByDisplayValue("Action…"),
-    { target: { value: "ai_review" } });
+  barAction("ai_review");
 };
 
 test("AI consent: declining sends nothing and is asked again next time",

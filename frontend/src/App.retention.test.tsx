@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 /* Bulk-action retention selector (keep-latest-N / older-than-N-days). */
 
+import { openLimit } from "./barTestUtil";
 import { act, cleanup, fireEvent, render, screen, waitFor } from
   "@testing-library/react";
 import { afterEach, expect, test, vi } from "vitest";
@@ -141,6 +142,7 @@ test("keep-latest-N is sent through to the delete call", async () => {
   render(<ToastProvider><DialogProvider><App /></DialogProvider></ToastProvider>);
   await selectFirstGroup();
 
+  openLimit();
   fireEvent.change(screen.getByTitle("Restrict this action to mails " +
     "beyond a keep-window instead of every mail in the selected groups."),
     { target: { value: "keep_latest" } });
@@ -173,6 +175,7 @@ test("the Trash button shows the retention-adjusted number, not the " +
   expect(bulkTrashButton().textContent).toBe("Trash 12");
   expect(bulkTrashButton().disabled).toBe(false);
 
+  openLimit();
   fireEvent.change(screen.getByTitle("Restrict this action to mails " +
     "beyond a keep-window instead of every mail in the selected groups."),
     { target: { value: "keep_latest" } });
@@ -201,6 +204,7 @@ test("an unrelated SSE status tick does not flap the settled count back " +
   render(<ToastProvider><DialogProvider><App /></DialogProvider></ToastProvider>);
   await selectFirstGroup();
 
+  openLimit();
   fireEvent.change(screen.getByTitle("Restrict this action to mails " +
     "beyond a keep-window instead of every mail in the selected groups."),
     { target: { value: "keep_latest" } });
@@ -230,6 +234,7 @@ test("older-than-days is sent through to the delete call", async () => {
   render(<ToastProvider><DialogProvider><App /></DialogProvider></ToastProvider>);
   await selectFirstGroup();
 
+  openLimit();
   fireEvent.change(screen.getByTitle("Restrict this action to mails " +
     "beyond a keep-window instead of every mail in the selected groups."),
     { target: { value: "older_than_days" } });
@@ -263,4 +268,40 @@ test("pinned mails are left out of the Trash count; a fully pinned " +
   await waitFor(() => expect(bulkTrashButton().textContent).toBe("Trash 0"));
   expect(bulkTrashButton().disabled).toBe(true);
   expect(screen.getByText(/all protected - nothing to move/)).toBeTruthy();
+});
+
+test("an active limit shows as a labelled token in the capsule and can be " +
+  "removed from it", async () => {
+  state = { ...baseState };
+  mountReady();
+  render(<ToastProvider><DialogProvider><App /></DialogProvider></ToastProvider>);
+  await selectFirstGroup();
+  expect(screen.queryByText("Keep newest 3")).toBeNull();
+
+  openLimit();
+  fireEvent.change(screen.getByTitle(/^Restrict this action/),
+    { target: { value: "keep_latest" } });
+  fireEvent.change(await screen.findByPlaceholderText("N"),
+    { target: { value: "3" } });
+  fireEvent.click(screen.getByRole("button", { name: "Done" }));
+  expect(screen.getByText("Keep newest 3")).toBeTruthy();
+  expect(screen.queryByPlaceholderText("N")).toBeNull();   // editor closed
+
+  fireEvent.click(screen.getByRole("button", { name: "Remove limit" }));
+  expect(screen.queryByText("Keep newest 3")).toBeNull();
+});
+
+test("the limit editor is closed again after the selection was cleared",
+  async () => {
+  state = { ...baseState };
+  mountReady();
+  render(<ToastProvider><DialogProvider><App /></DialogProvider></ToastProvider>);
+  await selectFirstGroup();
+  openLimit();
+  expect(screen.getByRole("button", { name: "Done" })).toBeTruthy();
+  fireEvent.click(screen.getByRole("button", { name: "Clear selection" }));
+  expect(screen.queryByRole("button", { name: "Done" })).toBeNull();
+  await selectFirstGroup();
+  expect(screen.queryByRole("button", { name: "Done" })).toBeNull();
+  expect(screen.getByRole("button", { name: "Move" })).toBeTruthy();
 });

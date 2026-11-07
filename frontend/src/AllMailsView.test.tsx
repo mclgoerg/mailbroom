@@ -2,6 +2,7 @@
 /* Flat "All mails" list: paging, sort/filter requests, folder per row,
  * selection + action bar, and the pinned-mail confirm/force flow. */
 
+import { barAction } from "./barTestUtil";
 import { cleanup, fireEvent, render, screen, waitFor }
   from "@testing-library/react";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
@@ -155,8 +156,7 @@ test("Move to folder asks for a folder and sends it", async () => {
   renderView();
   await screen.findByText("Subject 1");
   fireEvent.click(tick(1));
-  fireEvent.change(screen.getByDisplayValue("Action…"),
-    { target: { value: "move" } });
+  barAction("move");
   fireEvent.change(screen.getAllByDisplayValue("Move to folder…")[0],
     { target: { value: "Archive" } });
   await pressDialog(/^Move → Archive \(1\)$/);
@@ -169,8 +169,7 @@ test("mark read keeps the row and marks it read", async () => {
   renderView();
   await screen.findByText("Subject 1");
   fireEvent.click(tick(1));
-  fireEvent.change(screen.getByDisplayValue("Action…"),
-    { target: { value: "mark_read" } });
+  fireEvent.click(screen.getByRole("button", { name: "Mark read" }));
   await pressDialog("Mark as read (1)");
   await waitFor(() => expect(deleteMessages)
     .toHaveBeenCalledWith([["INBOX", 1]], "mark_read", "", false));

@@ -140,11 +140,13 @@ test("demo: the bulk bar's AI review option is disabled with the hint",
   probeDemo = true;
   await mount();
   fireEvent.click(document.querySelectorAll('input[type="checkbox"]')[1]);
-  await screen.findByDisplayValue("Action…");
-  const opt = screen.getByRole("option", { name: /AI review/ }) as
-    HTMLOptionElement;
-  expect(opt.disabled).toBe(true);
-  expect(opt.textContent).toContain(HINT);
+  const bar = await screen.findByRole("region",
+    { name: "Selection actions" });
+  fireEvent.click(within(bar).getByRole("button", { name: "More" }));
+  const item = screen.getByRole("menuitem", { name: /AI review/ }) as
+    HTMLButtonElement;
+  expect(item.disabled).toBe(true);
+  expect(item.textContent).toContain(HINT);
 });
 
 test("no demo flag: AI entry points stay hidden without a key, Add account " +
