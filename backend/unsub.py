@@ -2,7 +2,7 @@
 
 Three cases:
 - https URI + List-Unsubscribe-Post: One-Click  -> automated HTTPS POST
-- mailto: URI                                   -> automated mail via Bridge SMTP
+- mailto: URI                                   -> automated mail via the account's SMTP
 - plain https URI                               -> hand the link to the UI
 
 The HTTPS POST is guarded against SSRF: mails could carry URLs pointing at

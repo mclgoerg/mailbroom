@@ -2802,7 +2802,7 @@ def _apply_seen(folder: str, uids: list[int], acc) -> None:
 # Deletions are queued and processed by one worker at a time: jobs snapshot
 # UID sets up front, so running them concurrently could double-move the same
 # UIDs and interleave progress reporting. Sequential is just as fast in
-# practice (one Bridge connection) and keeps the bookkeeping exact.
+# practice (one IMAP connection) and keeps the bookkeeping exact.
 
 
 def _from_role_label(n: int, role: str) -> tuple[str, dict]:
