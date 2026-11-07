@@ -19,6 +19,7 @@ import { RulesModal } from "./components/RulesModal";
 import { AllMailsView } from "./components/AllMailsView";
 import { SearchPanel } from "./components/SearchPanel";
 import { SettingsModal } from "./components/SettingsModal";
+import { Welcome } from "./components/Welcome";
 import { Wizard, WIZARD_RESUME_KEY, type WizardStep } from "./components/Wizard";
 import { SpaceMapPanel } from "./components/SpaceMapPanel";
 import { StatsPanel } from "./components/StatsPanel";
@@ -150,8 +151,16 @@ export default function App() {
   const [editQuery, setEditQuery] = useState("");
   const [settingsOpen, setSettingsOpen] = useState(false);
   // First-run / "Add account" wizard (components/Wizard.tsx).
+  // Coming back from the OAuth consent redirect it starts out resumed (the
+  // marker is validated against the config once that has loaded).
   const [wizard, setWizard] = useState<{ mode: "first" | "add";
-    step?: WizardStep; account?: string; previous?: string } | null>(null);
+    step?: WizardStep; account?: string; previous?: string } | null>(() => {
+    try {
+      const r = JSON.parse(sessionStorage.getItem(WIZARD_RESUME_KEY) ?? "");
+      return r?.account ? { mode: r.mode === "add" ? "add" : "first",
+        step: "signin", account: r.account } : null;
+    } catch { return null; }
+  });
   const [searchOpen, setSearchOpen] = useState(false);
   const [rulesOpen, setRulesOpen] = useState(false);
   // A filter handed to the rules form ("Save as rule" of the AI filter panel).
@@ -601,9 +610,12 @@ export default function App() {
       api.getConfig().then(setCfg).catch(() => {});
   }, [unverified, state?.status]);
   const multiAccount = !!cfg && Object.keys(cfg.accounts).length > 1;
-  // The wizard opens by itself while no account is set up (until the user
-  // sets it up later this session) and again after the OAuth consent
-  // redirect that it started.
+  // While no account is set up, the full-screen Welcome shows (until the
+  // user sets up later this session); the wizard opens from it, and again
+  // after the OAuth consent redirect that it started.
+  const firstRunWizard = useRef(false);
+  const [setupLater, setSetupLater] = useState(
+    () => !!sessionStorage.getItem("pmc_wizard_later"));
   useEffect(() => {
     if (!cfg) return;
     const resume = sessionStorage.getItem(WIZARD_RESUME_KEY);
@@ -616,10 +628,9 @@ export default function App() {
             step: "signin", account: r.account });
           return;
         }
+        setWizard(null);
       } catch { /* ignore a broken marker */ }
     }
-    if (cfg.setup_needed && !sessionStorage.getItem("pmc_wizard_later"))
-      setWizard((w) => w ?? { mode: "first" });
   }, [cfg?.setup_needed, !!cfg]);
   // >= 1280 px: the group detail is a pane beside the list. It is not a
   // modal - the list stays keyboard-navigable and nothing traps focus.
@@ -1639,6 +1650,45 @@ export default function App() {
     />
   );
 
+  const wizardEl = wizard && cfg && (
+    <Wizard cfg={cfg} mode={wizard.mode} initialStep={wizard.step}
+      initialAccount={wizard.account} previousAccount={wizard.previous}
+      scan={{ account: state?.account ?? "", status: state?.status ?? "",
+        progress: state?.progress ?? "", error: state?.error ?? "",
+        scannedTs: state?.scanned_ts ?? null }}
+      onConfig={(next, name) => {
+        setCfg(next);
+        if (name && next.accounts[name]) switchAccount(name);
+        else if (!next.accounts[account])
+          switchAccount(next.default_account);
+      }}
+      onClose={() => {
+        if (wizard.mode === "first") {
+          sessionStorage.setItem("pmc_wizard_later", "1");
+          setSetupLater(true);
+        }
+        setWizard(null);
+        refresh();
+      }} />
+  
+  );
+  // First run: the wizard sits on a plain background, not on the empty app
+  // (latched, so finishing the sign-in test does not reveal the app mid-way).
+  if (!wizard) firstRunWizard.current = false;
+  else if (wizard.mode === "first" && cfg?.setup_needed)
+    firstRunWizard.current = true;
+
+  if (firstRunWizard.current) {
+    return <div className="min-h-dvh bg-surface">{wizardEl}</div>;
+  }
+  if (cfg?.setup_needed && !setupLater && !wizard) {
+    return <Welcome onStart={() => setWizard({ mode: "first" })}
+      onLater={() => {
+        sessionStorage.setItem("pmc_wizard_later", "1");
+        setSetupLater(true);
+      }} />;
+  }
+
   return (
     <div className="mx-auto max-w-6xl p-3 xl:max-w-360 pb-[calc(var(--bulkbar-h,0px)+0.75rem)]
       sm:p-5 sm:pb-[calc(var(--bulkbar-h,0px)+1.25rem)]">
@@ -2442,25 +2492,7 @@ export default function App() {
           onChanged={refresh}
         />
       )}
-      {wizard && cfg && (
-        <Wizard cfg={cfg} mode={wizard.mode} initialStep={wizard.step}
-          initialAccount={wizard.account} previousAccount={wizard.previous}
-          scan={{ account: state?.account ?? "", status: state?.status ?? "",
-            progress: state?.progress ?? "", error: state?.error ?? "",
-            scannedTs: state?.scanned_ts ?? null }}
-          onConfig={(next, name) => {
-            setCfg(next);
-            if (name && next.accounts[name]) switchAccount(name);
-            else if (!next.accounts[account])
-              switchAccount(next.default_account);
-          }}
-          onClose={() => {
-            if (wizard.mode === "first")
-              sessionStorage.setItem("pmc_wizard_later", "1");
-            setWizard(null);
-            refresh();
-          }} />
-      )}
+      {wizardEl}
       {settingsOpen && cfg && (
         <SettingsModal
           cfg={cfg}

@@ -99,6 +99,9 @@ const pick = (name: string | RegExp) =>
   fireEvent.click(screen.getByRole("button", { name }));
 const type = (label: RegExp, value: string) =>
   fireEvent.change(screen.getByLabelText(label), { target: { value } });
+/** The step the stepper marks as current. */
+const current = () => document.querySelector("[aria-current=step]")!
+  .textContent;
 const signIn = async (user = "me@mail.example", pw = "secret") => {
   type(/Email address/, user);
   fireEvent.change(document.querySelector("input[type=password]")!,
@@ -128,7 +131,7 @@ test("each provider shows only its own sign-in fields", () => {
   expect(screen.getByText("Connect account")).toBeTruthy();
   cleanup();
   open();
-  pick(/Custom/);
+  pick(/Another IMAP/);
   expect(screen.getByLabelText("Host")).toBeTruthy();
   expect((screen.getByLabelText("Host") as HTMLInputElement).value).toBe("");
 });
@@ -147,7 +150,7 @@ test("a failed test stays on the sign-in step with the translated error",
     await signIn();
     expect(await screen.findByText(/refused the sign-in/)).toBeTruthy();
     expect(screen.queryByText(/The ticked folders/)).toBeNull();
-    expect(screen.getByText(/Step 2 of 5/)).toBeTruthy();
+    expect(current()).toContain("Sign in");
   });
 
 test("the error reads German in German", async () => {
@@ -168,9 +171,8 @@ test("first run edits the default account in place and pins the test to it",
     open();
     pick("iCloud Mail");
     await signIn();
-    expect(await screen.findByText(/The ticked folders are scanned/))
+    expect(await screen.findByText("Connected - 7 folders found."))
       .toBeTruthy();
-    expect(screen.getByText("Connected - 7 folders found.")).toBeTruthy();
     const body = saves()[0].body;
     expect(body.add_account).toBeUndefined();
     expect(body.account).toBe("default");
@@ -185,32 +187,83 @@ test("Gmail app passwords lose their spaces", async () => {
   open();
   pick("Gmail");
   await signIn("me@gmail.example", "abcd efgh ijkl mnop");
-  await screen.findByText(/The ticked folders/);
+  await screen.findByText(/Connected - 7/);
   expect(saves()[0].body.imap.password).toBe("abcdefghijklmnop");
 });
 
-const toFolders = async () => {
+const toConnected = async () => {
   open();
   pick("iCloud Mail");
   await signIn();
+  await screen.findByText("Connected - 7 folders found.");
+};
+const toFolders = async () => {
+  await toConnected();
+  pick(/Choose folders/);
   await screen.findByText(/The ticked folders/);
   await screen.findByText("INBOX");
 };
+const toProtect = async () => {
+  await toConnected();
+  pick("Continue");
+  await screen.findByText(/Protect this page/);
+};
+const folderCalls = () => calls.filter((c) => c.url.includes("/api/folders"));
 
-test("Skip on folders keeps the defaults: nothing is saved", async () => {
-  await toFolders();
+test("folders are off the main path: Continue skips them, saves nothing " +
+  "and never lists them", async () => {
+  await toConnected();
+  expect(screen.queryByText(/The ticked folders/)).toBeNull();
   const before = saves().length;
-  pick("Skip");
+  pick("Continue");
   expect(saves().length).toBe(before);
   expect(await screen.findByText(/Protect this page/)).toBeTruthy();
+  expect(folderCalls()).toEqual([]);
 });
 
-test("Next on folders saves the exclusions", async () => {
+test("skipping the folders leaves the same exclusions that accepting the " +
+  "listed defaults saves", async () => {
   await toFolders();
-  pick("Next");
+  pick("Continue");
   await screen.findByText(/Protect this page/);
+  // accepting saves the wildcard rules plus every folder listed as excluded.
+  // Skipping saves nothing and keeps the backend's DEFAULT_EXCLUDED; that it
+  // scans the same folders is proven in tests/test_folder_skip_equivalence.py
+  const listed = await (await fetch("/api/folders")).json();
+  const defaults = [...listed.wildcards, ...listed.folders
+    .filter((x: any) => x.excluded).map((x: any) => x.raw)];
   expect(saves().pop()!.body).toEqual({ account: "default",
-    excluded_folders: ["Labels/*", "Trash"] });
+    excluded_folders: defaults });
+});
+
+test("Choose folders opens the list inline on the sign-in step; Continue " +
+  "saves the ticks", async () => {
+  await toFolders();
+  expect(current()).toContain("Sign in");
+  fireEvent.click(screen.getByLabelText("INBOX"));          // untick INBOX
+  pick("Continue");
+  await screen.findByText(/Protect this page/);
+  expect(saves().pop()!.body.excluded_folders).toEqual(
+    ["Labels/*", "INBOX", "Trash"]);
+});
+
+test("folder ticks survive collapsing the block: Continue still saves them",
+  async () => {
+    await toFolders();
+    fireEvent.click(screen.getByLabelText("INBOX"));
+    pick(/Choose folders/);                       // collapse again
+    expect(screen.queryByText("INBOX")).toBeNull();
+    pick("Continue");
+    await screen.findByText(/Protect this page/);
+    expect(saves().pop()!.body.excluded_folders).toEqual(
+      ["Labels/*", "INBOX", "Trash"]);
+  });
+
+test("editing the sign-in after a passed test asks for a new test", async () => {
+  await toConnected();
+  type(/Email address/, "other@mail.example");
+  expect(screen.queryByRole("button", { name: "Continue" })).toBeNull();
+  expect(screen.queryByText("Connected - 7 folders found.")).toBeNull();
 });
 
 test("the password step only shows with no login set, for the admin",
@@ -221,17 +274,15 @@ test("the password step only shows with no login set, for the admin",
       open(mkCfg({}, auth));
       pick("iCloud Mail");
       await signIn();
-      await screen.findByText(/The ticked folders/);
-      pick("Skip");
+      await screen.findByText("Connected - 7 folders found.");
+      pick("Continue");
       if (shown) await screen.findByText(/Protect this page/);
       else await screen.findByText(/Reading your mailbox/);
     }
   });
 
 test("setting the password saves it, signs in, then scans", async () => {
-  await toFolders();
-  pick("Skip");
-  await screen.findByText(/Protect this page/);
+  await toProtect();
   type(/New password/, "short");
   expect(screen.getByText(/at least 8/)).toBeTruthy();
   type(/New password/, "long enough pw");
@@ -253,9 +304,7 @@ test("setting the password saves it, signs in, then scans", async () => {
 });
 
 test("Skip on the password step sets nothing and starts the scan", async () => {
-  await toFolders();
-  pick("Skip");
-  await screen.findByText(/Protect this page/);
+  await toProtect();
   pick("Skip");
   await screen.findByText(/Reading your mailbox/);
   expect(saves().some((c) => c.body.auth)).toBe(false);
@@ -271,8 +320,17 @@ test("the scan step shows the progress, the result and a failure", async () => {
     <DialogProvider><Wizard cfg={cfg} mode="first" scan={scan}
       initialStep="scan" initialAccount="default" onConfig={onConfig}
       onClose={onClose} /></DialogProvider></ToastProvider>);
+  again({ ...idle, status: "scanning", progress: "connecting…" });
+  expect(await screen.findByRole("progressbar")).toBeTruthy();
+  expect(screen.getByRole("progressbar").getAttribute("aria-valuenow"))
+    .toBeNull();                                  // indeterminate
+  expect(screen.getByText("Grouping senders…")).toBeTruthy();
+  expect(screen.getByText(/the scan keeps running/)).toBeTruthy();
   again({ ...idle, status: "scanning", progress: "INBOX: 5/20" });
-  expect(await screen.findByText(/INBOX: 5\/20/)).toBeTruthy();
+  expect(screen.getByRole("progressbar").getAttribute("aria-valuenow"))
+    .toBe("25");
+  expect(screen.getByText("25%")).toBeTruthy();
+  expect(screen.getByText("5 of 20")).toBeTruthy();
   again({ ...idle, status: "error", error: "no_account" });
   expect(await screen.findByText(/No mail account is set up yet/))
     .toBeTruthy();
@@ -296,13 +354,14 @@ test("add mode creates the account only when the sign-in is tested",
     pick("Fastmail");
     expect(saves()).toEqual([]);
     await signIn("b@mail.example");
-    await screen.findByText(/The ticked folders/);
+    await screen.findByText(/Connected - 7/);
     const body = saves()[0].body;
     expect(body.add_account).toBe("b@mail.example");
     expect(body.account).toBe("b@mail.example");
     expect(onConfig.mock.calls[0][1]).toBe("b@mail.example");
-    // no protect step in add mode: Step n of 4
-    expect(screen.getByText(/Step 3 of 4/)).toBeTruthy();
+    // no protect step in add mode: three steps
+    expect(screen.getAllByRole("listitem").map((l) => l.textContent!.replace(/^\d/, "")))
+      .toEqual(["Choose provider", "Sign in", "First scan"]);
   });
 
 test("closing before the account exists changes nothing", () => {
@@ -332,7 +391,7 @@ test("closing after a good test keeps the account", async () => {
   open(mkCfg({ setup_needed: false }), "add");
   pick("Fastmail");
   await signIn("b@mail.example");
-  await screen.findByText(/The ticked folders/);
+  await screen.findByText(/Connected - 7/);
   fireEvent.click(screen.getAllByRole("button", { name: "Cancel" })[0]);
   await waitFor(() => expect(onClose).toHaveBeenCalled());
   expect(saves().some((c) => c.body.delete_account)).toBe(false);
@@ -346,7 +405,7 @@ test("an email that already names an account gets a number", async () => {
   open(cfg, "add");
   pick("Fastmail");
   await signIn("b@mail.example");
-  await screen.findByText(/The ticked folders/);
+  await screen.findByText(/Connected - 7/);
   expect(saves()[0].body.add_account).toBe("b@mail.example 2");
 });
 
@@ -364,9 +423,11 @@ test("the step count does not change when the password gets set mid-way",
         initialAccount="default" onConfig={onConfig} onClose={onClose} />
     </DialogProvider></ToastProvider>;
     const { rerender } = render(el(mkCfg()));
-    expect(screen.getByText(/Step 4 of 5/)).toBeTruthy();
+    expect(screen.getAllByRole("listitem")).toHaveLength(4);
+    expect(current()).toContain("Password");
     rerender(el(mkCfg({}, { mode: "password" })));
-    expect(screen.getByText(/Step 4 of 5/)).toBeTruthy();
+    expect(screen.getAllByRole("listitem")).toHaveLength(4);
+    expect(current()).toContain("Password");
   });
 
 const startSlowTest = async () => {
@@ -387,7 +448,7 @@ test("Cancel test ends a running test and stays on the sign-in step",
     await waitFor(() => expect(screen.queryByText("Testing the connection…"))
       .toBeNull());
     expect(onClose).not.toHaveBeenCalled();
-    expect(screen.getByText(/Step 2 of 4/)).toBeTruthy();
+    expect(current()).toContain("Sign in");
     expect(screen.queryByText(/Could not|refused/)).toBeNull();
     expect(screen.getByRole("button", { name: "Test connection" })
       .hasAttribute("disabled")).toBe(false);
@@ -410,7 +471,7 @@ test("a test that finishes after Cancel test changes nothing", async () => {
     .toBeNull());
   release();
   await sleepMs(50);
-  expect(screen.getByText(/Step 2 of 4/)).toBeTruthy();
+  expect(current()).toContain("Sign in");
   expect(screen.queryByText(/The ticked folders/)).toBeNull();
 });
 
@@ -489,7 +550,7 @@ test("the folders step is the simple view: no rule chips, no special " +
   await toFolders();
   expect(screen.queryByText(/Excluded by rule/)).toBeNull();
   expect(screen.queryByText(/Special folders/i)).toBeNull();
-  pick("Next");
+  pick("Continue");
   await screen.findByText(/Protect this page/);
   expect(saves().pop()!.body.excluded_folders).toContain("Labels/*");
 });
@@ -500,6 +561,8 @@ test("network failures in the folders and scan steps read as words, with " +
   open();
   pick("iCloud Mail");
   await signIn();
+  await screen.findByText(/Connected - /);
+  pick(/Choose folders/);
   expect(await screen.findByText(/Could not reach mail\.example/))
     .toBeTruthy();
   expect(screen.queryByText(/OSError/)).toBeNull();
@@ -518,10 +581,23 @@ test("the CA placeholder is Proton's path only on Proton", () => {
     .getAttribute("placeholder")).toBe("/certs/bridge-cert.pem");
   cleanup();
   open();
-  pick(/Custom/);
+  pick(/Another IMAP/);
   expect(screen.getByLabelText(/Custom CA file/)
     .getAttribute("placeholder")).toBe("");
   expect(screen.queryByText(/advanced settings below/)).toBeNull();
+});
+
+test("provider tiles: app-password hint where we know it, a monogram, and " +
+  "the other-server row", () => {
+  open();
+  expect(screen.getByRole("button", { name: "Gmail" })
+    .getAttribute("aria-describedby")).toBeTruthy();
+  expect(screen.getByRole("button", { name: "Proton Mail Bridge" })
+    .getAttribute("aria-describedby")).toBeNull();
+  expect(screen.getAllByText("App password")).toHaveLength(4);
+  expect(screen.getByRole("button", { name: "Another IMAP server" })
+    .getAttribute("aria-describedby")).toBeTruthy();
+  expect(current()).toContain("Choose provider");
 });
 
 test("German: the Custom tile is translated, 'Postfach' throughout, and the " +
@@ -529,7 +605,7 @@ test("German: the Custom tile is translated, 'Postfach' throughout, and the " +
   setLang("de");
   const cfg = mkCfg({}, { mode: "password" });
   open();
-  expect(screen.getByRole("button", { name: "Eigener Server (beliebiges IMAP)" }))
+  expect(screen.getByRole("button", { name: "Anderer IMAP-Server" }))
     .toBeTruthy();
   expect(screen.getByText("Postfach einrichten")).toBeTruthy();
   cleanup();
