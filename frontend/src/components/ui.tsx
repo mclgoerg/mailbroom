@@ -468,7 +468,7 @@ const BUTTON_VARIANT: Record<ButtonVariant, string> = {
     "bg-transparent enabled:hover:bg-keep-bg text-danger-fg",
   // A destructive action that is the panel's one big button, without the
   // alarm of a solid red fill (the sender detail's "Move N mails to Trash").
-  "danger-tint": "bg-keep-bg text-danger-fg",
+  "danger-tint": "bg-keep-bg enabled:hover:bg-keep-fg/16 text-danger-fg",
 };
 
 // sm: 32 / 36 px visual on touch, the ::after extends the hit area to 44.
@@ -838,7 +838,7 @@ export function StatTile({ label, value }: { label: string; value: ReactNode }) 
   return (
     <div className="min-w-0 rounded-card bg-panel2 px-3 py-2">
       <div className="truncate type-meta text-muted">{label}</div>
-      <div className="truncate type-title2">{value}</div>
+      <div className="truncate type-heading">{value}</div>
     </div>
   );
 }

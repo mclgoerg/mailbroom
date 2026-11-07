@@ -712,15 +712,15 @@ export function DetailPanel({ grouping, group, aiEnabled, protectedNow,
   const head = (
     <>
       {header}
-      <div className="grid grid-cols-3 gap-2 px-4 pt-3">
+      {actionRow}
+      {movePicker}
+      {note && <div className="px-4 pt-2 type-meta text-muted">{note}</div>}
+      <div className="grid grid-cols-3 gap-2 px-4 pt-4">
         <StatTile label={t("detail.mails")} value={group.count} />
         <StatTile label={t("detail.size")} value={fmtSize(group.size)} />
         <StatTile label={t("detail.opened")} value={`${opened}%`} />
       </div>
       {stillCallout}
-      {actionRow}
-      {movePicker}
-      {note && <div className="px-4 pt-2 type-meta text-muted">{note}</div>}
       {sievePanel}
       {poolBox}
     </>
@@ -759,7 +759,7 @@ export function DetailPanel({ grouping, group, aiEnabled, protectedNow,
               <option value="size">{t("Sort: size")}</option>
             </Select>
           )}
-          <Select value="" className="w-auto min-w-0 shrink"
+          <Select value="" className="w-28 min-w-0 shrink"
             onChange={(e) => selectPreset(e.target.value)}>
             <option value="" disabled>{t("Select…")}</option>
             <option value="all">{t("All / none")}</option>
@@ -843,7 +843,9 @@ export function DetailPanel({ grouping, group, aiEnabled, protectedNow,
         <>
           {tab === "senders" && hasSenders ? (
             <>
-              <div className="shrink-0 pb-3">
+              {/* (55%: the header may take at most that much of the pane, the
+                  sender list below keeps the rest) */}
+              <div className="max-h-[55%] shrink-0 overflow-y-auto pb-3">
                 {filingBox}
                 {head}
               </div>
