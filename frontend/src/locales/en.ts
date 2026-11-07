@@ -930,6 +930,7 @@ export const EN: Record<string, string> = {
     "Only headers are read: who sent what, when and how big. Nothing is "
     + "changed.",
   "wizard.scan_of": "{done} of {total}",
+  "wizard.ai_note": "AI helpers are optional - you can set them up in Settings.",
   "wizard.scan_close": "You can close this; the scan keeps running.",
   "wizard.ck_connected": "Connected to {name}",
   "wizard.ck_folders": "{n} folders found",

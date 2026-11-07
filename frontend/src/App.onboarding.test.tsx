@@ -189,6 +189,25 @@ test("Set up later on the Welcome shows the app; the Welcome states its " +
   sessionStorage.clear();
 });
 
+test("first run: the wizard sits on a plain background - no toolbar, Scan " +
+  "or setup cards behind it, also after the sign-in passes", async () => {
+  sessionStorage.clear();
+  await openRaw({ ...mkCfg({ user: "", password_set: false }),
+    setup_needed: true });
+  fireEvent.click(await screen.findByRole("button", { name: "Get started" }));
+  await screen.findByText("Where is your mail?");
+  expect(screen.queryByRole("button", { name: "Set up your mailbox" }))
+    .toBeNull();
+  expect(screen.queryByRole("button", { name: "Profile & settings" }))
+    .toBeNull();
+  expect(screen.queryByText("Inboxrake")).toBeNull();
+  // closing shows the app as before
+  fireEvent.click(screen.getAllByRole("button", { name: "Set up later" })[0]);
+  expect((await screen.findAllByRole("button",
+    { name: "Set up your mailbox" })).length).toBeGreaterThan(0);
+  sessionStorage.clear();
+});
+
 test("a configured install never shows the Welcome", async () => {
   sessionStorage.clear();
   await open({ password_set: true });

@@ -790,6 +790,9 @@ export const DE: Record<string, string> = {
     "Gelesen werden nur die Kopfzeilen: wer was wann geschickt hat und wie "
     + "groß es ist. Es wird nichts verändert.",
   "wizard.scan_of": "{done} von {total}",
+  "wizard.ai_note":
+    "KI-Helfer sind optional – du kannst sie in den Einstellungen "
+    + "einrichten.",
   "wizard.scan_close":
     "Du kannst das schließen; der Scan läuft weiter.",
   "wizard.ck_connected": "Mit {name} verbunden",

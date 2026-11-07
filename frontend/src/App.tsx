@@ -605,6 +605,7 @@ export default function App() {
   // While no account is set up, the full-screen Welcome shows (until the
   // user sets up later this session); the wizard opens from it, and again
   // after the OAuth consent redirect that it started.
+  const firstRunWizard = useRef(false);
   const [setupLater, setSetupLater] = useState(
     () => !!sessionStorage.getItem("pmc_wizard_later"));
   useEffect(() => {
@@ -1640,6 +1641,37 @@ export default function App() {
     />
   );
 
+  const wizardEl = wizard && cfg && (
+    <Wizard cfg={cfg} mode={wizard.mode} initialStep={wizard.step}
+      initialAccount={wizard.account} previousAccount={wizard.previous}
+      scan={{ account: state?.account ?? "", status: state?.status ?? "",
+        progress: state?.progress ?? "", error: state?.error ?? "",
+        scannedTs: state?.scanned_ts ?? null }}
+      onConfig={(next, name) => {
+        setCfg(next);
+        if (name && next.accounts[name]) switchAccount(name);
+        else if (!next.accounts[account])
+          switchAccount(next.default_account);
+      }}
+      onClose={() => {
+        if (wizard.mode === "first") {
+          sessionStorage.setItem("pmc_wizard_later", "1");
+          setSetupLater(true);
+        }
+        setWizard(null);
+        refresh();
+      }} />
+  
+  );
+  // First run: the wizard sits on a plain background, not on the empty app
+  // (latched, so finishing the sign-in test does not reveal the app mid-way).
+  if (!wizard) firstRunWizard.current = false;
+  else if (wizard.mode === "first" && cfg?.setup_needed)
+    firstRunWizard.current = true;
+
+  if (firstRunWizard.current) {
+    return <div className="min-h-dvh bg-surface">{wizardEl}</div>;
+  }
   if (cfg?.setup_needed && !setupLater && !wizard) {
     return <Welcome onStart={() => setWizard({ mode: "first" })}
       onLater={() => {
@@ -2451,27 +2483,7 @@ export default function App() {
           onChanged={refresh}
         />
       )}
-      {wizard && cfg && (
-        <Wizard cfg={cfg} mode={wizard.mode} initialStep={wizard.step}
-          initialAccount={wizard.account} previousAccount={wizard.previous}
-          scan={{ account: state?.account ?? "", status: state?.status ?? "",
-            progress: state?.progress ?? "", error: state?.error ?? "",
-            scannedTs: state?.scanned_ts ?? null }}
-          onConfig={(next, name) => {
-            setCfg(next);
-            if (name && next.accounts[name]) switchAccount(name);
-            else if (!next.accounts[account])
-              switchAccount(next.default_account);
-          }}
-          onClose={() => {
-            if (wizard.mode === "first") {
-              sessionStorage.setItem("pmc_wizard_later", "1");
-              setSetupLater(true);
-            }
-            setWizard(null);
-            refresh();
-          }} />
-      )}
+      {wizardEl}
       {settingsOpen && cfg && (
         <SettingsModal
           cfg={cfg}

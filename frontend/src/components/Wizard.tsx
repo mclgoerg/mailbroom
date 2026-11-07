@@ -587,6 +587,7 @@ export function Wizard({ cfg, mode, initialStep, initialAccount, scan,
               </ul>
               {!scanDone && <p className="type-meta text-muted">
                 {t("wizard.scan_close")}</p>}
+              <p className="type-meta text-muted">{t("wizard.ai_note")}</p>
             </>)}
           </div>
         )}
