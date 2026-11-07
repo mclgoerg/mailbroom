@@ -85,11 +85,13 @@ export function DuplicatesPanel({ onClose, onDeleted }: {
     setSel(next);
   };
 
-  // Mails inside a set arrive newest-first: select everything but [0].
+  // Mails inside a set arrive newest-first: in every identical set select
+  // everything but [0] (and untick [0], so one copy always stays). Rows the
+  // user ticked in the other two sections keep their state.
   const selectAllButNewest = () => {
-    const next = new Set<string>();
-    (sets ?? []).forEach((s) =>
-      s.mails.slice(1).forEach((m) => next.add(mailKey(m))));
+    const next = new Set(sel);
+    (sets ?? []).forEach((s) => s.mails.forEach((m, i) =>
+      i === 0 ? next.delete(mailKey(m)) : next.add(mailKey(m))));
     setSel(next);
   };
 

@@ -70,6 +70,7 @@ test("no duplicates: empty state and no selection actions", async () => {
   duplicates.mockResolvedValue([]);
   show();
   await screen.findByText("No duplicates found");
+  expect(screen.getByText(/no possible double-sends/)).toBeTruthy();
   expect(screen.queryByRole("button", { name: /Select all but newest/ }))
     .toBeNull();
   expect(screen.queryByRole("button", { name: /Trash selected/ })).toBeNull();
@@ -121,6 +122,27 @@ test("possible duplicates: own section, never selected by select-all-but-newest,
   await pressDialog(/Move to Trash \(2\)/);
   await waitFor(() => expect(deleteMessages).toHaveBeenCalledWith(
     [["INBOX", 1], ["INBOX", 8]], "trash"));
+});
+
+test("select-all-but-newest keeps manual picks in the other sections and "
+  + "unticks a ticked newest copy", async () => {
+  const ver = (uid: number, size: number) =>
+    ({ ...mk(uid), subject: "Report", addr: "c@z.example", size });
+  duplicates.mockResolvedValue([{ wasted: 10, mails: [mk(3), mk(1)] }]);
+  duplicateVersions.mockResolvedValue([{ wasted: 0,
+    mails: [ver(5, 10), ver(4, 20)] }]);
+  possibleDuplicates.mockResolvedValue([{ wasted: 10,
+    mails: [poss(8), poss(7)] }]);
+  show();
+  await screen.findByText(/Possible duplicates/);
+  fireEvent.click(screen.getAllByRole("checkbox", { name: /Invoice/ })[0]);
+  fireEvent.click(screen.getAllByRole("checkbox", { name: /Report/ })[0]);
+  fireEvent.click(screen.getAllByRole("checkbox", { name: /Offer/ })[0]);
+  fireEvent.click(screen.getByRole("button", { name: "Select all but newest" }));
+  fireEvent.click(screen.getByRole("button", { name: "Trash selected (3)" }));
+  await pressDialog(/Move to Trash \(3\)/);
+  await waitFor(() => expect(deleteMessages).toHaveBeenCalledWith(
+    [["INBOX", 1], ["INBOX", 5], ["INBOX", 8]], "trash"));
 });
 
 test("only possible duplicates: no empty state, no select-all button",
