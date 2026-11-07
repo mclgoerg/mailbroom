@@ -26,6 +26,19 @@ export function DuplicatesPanel({ onClose, onDeleted }: {
   const [note, setNote] = useState("");
   const [working, setWorking] = useState(false);
 
+  // The versions and possible lists are a bonus: their failure must not
+  // hide the identical list (or keep a stale selection alive).
+  const loadAll = async () => {
+    const s = await api.duplicates();
+    const [v, p] = await Promise.all([
+      api.duplicateVersions().catch(() => []),
+      api.possibleDuplicates().catch(() => [])]);
+    return { s, v, p };
+  };
+  const setLists = (l: { s: DupSet[]; v: DupSet[]; p: DupSet[] }) => {
+    setSets(l.s); setVersions(l.v); setPossible(l.p);
+  };
+
   useEffect(() => {
     if (!working) return;
     let alive = true;
@@ -38,12 +51,9 @@ export function DuplicatesPanel({ onClose, onDeleted }: {
           timer = setTimeout(poll, 800);
           return;
         }
-        const [exact, vers, likely] = await Promise.all([
-          api.duplicates(), api.duplicateVersions(), api.possibleDuplicates()]);
+        const lists = await loadAll();
         if (!alive) return;
-        setSets(exact);
-        setVersions(vers);
-        setPossible(likely);
+        setLists(lists);
         setSel(new Set());
         setNote(state.delete.error ? t("err.generic", { msg: state.delete.error }) : "");
         setWorking(false);
@@ -60,14 +70,8 @@ export function DuplicatesPanel({ onClose, onDeleted }: {
 
   useEffect(() => {
     let alive = true;
-    api.duplicates()
-      .then(async (s) => {
-        // the other lists are a bonus: their failure must not hide the first
-        const [v, p] = await Promise.all([
-          api.duplicateVersions().catch(() => []),
-          api.possibleDuplicates().catch(() => [])]);
-        if (alive) { setVersions(v); setPossible(p); setSets(s); }
-      })
+    loadAll()
+      .then((l) => alive && setLists(l))
       .catch((e) => alive && setError(String(e.message ?? e)));
     return () => { alive = false; };
   }, []);
@@ -109,33 +113,35 @@ export function DuplicatesPanel({ onClose, onDeleted }: {
   const setBlock = (s: DupSet, key: string,
     kind: "identical" | "versions" | "possible") => {
     const exact = kind === "identical";
-    let largest = 0;
-    s.mails.forEach((m, i) => { if (m.size > s.mails[largest].size) largest = i; });
+    // tag a copy only when it is strictly larger than every other one
+    const top = Math.max(...s.mails.map((m) => m.size));
+    const largest = s.mails.filter((m) => m.size === top).length === 1
+      ? s.mails.findIndex((m) => m.size === top) : -1;
     return (
-    <div key={key} className="my-2 border-y border-line bg-panel2">
-      <div className="flex items-baseline gap-2 px-3 pt-2 type-meta
-        text-muted md:px-2">
-        <span className="min-w-0 flex-1 truncate">{s.mails[0].addr}</span>
-        <span className="whitespace-nowrap">
-          ×{s.mails.length}{exact && <> · {t("dups.wasted",
-            { size: fmtSize(s.wasted) })}</>}
-        </span>
+      <div key={key} className="my-2 border-y border-line bg-panel2">
+        <div className="flex items-baseline gap-2 px-3 pt-2 type-meta
+          text-muted md:px-2">
+          <span className="min-w-0 flex-1 truncate">{s.mails[0].addr}</span>
+          <span className="whitespace-nowrap">
+            ×{s.mails.length}{exact && <> · {t("dups.wasted",
+              { size: fmtSize(s.wasted) })}</>}
+          </span>
+        </div>
+        {s.mails.map((m, mi) => (
+          <MailRow key={mailKey(m)} checked={sel.has(mailKey(m))}
+            onToggle={() => toggle(mailKey(m))}
+            onOpen={() => setView(m)}
+            subject={m.subject || t("(no subject)")}
+            unread={!m.seen} dateIso={m.date || ""} dateTime
+            selectLabel={t("select.named",
+              { subject: m.subject || t("(no subject)") })}
+            meta={[fmtSize(m.size), m.folder].join(" · ")}
+            trailing={exact && mi === 0
+              ? <Tag tone="safe">{t("dups.newest")}</Tag>
+              : kind === "versions" && mi === largest
+                ? <Tag>{t("dups.largest")}</Tag> : undefined} />
+        ))}
       </div>
-      {s.mails.map((m, mi) => (
-        <MailRow key={mailKey(m)} checked={sel.has(mailKey(m))}
-          onToggle={() => toggle(mailKey(m))}
-          onOpen={() => setView(m)}
-          subject={m.subject || t("(no subject)")}
-          unread={!m.seen} dateIso={m.date || ""} dateTime
-          selectLabel={t("select.named",
-            { subject: m.subject || t("(no subject)") })}
-          meta={[fmtSize(m.size), m.folder].join(" · ")}
-          trailing={exact && mi === 0
-            ? <Tag tone="safe">{t("dups.newest")}</Tag>
-            : kind === "versions" && mi === largest
-              ? <Tag>{t("dups.largest")}</Tag> : undefined} />
-      ))}
-    </div>
     );
   };
 

@@ -3598,16 +3598,15 @@ def possible_duplicates_list(limit: int = 200, acc=None) -> list[dict]:
     (whitespace collapsed, case-insensitive, non-empty), each mail within 10
     minutes of another in its group (chained by time). Mails already in an
     identical or versions set are left out. Same shape as duplicates_list;
-    the UI never
-    auto-selects these - the user compares and decides."""
+    the UI never auto-selects these - the user compares and decides."""
     acc = acc or accounts.get()
     with acc.lock:
         mails = list(acc.index.values())
-    exact = {id(m) for g in _dup_groups(mails) for s in g for m in s}
+    listed = {id(m) for g in _dup_groups(mails) for s in g for m in s}
     by_key: dict[tuple, list] = {}
     for m in mails:
         subject = " ".join((m["subject"] or "").split()).casefold()
-        if id(m) in exact or not subject or not m["ts"] or not m["addr"]:
+        if id(m) in listed or not subject or not m["ts"] or not m["addr"]:
             continue
         by_key.setdefault((m["addr"], subject), []).append(m)
     sets: list[list[dict]] = []

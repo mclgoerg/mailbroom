@@ -317,16 +317,21 @@ def test_mixed_group_goes_to_versions_whole(monkeypatch):
 
 
 def test_versions_account_param(monkeypatch):
-    _scan(monkeypatch, {
-        "INBOX": [make_msg(1, subject="S", msgid="<a@x.example>", size=700),
-                  make_msg(2, subject="S", msgid="<a@x.example>", size=800)],
-        "Trash": [], "Spam": []})
     from backend import accounts
-    name = accounts.names()[0]
-    r = client.get("/api/duplicates/versions", params={"account": name})
-    assert r.status_code == 200 and _ids(r.json()) == [[1, 2]]
-    r = client.get("/api/duplicates/versions",
-                   params={"account": "nobody-here"})
+    from test_multiaccount import _two_accounts
+    fakes = _two_accounts(monkeypatch)
+    for host, mid, uids in (("host-one", "<one@x.example>", (101, 102)),
+                            ("host-two", "<two@x.example>", (201, 202))):
+        for uid, size in zip(uids, (700, 900)):
+            fakes[host].mailbox["INBOX"].append(
+                make_msg(uid, subject="S", msgid=mid, size=size))
+    mailops.run_scan(accounts.get("one"))
+    mailops.run_scan(accounts.get("two"))
+    r1 = client.get("/api/duplicates/versions", params={"account": "one"})
+    r2 = client.get("/api/duplicates/versions", params={"account": "two"})
+    assert _ids(r1.json()) == [[101, 102]]
+    assert _ids(r2.json()) == [[201, 202]]
+    r = client.get("/api/duplicates/versions", params={"account": "nope"})
     assert r.status_code == 400
 
 

@@ -260,7 +260,7 @@ export const EN: Record<string, string> = {
   "atts.none_hint":
     "Use “Re-analyze” after new mail has been scanned.",
   "dups.none_hint":
-    "No mail shares a Message-ID with another, and none has the same sender, subject and size as another without one.",
+    "No two mails share a Message-ID, and no two mails without one share sender, subject and size.",
   "audit.empty_hint":
     "Actions such as moving mails to Trash, rule runs and undo will be listed here.",
   "search.body_hint":
@@ -647,10 +647,10 @@ export const EN: Record<string, string> = {
     "Same Message-ID and the same size - true copies. Safe to keep just the newest.",
   "dups.versions_title": "Same mail, different versions",
   "dups.versions_hint":
-    "Same Message-ID but different sizes (say, a copy with its attachments removed), or no usable Message-ID and identical sender, subject and size. Open them to compare; nothing here is selected for you.",
+    "Same mail, but the copies differ in size (say, one lost its attachments) - or mails without a Message-ID that match in sender, subject and size. Compare them; nothing is preselected.",
   "dups.summary": "{n} duplicate sets · {size} reclaimable",
   "dups.summary_one": "1 duplicate set · {size} reclaimable",
-  "dups.possible_title": "Possible duplicates - same sender and subject, sent within minutes",
+  "dups.possible_title": "Possible duplicates",
   "dups.possible_hint":
     "These have different Message-IDs and may differ in content. Open them to compare; nothing here is selected for you.",
   "dups.keep_newest": "Select all but newest",

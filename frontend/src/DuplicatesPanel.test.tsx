@@ -112,7 +112,7 @@ test("possible duplicates: own section, never selected by select-all-but-newest,
   possibleDuplicates.mockResolvedValue([{ wasted: 10,
     mails: [poss(8), poss(7)] }]);
   show();
-  await screen.findByText(/Possible duplicates - same sender and subject/);
+  await screen.findByText(/Possible duplicates/);
   expect(screen.getByText(/different Message-IDs and may differ/)).toBeTruthy();
   fireEvent.click(screen.getByRole("button", { name: "Select all but newest" }));
   expect(screen.getByRole("button", { name: "Trash selected (1)" })).toBeTruthy();
@@ -145,7 +145,7 @@ test("the possible section is hidden when empty and worded in German", async () 
   possibleDuplicates.mockResolvedValue([{ wasted: 10,
     mails: [poss(8), poss(7)] }]);
   show();
-  await screen.findByText(/Mögliche Duplikate - gleicher Absender und Betreff/);
+  await screen.findByText(/Mögliche Duplikate/);
 });
 
 
@@ -162,8 +162,8 @@ test("three headed sections, each with an explanation", async () => {
   await screen.findByText("Identical copies");
   expect(screen.getByText(/Same Message-ID and the same size/)).toBeTruthy();
   expect(screen.getByText("Same mail, different versions")).toBeTruthy();
-  expect(screen.getByText(/Same Message-ID but different sizes/)).toBeTruthy();
-  expect(screen.getByText(/Possible duplicates - same sender/)).toBeTruthy();
+  expect(screen.getByText(/the copies differ in size/)).toBeTruthy();
+  expect(screen.getByText("Possible duplicates")).toBeTruthy();
   // only the identical section is "reclaimable"; versions tag the largest
   expect(screen.getAllByText(/reclaimable/)).toHaveLength(2);   // header + set
   expect(screen.getByText("largest")).toBeTruthy();
@@ -210,4 +210,42 @@ test("the version sections are worded in German", async () => {
   show();
   await screen.findByText("Dieselbe Mail, verschiedene Versionen");
   expect(screen.getByText("größte")).toBeTruthy();
+});
+
+test("a tie for the largest copy tags none", async () => {
+  duplicateVersions.mockResolvedValue([{ wasted: 0,
+    mails: [ver(6, 500), ver(5, 500, "Archive")] }]);
+  show();
+  await screen.findByText("Same mail, different versions");
+  expect(screen.queryByText("largest")).toBeNull();
+});
+
+test("after a trash run all lists refresh, even if versions fails", async () => {
+  duplicates.mockResolvedValueOnce([{ wasted: 10, mails: [mk(3), mk(1)] }])
+    .mockResolvedValue([]);
+  duplicateVersions.mockResolvedValueOnce([verSet()])
+    .mockRejectedValue(new Error("boom"));
+  deleteMessages.mockResolvedValue({ ok: true, queued: 1 });
+  jobState.mockResolvedValue({ delete: { status: "done", error: "" } });
+  show();
+  fireEvent.click(await screen.findByRole("button", { name: "Select all but newest" }));
+  fireEvent.click(screen.getByRole("button", { name: "Trash selected (1)" }));
+  await pressDialog(/Move to Trash \(1\)/);
+  await screen.findByText("No duplicates found", {}, { timeout: 2500 });
+  expect(screen.queryByRole("button", { name: /Trash selected/ })).toBeNull();
+});
+
+test("after a trash run the versions list shows the new data", async () => {
+  duplicates.mockResolvedValue([{ wasted: 10, mails: [mk(3), mk(1)] }]);
+  duplicateVersions.mockResolvedValueOnce([verSet()]).mockResolvedValue([
+    { wasted: 0, mails: [{ ...ver(8, 100), subject: "Fresh" },
+      { ...ver(7, 300), subject: "Fresh" }] }]);
+  deleteMessages.mockResolvedValue({ ok: true, queued: 1 });
+  jobState.mockResolvedValue({ delete: { status: "done", error: "" } });
+  show();
+  fireEvent.click(await screen.findByRole("button", { name: "Select all but newest" }));
+  fireEvent.click(screen.getByRole("button", { name: "Trash selected (1)" }));
+  await pressDialog(/Move to Trash \(1\)/);
+  await screen.findAllByText("Fresh", {}, { timeout: 2500 });
+  expect(screen.queryByText("Report")).toBeNull();
 });
