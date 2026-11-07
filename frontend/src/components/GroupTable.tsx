@@ -231,7 +231,7 @@ function DesktopTable({ slice, baseIdx, selected, focusedKey, openKey, compact, 
             {sortBtn("label", groupLabel)}
           </th>
           {!compact && (
-            <th className={`${th} hidden w-40 lg:table-cell`}>{t("col.status_tags")}</th>
+            <th className={`${th} hidden w-40 xl:table-cell`}>{t("col.status_tags")}</th>
           )}
           <th className={`${th} w-24`}>{t("AI")}</th>
           <th className={`${sortableTh} w-18`} aria-sort={ariaSort("engagement")}>
@@ -246,7 +246,7 @@ function DesktopTable({ slice, baseIdx, selected, focusedKey, openKey, compact, 
             {sortBtn("size", t("Size"), undefined, true)}
           </th>
           {!compact && (
-            <th className={`${sortableTh} hidden w-30 text-right md:table-cell`}
+            <th className={`${sortableTh} hidden w-30 text-right md:table-cell lg:hidden xl:table-cell`}
               aria-sort={ariaSort("last")}>
               {sortBtn("last", t("Last"), undefined, true)}
             </th>
@@ -293,7 +293,7 @@ function DesktopTable({ slice, baseIdx, selected, focusedKey, openKey, compact, 
                 {unreadPct(g)}% {t("unread")}
               </div>
             </td>
-            {!compact && <td className="hidden px-2 py-2 align-top lg:table-cell">
+            {!compact && <td className="hidden px-2 py-2 align-top xl:table-cell">
               <div className="flex flex-wrap gap-1 overflow-hidden">
                 {g.new && (
                   <Tag tone="new">
@@ -343,7 +343,7 @@ function DesktopTable({ slice, baseIdx, selected, focusedKey, openKey, compact, 
               {fmtSize(g.size)}
             </td>
             {!compact && <td className="hidden whitespace-nowrap px-2 py-2 text-right
-              align-top tabular-nums text-muted md:table-cell">
+              align-top tabular-nums text-muted md:table-cell lg:hidden xl:table-cell">
               <ShortDate iso={g.last} />
             </td>}
             <td className="px-1 py-2 text-right align-top">

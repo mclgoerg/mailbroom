@@ -1,0 +1,43 @@
+import { useCallback, useEffect, useState } from "react";
+import { useMediaQuery } from "./components/ui";
+
+/** Pages of the app shell. Later tasks add more (overview, tool pages). */
+export type Page = "senders" | "all";
+
+export const PAGES: readonly Page[] = ["senders", "all"];
+export const DEFAULT_PAGE: Page = "senders";
+
+/** `#/senders` -> "senders"; anything else (empty, unknown) -> null. */
+export function parseHash(hash: string): Page | null {
+  const name = hash.replace(/^#\/?/, "").split(/[/?]/)[0];
+  return PAGES.find((p) => p === name) ?? null;
+}
+
+export const hashOf = (page: Page): string => `#/${page}`;
+
+/** The current page and a setter. The URL hash is the source of truth, so
+ *  back/forward and reloads keep the page; no router dependency. An empty or
+ *  unknown hash shows `fallback` without rewriting the URL. */
+export function useNav(fallback: Page = DEFAULT_PAGE): [Page, (p: Page) => void] {
+  const read = () => parseHash(window.location.hash) ?? fallback;
+  const [page, setPageState] = useState<Page>(read);
+  useEffect(() => {
+    const on = () => setPageState(read());
+    window.addEventListener("hashchange", on);
+    return () => window.removeEventListener("hashchange", on);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fallback]);
+  const setPage = useCallback((p: Page) => {
+    setPageState(p);
+    if (parseHash(window.location.hash) !== p)
+      window.location.hash = hashOf(p);
+  }, []);
+  return [page, setPage];
+}
+
+/** From here the sidebar replaces the header, Tools menu and Junk / Trash
+ *  links (Tailwind `lg`). Below it the old header stays. */
+export const SIDEBAR_QUERY = "(min-width: 1024px)";
+export const SIDEBAR_W = 244;
+
+export const useSidebar = () => useMediaQuery(SIDEBAR_QUERY);

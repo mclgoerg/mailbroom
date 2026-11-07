@@ -58,6 +58,7 @@ export default defineConfig(({ mode }) => ({
     __APP_VERSION__: JSON.stringify(pkg.version),
     ...(mode === "demo" ? { "import.meta.env.VITE_DEMO": '"1"' } : {}),
   },
+  test: { setupFiles: ["./src/testSetup.ts"] },
   // the demo's Pyodide worker is a module worker (it import()s pyodide.mjs)
   worker: { format: "es" },
   server: {

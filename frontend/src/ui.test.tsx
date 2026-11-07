@@ -30,6 +30,16 @@ const renderMenu = (onPick: () => void) =>
     </Menu>,
   );
 
+test("align=left pins the popover to the trigger's left edge", () => {
+  render(<Menu label="Profile" align="left" className="w-full"
+    triggerClassName="w-full" trigger={<>👤</>}>
+    <MenuItem>Do it</MenuItem>
+  </Menu>);
+  fireEvent.click(screen.getByLabelText("Profile"));
+  expect(screen.getByRole("menu").className).toContain("left-0");
+  expect(screen.getByLabelText("Profile").className).toContain("w-full");
+});
+
 test("menu opens, runs the action and closes again", () => {
   const onPick = vi.fn();
   renderMenu(onPick);
