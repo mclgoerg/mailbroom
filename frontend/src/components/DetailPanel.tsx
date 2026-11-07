@@ -428,6 +428,8 @@ export function DetailPanel({ grouping, group, aiEnabled, protectedNow,
   // One scope at a time: group Move steps aside like the footer button does.
   const canMove = !!onMove && tab === "mails" && group.count > 0
     && sel.size === 0 && !hideGroupActions;
+  // A swapped-in control resets when it disappears: no picker popping back.
+  useEffect(() => { if (!canMove) setMoveOpen(false); }, [canMove]);
   const aiRate = (aiEnabled || demo) && !busy && sel.size === 0
     && tab === "mails";
   const canRead = grouping === "thread" && !!mails && mails.length > 0;

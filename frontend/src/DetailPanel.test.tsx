@@ -908,6 +908,17 @@ describe("DetailPanel header and action row", () => {
       expect(screen.queryByRole("button", { name: "Move" })).toBeNull();
     });
 
+    it("an open picker resets when a mail gets ticked (no pop-back after "
+      + "clearing)", async () => {
+      await pick(vi.fn().mockResolvedValue(false));
+      expect(screen.getByDisplayValue("Move to folder…")).toBeTruthy();
+      fireEvent.click(document.querySelectorAll('input[type="checkbox"]')[0]);
+      await screen.findByText("1 selected");
+      fireEvent.click(screen.getByRole("button", { name: "Clear selection" }));
+      await screen.findByRole("button", { name: "Move" });
+      expect(screen.queryByDisplayValue("Move to folder…")).toBeNull();
+    });
+
     it("is not offered on a pooled row's Senders view, and neither is an "
       + "empty More menu", async () => {
       renderPanel([mkMail(1)], { grouping: "smart", onMove: noopAsync as never,
