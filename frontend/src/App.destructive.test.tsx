@@ -2,6 +2,7 @@
 /* Destructive flows that confirm through in-app dialogs: Empty Trash from
  * both entry points (profile menu + Trash panel), AI consent, restore. */
 
+import { openTool } from "./toolTestUtils";
 import { barAction } from "./barTestUtil";
 import { cleanup, fireEvent, render, screen, waitFor } from
   "@testing-library/react";
@@ -221,7 +222,7 @@ test("cancelling Empty Trash from the profile menu deletes nothing",
 });
 
 const openTrashPanel = async () => {
-  fireEvent.click(screen.getByTitle("Browse Trash"));
+  openTool("Clean up", /^Trash/);
   return screen.findByRole("button", { name: /Empty Trash \(5\)/ });
 };
 

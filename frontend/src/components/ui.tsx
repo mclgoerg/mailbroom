@@ -881,10 +881,10 @@ export function StatTile({ label, value }: { label: string; value: ReactNode }) 
 }
 
 /** Account-switcher-sized avatar - thin wrapper around `Avatar`. */
-export function AccountAvatar({ name, className = "" }: {
-  name: string; className?: string;
+export function AccountAvatar({ name, size, className = "" }: {
+  name: string; size?: "sm" | "md" | "lg"; className?: string;
 }) {
-  return <Avatar name={name} className={className} />;
+  return <Avatar name={name} size={size} className={className} />;
 }
 
 /** Non-interactive heading line inside a Menu (e.g. the identity). */
@@ -1389,21 +1389,29 @@ function ToastView({ toast, dismiss }: {
   );
 }
 
-/** Publishes the height of a fixed bottom bar as `--bulkbar-h` while
- *  `active`, so the toast stack (`.pmc-toasts`) sits above it. */
+/** Publishes the height of a fixed bottom bar as a CSS variable while
+ *  `active` (`--bulkbar-h` for the selection bar, `--tabbar-h` for the phone
+ *  tab bar), so the toast stack (`.pmc-toasts`) and the page padding clear
+ *  it. */
 export function useBulkBarHeight(ref: RefObject<HTMLElement | null>,
-    active: boolean) {
+    active: boolean, prop: "--bulkbar-h" | "--tabbar-h" = "--bulkbar-h") {
   useEffect(() => {
     const root = document.documentElement.style;
     const el = ref.current;
     if (!active || !el) return;
-    const sync = () => root.setProperty("--bulkbar-h", `${el.offsetHeight}px`);
+    const sync = () => root.setProperty(prop, `${el.offsetHeight}px`);
     sync();
+    // The phone tab bar steps aside (CSS) while a selection bar is up.
+    if (prop === "--bulkbar-h") document.documentElement.dataset.bulkbar = "";
     const ro = typeof ResizeObserver === "undefined"
       ? null : new ResizeObserver(sync);
     ro?.observe(el);
-    return () => { ro?.disconnect(); root.removeProperty("--bulkbar-h"); };
-  }, [ref, active]);
+    return () => {
+      ro?.disconnect();
+      root.removeProperty(prop);
+      if (prop === "--bulkbar-h") delete document.documentElement.dataset.bulkbar;
+    };
+  }, [ref, active, prop]);
 }
 
 /** One button of the selection capsule: icon-only below md (>= 44 px wide on

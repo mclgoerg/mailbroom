@@ -35,6 +35,7 @@ vi.mock("./api", () => ({
 import App from "./App";
 import { DialogProvider, ToastProvider } from "./components/ui";
 import { cancelDialog, expectNoDialog, findDialog, pressDialog } from "./dialogTestUtils";
+import { openTab, openTool } from "./toolTestUtils";
 import { setLang } from "./i18n";
 import type { AppState, Config, Group } from "./types";
 
@@ -114,8 +115,7 @@ const open = async (groups = FIXTURE) => {
   state = baseState(groups);
   render(<ToastProvider><DialogProvider><App /></DialogProvider></ToastProvider>);
   await waitFor(() => expect(screen.getAllByText(groups[0].label).length).toBeGreaterThan(0));
-  fireEvent.click(screen.getByRole("button", { name: "Tools" }));
-  fireEvent.click(await screen.findByRole("menuitem", { name: /Triage/ }));
+  openTool("Clean up", /^Triage/);
   return await screen.findByRole("dialog", { name: "Triage" });
 };
 const card = () => screen.getByTestId("triage-card");
@@ -139,8 +139,7 @@ test("the filter narrows the deck (current list, current filter)", async () => {
   render(<ToastProvider><DialogProvider><App /></DialogProvider></ToastProvider>);
   await waitFor(() => expect(screen.getAllByText("News A").length).toBeGreaterThan(0));
   fireEvent.change(screen.getByPlaceholderText(/Filter/i), { target: { value: "shop" } });
-  fireEvent.click(screen.getByRole("button", { name: "Tools" }));
-  fireEvent.click(await screen.findByRole("menuitem", { name: /Triage/ }));
+  openTool("Clean up", /^Triage/);
   const dlg = await screen.findByRole("dialog", { name: "Triage" });
   expect(within(dlg).getByText("Card 1 of 1")).toBeTruthy();
   expect(within(card()).getByText("Shop B")).toBeTruthy();
@@ -344,7 +343,10 @@ test("a group protected since the deck was dealt is skipped and said so", async 
   await within(dlg).findByRole("button", { name: "Apply" });
   state = baseState(FIXTURE.map((x) => x.key === "b@shop.example"
     ? { ...x, protected: true } : x));
-  fireEvent.click(screen.getAllByRole("button", { name: "Scan" })[0]);
+  // the Scan icon lives on the Senders page, behind the Clean up one
+  window.location.hash = "#/senders";
+  window.dispatchEvent(new HashChangeEvent("hashchange"));
+  fireEvent.click(await screen.findByRole("button", { name: "Scan" }));
   await new Promise((r) => setTimeout(r, 100));
   fireEvent.click(btn(dlg, "Apply"));
   const c = await findDialog();
@@ -415,7 +417,7 @@ test("closing without decisions needs no prompt", async () => {
   await waitFor(() => expect(screen.queryByRole("dialog", { name: "Triage" })).toBeNull());
 });
 
-test("Triage lives in the Tools menu only - no loose toolbar button " +
+test("Triage lives on the Clean up tab only - no loose toolbar button " +
   "(DESIGN.md toolbar rule; it wrapped the German phone toolbar)", async () => {
   localStorage.setItem("pmc_account", "proton");
   state = baseState(FIXTURE);
@@ -423,16 +425,17 @@ test("Triage lives in the Tools menu only - no loose toolbar button " +
   await waitFor(() => expect(screen.getAllByText(FIXTURE[0].label).length)
     .toBeGreaterThan(0));
   expect(screen.queryByRole("button", { name: /Triage/ })).toBeNull();
-  fireEvent.click(screen.getByRole("button", { name: "Tools" }));
-  expect(await screen.findByRole("menuitem", { name: /Triage/ })).toBeTruthy();
+  openTab("Clean up");
+  expect(await screen.findByRole("button", { name: /^Triage/ })).toBeTruthy();
 });
 
 test("the entry is disabled with no groups", async () => {
   localStorage.setItem("pmc_account", "proton");
   state = baseState([]);
   render(<ToastProvider><DialogProvider><App /></DialogProvider></ToastProvider>);
-  fireEvent.click(await screen.findByRole("button", { name: "Tools" }));
-  const item = await screen.findByRole("menuitem", { name: /Triage/ });
+  await screen.findByRole("link", { name: "Clean up" });
+  openTab("Clean up");
+  const item = await screen.findByRole("button", { name: /^Triage/ });
   expect(item.hasAttribute("disabled") || item.getAttribute("aria-disabled") === "true").toBe(true);
 });
 
@@ -442,8 +445,8 @@ test("German strings", async () => {
   state = baseState(FIXTURE);
   render(<ToastProvider><DialogProvider><App /></DialogProvider></ToastProvider>);
   await waitFor(() => expect(screen.getAllByText("News A").length).toBeGreaterThan(0));
-  fireEvent.click(screen.getByRole("button", { name: "Werkzeuge" }));
-  fireEvent.click(await screen.findByRole("menuitem", { name: /Triage/ }));
+  fireEvent.click(screen.getByRole("link", { name: "Aufräumen" }));
+  fireEvent.click(await screen.findByRole("button", { name: /^Triage/ }));
   const dlg = await screen.findByRole("dialog", { name: "Triage" });
   expect(within(dlg).getByText("Karte 1 von 5")).toBeTruthy();
   fireEvent.click(btn(dlg, /Papierkorb/));

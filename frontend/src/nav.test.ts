@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { act, renderHook } from "@testing-library/react";
 import { afterEach, expect, test } from "vitest";
-import { hashOf, parseHash, useNav } from "./nav";
+import { hashOf, isTabPage, parseHash, useNav } from "./nav";
 
 afterEach(() => { window.location.hash = ""; });
 
@@ -9,6 +9,10 @@ test("parseHash accepts known pages and rejects the rest", () => {
   expect(parseHash("#/senders")).toBe("senders");
   expect(parseHash("#/all")).toBe("all");
   expect(parseHash("#/all?x=1")).toBe("all");
+  expect(parseHash("#/cleanup")).toBe("cleanup");
+  expect(parseHash("#/insights")).toBe("insights");
+  expect(isTabPage("cleanup") && isTabPage("insights")).toBe(true);
+  expect(isTabPage("senders") || isTabPage("all")).toBe(false);
   expect(parseHash("")).toBeNull();
   expect(parseHash("#/nope")).toBeNull();
   expect(hashOf("all")).toBe("#/all");

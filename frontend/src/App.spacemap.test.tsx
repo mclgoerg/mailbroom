@@ -1,8 +1,9 @@
 // @vitest-environment jsdom
-/* Space map through the app: Tools -> Space map -> tick -> Done lands on the
+/* Space map through the app: Insights -> Space map -> tick -> Done lands on the
  * Sender tab with exactly those senders selected; the bulk bar's Trash then
  * confirms with their counts (and Cancel leaves everything alone). */
 
+import { openTab, openTool } from "./toolTestUtils";
 import { cleanup, fireEvent, render, screen, waitFor, within } from
   "@testing-library/react";
 import { afterEach, expect, test, vi } from "vitest";
@@ -97,8 +98,7 @@ const boot = async () => {
     .toBeGreaterThan(0), { timeout: 5000 });
 };
 const openMap = async () => {
-  fireEvent.click(screen.getByRole("button", { name: "Tools" }));
-  fireEvent.click(screen.getByRole("menuitem", { name: /^Space map/ }));
+  openTool("Insights", /^Space map/);
   return screen.findByTestId("space-map");
 };
 const tickDomain = (map: HTMLElement, re: RegExp) => {
@@ -126,8 +126,7 @@ test("Done: Sender tab, exactly the non-protected senders selected, Trash "
     .toBeGreaterThan(0));
   // start on another grouping: Done must bring the list back to Sender
   fireEvent.click(screen.getByRole("tab", { name: "Subject" }));
-  fireEvent.click(screen.getByRole("button", { name: "Tools" }));
-  fireEvent.click(screen.getByRole("menuitem", { name: /^Space map/ }));
+  openTool("Insights", /^Space map/);
   const map = await screen.findByTestId("space-map");
   fireEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Select" }));
   fireEvent.click(within(map).getByRole("button", { name: /^big\.example/ }));
@@ -189,6 +188,7 @@ test("switching account closes the map (it must not reopen on the other one)",
       fireEvent.click(screen.getByRole("button", { name: "Profile & settings" }));
       fireEvent.click(await screen.findByRole("menuitemradio", { name: /second/ }));
       await waitFor(() => expect(screen.queryByTestId("space-map")).toBeNull());
+      openTab("Senders");   // the map was opened from the Insights tab
       await waitFor(() => expect(screen.getAllByText("a@big.example").length)
         .toBeGreaterThan(0), { timeout: 5000 });
       expect(screen.queryByTestId("space-map")).toBeNull();

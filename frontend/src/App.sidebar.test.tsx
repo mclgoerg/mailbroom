@@ -150,13 +150,50 @@ test(">= 1024: sidebar with counts replaces the header, Tools menu and links",
   expect(await screen.findByRole("menuitem", { name: /Export CSV/ })).toBeTruthy();
 });
 
-test("< 1024: today's header, Tools menu and five segments, no sidebar",
+test("< 1024: top bar, tab bar and five segments, no sidebar, no Tools menu",
   async () => {
   mount(false);
-  expect(await screen.findByRole("heading", { name: "Inboxrake" })).toBeTruthy();
-  expect(screen.getByRole("button", { name: /Tools/ })).toBeTruthy();
-  expect(screen.queryByRole("navigation", { name: "Main navigation" })).toBeNull();
+  expect(await screen.findByRole("heading", { level: 1, name: "Senders" }))
+    .toBeTruthy();
+  const tabs = within(screen.getByRole("navigation",
+    { name: "Main navigation" }));
+  expect(tabs.getAllByRole("link").map((l) => l.textContent))
+    .toEqual(["Senders", "Clean up", "Insights"]);
+  expect(screen.queryByRole("button", { name: /Tools/ })).toBeNull();
+  expect(screen.queryByRole("heading", { name: "Inboxrake" })).toBeNull();
   expect(screen.getByRole("tab", { name: "All mails" })).toBeTruthy();
+  expect(screen.getByLabelText("Search all mails")).toBeTruthy();
+  expect(screen.getByLabelText("Scan")).toBeTruthy();
+});
+
+test("the tab bar publishes --tabbar-h and steps aside for the selection bar",
+  async () => {
+  mount(false);
+  await screen.findByRole("heading", { level: 1, name: "Senders" });
+  expect(document.documentElement.style.getPropertyValue("--tabbar-h"))
+    .not.toBe("");
+  expect(document.documentElement.dataset.bulkbar).toBeUndefined();
+  fireEvent.click((await screen.findAllByRole("checkbox"))[1]);
+  await screen.findByRole("region", { name: "Selection actions" });
+  // CSS hides .pmc-tabbar while this flag is set
+  expect(document.documentElement.dataset.bulkbar).toBe("");
+});
+
+test("#/cleanup shows the tool list below 1024 and the default page from 1024",
+  async () => {
+  window.location.hash = "#/cleanup";
+  mount(false);
+  expect(await screen.findByRole("heading", { level: 1, name: "Clean up" }))
+    .toBeTruthy();
+  expect(screen.getByRole("button", { name: /^Rules/ })).toBeTruthy();
+  expect(screen.queryByPlaceholderText("Search or filter…")).toBeNull();
+  cleanup();
+  window.location.hash = "#/insights";
+  mount(true);
+  const nav = within(await side());
+  expect(nav.getByRole("link", { name: /Senders/ })
+    .getAttribute("aria-current")).toBe("page");
+  expect(screen.queryByRole("link", { name: "Insights" })).toBeNull();
 });
 
 test("account menu in the sidebar carries the profile items", async () => {

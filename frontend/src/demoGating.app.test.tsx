@@ -4,6 +4,7 @@
  * with the flag off they are exactly as before (AI ones hidden without a
  * key, Add account enabled). */
 
+import { openTab } from "./toolTestUtils";
 import { cleanup, fireEvent, render, screen, waitFor, within } from
   "@testing-library/react";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
@@ -124,11 +125,11 @@ test("demo: AI filter, AI review and Add account are disabled with the hint",
   expect(aiFilter.textContent).toContain(HINT);
   fireEvent.keyDown(document, { key: "Escape" });
 
-  fireEvent.click(screen.getByRole("button", { name: "Tools" }));
-  const review = screen.getByRole("menuitem", { name: /AI review/ });
+  openTab("Clean up");
+  const review = screen.getByRole("button", { name: /AI review/ });
   expect((review as HTMLButtonElement).disabled).toBe(true);
   expect(review.textContent).toContain(HINT);
-  fireEvent.click(screen.getByRole("button", { name: "Tools" }));
+  openTab("Senders");
 
   fireEvent.click(screen.getByLabelText("Profile & settings"));
   const add = screen.getByRole("menuitem", { name: /Add account/ });
@@ -157,9 +158,9 @@ test("no demo flag: AI entry points stay hidden without a key, Add account " +
   expect(screen.queryByRole("menuitem", { name: /Describe a filter/ }))
     .toBeNull();
   fireEvent.keyDown(document, { key: "Escape" });
-  fireEvent.click(screen.getByRole("button", { name: "Tools" }));
-  expect(screen.queryByRole("menuitem", { name: /AI review/ })).toBeNull();
-  fireEvent.click(screen.getByRole("button", { name: "Tools" }));
+  openTab("Clean up");
+  expect(screen.queryByRole("button", { name: /AI review/ })).toBeNull();
+  openTab("Senders");
   fireEvent.click(screen.getByLabelText("Profile & settings"));
   expect((screen.getByRole("menuitem", { name: /Add account/ }) as
     HTMLButtonElement).disabled).toBe(false);
