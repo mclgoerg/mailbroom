@@ -51,6 +51,8 @@
 
 /* Pointer-coarse (touch) variant: `coarse:min-h-10` etc. */
 @custom-variant coarse (@media (pointer: coarse));
+/* Mouse / trackpad: hover reveals row controls (touch has sticky hover). */
+@custom-variant hoverable (@media (hover: hover) and (pointer: fine));
 
 /* Typography layers. Size / line-height / weight only: the colour (meta ->
    text-muted, ...) is applied by the component, so a layer can be combined

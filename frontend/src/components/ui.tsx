@@ -1071,17 +1071,36 @@ export function Modal({ children, onClose, full = false, size, label,
 /** The one checkbox. The <label> is the hit area (32 px, 44 px on touch);
  *  the box itself is 18 px in the accent colour. Without `label` text give
  *  it an `aria-label`. All native input props are forwarded. */
-export function Checkbox({ label, className = "", ...rest }:
-  Omit<ComponentProps<"input">, "type"> & { label?: ReactNode }) {
+export function Checkbox({ label, className = "", round = false, ...rest }:
+  Omit<ComponentProps<"input">, "type"> & {
+    label?: ReactNode;
+    /** Round check (iOS select mode) instead of the native box. */
+    round?: boolean;
+  }) {
   return (
-    <label className={`inline-flex min-h-8 min-w-8 coarse:min-h-11
-      coarse:min-w-11 cursor-pointer items-center gap-2 type-body
-      ${label != null ? "justify-start" : "shrink-0 justify-center"}
+    <label className={`group/ck relative inline-flex min-h-8 min-w-8
+      coarse:min-h-11 coarse:min-w-11 cursor-pointer items-center gap-2
+      type-body ${label != null ? "justify-start" : "shrink-0 justify-center"}
       ${rest.disabled ? "cursor-not-allowed text-faint" : ""}
       ${className}`}>
-      <input type="checkbox"
-        className="size-4.5 shrink-0 cursor-[inherit] accent-accent"
-        {...rest} />
+      {round ? (
+        <>
+          <input type="checkbox" className="peer sr-only" {...rest} />
+          {/* has-checked: the sibling input's state styles the disc */}
+          <span aria-hidden className="grid size-5.5 shrink-0 place-items-center
+            rounded-full border-2 border-muted text-on-accent
+            group-has-checked/ck:border-accent group-has-checked/ck:bg-accent
+            peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2
+            peer-focus-visible:outline-accent">
+            <Check size={14} strokeWidth={3}
+              className="opacity-0 group-has-checked/ck:opacity-100" />
+          </span>
+        </>
+      ) : (
+        <input type="checkbox"
+          className="size-4.5 shrink-0 cursor-[inherit] accent-accent"
+          {...rest} />
+      )}
       {label != null && <span className="min-w-0">{label}</span>}
     </label>
   );

@@ -27,7 +27,7 @@ const onProtect = vi.fn();
 const onInspect = vi.fn();
 
 function mount(senders: Group[], folders = ["Archive", "Promotions"]) {
-  const props = { folders, onAct, onProtect, onInspect, onAckUnsub: () => {} };
+  const props = { folders, onAct, onProtect, onInspect };
   const r = render(<SenderList senders={senders} {...props} />);
   return { ...r, again: (next: Group[]) =>
     r.rerender(<SenderList senders={next} {...props} />) };
@@ -90,7 +90,8 @@ describe("the list", () => {
       + "the other senders of co.example.")).toBeTruthy();
     expect(screen.getByText("Nothing in its mails says what it is about."))
       .toBeTruthy();
-    expect(screen.getByText(/^7 mails ·/)).toBeTruthy();
+    expect(screen.getByText(/^14% unread · last/)).toBeTruthy();
+    expect(screen.getByText("7")).toBeTruthy();
     expect(screen.getByRole("button", { name: "a" })).toBeTruthy();
   });
 
@@ -277,7 +278,7 @@ describe("a pool with hundreds of senders", () => {
 describe("File in Smart as...", () => {
   const onFile = vi.fn();
   beforeEach(() => onFile.mockReset().mockResolvedValue(true));
-  const props = { folders: [], onAct, onProtect, onInspect, onAckUnsub: () => {} };
+  const props = { folders: [], onAct, onProtect, onInspect };
   const mountFile = (senders: Group[], rowKind = "orders",
       categories: string[] = []) => render(
     <DialogProvider>

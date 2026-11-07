@@ -39,7 +39,7 @@ const RATING_FILTERS: { key: string; label: string }[] = [
 export function DetailPanel({ grouping, group, aiEnabled, protectedNow,
   unsubscribedNow, onTrash, onMove, onProtect, onBlock, onUnblock, blocked, folders,
   sieve = true, smartMin = 10, onClose, onEmptied, onDeleted, variant = "modal", hideGroupActions = false,
-  senders, onSenderAct, onSenderProtect, renderSender, onAckUnsub, backLabel,
+  senders, onSenderAct, onSenderProtect, renderSender, backLabel,
   aiSort, onFile, categories, filingBox }: {
   grouping: Grouping;
   group: Group;
@@ -82,7 +82,6 @@ export function DetailPanel({ grouping, group, aiEnabled, protectedNow,
   onSenderAct?: (keys: string[], action: SenderAction, dest?: string) => Promise<boolean>;
   onSenderProtect?: (keys: string[]) => Promise<boolean>;
   renderSender?: (g: Group, back: () => void) => ReactNode;
-  onAckUnsub?: (addr: string) => void;
   backLabel?: string;                    // set: the close button goes back
   // Pooled Smart rows: AI sorting of what the rules left in Other. `onSort`
   // only when an AI is configured; `total` = senders the AI sorted so far.
@@ -883,8 +882,7 @@ export function DetailPanel({ grouping, group, aiEnabled, protectedNow,
                 <SenderList senders={senders!} folders={folders}
                   rowKind={group.kind} categories={categories} onFile={onFile}
                   onAct={onSenderAct!} onProtect={onSenderProtect!}
-                  onInspect={setInspect} onSelectedChange={setSenderSel}
-                  onAckUnsub={onAckUnsub ?? (() => {})} />
+                  onInspect={setInspect} onSelectedChange={setSenderSel} />
               </div>
             </>
           ) : (

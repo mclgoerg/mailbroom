@@ -1,5 +1,5 @@
 import { Archive, BarChart3, BellOff, ChevronDown, ChevronsUpDown, ClipboardList,
-  Copy, Download, Eye, FolderInput, Info, Layers, LayoutGrid, Mail, Monitor, Moon, Paperclip, Pencil, Plus,
+  Copy, Download, Eye, FolderInput, Info, Layers, LayoutGrid, ListChecks, Mail, Monitor, Moon, Paperclip, Pencil, Plus,
   MoreHorizontal, Power,
   ScrollText, Search, Settings as SettingsIcon, ShieldAlert, Sparkles, Star, Sun,
   Trash2, User, Wand2, Wrench, X }
@@ -36,7 +36,7 @@ import { FoldersPanel } from "./components/FoldersPanel";
 import { AccountAvatar, BarButton, BulkBar, Button,
   choiceDialog, confirmDialog, EmptyState, ensureAiAck, FILTER_ROW, Input, isModalOpen, LINK,
   Menu, MenuDivider, MenuGroup, MenuHeading, MenuItem, Notice, ProgressBar,
-  promptDialog, Segmented, Select, Spinner, useAppearance, useToast,
+  promptDialog, Segmented, Select, Spinner, useAppearance, useMediaQuery, useToast,
   type ToastVariant } from "./components/ui";
 import { nowMs } from "./clock";
 import { demoHint, setDemo, useDemo } from "./demoMode";
@@ -133,6 +133,9 @@ export default function App() {
     localStorage.setItem("pmc_sort_dir", String(sortDir));
   }, [sortK, sortDir]);
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  // Select mode ("Select" / "Done" button): checkboxes on every row. It ends
+  // wherever the selection is reset with the view (account, grouping, page).
+  const [selectMode, setSelectMode] = useState(false);
   // Which quick-select chip's 3-tap cycle (filter -> select -> clear,
   // see selectPreset) is mid-way through, and at which step - tracked
   // explicitly rather than derived from whether the matches HAPPEN to
@@ -273,6 +276,7 @@ export default function App() {
     setState(null);
     setPending("");
     setSelected(new Set());
+    setSelectMode(false);
     setDetail(null);
     setSpaceOpen(false);
     setFilter("");
@@ -1401,11 +1405,6 @@ export default function App() {
     }
   };
 
-  const ackUnsub = async (addr: string) => {
-    try { await api.unsubscribeAck(addr); refresh(); }
-    catch (e: any) { fail(e); }
-  };
-
   // AI review of `keys` (undefined = the whole grouping). Plain review
   // skips groups that already have a verdict (no double billing); when some
   // in scope are rated, ask whether to review only the new ones or to re-rate
@@ -1660,7 +1659,7 @@ export default function App() {
         ? members?.get(detail.key) : undefined}
       onSenderAct={actOnSenders} onSenderProtect={protectSenders}
       onFile={fileSenders} categories={ownCategories}
-      renderSender={renderSender} onAckUnsub={ackUnsub}
+      renderSender={renderSender}
       aiSort={mode === "smart" && isPooled(detail) ? {
         total: aiSortedCount, checked: aiCheckedCount,
         busy: aiRunning || scanning,
@@ -1718,6 +1717,7 @@ export default function App() {
     pageByApp.current = true;
     setPage(p);
     setSelected(new Set());
+    setSelectMode(false);
     setFocusIdx(-1);
     cancelFollow();
     setDetail(null);
@@ -1862,6 +1862,25 @@ export default function App() {
   const scannedAgo = fmtAgo(state?.scanned_ts);
   // Acts on the current grouping, so only the sender pages carry it (below
   // 1024 the Tools menu still holds the same two entries).
+  // Select mode button: an icon on phones (row 2 is tight), text above.
+  const phoneRow = useMediaQuery("(width < 48rem)");
+  const toggleSelectMode = () => {
+    if (selectMode) setSelected(new Set());
+    setSelectMode(!selectMode);
+  };
+  const selectLabel = selectMode ? t("select.done") : t("select.enter");
+  const selectBtn = phoneRow ? (
+    <Button variant={selectMode ? "tinted" : "secondary"} size="icon"
+      label={selectLabel} aria-pressed={selectMode}
+      onClick={toggleSelectMode}>
+      <ListChecks size={18} aria-hidden />
+    </Button>
+  ) : (
+    <Button variant={selectMode ? "tinted" : "secondary"}
+      aria-pressed={selectMode} onClick={toggleSelectMode}>
+      {selectLabel}
+    </Button>
+  );
   const moreMenu = wide && (
     <Menu variant="secondary" icon label={t("menu.more")}
       trigger={<MoreHorizontal size={18} aria-hidden />}>
@@ -1978,6 +1997,7 @@ export default function App() {
               if (v === "flat") setFlat(true);
               else { setFlat(false); setMode(v); }
               setSelected(new Set());
+              setSelectMode(false);
               setFocusIdx(-1);
               cancelFollow();
               setDetail(null);   // a pane would otherwise keep the old grouping's group
@@ -2127,6 +2147,7 @@ export default function App() {
               setSortDir(k === "label" ? 1 : -1);
             }}
             onDir={(d) => setSortDir(d === "asc" ? 1 : -1)} />
+          {selectBtn}
           {moreMenu}
         </div>
       )}
@@ -2429,6 +2450,7 @@ export default function App() {
           groups={groups}
           selected={selected}
           compact={paneOpen}
+          selectMode={selectMode}
           openKey={paneOpen ? detail.key : null}
           focusedKey={focusIdx >= 0 ? groups[focusIdx]?.key ?? null : null}
           onToggle={(k) => {
@@ -2443,7 +2465,6 @@ export default function App() {
           }}
           onOpen={openGroup}
           blockedKeys={blockedRules}
-          onAckUnsub={ackUnsub}
           sortK={sortK}
           sortDir={sortDir}
           onSort={(k) => {

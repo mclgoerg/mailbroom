@@ -102,7 +102,7 @@ const openMap = async () => {
   return screen.findByTestId("space-map");
 };
 const tickDomain = (map: HTMLElement, re: RegExp) => {
-  fireEvent.click(screen.getByRole("button", { name: "Select" }));
+  fireEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Select" }));
   fireEvent.click(within(map).getByRole("button", { name: re }));
 };
 
@@ -129,7 +129,7 @@ test("Done: Sender tab, exactly the non-protected senders selected, Trash "
   fireEvent.click(screen.getByRole("button", { name: "Tools" }));
   fireEvent.click(screen.getByRole("menuitem", { name: /^Space map/ }));
   const map = await screen.findByTestId("space-map");
-  fireEvent.click(screen.getByRole("button", { name: "Select" }));
+  fireEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Select" }));
   fireEvent.click(within(map).getByRole("button", { name: /^big\.example/ }));
   fireEvent.click(screen.getByRole("button", { name: "Done" }));
 

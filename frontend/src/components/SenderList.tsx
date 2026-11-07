@@ -55,13 +55,12 @@ export function filterSenders(list: Group[], query: string): Group[] {
  *  account change). Unsubscribe is NOT offered here: it stays an explicit
  *  single-sender action inside one sender's own detail view. */
 export function SenderList({ senders, folders, onAct, onProtect, onInspect,
-  onAckUnsub, onSelectedChange, rowKind, categories = [], onFile }: {
+  onSelectedChange, rowKind, categories = [], onFile }: {
   senders: Group[];                      // live sender records of this row
   folders: string[];
   onAct: (keys: string[], action: SenderAction, dest?: string) => Promise<boolean>;
   onProtect: (keys: string[]) => Promise<boolean>;
   onInspect: (g: Group) => void;
-  onAckUnsub: (addr: string) => void;
   // How many senders are ticked (the panel hides its whole-group red button
   // while this bar owns the destructive action).
   onSelectedChange?: (n: number) => void;
@@ -180,7 +179,7 @@ export function SenderList({ senders, folders, onAct, onProtect, onInspect,
               ks.forEach((k) => checked ? next.add(k) : next.delete(k));
               setSel(next);
             }}
-            onOpen={onInspect} onAckUnsub={onAckUnsub}
+            onOpen={onInspect}
             sortK="count" sortDir={-1} onSort={() => {}}
             groupLabel={t("Sender")} grouping="sender" cards
             resetSignal={`${query}|${sortBy}`}

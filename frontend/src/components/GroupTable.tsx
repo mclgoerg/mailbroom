@@ -2,12 +2,11 @@ import { ArrowDown, Briefcase, Building2, CalendarCheck, ChevronLeft,
   ChevronRight, ChevronsLeft, ChevronsRight, KeyRound, LifeBuoy,
   MessagesSquare, Newspaper, Package, Reply, Shapes, Shield, Tag as TagIcon,
   Users, type LucideIcon } from "lucide-react";
-import { useEffect, useRef, useState, type MouseEvent } from "react";
+import { useEffect, useRef, useState, type MouseEvent, type ReactNode } from "react";
 import { fmtSize } from "../api";
 import type { Group, Grouping, SmartKind } from "../types";
 import { t } from "../i18n";
-import { AiTag, Avatar, Button, Checkbox, EngagementMeter, PinBadge, RatingChips, ShortDate, StillMailingBadge, Tag, TrackerBadge, Select, isModalOpen, useOptionalToast } from "./ui";
-import { useDemo } from "../demoMode";
+import { Avatar, Button, Checkbox, ShortDate, StillMailingBadge, Tag, Select, isModalOpen, type TagTone } from "./ui";
 
 export type SortKey = "count" | "size" | "label" | "last" | "unreadPct"
   | "engagement";
@@ -25,11 +24,14 @@ interface Props {
   compact?: boolean;
   onToggle: (key: string) => void;
   onToggleAll: (checked: boolean, keys: string[]) => void;
+  // Select mode (App's "Select" button): checkboxes are shown on every row.
+  // Without it they show on row hover / focus and once something is
+  // selected (mouse), and only once something is selected on touch.
+  selectMode?: boolean;
   // Opens DetailPanel, which is where single-group actions (Trash/Block/
   // Protect) now live - rows themselves are selection + navigation only.
   onOpen: (g: Group) => void;
   blockedKeys?: Map<string, string>;   // group key -> blocking rule id
-  onAckUnsub: (addr: string) => void;
   sortK: SortKey;
   sortDir: number;
   onSort: (k: SortKey) => void;
@@ -40,7 +42,7 @@ interface Props {
   // sender sits in its row). Empty / absent = no line.
   rowNote?: (g: Group) => string;
   // Always the card layout (a list inside the detail panel, which is narrow
-  // beside the list at any viewport width).
+  // beside the list at any viewport width); its checkboxes are always shown.
   cards?: boolean;
 }
 
@@ -102,80 +104,57 @@ interface PageProps extends Props {
 const unreadPct = (g: Group) =>
   g.count ? Math.round((100 * g.unread) / g.count) : 0;
 
-/* Unsubscribe outcome, shown next to the other per-group tags. "pending"
-   (some senders done, the rest never tried - only possible for domain/
-   subject groupings with several senders) and "failed" are informational
-   only; "link" additionally offers the stashed URL plus a way to confirm
-   it without re-running the whole bulk job. */
-function UnsubBadge({ g, onAck }: { g: Group; onAck: (addr: string) => void }) {
+/* One status pill per row: the first thing that applies, in this priority
+   (the detail header shows all the rest). The unsubscribe page to confirm is
+   only a hint here - the link and "Mark as done" live in the detail. */
+function rowPill(g: Group, blocked: boolean): ReactNode {
   const u = g.unsubscribed;
-  const demo = useDemo();
-  const toast = useOptionalToast();
-  // A broken promise outranks the "✓ Unsubscribed" it contradicts - and it
-  // shows even on a row with no unsubscribe header of its own.
   if (g.still_mailing) return <StillMailingBadge sm={g.still_mailing} />;
-  if (!u) return null;
-  if (u.status === "done") {
-    return (
-      <Tag tone="safe" className="whitespace-nowrap">
-        ✓ {t("Unsubscribed")}
-      </Tag>
-    );
+  const pill = (tone: TagTone, label: string, title?: string) => (
+    <Tag tone={tone} dot className="whitespace-nowrap">
+      <span title={title}>{label}</span>
+    </Tag>
+  );
+  if (u?.status === "link") return pill("review", t("unsub.pill_link"));
+  if (blocked) return pill("keep", t("Blocked"));
+  if (g.new) return pill("new", t("New"), t("new_sender.tip"));
+  if (g.ai) {
+    return pill(VERDICT_PILL[g.ai.verdict] ?? "neutral",
+      g.ai.verdict.replace("_", " "), g.ai.reason);
   }
-  if (u.status === "failed") {
-    return (
-      <Tag tone="keep" className="whitespace-nowrap">
-        ⚠ {t("unsub.badge_failed")}
-      </Tag>
-    );
+  if (u?.status === "done") return pill("info", t("Unsubscribed"));
+  if (u?.status === "failed") return pill("keep", t("unsub.badge_failed"));
+  if (u?.status === "pending") {
+    return pill("review", t("unsub.badge_pending", { n: u.n, of: u.of }));
   }
-  if (u.status === "pending") {
-    return (
-      <Tag tone="review" className="whitespace-nowrap">
-        {t("unsub.badge_pending", { n: u.n, of: u.of })}
-      </Tag>
-    );
-  }
-  // "link": needs a manual confirmation page. Label stays short (unlike
-  // the DetailPanel's own button) - the desktop table's Type column is a
-  // fixed w-40, and the full "Open unsubscribe page" text wrapped onto
-  // two lines there and blew up the row height (390px + 1440px screenshot
-  // check against scripts/demo.py, 2026-09-28).
-  const linkCls = `cursor-pointer whitespace-nowrap rounded-badge bg-review-bg
-    px-1.5 py-0.5 type-caption text-review-fg underline hover:opacity-80`;
+  if (g.replied) return pill("info", t("replied"), t("replied.tip"));
+  return null;
+}
+
+const VERDICT_PILL: Record<string, TagTone> = {
+  delete_safe: "safe", review: "review", keep: "keep",
+};
+
+/** "76% unread · last 6 Nov" - the one meta line of a row. */
+function MetaLine({ g }: { g: Group }) {
   return (
-    <span className="inline-flex shrink-0 items-center gap-1">
-      {demo ? (
-        // the demo's links point at a made-up host: explain, open nothing
-        <button type="button" title={t("unsub.open_link")}
-          onClick={(e) => { e.stopPropagation();
-            toast?.show(t("unsub.demo_hint")); }}
-          className={linkCls}>
-          ✉ {t("unsub.badge_link")}
-        </button>
-      ) : (
-      <a href={u.link} target="_blank" rel="noopener noreferrer"
-        title={t("unsub.open_link")}
-        onClick={(e) => e.stopPropagation()}
-        className={linkCls}>
-        ✉ {t("unsub.badge_link")}
-      </a>
-      )}
-      <button title={t("unsub.mark_done")} aria-label={t("unsub.mark_done")}
-        className="rounded-badge bg-chip px-1.5 py-0.5 type-caption
-          text-chiptext hover:bg-chiph"
-        onClick={(e) => { e.stopPropagation(); onAck(u.addr); }}>
-        ✓
-      </button>
-    </span>
+    <>{unreadPct(g)}% {t("unread")} · {t("row.last")} <ShortDate iso={g.last} /></>
   );
 }
+
+/* Sender rows drop the address line (it is the detail header's first line):
+   name + one meta line keep a row at 56-60 px (the pooled senders' own list
+   inside the detail panel, `cards`, still shows it). */
+
+/* Selected / open row: a lighter panel + (open) the accent edge. Never an
+   accent tint - the status pills must keep 4.5:1 on it (index.contrast.test). */
+const ROW_ON = "bg-panel2";
 
 /* Desktop: fixed-layout table so column widths never change when the
    grouping mode (and with it the content) changes. */
 function DesktopTable({ slice, baseIdx, selected, focusedKey, openKey, compact, onToggle,
-  onToggleAll, onOpen, blockedKeys,
-  onAckUnsub, sortK, sortDir, onSort, groupLabel, grouping, rowNote
+  onToggleAll, onOpen, blockedKeys, selectMode, cards,
+  sortK, sortDir, onSort, groupLabel, grouping, rowNote
 }: PageProps) {
   // Sort indicator, inline after the label: the active column shows an
   // accent arrow that ROTATES between directions; inactive sortable columns
@@ -204,6 +183,11 @@ function DesktopTable({ slice, baseIdx, selected, focusedKey, openKey, compact, 
   );
   const allChecked =
     slice.length > 0 && slice.every((g) => selected.has(g.key));
+  const showChecks = !!cards || !!selectMode || selected.size > 0;
+  // Hidden checkboxes stay in the layout (no shift): the mouse reveals them
+  // on hover / focus; on touch they are inert until select mode.
+  const hiddenCls = `opacity-0 coarse:pointer-events-none
+    focus-within:opacity-100`;
   // (The strip above the sticky header, inside body's top padding, is
   // covered by body::before in index.css.)
   const th = "px-2 py-2 align-bottom type-meta font-semibold";
@@ -215,14 +199,20 @@ function DesktopTable({ slice, baseIdx, selected, focusedKey, openKey, compact, 
       "button, a, input, label, [data-no-open]")) return;
     onOpen(g);
   };
+  // Hairlines start after the avatar (inset list), so the first two cells
+  // carry none.
+  const td = "border-b border-line";
   // table-fixed: column widths come from the header cells, so they are
   // content-independent and identical in every grouping mode.
   return (
+    <div className="group/table overflow-clip rounded-card bg-panel">
     <table className="w-full table-fixed border-collapse type-body">
       <thead>
-        <tr className="sticky top-0 z-(--z-sticky) bg-surface text-left text-muted">
-          <th className={`${th} w-8`}>
-            <Checkbox checked={allChecked} className="-mx-2 -my-1"
+        <tr className="sticky top-0 z-(--z-sticky) bg-panel text-left text-muted">
+          <th className={`${th} w-10`}>
+            <Checkbox checked={allChecked} className={`-mx-2 -my-1 ${showChecks
+              ? "" : `${hiddenCls} hoverable:group-hover/table:opacity-100`}`}
+              aria-label={t("Select all")}
               onChange={(e) => onToggleAll(e.target.checked,
                 slice.map((g) => g.key))} />
           </th>
@@ -230,56 +220,48 @@ function DesktopTable({ slice, baseIdx, selected, focusedKey, openKey, compact, 
           <th className={sortableTh} aria-sort={ariaSort("label")}>
             {sortBtn("label", groupLabel)}
           </th>
-          {!compact && (
-            <th className={`${th} hidden w-40 xl:table-cell`}>{t("col.status_tags")}</th>
-          )}
-          <th className={`${th} w-24`}>{t("AI")}</th>
-          <th className={`${sortableTh} w-18`} aria-sort={ariaSort("engagement")}>
-            {sortBtn("engagement", t("Eng."), t("eng.col_tip"))}
+          <th className={`${th} ${compact ? "w-36" : "w-44"}`} />
+          <th className={`${th} w-32 text-right`}
+            aria-sort={ariaSort(sortK === "size" ? "size" : "count")}>
+            <span className="group/th inline-flex items-center gap-3">
+              {sortBtn("count", t("Mails"), undefined, true)}
+              {sortBtn("size", t("Size"), undefined, true)}
+            </span>
           </th>
-          <th className={`${sortableTh} w-18 text-right`}
-            aria-sort={ariaSort("count")}>
-            {sortBtn("count", t("Mails"), undefined, true)}
-          </th>
-          <th className={`${sortableTh} w-20 text-right`}
-            aria-sort={ariaSort("size")}>
-            {sortBtn("size", t("Size"), undefined, true)}
-          </th>
-          {!compact && (
-            <th className={`${sortableTh} hidden w-30 text-right md:table-cell lg:hidden xl:table-cell`}
-              aria-sort={ariaSort("last")}>
-              {sortBtn("last", t("Last"), undefined, true)}
-            </th>
-          )}
           <th className="w-11" />
         </tr>
       </thead>
       <tbody>
-        {slice.map((g, i) => (
+        {slice.map((g, i) => {
+          const on = g.key === openKey || selected.has(g.key);
+          return (
           <tr key={g.key} data-gidx={baseIdx + i}
             aria-current={g.key === openKey || undefined}
             onClick={rowClick(g)}
-            className={`cursor-pointer border-b border-line hover:bg-panel
-              ${g.key === openKey ? "bg-panel2" : g.key === focusedKey ? "bg-panel" : ""}
+            className={`group/row cursor-pointer hover:bg-panel2
+              ${on ? ROW_ON : g.key === focusedKey ? "bg-panel2/60" : ""}
               ${g.key === focusedKey ? "outline outline-1 -outline-offset-1 outline-accent/60" : ""}`}>
             {/* Open row: 2 px accent left edge (§4.11 selected row). */}
-            <td className={`px-2 py-2 align-top ${g.key === openKey
-              ? "shadow-open-edge" : ""}`} data-no-open>
-              <Checkbox checked={selected.has(g.key)} className="-mx-2 -my-1"
+            <td className={`px-2 py-2.5 align-middle ${g.key === openKey
+              ? "shadow-open-edge" : ""}`}
+              {...(showChecks ? { "data-no-open": true } : {})}>
+              <Checkbox checked={selected.has(g.key)}
+                className={`-mx-2 -my-1 ${showChecks ? "" : `${hiddenCls}
+                  hoverable:group-hover/row:opacity-100`}`}
                 aria-label={t("Select {label}", { label: g.label || g.key })}
                 onChange={() => onToggle(g.key)} />
             </td>
-            <td className="py-2 pl-0 pr-2 align-top">
+            <td className="py-2.5 pl-0 pr-2 align-middle">
               <RowAvatar g={g} grouping={grouping} />
             </td>
-            <td className="min-w-0 px-2 py-2">
+            <td className={`min-w-0 px-2 py-2.5 ${td}`}>
               <button
                 className="block w-full cursor-pointer truncate text-left
                   type-body font-medium hover:underline"
                 onClick={() => onOpen(g)}>
                 {g.label}
               </button>
-              {g.sub && (
+              {g.sub && grouping !== "sender" && (
                 <div className="truncate type-meta text-muted">
                   {localizedSub(g.sub)}
                 </div>
@@ -289,151 +271,97 @@ function DesktopTable({ slice, baseIdx, selected, focusedKey, openKey, compact, 
                   title={rowNote(g)}>{rowNote(g)}</div>
               )}
               <div className="truncate type-meta text-muted">
-                <ShortDate iso={g.first} /> → <ShortDate iso={g.last} /> ·{" "}
-                {unreadPct(g)}% {t("unread")}
+                <MetaLine g={g} />
               </div>
             </td>
-            {!compact && <td className="hidden px-2 py-2 align-top xl:table-cell">
-              <div className="flex flex-wrap gap-1 overflow-hidden">
-                {g.new && (
-                  <Tag tone="new">
-                    <span title={t("new_sender.tip")}>🆕 {t("New")}</span>
-                  </Tag>
-                )}
-                {g.replied && (
-                  <Tag tone="info">
-                    <span title={t("replied.tip")}>↩ {t("replied")}</span>
-                  </Tag>
-                )}
-                {g.att_size > 0 && (
-                  <Tag tone="attach">
-                    📎 {fmtSize(g.att_size)}
-                  </Tag>
-                )}
-                <PinBadge n={g.pinned} />
-                <UnsubBadge g={g} onAck={onAckUnsub} />
-                {blockedKeys?.has(g.key) && (
-                  <Tag tone="keep">
-                    🚫 {t("Blocked")}
-                  </Tag>
-                )}
-                {g.tags.map((tag) => <Tag key={tag} tone="category">{tag}</Tag>)}
-              </div>
-            </td>}
-            <td className="px-2 py-2 align-top">
-              <div className="flex flex-col items-start gap-0.5">
-                {g.ai && <AiTag ai={g.ai} />}
-                {g.ratings && <RatingChips ratings={g.ratings} />}
-              </div>
+            <td className={`px-2 py-2.5 text-right ${td}`}>
+              {rowPill(g, !!blockedKeys?.has(g.key))}
             </td>
-            <td className="px-2 py-2 align-top">
-              {/* beside the meter, not in the tag cell (overflow-hidden
-                  would clip its popover) */}
-              <div className="flex items-center gap-0.5">
-                <EngagementMeter g={g} />
-                <TrackerBadge g={g} />
-              </div>
+            <td className={`whitespace-nowrap px-2 py-2.5 text-right
+              tabular-nums ${td}`}>
+              <div className="font-semibold">{g.count}</div>
+              <div className="type-meta text-muted">{fmtSize(g.size)}</div>
             </td>
-            <td className="whitespace-nowrap px-2 py-2 text-right align-top
-              tabular-nums">
-              {g.count}
-            </td>
-            <td className="whitespace-nowrap px-2 py-2 text-right align-top
-              tabular-nums text-muted">
-              {fmtSize(g.size)}
-            </td>
-            {!compact && <td className="hidden whitespace-nowrap px-2 py-2 text-right
-              align-top tabular-nums text-muted md:table-cell lg:hidden xl:table-cell">
-              <ShortDate iso={g.last} />
-            </td>}
-            <td className="px-1 py-2 text-right align-top">
+            <td className={`px-1 py-2.5 text-right ${td}`}>
               <Button variant="quiet" size="icon" label={t("View details")}
                 className="text-faint" onClick={() => onOpen(g)}>
                 <ChevronRight size={18} />
               </Button>
             </td>
           </tr>
-        ))}
+          );
+        })}
       </tbody>
     </table>
+    </div>
   );
 }
 
-/* Mobile: a card list - no table semantics, no horizontal squeeze. */
+/* Mobile: a card list - no table semantics, no horizontal squeeze. The
+   round checks only exist in select mode (a tap on a card opens it). */
 function MobileCards({ slice, baseIdx, selected, focusedKey, onToggle,
-  onOpen, blockedKeys, onAckUnsub, grouping, rowNote
+  onOpen, blockedKeys, selectMode, cards, grouping, rowNote
 }: PageProps) {
+  const showChecks = !!cards || !!selectMode || selected.size > 0;
   return (
-    <div>
-      {slice.map((g, i) => (
+    <div className="overflow-clip rounded-card bg-panel">
+      {slice.map((g, i) => {
+        const pill = rowPill(g, !!blockedKeys?.has(g.key));
+        return (
         <div key={g.key} data-gidx={baseIdx + i}
-          className={`flex items-stretch border-b border-line
-            ${g.key === focusedKey ? "bg-panel" : ""}`}>
+          className={`flex items-stretch
+            ${selected.has(g.key) ? ROW_ON
+              : g.key === focusedKey ? "bg-panel2/60" : ""}`}>
           {/* The whole left gutter (44 px, full card height) is the
-              checkbox's hit area; it never overlaps the open-detail area. */}
-          <Checkbox checked={selected.has(g.key)}
-            className="w-11 shrink-0 self-stretch coarse:min-h-0"
-            aria-label={t("Select {label}", { label: g.label || g.key })}
-            onChange={() => onToggle(g.key)} />
+              check's hit area; it never overlaps the open-detail area. */}
+          {showChecks && (
+            <Checkbox round checked={selected.has(g.key)}
+              className="w-11 shrink-0 self-stretch coarse:min-h-0"
+              aria-label={t("Select {label}", { label: g.label || g.key })}
+              onChange={() => onToggle(g.key)} />
+          )}
           {/* Taps anywhere on the card open the detail; the title is the
               real <button>, so keyboard and screen-reader users can too. */}
-          <div className="flex min-w-0 flex-1 cursor-pointer items-center
-            gap-3 py-2.5 pr-1" onClick={() => onOpen(g)}>
+          <div className={`flex min-w-0 flex-1 cursor-pointer items-center
+            gap-3 py-2.5 pr-1 ${showChecks ? "" : "pl-3"}`}
+            onClick={() => onOpen(g)}>
             <RowAvatar g={g} grouping={grouping} />
-            <div className="min-w-0 flex-1">
-              <button type="button" data-no-open
-                className="block w-full cursor-pointer truncate text-left
-                  type-body-mobile"
-                onClick={(e) => { e.stopPropagation(); onOpen(g); }}>
-                {g.label}
-              </button>
-              {g.sub && (
-                <div className="truncate type-meta text-muted">
-                  {localizedSub(g.sub)}
+            <div className={`min-w-0 flex-1 pb-2.5 pt-0.5
+              ${i < slice.length - 1 ? "border-b border-line" : ""}`}>
+              <div className="flex items-center gap-2">
+                <div className="min-w-0 flex-1">
+                  <button type="button" data-no-open
+                    className="block w-full cursor-pointer truncate text-left
+                      type-body-mobile"
+                    onClick={(e) => { e.stopPropagation(); onOpen(g); }}>
+                    {g.label}
+                  </button>
+                  {g.sub && (grouping !== "sender" || cards) && (
+                    <div className="truncate type-meta text-muted">
+                      {localizedSub(g.sub)}
+                    </div>
+                  )}
+                  {rowNote?.(g) && (
+                    <div className="type-meta text-muted">{rowNote(g)}</div>
+                  )}
+                  <div className="truncate type-meta text-muted">
+                    <MetaLine g={g} />
+                  </div>
                 </div>
-              )}
-              {rowNote?.(g) && (
-                <div className="type-meta text-muted">{rowNote(g)}</div>
-              )}
-              <div className="truncate type-meta text-muted">
-                {t("n.mails", { n: g.count })} · <ShortDate iso={g.last} /> ·{" "}
-                {fmtSize(g.size)} · {unreadPct(g)}% {t("unread")}
+                <div className="shrink-0 whitespace-nowrap text-right
+                  tabular-nums">
+                  <div className="font-semibold">{g.count}</div>
+                  <div className="type-meta text-muted">{fmtSize(g.size)}</div>
+                </div>
+                <ChevronRight aria-hidden size={18}
+                  className="shrink-0 text-faint" />
               </div>
-              <div className="mt-1 flex flex-wrap items-center gap-1">
-                <EngagementMeter g={g} />
-                {g.new && (
-                  <Tag tone="new">
-                    <span title={t("new_sender.tip")}>🆕 {t("New")}</span>
-                  </Tag>
-                )}
-                {g.replied && (
-                  <Tag tone="info">
-                    <span title={t("replied.tip")}>↩ {t("replied")}</span>
-                  </Tag>
-                )}
-                {g.att_size > 0 && (
-                  <Tag tone="attach">
-                    📎 {fmtSize(g.att_size)}
-                  </Tag>
-                )}
-                <PinBadge n={g.pinned} />
-                <TrackerBadge g={g} />
-                <UnsubBadge g={g} onAck={onAckUnsub} />
-                {blockedKeys?.has(g.key) && (
-                  <Tag tone="keep">
-                    🚫 {t("Blocked")}
-                  </Tag>
-                )}
-                {g.ai && <AiTag ai={g.ai} />}
-                {g.ratings && <RatingChips ratings={g.ratings} />}
-                {g.tags.map((tag) => <Tag key={tag} tone="category">{tag}</Tag>)}
-              </div>
+              {pill && <div className="mt-1 flex">{pill}</div>}
             </div>
-            <ChevronRight aria-hidden size={18}
-              className="shrink-0 text-faint" />
           </div>
         </div>
-      ))}
+        );
+      })}
     </div>
   );
 }
