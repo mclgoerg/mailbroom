@@ -1383,7 +1383,7 @@ export const BAR_BTN = `inline-flex shrink-0 items-center justify-center
   rounded-full max-md:min-w-10 max-md:px-0 coarse:max-md:min-w-11`;
 
 /** The floating selection bar, shared by the group list and All mails.
- *  >= md a centred capsule (translucent `bar-glass`, `rounded-full` from xl)
+ *  >= md a centred capsule (translucent `bar-glass`, `rounded-full` while it fits one row)
  *  inside the page's `max-w-6xl` width: `summary`, Clear, the active
  *  limiter `token`, `actions`, `primary` (the destructive button). Below md
  *  a full-width bar (summary + Clear + token, then actions + primary) above
@@ -1401,6 +1401,20 @@ export function BulkBar({ summary, onClear, token, actions, primary, swap }: {
 }) {
   const ref = useRef<HTMLDivElement>(null);
   useBulkBarHeight(ref, true);
+  // A stadium (`rounded-full`) only while the capsule is ONE row: wrapped
+  // onto two rows it would look like a fat pill, so it keeps card corners.
+  const capsule = useRef<HTMLDivElement>(null);
+  const [oneRow, setOneRow] = useState(true);
+  useEffect(() => {
+    const el = capsule.current;
+    if (!el || typeof ResizeObserver === "undefined") return;
+    // 70 px: one row is ~52 px (36 px buttons + padding), two rows ~94 px.
+    const sync = () => setOneRow(el.offsetHeight < 70);
+    sync();
+    const ro = new ResizeObserver(sync);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
   const prev = useRef<"move" | "limit" | null>(null);
   useEffect(() => {
     const was = prev.current, now = swap ?? null;
@@ -1422,10 +1436,11 @@ export function BulkBar({ summary, onClear, token, actions, primary, swap }: {
         z-(--z-bulkbar) px-2 md:px-5"
       style={{ paddingBottom:
         "calc(env(safe-area-inset-bottom) + 0.5rem)" }}>
-      <div className="pointer-events-auto mx-auto flex w-fit max-w-6xl
-        flex-col gap-1.5 rounded-card border bar-glass px-3 py-2 shadow-bar
-        max-md:w-full md:flex-row md:flex-wrap md:items-center
-        md:justify-center md:gap-x-2 xl:rounded-full xl:px-4 xl:max-w-360">
+      <div ref={capsule} className={`pointer-events-auto mx-auto flex w-fit
+        max-w-6xl flex-col gap-1.5 rounded-card border bar-glass px-3 py-2
+        shadow-bar max-md:w-full md:flex-row md:flex-wrap md:items-center
+        md:justify-center md:gap-x-2 md:px-4 xl:max-w-360
+        ${oneRow ? "md:rounded-full" : ""}`}>
         <div className="flex min-w-0 items-center gap-2 md:contents">
           <span className="min-w-0 flex-1 truncate type-meta text-muted
             md:flex-none md:whitespace-nowrap">{summary}</span>
