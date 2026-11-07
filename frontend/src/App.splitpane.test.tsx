@@ -326,7 +326,7 @@ test("...and closes without stealing focus from the filter input",
   mount(true, { [A.key]: A });
   fireEvent.click(await row("Alpha"));
   await waitFor(() => expect(paneTitle()).toBe("Alpha"));
-  const filter = screen.getByPlaceholderText(/filter groups/i);
+  const filter = screen.getByPlaceholderText(/search or filter/i);
   filter.focus();
   await blockAndTrash([A.key]);
   await waitFor(() => expect(pane()).toBeNull());

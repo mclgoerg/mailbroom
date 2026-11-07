@@ -120,8 +120,10 @@ const mount = async () => {
     .toBeGreaterThan(0));
 };
 
+// The AI filter is an entry of the Filter menu.
 const openPanel = async () => {
-  fireEvent.click(screen.getByLabelText("Describe a filter"));
+  fireEvent.click(screen.getByRole("button", { name: "Filter" }));
+  fireEvent.click(screen.getByRole("menuitem", { name: /^Describe a filter/ }));
   return screen.findByRole("dialog", { name: "Describe a filter" });
 };
 
@@ -136,7 +138,9 @@ const sendSentence = async (text = "newsletters I never read") => {
 test("the button is hidden without an AI provider", async () => {
   cfg = mkCfg(false);
   await mount();
-  expect(screen.queryByLabelText("Describe a filter")).toBeNull();
+  fireEvent.click(screen.getByRole("button", { name: "Filter" }));
+  expect(screen.queryByRole("menuitem", { name: /Describe a filter/ }))
+    .toBeNull();
 });
 
 test("the first send asks for consent; declining sends nothing", async () => {
@@ -176,7 +180,7 @@ test("after consent: send, result, live preview that matches the list's " +
   fireEvent.change(input, { target: { value: "tag:newsletter unread:>90 age:>1y" } });
 
   fireEvent.click(within(dlg).getByRole("button", { name: "Apply" }));
-  const main = screen.getByPlaceholderText("filter groups…") as HTMLInputElement;
+  const main = screen.getByPlaceholderText("Search or filter…") as HTMLInputElement;
   expect(main.value).toBe("tag:newsletter unread:>90 age:>1y");
   expect(screen.queryByRole("dialog", { name: "Describe a filter" })).toBeNull();
   expect(screen.queryAllByText("Fresh Friend")).toHaveLength(0);   // list filtered
@@ -194,7 +198,7 @@ test("Apply uses the query as edited, not the AI's first answer", async () => {
     "tag:newsletter unread:>90 age:>1y");
   fireEvent.change(input, { target: { value: "tag:newsletter age:>2y" } });
   fireEvent.click(within(dlg).getByRole("button", { name: "Apply" }));
-  expect((screen.getByPlaceholderText("filter groups…") as HTMLInputElement)
+  expect((screen.getByPlaceholderText("Search or filter…") as HTMLInputElement)
     .value).toBe("tag:newsletter age:>2y");
 });
 
@@ -266,7 +270,8 @@ test("Ctrl+Enter and Cmd+Enter send the sentence; plain Enter only adds a " +
 test("the shortcut hint is German in German", async () => {
   setLang("de");
   await mount();
-  fireEvent.click(screen.getByLabelText("Filter beschreiben"));
+  fireEvent.click(screen.getByRole("button", { name: "Filter" }));
+  fireEvent.click(screen.getByRole("menuitem", { name: /^Filter beschreiben/ }));
   expect(await screen.findByText(/Strg\+Enter/)).toBeTruthy();
 });
 
@@ -277,7 +282,7 @@ test("a coded backend error is shown in the user's words", async () => {
   const dlg = await sendSentence();
   expect(await within(dlg).findByText(/budget is used up/)).toBeTruthy();
   // still on the form, nothing applied
-  expect((screen.getByPlaceholderText("filter groups…") as HTMLInputElement)
+  expect((screen.getByPlaceholderText("Search or filter…") as HTMLInputElement)
     .value).toBe("");
 });
 
@@ -307,7 +312,7 @@ test("Save as rule opens the rules form with the query filled in",
     expect(await screen.findByDisplayValue(
       "tag:newsletter unread:>90 age:>1y")).toBeTruthy();   // the rule form
     // the main filter was not touched
-    expect((screen.getByPlaceholderText("filter groups…") as HTMLInputElement)
+    expect((screen.getByPlaceholderText("Search or filter…") as HTMLInputElement)
       .value).toBe("");
   });
 
@@ -315,7 +320,8 @@ test("German strings and the language are sent along", async () => {
   setLang("de");
   localStorage.setItem("pmc_ai_ack", "1");
   await mount();
-  fireEvent.click(screen.getByLabelText("Filter beschreiben"));
+  fireEvent.click(screen.getByRole("button", { name: "Filter" }));
+  fireEvent.click(screen.getByRole("menuitem", { name: /^Filter beschreiben/ }));
   const dlg = await screen.findByRole("dialog", { name: "Filter beschreiben" });
   expect(within(dlg).getByText(/Nur dieser Satz und die Filter-Syntax/))
     .toBeTruthy();
@@ -334,7 +340,8 @@ test("without a scan the preview says so", async () => {
   state = { ...baseState(), status: "idle", groups: { sender: {}, smart: {},
     domain: {}, subject: {}, thread: {} } };
   render(<ToastProvider><DialogProvider><App /></DialogProvider></ToastProvider>);
-  fireEvent.click(await screen.findByLabelText("Describe a filter"));
+  fireEvent.click(await screen.findByRole("button", { name: "Filter" }));
+  fireEvent.click(screen.getByRole("menuitem", { name: /^Describe a filter/ }));
   const dlg = await screen.findByRole("dialog", { name: "Describe a filter" });
   fireEvent.change(within(dlg).getByLabelText(
     "Describe what you are looking for"), { target: { value: "x" } });

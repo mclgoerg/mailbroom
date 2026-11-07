@@ -177,8 +177,7 @@ export function AllMailsView({ state, onChanged, toolbarSlot }: {
     else if (v) act(v);
   };
 
-  const filterRow = (
-    <div className={FILTER_ROW}>
+  const filterControls = (<>
       <div className="relative min-w-0 flex-1 md:min-w-70">
         <Input className="w-full pr-9 coarse:pr-10" value={q}
           placeholder={t("mails.filter")}
@@ -197,13 +196,13 @@ export function AllMailsView({ state, onChanged, toolbarSlot }: {
       <SortControl options={SORTS} value={sortK} dir={dir}
         onValue={(k) => { setSortK(k); setDir(naturalDir(k)); }}
         onDir={setDir} />
-    </div>
-  );
+  </>);
+  const filterRow = <div className={FILTER_ROW}>{filterControls}</div>;
 
   return (
     <div>
       {toolbarSlot !== null && (toolbarSlot
-        ? createPortal(filterRow, toolbarSlot) : filterRow)}
+        ? createPortal(filterControls, toolbarSlot) : filterRow)}
       <div className="mb-2 flex min-h-5 flex-wrap items-center gap-x-3
         type-meta text-muted">
         <span>{t("mails.count", { n: mails.length, total })}</span>

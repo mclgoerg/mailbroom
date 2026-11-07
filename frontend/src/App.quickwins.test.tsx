@@ -142,10 +142,10 @@ test("hidden without a scan, on another tab, with a filter, with a " +
   fireEvent.click(screen.getByRole("tab", { name: "Sender" }));
   expect(strip()).not.toBeNull();
 
-  fireEvent.change(screen.getByPlaceholderText("filter groups…"),
+  fireEvent.change(screen.getByPlaceholderText("Search or filter…"),
     { target: { value: "fresh" } });
   expect(strip()).toBeNull();
-  fireEvent.change(screen.getByPlaceholderText("filter groups…"),
+  fireEvent.change(screen.getByPlaceholderText("Search or filter…"),
     { target: { value: "" } });
   expect(strip()).not.toBeNull();
 
@@ -158,7 +158,7 @@ test("Review sets the filter and selects exactly the card's groups",
   setup();
   await ready();
   fireEvent.click(screen.getAllByRole("button", { name: "Review" })[0]);
-  expect((screen.getByPlaceholderText("filter groups…") as HTMLInputElement)
+  expect((screen.getByPlaceholderText("Search or filter…") as HTMLInputElement)
     .value).toBe("eng:low age:>1y");
   // exactly the one non-protected match is selected (bar: groups + mails)
   await waitFor(() => expect(screen.getByText(/^1 group · 30 mails( · .+)?$/))
@@ -346,11 +346,11 @@ test("the cached-verdicts notice is a muted status-line suffix, not a banner",
     expect(screen.queryByTestId("cached-verdicts")).toBeNull();
   });
 
-test("the chip row scrolls on one line on phones and wraps from md", async () => {
+test("the chip row is gone: quick filters live in the Filter menu", async () => {
   setup();
   await ready();
-  const row = screen.getByTestId("chip-row");
-  expect(row.className).toContain("overflow-x-auto");
-  expect(row.className).not.toMatch(/(^|\s)flex-wrap/);   // wrap only via md:
-  expect(row.className).toContain("md:flex-wrap");
+  expect(screen.queryByTestId("chip-row")).toBeNull();
+  fireEvent.click(screen.getByRole("button", { name: "Filter" }));
+  expect(screen.getByRole("menuitemradio", { name: "AI-safe groups" }))
+    .toBeTruthy();
 });

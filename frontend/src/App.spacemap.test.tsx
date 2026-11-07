@@ -92,7 +92,7 @@ const SENDERS = Object.fromEntries([
 const boot = async () => {
   state = { ...baseState, groups: { ...baseState.groups, sender: SENDERS } };
   render(<ToastProvider><DialogProvider><App /></DialogProvider></ToastProvider>);
-  await screen.findByPlaceholderText("filter groups…");
+  await screen.findByPlaceholderText("Search or filter…");
   await waitFor(() => expect(screen.getAllByText("a@big.example").length)
     .toBeGreaterThan(0), { timeout: 5000 });
 };
@@ -121,7 +121,7 @@ test("Done: Sender tab, exactly the non-protected senders selected, Trash "
   ].map((g) => [g.key, g]));
   state = { ...baseState, groups: { ...baseState.groups, sender: senders } };
   render(<ToastProvider><DialogProvider><App /></DialogProvider></ToastProvider>);
-  await screen.findByPlaceholderText("filter groups…");
+  await screen.findByPlaceholderText("Search or filter…");
   await waitFor(() => expect(screen.getAllByText("a@big.example").length)
     .toBeGreaterThan(0));
   // start on another grouping: Done must bring the list back to Sender
@@ -159,14 +159,14 @@ test("Done replaces a selection made in another tab", async () => {
 
 test("Done clears an active filter and says so", async () => {
   await boot();
-  fireEvent.change(screen.getByPlaceholderText("filter groups…"),
+  fireEvent.change(screen.getByPlaceholderText("Search or filter…"),
     { target: { value: "big" } });
   const map = await openMap();
   tickDomain(map, /^other\.example/);
   fireEvent.click(screen.getByRole("button", { name: "Done" }));
   expect(await screen.findByText("Filter cleared to show your selection."))
     .toBeTruthy();
-  expect((screen.getByPlaceholderText("filter groups…") as HTMLInputElement)
+  expect((screen.getByPlaceholderText("Search or filter…") as HTMLInputElement)
     .value).toBe("");
 });
 

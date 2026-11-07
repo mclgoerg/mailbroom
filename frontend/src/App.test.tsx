@@ -465,29 +465,33 @@ test("selecting a group reveals the bulk-action bar; Clear selection " +
   await waitFor(() => expect(screen.queryByText(/^Trash \d+$/)).toBeNull());
 });
 
-test("a quick-select chip first narrows the filter box, then (tapped " +
+test("a quick filter first narrows the filter box, then (tapped " +
   "again) adds the matches to the selection", async () => {
   renderWithOneSenderGroup();
   await waitFor(() => expect(screen.getAllByText("DHL Paket").length)
     .toBeGreaterThan(0));
-  const chip = screen.getByRole("button", { name: "6 mo" });
+  // The quick filters live in the Filter menu: one open + click per tap.
+  const chip = { click: () => {
+    fireEvent.click(screen.getByRole("button", { name: "Filter" }));
+    fireEvent.click(screen.getByRole("menuitemradio", { name: "6 mo" }));
+  } };
 
   // Tap 1: filters only, selection untouched.
-  fireEvent.click(chip);
-  expect((screen.getByPlaceholderText("filter groups…") as HTMLInputElement)
+  chip.click();
+  expect((screen.getByPlaceholderText("Search or filter…") as HTMLInputElement)
     .value).toBe("age:>6m");
   expect(screen.queryByText(/^Trash \d+$/)).toBeNull();
 
   // Tap 2: same filter already showing -> selects every match.
-  fireEvent.click(chip);
+  chip.click();
   await waitFor(() => expect(screen.getByText(/^Trash \d+$/)).toBeTruthy());
 
   // Tap 3: un-selects exactly what tap 2 selected (not just a no-op
   // "leave it alone") AND clears the filter - so the bulk bar disappears
   // too, not just the filter text.
-  fireEvent.click(chip);
+  chip.click();
   await waitFor(() => {
-    const el = screen.getByPlaceholderText("filter groups…");
+    const el = screen.getByPlaceholderText("Search or filter…");
     expect((el as HTMLInputElement).value).toBe("");
   });
   expect(screen.queryByText(/^Trash \d+$/)).toBeNull();
@@ -497,17 +501,17 @@ test("a quick-select chip first narrows the filter box, then (tapped " +
   // both look like nothing happened" just because the matches were
   // still selected from the first cycle (tap 3 must have undone that).
   // Tap 4: filters again, still nothing selected.
-  fireEvent.click(chip);
-  expect((screen.getByPlaceholderText("filter groups…") as HTMLInputElement)
+  chip.click();
+  expect((screen.getByPlaceholderText("Search or filter…") as HTMLInputElement)
     .value).toBe("age:>6m");
   expect(screen.queryByText(/^Trash \d+$/)).toBeNull();
   // Tap 5: selects again - the bulk bar must (re)appear.
-  fireEvent.click(chip);
+  chip.click();
   await waitFor(() => expect(screen.getByText(/^Trash \d+$/)).toBeTruthy());
   // Tap 6: clears again, bulk bar gone again.
-  fireEvent.click(chip);
+  chip.click();
   await waitFor(() => {
-    const el = screen.getByPlaceholderText("filter groups…");
+    const el = screen.getByPlaceholderText("Search or filter…");
     expect((el as HTMLInputElement).value).toBe("");
   });
   expect(screen.queryByText(/^Trash \d+$/)).toBeNull();

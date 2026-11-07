@@ -112,13 +112,18 @@ test("the New chip shows a live count; tap 1 filters, tap 2 selects " +
 
   // The chip's count is every flagged group (2) - protection only
   // affects which ones selectPreset actually adds to the selection.
-  const chip = await screen.findByText("New (2)");
+  await screen.findByRole("button", { name: "Filter" });
+  // The quick filter now lives in the Filter menu (one open + click per tap).
+  const tap = () => {
+    fireEvent.click(screen.getByRole("button", { name: "Filter" }));
+    fireEvent.click(screen.getByRole("menuitemradio", { name: /^New \(2\)/ }));
+  };
 
   // Tap 1: filters to is:new, selection untouched. Both flagged groups
   // stay visible (protection only affects selection, not visibility),
   // the unflagged one disappears.
-  fireEvent.click(chip);
-  expect((screen.getByPlaceholderText("filter groups…") as HTMLInputElement)
+  tap();
+  expect((screen.getByPlaceholderText("Search or filter…") as HTMLInputElement)
     .value).toBe("is:new");
   expect(screen.queryAllByText("Sender A").length).toBeGreaterThan(0);
   expect(screen.queryAllByText("Sender B").length).toBeGreaterThan(0);
@@ -127,18 +132,21 @@ test("the New chip shows a live count; tap 1 filters, tap 2 selects " +
   // The chip itself must survive its OWN filter being active (regression
   // check: its count/visibility come from the full mailbox, not the
   // now-filtered list).
-  expect(screen.getByText("New (2)")).toBeTruthy();
+  fireEvent.click(screen.getByRole("button", { name: "Filter" }));
+  expect(screen.getByRole("menuitemradio", { name: /^New \(2\)/ })
+    .getAttribute("aria-checked")).toBe("true");
+  fireEvent.keyDown(document, { key: "Escape" });
 
   // Tap 2: already showing is:new -> selects every match except the
   // protected one (bar scoped to exactly Sender A's 5 mails).
-  fireEvent.click(chip);
+  tap();
   await waitFor(() => expect(screen.getByText("Trash 5")).toBeTruthy());
 
   // Tap 3: un-selects what tap 2 selected AND clears the filter (Sender
   // C reappears, the bulk bar disappears).
-  fireEvent.click(chip);
+  tap();
   await waitFor(() => {
-    const el = screen.getByPlaceholderText("filter groups…");
+    const el = screen.getByPlaceholderText("Search or filter…");
     expect((el as HTMLInputElement).value).toBe("");
   });
   expect(screen.queryAllByText("Sender C").length).toBeGreaterThan(0);
@@ -147,8 +155,8 @@ test("the New chip shows a live count; tap 1 filters, tap 2 selects " +
   // Regression: a second cycle must look identical to the first - tap 2
   // must visibly reselect (not silently no-op because tap 3 left the
   // matches selected).
-  fireEvent.click(chip);                                  // tap 4: filter
+  tap();                                  // tap 4: filter
   expect(screen.queryByText(/^Trash \d+$/)).toBeNull();
-  fireEvent.click(chip);                                   // tap 5: select
+  tap();                                   // tap 5: select
   await waitFor(() => expect(screen.getByText("Trash 5")).toBeTruthy());
 });

@@ -78,18 +78,18 @@ test("All mails swaps the group chrome for the flat list and back",
   async () => {
     state = { ...baseState };
     render(<ToastProvider><DialogProvider><App /></DialogProvider></ToastProvider>);
-    await screen.findByPlaceholderText("filter groups…");
+    await screen.findByPlaceholderText("Search or filter…");
     expect(screen.queryByPlaceholderText("filter mails…")).toBeNull();
 
     fireEvent.click(screen.getByText("All mails"));
     await screen.findByText("Flat mail");
     expect(screen.getByPlaceholderText("filter mails…")).toBeTruthy();
-    expect(screen.queryByPlaceholderText("filter groups…")).toBeNull();
+    expect(screen.queryByPlaceholderText("Search or filter…")).toBeNull();
     expect(screen.queryByText("6 mo")).toBeNull();  // chips
     expect(localStorage.getItem("pmc_view")).toBe("mails");
 
     fireEvent.click(screen.getByRole("tab", { name: "Sender" }));
-    await screen.findByPlaceholderText("filter groups…");
+    await screen.findByPlaceholderText("Search or filter…");
     expect(screen.queryByText("Flat mail")).toBeNull();
     expect(localStorage.getItem("pmc_view")).toBe("groups");
   });
@@ -113,7 +113,7 @@ test("Thread is a fourth grouping tab with its own groups", async () => {
   state = { ...baseState, groups: { ...baseState.groups,
     thread: { [thread.key]: thread } } };
   render(<ToastProvider><DialogProvider><App /></DialogProvider></ToastProvider>);
-  await screen.findByPlaceholderText("filter groups…");
+  await screen.findByPlaceholderText("Search or filter…");
   expect(screen.queryByText("Project plan")).toBeNull();     // sender tab
 
   fireEvent.click(screen.getByRole("tab", { name: "Thread" }));
