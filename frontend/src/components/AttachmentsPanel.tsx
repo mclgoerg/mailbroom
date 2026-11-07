@@ -9,7 +9,7 @@ import { Button, EmptyState, Loading, MailRow, Modal,
   PanelHeader, Spinner, Tag, Toolbar } from "./ui";
 
 /** Attachment explorer: lazy BODYSTRUCTURE analysis, then the mailbox's
- *  attachment-heaviest mails. Proton IMAP cannot strip attachments, so the
+ *  attachment-heaviest mails. IMAP cannot strip single attachments, so the
  *  actions delete/move whole mails (reversible, as everywhere). */
 export function AttachmentsPanel({ state, onClose, onDeleted }: {
   state: AppState;

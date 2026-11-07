@@ -616,8 +616,8 @@ export const EN: Record<string, string> = {
   "atts.reanalyze": "Re-analyze",
   "atts.intro":
     "Run the analysis to list mails by attachment size. Afterwards the "
-    + "att:>10m filter also works on groups. Proton cannot strip single "
-    + "attachments over IMAP - deleting removes the whole mail (undoable).",
+    + "att:>10m filter also works on groups. Single attachments can't be "
+    + "removed over IMAP - deleting removes the whole mail (can be undone).",
   "atts.none": "No attachments found",
   "atts.running": "Analyzing attachments…",
   "unsub.running": "Unsubscribing…",

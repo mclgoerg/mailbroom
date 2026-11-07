@@ -64,7 +64,7 @@ the short version; [install.md](install.md) covers running it and
 - **Attachment explorer** - an on-demand BODYSTRUCTURE pass (structure
   only, no content downloaded) lists mails by attachment size with file
   names, adds a 📎 aggregate to groups, and enables the `att:>10m` filter.
-  Proton IMAP can't strip single attachments, so cleanup means deleting
+  IMAP can't strip single attachments, so cleanup means deleting
   the whole mail (reversible as always).
 - **Statistics** (Tools -> Statistics) - mails-per-year histogram, top
   domains by size, scan history and per-month cleanup tallies ("moved to
@@ -177,17 +177,18 @@ the short version; [install.md](install.md) covers running it and
   per mail. Mails indexed before this existed show up under "Check older
   mails" (a rebuild of the index, with the usual confirm).
 - **One-click unsubscribe** - RFC 8058 one-click POST or unsubscribe mail
-  via Bridge SMTP, straight from a group's detail view - or in bulk:
-  select any number of groups and unsubscribe from every one of their
-  senders in the background, with live progress and cancel. Every
+  via the account's SMTP server, straight from a group's detail view - or
+  in bulk: select any number of groups and unsubscribe from every one of
+  their senders in the background, with live progress and cancel. Every
   outcome (done / needs a confirmation page / failed) is remembered per
   sender and survives rescans and restarts, shown as a badge on the
   group and filterable with `is:unsubscribed` / `is:not-unsubscribed`
   (and `is:still-mailing`, see the Unsubscribe watchdog).
   Protected senders are always skipped.
-- **Sieve export** - generate a Proton Sieve filter for a sender or
-  domain (move to folder / delete on arrival / mark read) with a copy
-  button, so future mail never clutters the mailbox again.
+- **Sieve export** (Proton accounts only) - generate a Proton Sieve
+  filter for a sender or domain (move to folder / delete on arrival / mark
+  read) with a copy button, so future mail never clutters the mailbox
+  again.
 - **Undo** - every move to Trash ends in a toast ("Moved 618 mails to
   Trash") with an **Undo** button; older deletions can be restored from
   the Undo list in the status line above the list (destination UID and

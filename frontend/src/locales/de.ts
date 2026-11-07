@@ -453,8 +453,8 @@ export const DE: Record<string, string> = {
   "atts.reanalyze": "Neu analysieren",
   "atts.intro":
     "Analyse starten, um Mails nach Anhanggröße zu listen. Danach "
-    + "funktioniert auch der Filter att:>10m auf Gruppen. Proton kann per "
-    + "IMAP keine einzelnen Anhänge entfernen - Löschen entfernt die ganze "
+    + "funktioniert auch der Filter att:>10m auf Gruppen. Einzelne Anhänge "
+    + "lassen sich per IMAP nicht entfernen - Löschen entfernt die ganze "
     + "Mail (rückgängig machbar).",
   "atts.none": "Keine Anhänge gefunden",
   "atts.running": "Analysiere Anhänge…",
