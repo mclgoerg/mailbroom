@@ -1,5 +1,18 @@
 # Changelog
 
+## [2.3.0](https://github.com/mclgoerg/inboxrake/compare/v2.2.1...v2.3.0) (2026-11-07)
+
+
+### Features
+
+* a calmer sender detail with the actions up front ([#266](https://github.com/mclgoerg/inboxrake/issues/266)) ([2a5e60b](https://github.com/mclgoerg/inboxrake/commit/2a5e60ba5276a23c2fc7101ad03efc70af7dd973))
+* a floating bar for selected senders ([#268](https://github.com/mclgoerg/inboxrake/issues/268)) ([b806421](https://github.com/mclgoerg/inboxrake/commit/b806421130e6a0948b2d90023aeaef2b1b64d4b6))
+* a welcome screen and a shorter first-run setup ([#265](https://github.com/mclgoerg/inboxrake/issues/265)) ([e39dc96](https://github.com/mclgoerg/inboxrake/commit/e39dc964bf80432a643eb672340b130dddf6463c))
+* calmer sender rows and a Select mode ([#270](https://github.com/mclgoerg/inboxrake/issues/270)) ([d79d8cb](https://github.com/mclgoerg/inboxrake/commit/d79d8cb57f83d2a7759d8727c57f555bcd74b172))
+* one toolbar with a Filter menu ([#269](https://github.com/mclgoerg/inboxrake/issues/269)) ([cddfe9f](https://github.com/mclgoerg/inboxrake/commit/cddfe9f388165868d7a3c52c13f69d3d478efc8c))
+* sidebar navigation on wide screens ([#267](https://github.com/mclgoerg/inboxrake/issues/267)) ([c33ce17](https://github.com/mclgoerg/inboxrake/commit/c33ce17e2fa53c5b613db24b2248d812111448aa))
+* warm graphite theme, system font and appearance setting ([#263](https://github.com/mclgoerg/inboxrake/issues/263)) ([cf30219](https://github.com/mclgoerg/inboxrake/commit/cf30219153acc34c2ef21a23ccc04cbf0c5965ab))
+
 ## [2.2.1](https://github.com/mclgoerg/inboxrake/compare/v2.2.0...v2.2.1) (2026-11-07)
 
 
