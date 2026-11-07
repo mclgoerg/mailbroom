@@ -130,7 +130,9 @@ test("a selection reveals the checkboxes without select mode, and the x key togg
     .toBe(1);
   fireEvent.keyDown(window, { key: "x" });
   // the focused row keeps its box (x has a visible target), the other waits
-  expect(hiddenBoxes().length).toBe(1);
+  expect(hiddenBoxes().length).toBe(2);   // still "hidden" on touch
+  expect(boxes()[0].closest("label")!.className)
+    .toContain("hoverable:opacity-100");
 });
 
 test("changing the grouping ends select mode", async () => {

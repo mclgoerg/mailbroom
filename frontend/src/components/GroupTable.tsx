@@ -6,7 +6,7 @@ import { useEffect, useRef, useState, type MouseEvent, type ReactNode } from "re
 import { fmtSize } from "../api";
 import type { Group, Grouping, SmartKind } from "../types";
 import { t } from "../i18n";
-import { Avatar, Button, Checkbox, ShortDate, StillMailingBadge, Tag, Select, isModalOpen, type TagTone } from "./ui";
+import { Avatar, Button, cap, Checkbox, ShortDate, StillMailingBadge, Tag, Select, isModalOpen, type TagTone } from "./ui";
 
 export type SortKey = "count" | "size" | "label" | "last" | "unreadPct"
   | "engagement";
@@ -107,9 +107,6 @@ const unreadPct = (g: Group) =>
 /* One status pill per row: the first thing that applies, in this priority
    (the detail header shows all the rest). The unsubscribe page to confirm is
    only a hint here - the link and "Mark as done" live in the detail. */
-/** Pill labels read in sentence case in every language. */
-const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
-
 function rowPill(g: Group, blocked: boolean): ReactNode {
   const u = g.unsubscribed;
   if (g.still_mailing) return <StillMailingBadge sm={g.still_mailing} />;
@@ -148,11 +145,12 @@ function MetaLine({ g }: { g: Group }) {
   return (
     <div className="flex min-w-0 overflow-hidden type-meta text-muted">
       {g.sub && (
-        <span className="min-w-0 truncate">{localizedSub(g.sub)}</span>
+        <>
+          <span className="min-w-0 truncate">{localizedSub(g.sub)}</span>
+          <span aria-hidden className="mx-1 shrink-0">·</span>
+        </>
       )}
-      <span className="shrink-0 whitespace-nowrap">
-        {g.sub ? "\u00a0· " : ""}<Stats g={g} />
-      </span>
+      <span className="shrink-0 whitespace-nowrap"><Stats g={g} /></span>
     </div>
   );
 }
@@ -258,9 +256,10 @@ function DesktopTable({ slice, baseIdx, selected, focusedKey, openKey, compact, 
               ? "shadow-open-edge" : ""}`}
               {...(showChecks ? { "data-no-open": true } : {})}>
               <Checkbox checked={selected.has(g.key)}
-                className={`-mx-2 -my-1 ${showChecks
-                  || g.key === focusedKey ? "" : `${hiddenCls}
-                  hoverable:group-hover/row:opacity-100`}`}
+                className={`-mx-2 -my-1 ${showChecks ? "" : `${hiddenCls}
+                  hoverable:group-hover/row:opacity-100 ${
+                    // the j/k row: what `x` ticks (mouse / keyboard only)
+                    g.key === focusedKey ? "hoverable:opacity-100" : ""}`}`}
                 aria-label={t("Select {label}", { label: g.label || g.key })}
                 onChange={() => onToggle(g.key)} />
             </td>

@@ -335,10 +335,10 @@ describe("GroupTable rows and header", () => {
     expect(row.querySelectorAll("td").length).toBe(6);
     const meta = row.querySelector("td:nth-child(3) div:last-child")!;
     // the sub (address) truncates in front; the stats stay whole
-    expect(meta.textContent).toBe("s2@x.example\u00a0· 75% unread · last 1 Jan 2025");
+    expect(meta.textContent).toBe("s2@x.example·75% unread · last 1 Jan 2025");
     expect(meta.children[0].className).toContain("truncate");
-    expect(meta.children[1].className).toContain("whitespace-nowrap");
-    expect(meta.children[1].className).toContain("shrink-0");
+    expect(meta.children[2].className).toContain("whitespace-nowrap");
+    expect(meta.children[2].className).toContain("shrink-0");
     expect(meta.querySelector("time")!.getAttribute("title"))
       .toBe("2025-01-01");
     const num = row.querySelector("td:nth-child(5)")!;
@@ -370,7 +370,7 @@ describe("GroupTable rows and header", () => {
     const g = { ...mk(0), sub: "2 mails, 1 sender" };
     const { container } = renderTable({ groups: [g], rowNote: () => "why" });
     const td = container.querySelector("tbody td:nth-child(3)")!;
-    expect(td.textContent).toContain("2 mails, 1 sender\u00a0· 0% unread");
+    expect(td.textContent).toContain("2 mails, 1 sender·0% unread");
     expect(td.querySelectorAll("div").length).toBe(3);   // name line, note, meta
   });
 
@@ -465,8 +465,10 @@ describe("GroupTable select mode", () => {
     const { container } = renderTable({ groups: [mk(0), mk(1)],
       focusedKey: mk(1).key });
     const boxes = [...container.querySelectorAll("tbody tr td:first-child label")];
-    expect(hidden(boxes[0])).toBe(true);
-    expect(hidden(boxes[1])).toBe(false);
+    expect(boxes[0].className).not.toContain("hoverable:opacity-100");
+    // mouse / keyboard only: on touch the box stays hidden outside select mode
+    expect(boxes[1].className).toContain("hoverable:opacity-100");
+    expect(boxes[1].className).toContain("opacity-0");
   });
 
   it("a hidden checkbox is inert on touch (the tap opens the row)", () => {

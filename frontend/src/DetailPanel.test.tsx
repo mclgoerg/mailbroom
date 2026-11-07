@@ -198,14 +198,14 @@ describe("DetailPanel", () => {
       renderPanel([mkMail(1)], { grouping: "smart", group: row,
         unsubscribedNow: statuses[1] });
       await waitFor(() => screen.getByText("Mail 1"));
-      expect(screen.getByText("unsubscribe failed")).toBeTruthy();
+      expect(screen.getByText("Unsubscribe failed")).toBeTruthy();
     });
 
     it("an own row with the action shows no second status", async () => {
       renderPanel([mkMail(1)], { grouping: "smart", group: ownRow,
         unsubscribedNow: statuses[1] });
       await waitFor(() => screen.getByText("Mail 1"));
-      expect(screen.queryByText("unsubscribe failed")).toBeNull();
+      expect(screen.queryByText("Unsubscribe failed")).toBeNull();
     });
 
     it("a pooled row has none on a phone either", async () => {
@@ -822,7 +822,7 @@ describe("DetailPanel header and action row", () => {
       group: mkGroup({ ai: { verdict: "review", reason: "r" } as Group["ai"],
         new: true }) });
     await waitFor(() => screen.getByText("Mail 1"));
-    expect(screen.getByText("review")).toBeTruthy();
+    expect(screen.getByText("Review")).toBeTruthy();
     expect(screen.getByText(/New/)).toBeTruthy();
     expect(screen.getByText("protected")).toBeTruthy();
     expect(screen.getByText("Blocked")).toBeTruthy();

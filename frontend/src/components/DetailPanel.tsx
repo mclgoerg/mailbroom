@@ -16,7 +16,7 @@ import { RowAvatar, localizedSub } from "./GroupTable";
 import { MailRows, MessageView } from "./MailList";
 import { SenderList, type FileEntry, type SenderAction } from "./SenderList";
 import { ThreadView } from "./ThreadView";
-import { ACTION_BTN, ActionButton, ActionFace, AiTag, Button, Chip,
+import { ACTION_BTN, ActionButton, ActionFace, AiTag, Button, cap, Chip,
   confirmDialog, DemoHint, EngagementMeter, ensureAiAck, Input, LINK,
   LINK_ACCENT, Loading, Menu, MenuItem, Modal, Notice, PanelHeader, PinButton,
   ProtectButton, RatingChips, Segmented, Select, Spinner, StatTile,
@@ -453,7 +453,7 @@ export function DetailPanel({ grouping, group, aiEnabled, protectedNow,
     if (canUnsub || isPooled(group)) return null;
     if (u.status === "done") return { text: t("Unsubscribed"), failed: false };
     if (u.status === "failed") {
-      return { text: t("unsub.badge_failed"), failed: true };
+      return { text: cap(t("unsub.badge_failed")), failed: true };
     }
     return null;
   })();

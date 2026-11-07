@@ -76,10 +76,13 @@ const VERDICT_TONE: Record<string, TagTone> = {
   keep: "keep",
 };
 
+/** Status labels read in sentence case in every language. */
+export const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+
 export function AiTag({ ai }: { ai: GroupAi }) {
   return (
     <Tag tone={VERDICT_TONE[ai.verdict]}>
-      <span title={ai.reason}>{t(`v.${ai.verdict}`)}</span>
+      <span title={ai.reason}>{cap(t(`v.${ai.verdict}`))}</span>
     </Tag>
   );
 }
