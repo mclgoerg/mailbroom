@@ -103,6 +103,16 @@ for (const [name, tk] of Object.entries(themes)) {
     }
   });
 
+  // A selected / open sender row is `bg-panel2` (GroupTable ROW_ON): its
+  // status pills and muted meta line must stay readable on it.
+  test(`${name}: pills and muted text on a selected row`, () => {
+    min("muted on panel2", tk.muted, tk.panel2);
+    for (const s of SEMANTIC) {
+      const tint = over(tk[`${s}-bg`], tk.panel2);
+      min(`${s}-fg on ${s}-bg over panel2`, tk[`${s}-fg`], tint);
+    }
+  });
+
   test(`${name}: text on fills`, () => {
     for (const a of ["accent", "accenth"]) {
       min(`on-accent on ${a}`, tk["on-accent"], tk[a]);

@@ -178,6 +178,36 @@ describe("DetailPanel", () => {
         }
       });
 
+    it("a partial result (n of m) shows in the header, even when outranked or pooled", async () => {
+      const pending = { n: 2, of: 5, status: "pending" as const, link: "",
+        addr: "" };
+      renderPanel([mkMail(1)], { grouping: "smart", group: pooled("newsletter"),
+        unsubscribedNow: pending });
+      await waitFor(() => screen.getByText("Mail 1"));
+      expect(screen.getByText("2/5 unsubscribed")).toBeTruthy();
+    });
+
+    it("done / failed show in the header when no action says it", async () => {
+      const row = mkGroup({ key: "s:q@x.example", kind: "sender",
+        addr: "q@x.example", unsub: false });
+      renderPanel([mkMail(1)], { grouping: "smart", group: row,
+        unsubscribedNow: statuses[3] });
+      await waitFor(() => screen.getByText("Mail 1"));
+      expect(screen.getByText("Unsubscribed")).toBeTruthy();
+      cleanup();
+      renderPanel([mkMail(1)], { grouping: "smart", group: row,
+        unsubscribedNow: statuses[1] });
+      await waitFor(() => screen.getByText("Mail 1"));
+      expect(screen.getByText("Unsubscribe failed")).toBeTruthy();
+    });
+
+    it("an own row with the action shows no second status", async () => {
+      renderPanel([mkMail(1)], { grouping: "smart", group: ownRow,
+        unsubscribedNow: statuses[1] });
+      await waitFor(() => screen.getByText("Mail 1"));
+      expect(screen.queryByText("Unsubscribe failed")).toBeNull();
+    });
+
     it("a pooled row has none on a phone either", async () => {
       vi.stubGlobal("matchMedia", (q: string) => ({
         matches: true, media: q, addEventListener: () => {},
@@ -792,7 +822,7 @@ describe("DetailPanel header and action row", () => {
       group: mkGroup({ ai: { verdict: "review", reason: "r" } as Group["ai"],
         new: true }) });
     await waitFor(() => screen.getByText("Mail 1"));
-    expect(screen.getByText("review")).toBeTruthy();
+    expect(screen.getByText("Review")).toBeTruthy();
     expect(screen.getByText(/New/)).toBeTruthy();
     expect(screen.getByText("protected")).toBeTruthy();
     expect(screen.getByText("Blocked")).toBeTruthy();

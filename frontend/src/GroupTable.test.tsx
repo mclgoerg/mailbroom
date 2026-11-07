@@ -2,8 +2,7 @@
 import { cleanup, fireEvent, render } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { GroupTable, localizedSub } from "./components/GroupTable";
-import { ToastProvider } from "./components/ui";
-import { setDemo } from "./demoMode";
+import { EngagementMeter, PinBadge, TrackerBadge } from "./components/ui";
 import { setLang } from "./i18n";
 import type { Group } from "./types";
 
@@ -28,7 +27,6 @@ function renderTable(extra: Partial<Parameters<typeof GroupTable>[0]> = {}) {
       onToggle={noop}
       onToggleAll={noop}
       onOpen={noop}
-      onAckUnsub={noop}
       sortK="count"
       sortDir={-1}
       onSort={noop}
@@ -40,6 +38,22 @@ function renderTable(extra: Partial<Parameters<typeof GroupTable>[0]> = {}) {
 }
 
 const rows = (c: HTMLElement) => c.querySelectorAll("tbody tr").length;
+
+
+// The engagement meter, tracker and pin badges left the rows for the detail
+// header; their own behaviour (popovers, tooltips, not opening a row they
+// sit in) is still tested here in a row-shaped host.
+function renderBadges({ groups: [g], onOpen = noop }: {
+  groups: Group[]; onOpen?: (g: Group) => void;
+}) {
+  return render(
+    <table><tbody>
+      <tr onClick={() => onOpen(g)}><td>
+        <EngagementMeter g={g} /><TrackerBadge g={g} /><PinBadge n={g.pinned} />
+      </td></tr>
+    </tbody></table>,
+  );
+}
 
 describe("GroupTable pagination", () => {
   beforeEach(() => {
@@ -86,7 +100,7 @@ describe("GroupTable pagination", () => {
   });
 });
 
-describe("unsubscribe badge", () => {
+describe("unsubscribe pill", () => {
   // Desktop table and mobile cards both render (only CSS toggles which is
   // visible), so every assertion here is duplicate-aware.
   beforeEach(() => setLang("en"));
@@ -95,67 +109,38 @@ describe("unsubscribe badge", () => {
   const withUnsub = (u: Group["unsubscribed"]) =>
     [{ ...mk(0), unsubscribed: u }];
 
-  it("shows done", () => {
+  it("shows done as an info pill", () => {
     const { getAllByText } = renderTable({ groups: withUnsub(
       { n: 1, of: 1, status: "done", link: "", addr: "" }) });
-    expect(getAllByText(/Unsubscribed/).length).toBe(2);
+    expect(getAllByText("Unsubscribed").length).toBe(2);
   });
 
-  it("shows a link plus a mark-done button, which calls back with the addr",
+  it("a page to confirm is a hint only: no link, no mark-done on the row",
     () => {
-    const onAckUnsub = vi.fn();
-    const { getAllByText, getAllByTitle } = renderTable({ onAckUnsub, groups:
-      withUnsub({ n: 0, of: 1, status: "link",
+    const onOpen = vi.fn();
+    const { container, getAllByText, queryAllByTitle } = renderTable({
+      onOpen, groups: withUnsub({ n: 0, of: 1, status: "link",
         link: "https://x.example/unsub", addr: "news@x.example" }) });
-    const links = getAllByText(/Confirm/) as HTMLAnchorElement[];
-    expect(links[0].href).toBe("https://x.example/unsub");
-    fireEvent.click(getAllByTitle("Mark as done")[0]);
-    expect(onAckUnsub).toHaveBeenCalledWith("news@x.example");
+    expect(getAllByText("Confirm on page").length).toBe(2);
+    expect(container.querySelector("a[href]")).toBeNull();
+    expect(queryAllByTitle("Mark as done").length).toBe(0);
+    // the pill is not a control: a click on it opens the row like any other
+    fireEvent.click(getAllByText("Confirm on page")[0]
+      .closest("tr")!.querySelector("td:nth-child(4)")!);
+    expect(onOpen).toHaveBeenCalledTimes(1);
   });
 
-  it("in the demo the Confirm badge opens nothing and shows the hint",
-    () => {
-    const open = vi.fn();
-    vi.stubGlobal("open", open);
-    setDemo(true);
-    try {
-      const { container, getAllByText, getByText } = render(
-        <ToastProvider><GroupTable groups={withUnsub({ n: 0, of: 1,
-          status: "link", link: "https://unsub.example/u",
-          addr: "news@x.example" })} selected={new Set()} focusedKey={null}
-          onToggle={noop} onToggleAll={noop} onOpen={noop}
-          onAckUnsub={noop} sortK="count" sortDir={-1} onSort={noop}
-          groupLabel="Sender" resetSignal="a" /></ToastProvider>);
-      expect(container.querySelector('a[href*="unsub.example"]')).toBeNull();
-      expect(container.querySelector('a[target="_blank"]')).toBeNull();
-      fireEvent.click(getAllByText(/Confirm/)[0]);
-      expect(open).not.toHaveBeenCalled();
-      getByText("In your own install this opens the sender's unsubscribe page.");
-    } finally {
-      setDemo(false);
-      vi.unstubAllGlobals();
-    }
-  });
-
-  it("outside the demo the Confirm badge stays a new-tab link", () => {
-    const { container } = renderTable({ groups: withUnsub({ n: 0, of: 1,
-      status: "link", link: "https://x.example/unsub", addr: "n@x.example" }) });
-    const a = container.querySelector(
-      'a[href="https://x.example/unsub"]') as HTMLAnchorElement;
-    expect(a.target).toBe("_blank");
-  });
-
-  it("shows a partial-progress badge without claiming full completion",
+  it("shows a partial-progress pill without claiming full completion",
     () => {
     const { getAllByText } = renderTable({ groups: withUnsub(
       { n: 1, of: 3, status: "pending", link: "", addr: "" }) });
     expect(getAllByText("1/3 unsubscribed").length).toBe(2);
   });
 
-  it("shows a failed badge", () => {
+  it("shows a failed pill", () => {
     const { getAllByText } = renderTable({ groups: withUnsub(
       { n: 0, of: 1, status: "failed", link: "", addr: "" }) });
-    expect(getAllByText(/unsubscribe failed/).length).toBe(2);
+    expect(getAllByText("Unsubscribe failed").length).toBe(2);
   });
 
   it("shows nothing when never attempted", () => {
@@ -185,15 +170,15 @@ describe("pinned badge", () => {
   afterEach(cleanup);
 
   it("shows no pin indicator for a group without pinned mails", () => {
-    const { queryAllByTitle } = renderTable({ groups: [mk(0)] });
+    const { queryAllByTitle } = renderBadges({ groups: [mk(0)] });
     expect(queryAllByTitle(/protected from bulk actions/).length).toBe(0);
   });
 
-  it("shows the pinned-mail count on the row (desktop + mobile)", () => {
-    const { getAllByTitle } = renderTable({
+  it("shows the pinned-mail count on the row", () => {
+    const { getAllByTitle } = renderBadges({
       groups: [{ ...mk(4), pinned: 3 }] });
     const badges = getAllByTitle("3 mails protected from bulk actions");
-    expect(badges.length).toBe(2);
+    expect(badges.length).toBe(1);
     expect(badges[0].textContent).toContain("3");
   });
 });
@@ -255,8 +240,8 @@ describe("engagement indicator", () => {
     [67, "high", 3], [100, "high", 3]])(
     "score %i renders the %s tier with %i lit bar(s)",
     (score, tier, lit) => {
-      const { container } = renderTable({ groups: [eng(score)] });
-      const meter = container.querySelector("tbody [data-eng]")!;
+      const { container } = renderBadges({ groups: [eng(score)] });
+      const meter = container.querySelector("[data-eng]")!;
       expect(meter.getAttribute("data-eng")).toBe(tier);
       expect(meter.querySelectorAll('[data-lit="true"]').length).toBe(lit);
       expect(meter.querySelectorAll('[data-lit="false"]').length)
@@ -264,43 +249,43 @@ describe("engagement indicator", () => {
     });
 
   it("the tooltip spells out what the score is made of", () => {
-    const { container } = renderTable({ groups: [eng(12, {
+    const { container } = renderBadges({ groups: [eng(12, {
       count: 100, unread: 88, replied: false, bulk: true,
       last: "2023-05-01" })] });
-    expect(container.querySelector("tbody [data-eng]")!
+    expect(container.querySelector("[data-eng]")!
       .getAttribute("title")).toBe(
       "Engagement 12/100 (low): 12% read, never replied, "
       + "newsletter/bulk, last mail 2023");
   });
 
   it("the tooltip names a replied sender and omits the bulk part", () => {
-    const { container } = renderTable({ groups: [eng(90, {
+    const { container } = renderBadges({ groups: [eng(90, {
       count: 4, unread: 0, replied: true, bulk: false,
       last: "2026-09-01" })] });
-    expect(container.querySelector("tbody [data-eng]")!
+    expect(container.querySelector("[data-eng]")!
       .getAttribute("title")).toBe(
       "Engagement 90/100 (high): 100% read, replied, last mail 2026");
   });
 
   it("tapping the meter opens a popover naming the score and its parts "
     + "(touch screens have no hover)", () => {
-    const { container, getByRole, queryByRole } = renderTable({
+    const { container, getByRole, queryByRole } = renderBadges({
       groups: [eng(12, { count: 100, unread: 88, bulk: true,
         last: "2023-05-01" })] });
     expect(queryByRole("dialog")).toBeNull();
-    fireEvent.click(container.querySelector("tbody [data-eng]")!);
+    fireEvent.click(container.querySelector("[data-eng]")!);
     const pop = getByRole("dialog");
     expect(pop.textContent).toContain("Engagement score 12/100 · low");
     expect(pop.textContent).toContain(
       "12% read · never replied · newsletter/bulk · last mail 2023");
     // toggles closed again
-    fireEvent.click(container.querySelector("tbody [data-eng]")!);
+    fireEvent.click(container.querySelector("[data-eng]")!);
     expect(queryByRole("dialog")).toBeNull();
   });
 
   it("the popover closes on outside tap and on Escape", () => {
-    const { container, queryByRole } = renderTable({ groups: [eng(50)] });
-    const meter = () => container.querySelector("tbody [data-eng]")!;
+    const { container, queryByRole } = renderBadges({ groups: [eng(50)] });
+    const meter = () => container.querySelector("[data-eng]")!;
     fireEvent.click(meter());
     expect(queryByRole("dialog")).not.toBeNull();
     fireEvent.pointerDown(document.body);
@@ -310,62 +295,22 @@ describe("engagement indicator", () => {
     expect(queryByRole("dialog")).toBeNull();
   });
 
-  it("tapping the meter on a mobile card does not open the group", () => {
-    const onOpen = vi.fn();
-    const { container } = renderTable({ groups: [eng(50)], onOpen });
-    const cardMeter = container.querySelector(".md\\:hidden [data-eng]")!;
-    fireEvent.click(cardMeter);
-    expect(onOpen).not.toHaveBeenCalled();
-  });
-
-  it("a tap on the card's checkbox gutter toggles selection without opening the detail", () => {
-    const onOpen = vi.fn();
-    const onToggle = vi.fn();
-    const { container } = renderTable({ groups: [mk(1)], onOpen, onToggle });
-    const card = container.querySelector(".md\\:hidden [data-gidx]")!;
-    const gutter = card.querySelector("label")!;
-    expect(gutter.className).toContain("w-11");
-    expect(gutter.className).toContain("self-stretch");
-    // The open-detail area is a sibling of the gutter, never an ancestor.
-    expect(gutter.nextElementSibling!.contains(gutter)).toBe(false);
-    fireEvent.click(gutter.querySelector("input")!);
-    expect(onToggle).toHaveBeenCalledWith(mk(1).key);
-    expect(onOpen).not.toHaveBeenCalled();
-    fireEvent.click(gutter);
-    expect(onOpen).not.toHaveBeenCalled();
-    fireEvent.click(gutter.nextElementSibling!);
-    expect(onOpen).toHaveBeenCalledTimes(1);
-  });
-
   it("the popover flips to the right edge when it would overflow", () => {
     const rect = vi.spyOn(Element.prototype, "getBoundingClientRect");
     rect.mockReturnValue({ left: 300, right: window.innerWidth + 40,
       width: 240, height: 60, top: 0, bottom: 60, x: 300, y: 0,
       toJSON: () => ({}) });
-    const { container, getByRole } = renderTable({ groups: [eng(50)] });
-    fireEvent.click(container.querySelector("tbody [data-eng]")!);
+    const { container, getByRole } = renderBadges({ groups: [eng(50)] });
+    fireEvent.click(container.querySelector("[data-eng]")!);
     expect(getByRole("dialog").className).toContain("right-0");
     rect.mockRestore();
   });
 
-  it("is also shown on the mobile cards", () => {
-    const { container } = renderTable({ groups: [eng(80)] });
-    expect(container.querySelectorAll("[data-eng='high']").length).toBe(2);
-  });
-
-  it("the column header sorts by engagement", () => {
-    const onSort = vi.fn();
-    const { getByText } = renderTable({ onSort });
-    fireEvent.click(getByText("Engagement"));
-    expect(onSort).toHaveBeenCalledWith("engagement");
-  });
-
   it("is translated in German", () => {
     setLang("de");
-    const { container, getByText } = renderTable({ groups: [eng(10)] });
+    const { container } = renderBadges({ groups: [eng(10)] });
     expect(container.querySelector("[data-eng]")!.getAttribute("title"))
       .toContain("Interaktion 10/100 (niedrig)");
-    getByText("Interaktion");
   });
 });
 
@@ -383,13 +328,75 @@ describe("GroupTable rows and header", () => {
   beforeEach(() => setLang("en"));
   afterEach(cleanup);
 
-  it("shows a short, non-wrapping date with the ISO date as title", () => {
-    const { container } = renderTable({ groups: [mk(0)] });
-    const td = container.querySelector("tbody tr td:nth-last-child(2)")!;
-    expect(td.className).toContain("whitespace-nowrap");
-    const time = td.querySelector("time")!;
-    expect(time.getAttribute("title")).toBe("2025-01-01");
-    expect(time.textContent).toBe("1 Jan 2025");
+  it("a row is avatar, name, one meta line, mails over size and a chevron", () => {
+    const g = { ...mk(2), count: 76, unread: 57, size: 7.2 * 1024 * 1024 };
+    const { container } = renderTable({ groups: [g] });
+    const row = container.querySelector("tbody tr")!;
+    expect(row.querySelectorAll("td").length).toBe(6);
+    const meta = row.querySelector("td:nth-child(3) div:last-child")!;
+    // the sub (address) truncates in front; the stats stay whole
+    expect(meta.textContent).toBe("s2@x.example·75% unread · last 1 Jan 2025");
+    expect(meta.children[0].className).toContain("truncate");
+    expect(meta.children[2].className).toContain("whitespace-nowrap");
+    expect(meta.children[2].className).toContain("shrink-0");
+    expect(meta.querySelector("time")!.getAttribute("title"))
+      .toBe("2025-01-01");
+    const num = row.querySelector("td:nth-child(5)")!;
+    expect(num.className).toContain("whitespace-nowrap");
+    expect(num.children[0].textContent).toBe("76");
+    expect(num.children[0].className).toContain("font-semibold");
+    expect(num.children[1].textContent).toBe("7.2 MB");
+  });
+
+  it("phone cards: the address has its own line, the stats share one with the pill", () => {
+    const { container } = renderTable({ groups: [{ ...mk(2), new: true }] });
+    const card = container.querySelector(".md\\:hidden [data-gidx]")!;
+    const lines = [...card.querySelector("button[data-no-open]")!
+      .parentElement!.children].slice(1);
+    expect(lines[0].textContent).toBe("s2@x.example");
+    expect(lines[0].className).toContain("truncate");
+    expect(lines[1].textContent).toBe("0% unread · last 1 Jan 2025New");
+    expect(lines[1].className).toContain("flex-wrap");
+    expect(lines[1].querySelector(".type-caption")!.textContent).toBe("New");
+  });
+
+  it("a row without a sub starts its meta line with the stats", () => {
+    const { container } = renderTable({ groups: [{ ...mk(0), sub: "" }] });
+    expect(container.querySelector("tbody td:nth-child(3) div:last-child")!
+      .textContent).toBe("0% unread · last 1 Jan 2025");
+  });
+
+  it("Smart / thread summaries keep their line, with the rows' note under the name", () => {
+    const g = { ...mk(0), sub: "2 mails, 1 sender" };
+    const { container } = renderTable({ groups: [g], rowNote: () => "why" });
+    const td = container.querySelector("tbody td:nth-child(3)")!;
+    expect(td.textContent).toContain("2 mails, 1 sender·0% unread");
+    expect(td.querySelectorAll("div").length).toBe(3);   // name line, note, meta
+  });
+
+  it("beside the detail pane the pill joins the name line instead of a column", () => {
+    const { container } = renderTable({ compact: true,
+      groups: [{ ...mk(0), new: true }] });
+    const row = container.querySelector("tbody tr")!;
+    expect(row.querySelectorAll("td").length).toBe(5);
+    expect(container.querySelectorAll("thead th").length).toBe(5);
+    expect(row.querySelector("td:nth-child(3) .type-caption")!.textContent)
+      .toBe("New");
+  });
+
+  it("the header keeps Name / Mails / Size sortable and drops the rest", () => {
+    const onSort = vi.fn();
+    const { container, getByText, queryByText } = renderTable({ onSort });
+    const head = container.querySelector("thead")!;
+    for (const gone of ["Engagement", "AI", "Last", "Status & tags"]) {
+      expect(queryByText(gone)).toBeNull();
+    }
+    fireEvent.click(getByText("Size"));
+    fireEvent.click(getByText("Mails"));
+    fireEvent.click(getByText("Sender"));
+    expect(onSort.mock.calls.map((c) => c[0]))
+      .toEqual(["size", "count", "label"]);
+    expect(head.querySelectorAll("button").length).toBe(3);
   });
 
   it("marks only the sorted column with aria-sort", () => {
@@ -397,34 +404,140 @@ describe("GroupTable rows and header", () => {
     const sorted = container.querySelectorAll("th[aria-sort]");
     expect(sorted.length).toBe(1);
     expect(sorted[0].getAttribute("aria-sort")).toBe("descending");
-    expect(sorted[0].textContent).toBe("Mails");
+    expect(sorted[0].textContent).toBe("MailsSize");
   });
 
   it("opens the detail from a row click, but not from the checkbox column, buttons or a text selection", () => {
     const onOpen = vi.fn();
-    const onAckUnsub = vi.fn();
-    const g = { ...mk(0), unsubscribed: { status: "link", link: "https://x.example/u", addr: "s0@x.example" } } as Group;
-    const { container } = renderTable({ onOpen, onAckUnsub, groups: [g] });
+    const { container } = renderTable({ onOpen, groups: [mk(0)],
+      selectMode: true });
     const row = container.querySelector("tbody tr")!;
     const tds = row.querySelectorAll("td");
     fireEvent.click(row.querySelector("input[type=checkbox]")!);
     fireEvent.click(tds[0]);                       // checkbox cell, beside the box
-    fireEvent.click(row.querySelector("button[title='unsub.mark_done'], button[aria-label]:not([aria-label='View details'])")!);
     expect(onOpen).not.toHaveBeenCalled();
-    expect(onAckUnsub).toHaveBeenCalledTimes(1);
     const sel = vi.spyOn(window, "getSelection").mockReturnValue(
       { toString: () => "some text" } as Selection);
-    fireEvent.click(tds[6]);
+    fireEvent.click(tds[4]);
     expect(onOpen).not.toHaveBeenCalled();
     sel.mockRestore();
-    fireEvent.click(tds[6]);
+    fireEvent.click(tds[4]);
     expect(onOpen).toHaveBeenCalledTimes(1);
-    fireEvent.click(tds[5]);                       // Eng cell opens too
-    expect(onOpen).toHaveBeenCalledTimes(2);
-    fireEvent.click(row.querySelector("[data-eng]")!);   // meter itself doesn't
+    fireEvent.click(tds[3]);                       // the pill cell opens too
     expect(onOpen).toHaveBeenCalledTimes(2);
     fireEvent.click(row.querySelector("button[aria-label='View details']")!);
     expect(onOpen).toHaveBeenCalledTimes(3);
+  });
+});
+
+describe("GroupTable select mode", () => {
+  beforeEach(() => setLang("en"));
+  afterEach(cleanup);
+
+  const hidden = (el: Element) => el.className.includes("opacity-0");
+  const rowBox = (c: HTMLElement) =>
+    c.querySelector("tbody tr td:first-child label")!;
+  const headBox = (c: HTMLElement) =>
+    c.querySelector("thead th:first-child label")!;
+  const cardChecks = (c: HTMLElement) =>
+    c.querySelectorAll(".md\\:hidden [data-gidx] input[type=checkbox]");
+
+  it("desktop: checkboxes wait for hover / focus until something is "
+    + "selected or select mode is on", () => {
+    const idle = renderTable({ groups: [mk(0)] });
+    expect(hidden(rowBox(idle.container))).toBe(true);
+    expect(hidden(headBox(idle.container))).toBe(true);
+    expect(rowBox(idle.container).className).toContain(
+      "hoverable:group-hover/row:opacity-100");
+    expect(rowBox(idle.container).className).toContain(
+      "focus-within:opacity-100");
+    idle.unmount();
+    const sel = renderTable({ groups: [mk(0)], selected: new Set([mk(0).key]) });
+    expect(hidden(rowBox(sel.container))).toBe(false);
+    expect(hidden(headBox(sel.container))).toBe(false);
+    sel.unmount();
+    const mode = renderTable({ groups: [mk(0)], selectMode: true });
+    expect(hidden(rowBox(mode.container))).toBe(false);
+    expect(hidden(headBox(mode.container))).toBe(false);
+  });
+
+  it("the j/k-focused row shows its checkbox, so x has a visible target", () => {
+    const { container } = renderTable({ groups: [mk(0), mk(1)],
+      focusedKey: mk(1).key });
+    const boxes = [...container.querySelectorAll("tbody tr td:first-child label")];
+    expect(boxes[0].className).not.toContain("hoverable:opacity-100");
+    // mouse / keyboard only: on touch the box stays hidden outside select mode
+    expect(boxes[1].className).toContain("hoverable:opacity-100");
+    expect(boxes[1].className).toContain("opacity-0");
+  });
+
+  it("a hidden checkbox is inert on touch (the tap opens the row)", () => {
+    const { container } = renderTable({ groups: [mk(0)] });
+    expect(rowBox(container).className).toContain("coarse:pointer-events-none");
+  });
+
+  it("phone cards have no checkboxes outside select mode", () => {
+    const idle = renderTable({ groups: [mk(0), mk(1)] });
+    expect(cardChecks(idle.container).length).toBe(0);
+    idle.unmount();
+    const mode = renderTable({ groups: [mk(0), mk(1)], selectMode: true });
+    expect(cardChecks(mode.container).length).toBe(2);
+    mode.unmount();
+    const sel = renderTable({ groups: [mk(0)], selected: new Set([mk(0).key]) });
+    expect(cardChecks(sel.container).length).toBe(1);
+  });
+
+  it("the list inside a detail panel (cards) always shows its checks", () => {
+    const { container } = renderTable({ groups: [mk(0)], cards: true });
+    expect(container.querySelector("tbody")).toBeNull();
+    expect(container.querySelectorAll("[data-gidx] input[type=checkbox]")
+      .length).toBe(1);
+  });
+
+  it("a tap on the card's check gutter toggles selection without opening the detail", () => {
+    const onOpen = vi.fn();
+    const onToggle = vi.fn();
+    const { container } = renderTable({ groups: [mk(1)], onOpen, onToggle,
+      selectMode: true });
+    const card = container.querySelector(".md\\:hidden [data-gidx]")!;
+    const gutter = card.querySelector("label")!;
+    expect(gutter.className).toContain("w-11");
+    expect(gutter.className).toContain("self-stretch");
+    // The open-detail area is a sibling of the gutter, never an ancestor.
+    expect(gutter.nextElementSibling!.contains(gutter)).toBe(false);
+    fireEvent.click(gutter.querySelector("input")!);
+    expect(onToggle).toHaveBeenCalledWith(mk(1).key);
+    expect(onOpen).not.toHaveBeenCalled();
+    fireEvent.click(gutter);
+    expect(onOpen).not.toHaveBeenCalled();
+    fireEvent.click(gutter.nextElementSibling!);
+    expect(onOpen).toHaveBeenCalledTimes(1);
+  });
+
+  it("select-all in the header selects the shown page", () => {
+    const onToggleAll = vi.fn();
+    const { getByLabelText } = renderTable({ onToggleAll, selectMode: true });
+    fireEvent.click(getByLabelText("Select all"));
+    expect(onToggleAll).toHaveBeenCalledWith(true,
+      groups.slice(0, 50).map((g) => g.key));
+  });
+
+  it("selected rows get the lighter panel, not an accent tint", () => {
+    const { container } = renderTable({ groups: [mk(0), mk(1)],
+      selected: new Set([mk(0).key]) });
+    const [a, b] = container.querySelectorAll("tbody tr");
+    expect(a.className).toContain("bg-panel2");
+    expect(a.className).not.toContain("accent-tint");
+    expect(b.className).not.toMatch(/(^| )bg-panel2( |$)/);
+  });
+
+  it("keeps rows to the two text lines (no tag cell, no wrapping badges)", () => {
+    const { container } = renderTable({ groups: [{ ...mk(0), new: true,
+      tags: ["newsletter"], att_size: 5000, pinned: 2, replied: true }] });
+    expect(container.textContent).not.toContain("newsletter");
+    expect(container.textContent).not.toMatch(/KB|protected/);
+    expect(container.querySelector("tbody tr")!.querySelectorAll("td").length)
+      .toBe(6);
   });
 });
 
@@ -484,55 +597,89 @@ describe("GroupTable avatars and phone cards", () => {
   });
 });
 
-
-describe("GroupTable status badges vs category tags", () => {
+describe("GroupTable status pill (one per row, first match wins)", () => {
   beforeEach(() => setLang("en"));
   afterEach(cleanup);
-  const g = { ...mk(0), new: true, replied: true, tags: ["newsletter", "shopping"],
-    ai: { verdict: "review", reason: "r" } as Group["ai"] };
 
-  it("the column is headed Status & tags (German: Status & Tags)", () => {
-    const { container } = renderTable({ groups: [g] });
-    expect(container.querySelector("thead")!.textContent)
-      .toContain("Status & tags");
-    cleanup(); setLang("de");
-    const de = renderTable({ groups: [g] });
-    expect(de.container.querySelector("thead")!.textContent)
-      .toContain("Status & Tags");
-  });
+  const sm = { since: "2025-02-01", n: 3, last: "2025-03-01" } as
+    unknown as NonNullable<Group["still_mailing"]>;
+  const link = { n: 0, of: 1, status: "link", link: "https://x.example/u",
+    addr: "a@x.example" } as Group["unsubscribed"];
+  const done = { n: 1, of: 1, status: "done", link: "", addr: "" } as
+    Group["unsubscribed"];
+  const ai = { verdict: "delete_safe", reason: "r" } as Group["ai"];
+  const everything = { ...mk(0), still_mailing: sm, unsubscribed: link,
+    new: true, ai, replied: true };
+  const blocked = new Map([[mk(0).key, "rule1"]]);
 
-  const tagEls = (el: Element) => [...el.querySelectorAll("span.type-caption")]
-    .filter((e) => ["newsletter", "shopping"].includes(e.textContent!));
-
-  it("table: categories come after the state badges, in the outlined style", () => {
-    const { container } = renderTable({ groups: [g] });
+  /** The pill text of the desktop row (the mobile card shows the same). */
+  const pillOf = (g: Group, blockedKeys?: Map<string, string>) => {
+    const { container, unmount } = renderTable({ groups: [g], blockedKeys });
     const cell = container.querySelector("tbody tr td:nth-child(4)")!;
-    const all = [...cell.querySelectorAll("span.type-caption")];
-    const tags = tagEls(cell);
-    expect(tags).toHaveLength(2);
-    for (const tg of tags) {
-      expect(tg.className).toContain("border-line");
-      expect(tg.className).not.toContain("bg-");        // not a filled badge
-    }
-    const states = all.filter((e) => !tags.includes(e));
-    expect(states.length).toBeGreaterThan(0);
-    for (const st of states) {
-      expect(st.className).toContain("bg-");
-      expect(st.compareDocumentPosition(tags[0])
-        & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    }
+    const text = cell.textContent;
+    const pills = cell.querySelectorAll("span.type-caption").length;
+    const cardPills = container.querySelectorAll(
+      ".md\\:hidden .type-caption").length;
+    unmount();
+    return { text, pills, cardPills };
+  };
+
+  it.each([
+    ["Still mailing", everything, blocked],
+    ["Confirm on page", { ...everything, still_mailing: null }, blocked],
+    ["Blocked", { ...everything, still_mailing: null, unsubscribed: done },
+      blocked],
+    ["New", { ...everything, still_mailing: null, unsubscribed: done }, undefined],
+    ["Safe to delete", { ...everything, still_mailing: null, new: false,
+      unsubscribed: done }, undefined],
+    ["Unsubscribed", { ...everything, still_mailing: null, new: false,
+      ai: null, unsubscribed: done }, undefined],
+    ["Replied", { ...everything, still_mailing: null, new: false,
+      ai: null, unsubscribed: null }, undefined],
+  ] as [string, Group, Map<string, string> | undefined][])(
+    "%s outranks everything below it", (want, g, b) => {
+    const { text, pills, cardPills } = pillOf(g, b);
+    expect(text).toContain(want);
+    expect(pills).toBeGreaterThanOrEqual(1);
+    expect(text!.match(/Still mailing|Confirm on page|Blocked|New|Safe to delete|Unsubscribed|Replied/g))
+      .toHaveLength(1);
+    expect(cardPills).toBe(pills);
   });
 
-  it("phone card: categories last, after state badges and the AI verdict", () => {
-    const { container } = renderTable({ groups: [g] });
-    const card = container.querySelector(".md\\:hidden")!;
-    const tags = tagEls(card);
-    expect(tags).toHaveLength(2);
-    const ai = [...card.querySelectorAll("span.type-caption")]
-      .find((e) => e.textContent === "review")!;
-    expect(ai.compareDocumentPosition(tags[0])
-      & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(tags[0].className).toContain("border-line");
+  it("verdict pills are translated (German too)", () => {
+    setLang("de");
+    const { container } = renderTable({ groups: [{ ...mk(0),
+      ai: { verdict: "delete_safe", reason: "r" } as Group["ai"] }] });
+    expect(container.querySelector("tbody tr td:nth-child(4)")!.textContent)
+      .toBe("Sicher löschbar");
+  });
+
+  it("an AI review / keep verdict gets its own tone", () => {
+    const { container } = renderTable({ groups: [{ ...mk(0),
+      ai: { verdict: "keep", reason: "r" } as Group["ai"] }] });
+    const p = container.querySelector("tbody tr td:nth-child(4) .type-caption")!;
+    expect(p.className).toContain("bg-keep-bg");
+    expect(p.className).toContain("rounded-full");
+  });
+
+  it("a row without any state has no pill and no empty line on the card", () => {
+    const { container } = renderTable({ groups: [mk(0)] });
+    expect(container.querySelector("tbody tr td:nth-child(4)")!.textContent)
+      .toBe("");
+    expect(container.querySelectorAll(".md\\:hidden .type-caption").length)
+      .toBe(0);
+  });
+
+  it("the pill is a status, not a control (the row opens from it)", () => {
+    const { container } = renderTable({ groups: [{ ...mk(0), new: true }] });
+    const cell = container.querySelector("tbody tr td:nth-child(4)")!;
+    expect(cell.querySelector("button, a")).toBeNull();
+  });
+
+  it("the Still mailing pill keeps its explanatory popover", () => {
+    const { container, getByRole } = renderTable({ groups: [everything] });
+    fireEvent.click(container.querySelector("tbody [data-still-mailing]")!);
+    expect(getByRole("dialog").textContent).toContain("Still mailing");
   });
 });
 
@@ -557,13 +704,13 @@ describe("GroupTable focus", () => {
     row.focus();
     expect(document.activeElement).toBe(row);
     rerender(<GroupTable groups={[mk(1)]} selected={new Set()} focusedKey={null}
-      onToggle={noop} onToggleAll={noop} onOpen={noop} onAckUnsub={noop}
+      onToggle={noop} onToggleAll={noop} onOpen={noop}
       sortK="count" sortDir={-1} onSort={noop} groupLabel="Sender" resetSignal="a" />);
     expect(row.isConnected).toBe(false);
     expect(document.activeElement!.textContent).toBe("Sender 1");  // took its place
     document.querySelector<HTMLElement>("tbody tr button")!.focus();
     rerender(<GroupTable groups={[]} selected={new Set()} focusedKey={null}
-      onToggle={noop} onToggleAll={noop} onOpen={noop} onAckUnsub={noop}
+      onToggle={noop} onToggleAll={noop} onOpen={noop}
       sortK="count" sortDir={-1} onSort={noop} groupLabel="Sender" resetSignal="a" />);
     expect(document.activeElement)                    // no rows left: the list
       .toBe(container.querySelector("[data-focus-return]"));
@@ -572,7 +719,7 @@ describe("GroupTable focus", () => {
   it("does not steal focus when it was never in the list", () => {
     const { rerender } = renderTable({ groups: [mk(0)] });
     rerender(<GroupTable groups={[mk(1)]} selected={new Set()} focusedKey={null}
-      onToggle={noop} onToggleAll={noop} onOpen={noop} onAckUnsub={noop}
+      onToggle={noop} onToggleAll={noop} onOpen={noop}
       sortK="count" sortDir={-1} onSort={noop} groupLabel="Sender" resetSignal="a" />);
     expect(document.activeElement).toBe(document.body);
   });
@@ -582,7 +729,7 @@ describe("GroupTable focus lands on the row that took the place", () => {
   afterEach(cleanup);
   const re = (groups: Group[]) => (<GroupTable groups={groups} selected={new Set()}
     focusedKey={null} onToggle={noop} onToggleAll={noop} onOpen={noop}
-    onAckUnsub={noop} sortK="count" sortDir={-1} onSort={noop}
+    sortK="count" sortDir={-1} onSort={noop}
     groupLabel="Sender" resetSignal="a" />);
   it("focuses the next row, or the previous when the last one was removed", () => {
     const { container, rerender } = render(re([mk(0), mk(1), mk(2)]));
@@ -609,7 +756,7 @@ describe("tracker badge", () => {
   it("is absent without tracker data or without tracking", () => {
     for (const g of [tracked(undefined),
       tracked({ checked: 4, pixel: 0, click: 0, hosts: [] })]) {
-      const { container, unmount } = renderTable({ groups: [g] });
+      const { container, unmount } = renderBadges({ groups: [g] });
       expect(container.querySelector('[aria-label^="Tracks"]')).toBeNull();
       unmount();
     }
@@ -622,18 +769,18 @@ describe("tracker badge", () => {
     [{ checked: 4, pixel: 2, click: 1, hosts: ["t.example"] },
       "Tracks opens and clicks"],
   ])("labels what it tracks (%#)", (trackers, label) => {
-    const { container } = renderTable({ groups: [tracked(trackers)] });
-    expect(container.querySelector(`tbody [aria-label="${label}"]`))
+    const { container } = renderBadges({ groups: [tracked(trackers)] });
+    expect(container.querySelector(`[aria-label="${label}"]`))
       .not.toBeNull();
   });
 
   it("tapping it opens a popover with the share and the hosts, and does "
     + "not open the row", () => {
     const onOpen = vi.fn();
-    const { container, getByRole } = renderTable({ onOpen, groups: [tracked({
+    const { container, getByRole } = renderBadges({ onOpen, groups: [tracked({
       checked: 4, pixel: 3, click: 1, hosts: ["t.example", "u.example"] })] });
     fireEvent.click(container.querySelector(
-      'tbody [aria-label="Tracks opens and clicks"]')!);
+      '[aria-label="Tracks opens and clicks"]')!);
     const pop = getByRole("dialog");
     expect(pop.textContent).toContain("3 of 4 checked mails contain a "
       + "tracking pixel");
@@ -645,9 +792,10 @@ describe("tracker badge", () => {
 
   it("is translated", () => {
     setLang("de");
-    const { container } = renderTable({ groups: [tracked({
+    const { container } = renderBadges({ groups: [tracked({
       checked: 4, pixel: 3, click: 0, hosts: [] })] });
-    expect(container.querySelector('tbody [aria-label="Verfolgt Öffnungen"]'))
+    expect(container.querySelector('[aria-label="Verfolgt Öffnungen"]'))
       .not.toBeNull();
   });
 });
+

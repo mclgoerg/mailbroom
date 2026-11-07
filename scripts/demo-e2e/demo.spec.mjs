@@ -78,6 +78,8 @@ test("the first /api/state answers (synthetic Host: localhost) @fast", async () 
 test("Trash and Undo through the UI", async () => {
   const before = await senders();
   const row = page.locator("[data-gidx]").first();
+  // Checkboxes only show on hover / in select mode: enter it like a user.
+  await page.getByRole("button", { name: "Select", exact: true }).click();
   await row.locator('input[type="checkbox"]').check();
   // The bulk bar's button (the sidebar also has a "Trash 70" item).
   await page.getByRole("region", { name: "Selection actions" })

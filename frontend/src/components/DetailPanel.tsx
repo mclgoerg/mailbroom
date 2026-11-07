@@ -16,7 +16,7 @@ import { RowAvatar, localizedSub } from "./GroupTable";
 import { MailRows, MessageView } from "./MailList";
 import { SenderList, type FileEntry, type SenderAction } from "./SenderList";
 import { ThreadView } from "./ThreadView";
-import { ACTION_BTN, ActionButton, ActionFace, AiTag, Button, Chip,
+import { ACTION_BTN, ActionButton, ActionFace, AiTag, Button, cap, Chip,
   confirmDialog, DemoHint, EngagementMeter, ensureAiAck, Input, LINK,
   LINK_ACCENT, Loading, Menu, MenuItem, Modal, Notice, PanelHeader, PinButton,
   ProtectButton, RatingChips, Segmented, Select, Spinner, StatTile,
@@ -39,7 +39,7 @@ const RATING_FILTERS: { key: string; label: string }[] = [
 export function DetailPanel({ grouping, group, aiEnabled, protectedNow,
   unsubscribedNow, onTrash, onMove, onProtect, onBlock, onUnblock, blocked, folders,
   sieve = true, smartMin = 10, onClose, onEmptied, onDeleted, variant = "modal", hideGroupActions = false,
-  senders, onSenderAct, onSenderProtect, renderSender, onAckUnsub, backLabel,
+  senders, onSenderAct, onSenderProtect, renderSender, backLabel,
   aiSort, onFile, categories, filingBox }: {
   grouping: Grouping;
   group: Group;
@@ -82,7 +82,6 @@ export function DetailPanel({ grouping, group, aiEnabled, protectedNow,
   onSenderAct?: (keys: string[], action: SenderAction, dest?: string) => Promise<boolean>;
   onSenderProtect?: (keys: string[]) => Promise<boolean>;
   renderSender?: (g: Group, back: () => void) => ReactNode;
-  onAckUnsub?: (addr: string) => void;
   backLabel?: string;                    // set: the close button goes back
   // Pooled Smart rows: AI sorting of what the rules left in Other. `onSort`
   // only when an AI is configured; `total` = senders the AI sorted so far.
@@ -440,6 +439,25 @@ export function DetailPanel({ grouping, group, aiEnabled, protectedNow,
   const hasMore = (aiEnabled && busy) || aiRate || canRead || canPinAll
     || pinnedCount > 0 || canSieve;
 
+  // Unsubscribe state as a quiet header signal where no action says it: a
+  // partial result ("2 of 5") has no button at all, done / failed show up
+  // here when the actions are not offered (an own row has the disabled
+  // "Unsubscribed" / "Retry" button; a pooled row never shows a status).
+  const unsubStatus = (() => {
+    const u = unsubscribedNow;
+    if (!u) return null;
+    if (u.status === "pending") {
+      return { text: t("unsub.badge_pending", { n: u.n, of: u.of }),
+        failed: false };
+    }
+    if (canUnsub || isPooled(group)) return null;
+    if (u.status === "done") return { text: t("Unsubscribed"), failed: false };
+    if (u.status === "failed") {
+      return { text: cap(t("unsub.badge_failed")), failed: true };
+    }
+    return null;
+  })();
+
   // Header: who this is, then the quiet signals the rows no longer carry.
   const header = (
     <div className="px-4 pt-4">
@@ -496,6 +514,12 @@ export function DetailPanel({ grouping, group, aiEnabled, protectedNow,
           <Tag tone="keep" className="inline-flex items-center gap-1">
             <Ban size={14} aria-hidden /> {t("Blocked")}
           </Tag>
+        )}
+        {unsubStatus && (
+          <span className={`inline-flex items-center gap-1 type-meta
+            ${unsubStatus.failed ? "text-danger-fg" : "text-muted"}`}>
+            <BellOff size={14} aria-hidden /> {unsubStatus.text}
+          </span>
         )}
       </div>
     </div>
@@ -883,8 +907,7 @@ export function DetailPanel({ grouping, group, aiEnabled, protectedNow,
                 <SenderList senders={senders!} folders={folders}
                   rowKind={group.kind} categories={categories} onFile={onFile}
                   onAct={onSenderAct!} onProtect={onSenderProtect!}
-                  onInspect={setInspect} onSelectedChange={setSenderSel}
-                  onAckUnsub={onAckUnsub ?? (() => {})} />
+                  onInspect={setInspect} onSelectedChange={setSenderSel} />
               </div>
             </>
           ) : (
