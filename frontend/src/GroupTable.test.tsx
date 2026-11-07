@@ -334,7 +334,11 @@ describe("GroupTable rows and header", () => {
     const row = container.querySelector("tbody tr")!;
     expect(row.querySelectorAll("td").length).toBe(6);
     const meta = row.querySelector("td:nth-child(3) div:last-child")!;
-    expect(meta.textContent).toBe("75% unread · last 1 Jan 2025");
+    // the sub (address) truncates in front; the stats stay whole
+    expect(meta.textContent).toBe("s2@x.example · 75% unread · last 1 Jan 2025");
+    expect(meta.children[0].className).toContain("truncate");
+    expect(meta.children[1].className).toContain("whitespace-nowrap");
+    expect(meta.children[1].className).toContain("shrink-0");
     expect(meta.querySelector("time")!.getAttribute("title"))
       .toBe("2025-01-01");
     const num = row.querySelector("td:nth-child(5)")!;
@@ -342,6 +346,20 @@ describe("GroupTable rows and header", () => {
     expect(num.children[0].textContent).toBe("76");
     expect(num.children[0].className).toContain("font-semibold");
     expect(num.children[1].textContent).toBe("7.2 MB");
+  });
+
+  it("a row without a sub starts its meta line with the stats", () => {
+    const { container } = renderTable({ groups: [{ ...mk(0), sub: "" }] });
+    expect(container.querySelector("tbody td:nth-child(3) div:last-child")!
+      .textContent).toBe("0% unread · last 1 Jan 2025");
+  });
+
+  it("Smart / thread summaries keep their line, with the rows' note under the name", () => {
+    const g = { ...mk(0), sub: "2 mails, 1 sender" };
+    const { container } = renderTable({ groups: [g], rowNote: () => "why" });
+    const td = container.querySelector("tbody td:nth-child(3)")!;
+    expect(td.textContent).toContain("2 mails, 1 sender · 0% unread");
+    expect(td.querySelectorAll("div").length).toBe(2);   // note + meta
   });
 
   it("the header keeps Name / Mails / Size sortable and drops the rest", () => {

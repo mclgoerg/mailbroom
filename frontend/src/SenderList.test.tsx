@@ -90,7 +90,7 @@ describe("the list", () => {
       + "the other senders of co.example.")).toBeTruthy();
     expect(screen.getByText("Nothing in its mails says what it is about."))
       .toBeTruthy();
-    expect(screen.getByText(/^14% unread · last/)).toBeTruthy();
+    expect(screen.getByText(/14% unread · last/)).toBeTruthy();
     expect(screen.getByText("7")).toBeTruthy();
     expect(screen.getByRole("button", { name: "a" })).toBeTruthy();
   });

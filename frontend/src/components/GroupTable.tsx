@@ -135,16 +135,21 @@ const VERDICT_PILL: Record<string, TagTone> = {
   delete_safe: "safe", review: "review", keep: "keep",
 };
 
-/** "76% unread · last 6 Nov" - the one meta line of a row. */
+/** The row's one meta line: the sub (address, Smart summary...) truncates,
+ *  "76% unread · last 6 Nov" stays whole. */
 function MetaLine({ g }: { g: Group }) {
   return (
-    <>{unreadPct(g)}% {t("unread")} · {t("row.last")} <ShortDate iso={g.last} /></>
+    <div className="flex min-w-0 type-meta text-muted">
+      {g.sub && (
+        <span className="min-w-0 truncate">{localizedSub(g.sub)}</span>
+      )}
+      <span className="shrink-0 whitespace-nowrap">
+        {g.sub ? " · " : ""}{unreadPct(g)}% {t("unread")} · {t("row.last")}{" "}
+        <ShortDate iso={g.last} />
+      </span>
+    </div>
   );
 }
-
-/* Sender rows drop the address line (it is the detail header's first line):
-   name + one meta line keep a row at 56-60 px (the pooled senders' own list
-   inside the detail panel, `cards`, still shows it). */
 
 /* Selected / open row: a lighter panel + (open) the accent edge. Never an
    accent tint - the status pills must keep 4.5:1 on it (index.contrast.test). */
@@ -261,18 +266,11 @@ function DesktopTable({ slice, baseIdx, selected, focusedKey, openKey, compact, 
                 onClick={() => onOpen(g)}>
                 {g.label}
               </button>
-              {g.sub && grouping !== "sender" && (
-                <div className="truncate type-meta text-muted">
-                  {localizedSub(g.sub)}
-                </div>
-              )}
               {rowNote?.(g) && (
                 <div className="truncate type-meta text-muted"
                   title={rowNote(g)}>{rowNote(g)}</div>
               )}
-              <div className="truncate type-meta text-muted">
-                <MetaLine g={g} />
-              </div>
+              <MetaLine g={g} />
             </td>
             <td className={`px-2 py-2.5 text-right ${td}`}>
               {rowPill(g, !!blockedKeys?.has(g.key))}
@@ -336,17 +334,10 @@ function MobileCards({ slice, baseIdx, selected, focusedKey, onToggle,
                     onClick={(e) => { e.stopPropagation(); onOpen(g); }}>
                     {g.label}
                   </button>
-                  {g.sub && (grouping !== "sender" || cards) && (
-                    <div className="truncate type-meta text-muted">
-                      {localizedSub(g.sub)}
-                    </div>
-                  )}
                   {rowNote?.(g) && (
                     <div className="type-meta text-muted">{rowNote(g)}</div>
                   )}
-                  <div className="truncate type-meta text-muted">
-                    <MetaLine g={g} />
-                  </div>
+                  <MetaLine g={g} />
                 </div>
                 <div className="shrink-0 whitespace-nowrap text-right
                   tabular-nums">
