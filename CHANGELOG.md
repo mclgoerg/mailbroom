@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.2.1](https://github.com/mclgoerg/inboxrake/compare/v2.2.0...v2.2.1) (2026-11-07)
+
+
+### Bug Fixes
+
+* keep manual picks on "Select all but newest" and complete the duplicates hints ([#261](https://github.com/mclgoerg/inboxrake/issues/261)) ([107073d](https://github.com/mclgoerg/inboxrake/commit/107073d1bdbf9c2914803e0dcc8cbe2ac36be854))
+
 ## [2.2.0](https://github.com/mclgoerg/inboxrake/compare/v2.1.0...v2.2.0) (2026-11-07)
 
 
