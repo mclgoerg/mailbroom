@@ -1691,7 +1691,7 @@ export default function App() {
                 </span>}>
             {multiAccount && (
               <>
-                <MenuHeading>{t("menu.accounts")}</MenuHeading>
+                <MenuGroup label={t("menu.accounts")}>
                 {Object.entries(cfg!.accounts).map(([n, a]) => (
                   <MenuItem key={n} active={n === account} sub={a.user}
                     onClick={() => n !== account && switchAccount(n)}>
@@ -1701,6 +1701,7 @@ export default function App() {
                     </span>
                   </MenuItem>
                 ))}
+                </MenuGroup>
               </>
             )}
             <MenuItem disabled={demo} sub={demo ? demoHint() : undefined}
@@ -1719,7 +1720,7 @@ export default function App() {
                 )}
               </MenuHeading>
             )}
-            <MenuHeading>{t("Appearance")}</MenuHeading>
+            <MenuGroup label={t("Appearance")}>
             {(["system", "light", "dark"] as const).map((a) => (
               <MenuItem key={a} active={appearance === a}
                 onClick={() => setAppearance(a)}>
@@ -1731,6 +1732,8 @@ export default function App() {
                 {t(`appearance.${a}`)}
               </MenuItem>
             ))}
+            </MenuGroup>
+            <MenuDivider />
             <MenuItem onClick={() => setSettingsOpen(true)}>
               <SettingsIcon size={16} className="mr-1 inline align-text-bottom" />
               {t("Settings")}

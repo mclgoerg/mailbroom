@@ -461,7 +461,7 @@ const BUTTON_VARIANT: Record<ButtonVariant, string> = {
   primary: "bg-accent enabled:hover:bg-accenth text-on-accent",
   secondary: "bg-chip enabled:hover:bg-chiph text-body",
   // Secondary call to action ("Review", "Done", an active Filter).
-  tinted: "bg-accent-tint enabled:hover:bg-accent/25 text-accent",
+  tinted: "bg-accent-tint enabled:hover:bg-accent/22 enabled:hover:text-accenth text-accent",
   quiet: "bg-transparent enabled:hover:bg-chip text-body",
   danger: "bg-danger enabled:hover:bg-danger-h text-white",
   "danger-quiet":

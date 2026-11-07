@@ -35,8 +35,10 @@ function parse(v: string): Rgba {
 
 function tokens(body: string): Record<string, Rgba> {
   const out: Record<string, Rgba> = {};
+  // Every --color-* must parse: an unsupported notation (#fff, oklch(), ...)
+  // throws here instead of silently dropping out of the checks.
   for (const m of body.matchAll(/--color-([\w-]+):\s*([^;]+);/g)) {
-    try { out[m[1]] = parse(m[2].trim()); } catch { /* not a colour */ }
+    out[m[1]] = parse(m[2].trim());
   }
   return out;
 }
@@ -58,10 +60,25 @@ function ratio(fg: Rgba, bg: Rgba): number {
 }
 
 const dark = tokens(block("@theme"));
+const lightOverrides = tokens(block('html[data-theme="light"]'));
+// Tokens the light theme intentionally inherits from the dark block.
+const INHERITED = ["danger"];
 const themes: Record<string, Record<string, Rgba>> = {
   dark,
-  light: { ...dark, ...tokens(block('html[data-theme="light"]')) },
+  light: { ...dark, ...lightOverrides },
 };
+
+test("light theme overrides every colour token except the listed ones", () => {
+  const missing = Object.keys(dark)
+    .filter((k) => !(k in lightOverrides) && !INHERITED.includes(k));
+  expect(missing).toEqual([]);
+  expect(INHERITED.every((k) => k in dark && !(k in lightOverrides))).toBe(true);
+});
+
+test("an unparseable colour is an error, not a skipped check", () => {
+  expect(() => tokens("--color-x: #fff;")).toThrow();
+  expect(() => tokens("--color-x: oklch(0.5 0.1 40);")).toThrow();
+});
 const SEMANTIC = ["safe", "review", "keep", "info", "attach", "new"];
 const WHITE: Rgba = [255, 255, 255, 1];
 
@@ -91,8 +108,14 @@ for (const [name, tk] of Object.entries(themes)) {
       min(`on-accent on ${a}`, tk["on-accent"], tk[a]);
     }
     for (const d of ["danger", "danger-h"]) min(`white on ${d}`, WHITE, tk[d]);
-    min("accent on accent-tint over panel", tk.accent,
-      over(tk["accent-tint"], tk.panel));
+    // `tinted` Button: rest (accent on accent-tint) and hover (accenth on
+    // accent at 22%, see BUTTON_VARIANT), over every base it sits on.
+    const hover: Rgba = [...tk.accent.slice(0, 3), 0.22] as unknown as Rgba;
+    for (const base of ["surface", "panel"]) {
+      min(`tinted rest over ${base}`, tk.accent,
+        over(tk["accent-tint"], tk[base]));
+      min(`tinted hover over ${base}`, tk.accenth, over(hover, tk[base]));
+    }
     min("chiptext on chip", tk.chiptext, tk.chip);
     min("body on chip", tk.body, tk.chip);
   });
