@@ -1090,10 +1090,10 @@ test("BulkBar renders every slot, Clear works, and --bulkbar-h follows its mount
     .mockReturnValue(96);
   const { unmount } = render(
     <BulkBar summary="2 groups · 5 mails" onClear={onClear}
-      secondary={<button>Export</button>} modifiers={<span>Limit to:</span>}
-      action={<span>Action slot</span>} primary={<button>Trash 5</button>} />);
+      token={<span>Keep newest 5</span>}
+      actions={<span>Action slot</span>} primary={<button>Trash 5</button>} />);
   expect(screen.getByRole("region", { name: "Selection actions" })).toBeTruthy();
-  for (const txt of ["2 groups · 5 mails", "Export", "Limit to:",
+  for (const txt of ["2 groups · 5 mails", "Keep newest 5",
     "Action slot", "Trash 5"]) expect(screen.getByText(txt)).toBeTruthy();
   fireEvent.click(screen.getByRole("button", { name: "Clear selection" }));
   expect(onClear).toHaveBeenCalled();

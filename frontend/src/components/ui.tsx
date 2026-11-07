@@ -604,7 +604,7 @@ export function SectionLabel({ children, className = "" }: {
  * phone). Closes
  * on outside click, Escape, or after any click inside (items just run
  * their onClick). Sits BELOW modals (z-modal). */
-export function Menu({ trigger, label, variant, icon, triggerClass,
+export function Menu({ trigger, label, variant, icon, up, triggerClass,
   className = "", align, children }: {
   trigger: ReactNode;
   children: ReactNode;
@@ -617,6 +617,8 @@ export function Menu({ trigger, label, variant, icon, triggerClass,
   /** Popover edge: "left" pins it to the trigger's left edge; default is
    *  right-aligned, flipped when it would overflow the viewport. */
   align?: "left";
+  /** Open upward (a menu on a bottom bar). */
+  up?: boolean;
 } & (
   /** `variant` renders the trigger as a design-system `Button` (a labelled
    *  "Tools ▾" button; with `icon` a square icon button, whose `label` is
@@ -700,7 +702,8 @@ export function Menu({ trigger, label, variant, icon, triggerClass,
       )}
       {open && (
         <div ref={pop} role="menu" onKeyDown={onMenuKey}
-          className={`absolute top-full z-(--z-dropdown) mt-1 min-w-52
+          className={`absolute z-(--z-dropdown) min-w-52
+            ${up ? "bottom-full mb-2" : "top-full mt-1"}
             max-w-[calc(100vw-1rem)] rounded-card border border-line bg-panel
             p-1 shadow-popover ${alignLeft || align === "left" ? "left-0" : "right-0"}`}
           onClick={() => close()}>
@@ -1358,54 +1361,60 @@ export function useBulkBarHeight(ref: RefObject<HTMLElement | null>,
   }, [ref, active]);
 }
 
-/** Shared by the bar's Clear and `secondary` buttons: icon-only below md
- *  (>= 44 px wide on touch), icon + text from md. */
-export const BAR_ICON_BTN = `inline-flex shrink-0 items-center justify-center
-  max-md:min-w-10 max-md:px-0 coarse:max-md:min-w-11`;
+/** One button of the selection capsule: icon-only below md (>= 44 px wide on
+ *  touch, the label stays as the accessible name), icon + text from md. */
+export function BarButton({ icon, children, variant = "secondary", className = "",
+  ...rest }: Omit<ComponentProps<"button">, "title"> & {
+  icon: ReactNode; variant?: ButtonVariant; title?: string;
+}) {
+  return (
+    <Button variant={variant} size="sm" {...rest}
+      className={`${BAR_BTN} ${className}`}>
+      {icon}
+      <span className="sr-only md:not-sr-only md:ml-1.5">{children}</span>
+    </Button>
+  );
+}
 
-/** The fixed bottom selection bar, shared by the group list and All mails.
- *  Phone (< md): summary + Clear + `secondary` / `modifiers` / `action` +
- *  `primary` on three compact rows. >= md: one row (wrapping to two at
- *  768-1023), inside the same `max-w-6xl` + page padding as the content.
- *  Publishes its height as `--bulkbar-h` (page padding, toasts). Mount it
- *  only while something is selected. */
-export function BulkBar({ summary, onClear, secondary, modifiers, action,
-  primary }: {
-  summary: ReactNode; onClear: () => void; secondary?: ReactNode;
-  modifiers?: ReactNode; action: ReactNode; primary: ReactNode;
+/** Shared by the capsule's buttons (see `BarButton`). */
+export const BAR_BTN = `inline-flex shrink-0 items-center justify-center
+  rounded-full max-md:min-w-10 max-md:px-0 coarse:max-md:min-w-11`;
+
+/** The floating selection bar, shared by the group list and All mails.
+ *  >= md a centred capsule (translucent `bar-glass`, `rounded-full` from lg)
+ *  inside the page's `max-w-6xl` width: `summary`, Clear, the active
+ *  limiter `token`, `actions`, `primary` (the destructive button). Below md
+ *  a full-width bar on two rows (summary + Clear + token, then actions +
+ *  primary) above the safe area. A caller swaps `actions` for a picker with
+ *  its own Cancel. Publishes its height as `--bulkbar-h` (page padding,
+ *  toasts). Mount it only while something is selected. */
+export function BulkBar({ summary, onClear, token, actions, primary }: {
+  summary: ReactNode; onClear: () => void; token?: ReactNode;
+  actions: ReactNode; primary: ReactNode;
 }) {
   const ref = useRef<HTMLDivElement>(null);
   useBulkBarHeight(ref, true);
   return (
     <div ref={ref} role="region" aria-label={t("bar.label")}
-      className="fixed inset-x-0 bottom-0 lg:left-61 z-(--z-bulkbar) border-t border-line
-        bg-panel pt-1.5 shadow-bar"
+      className="pointer-events-none fixed inset-x-0 bottom-0 lg:left-61
+        z-(--z-bulkbar) px-2 md:px-5"
       style={{ paddingBottom:
-        "calc(env(safe-area-inset-bottom) + 0.375rem)" }}>
-      <div className="mx-auto flex max-w-6xl flex-col gap-1.5 px-3 sm:px-5 xl:max-w-360
-        md:flex-row md:flex-wrap md:items-center md:gap-x-2">
-        <div className="flex items-center gap-2 md:contents">
+        "calc(env(safe-area-inset-bottom) + 0.5rem)" }}>
+      <div className="pointer-events-auto mx-auto flex w-fit max-w-6xl
+        flex-col gap-1.5 rounded-card border bar-glass px-3 py-2 shadow-bar
+        max-md:w-full md:flex-row md:flex-wrap md:items-center
+        md:justify-center md:gap-x-2 lg:rounded-full lg:px-4 xl:max-w-360">
+        <div className="flex min-w-0 items-center gap-2 md:contents">
           <span className="min-w-0 flex-1 truncate type-meta text-muted
             md:flex-none md:whitespace-nowrap">{summary}</span>
-          {/* One button: icon-only on a phone, icon + text from md. */}
-          <Button variant="quiet" size="sm" onClick={onClear}
-            className={BAR_ICON_BTN}>
-            <X size={16} aria-hidden />
-            <span className="sr-only md:not-sr-only md:ml-1.5">
-              {t("bar.clear")}
-            </span>
-          </Button>
-          {secondary}
+          <BarButton variant="quiet" icon={<X size={16} aria-hidden />}
+            onClick={onClear}>{t("bar.clear")}</BarButton>
+          {token}
         </div>
-        {modifiers && (
-          <div className="flex items-center gap-2 type-meta text-muted
-            md:ml-auto">{modifiers}</div>
-        )}
-        {/* A real group from md, so Action + Trash wrap together. */}
         <div className="flex flex-wrap items-center gap-1.5 md:flex-nowrap
-          md:gap-2 md:ml-auto">
-          <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5
-            md:flex-none md:flex-nowrap md:gap-2">{action}</div>
+          md:gap-2">
+          <div className="flex min-w-0 flex-1 items-center gap-1.5
+            md:flex-none md:gap-2">{actions}</div>
           <div className="shrink-0">{primary}</div>
         </div>
       </div>

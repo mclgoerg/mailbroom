@@ -4,6 +4,7 @@
  * filter reaches the members, shortcuts exist only where a row stands for one
  * exact sender / domain, and the phone layout renders the same rows as cards. */
 
+import { barAction } from "./barTestUtil";
 import { cleanup, fireEvent, render, screen, waitFor, within } from
   "@testing-library/react";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
@@ -629,8 +630,9 @@ test("protecting every sender of a pool closes its panel instead of leaving "
 
 const tickRow = (label: string) =>
   fireEvent.click(screen.getAllByLabelText(`Select ${label}`)[0]);
-const unsubOption = () => screen.getAllByRole("combobox").flatMap((c) =>
-  [...(c as HTMLSelectElement).options]).find((o) => o.value === "unsubscribe")!;
+const unsubOption = () => within(screen.getByRole("region",
+  { name: "Selection actions" })).getByRole("button",
+  { name: "Unsubscribe" }) as HTMLButtonElement;
 
 test("a selection unsubscribes only from own rows - pooled rows are skipped, "
   + "and the confirmation says so", async () => {
@@ -639,7 +641,7 @@ test("a selection unsubscribes only from own rows - pooled rows are skipped, "
   tickRow("Newsletters");
   tickRow("payco.example");
   expect(unsubOption().disabled).toBe(false);
-  pickAction("unsubscribe");
+  barAction("unsubscribe");
   const dlg = await findDialog();
   expect(within(dlg).getByText("Unsubscribe from the senders of the selected group?"))
     .toBeTruthy();
@@ -657,7 +659,7 @@ test("with only pooled rows selected, Unsubscribe is not offered", async () => {
   tickRow("Newsletters");
   tickRow("Accounts & security");
   expect(unsubOption().disabled).toBe(true);
-  pickAction("unsubscribe");               // even forced: nothing is sent
+  barAction("unsubscribe");               // even forced: nothing is sent
   await new Promise((r) => setTimeout(r, 50));
   expect(unsubscribeBulk).not.toHaveBeenCalled();
 });
@@ -668,8 +670,8 @@ test("the pool itself offers no Unsubscribe, its senders' own detail does",
     openRow("Newsletters");
     await screen.findByRole("tab", { name: "Senders (2)" });
     expect(screen.queryByRole("button", { name: "Unsubscribe" })).toBeNull();
-    expect(screen.queryAllByRole("option", { name: "Unsubscribe" }).filter(
-      (o) => !(o as HTMLOptionElement).disabled)).toHaveLength(0);
+    expect(screen.queryByRole("region", { name: "Selection actions" }))
+      .toBeNull();
   });
 
 
