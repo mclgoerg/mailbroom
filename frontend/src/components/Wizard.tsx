@@ -578,7 +578,7 @@ export function Wizard({ cfg, mode, initialStep, initialAccount, scan,
               <ul className="w-full overflow-hidden rounded-card bg-panel2
                 text-left">
                 <ScanStep done label={t("wizard.ck_connected",
-                  { name: acct ?? "" })} />
+                  { name: preset === "custom" ? f.host : presetLabel(preset) })} />
                 <ScanStep done label={connected > 0
                   ? t("wizard.ck_folders", { n: connected })
                   : t("wizard.ck_folders_ready")} />

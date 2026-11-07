@@ -53,7 +53,7 @@ export function Welcome({ onStart, onLater }: {
         </ul>
         <Button ref={start} className="mt-10 w-full max-w-xs" onClick={onStart}>
           {t("welcome.start")}</Button>
-        <Button variant="quiet" className="mt-2 text-accent" onClick={onLater}>
+        <Button variant="tinted" className="mt-3" onClick={onLater}>
           {t("wizard.later")}</Button>
       </div>
     </main>
