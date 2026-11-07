@@ -146,7 +146,7 @@ const mount = async (over: Partial<AppState> = {},
 };
 
 const openProfile = () =>
-  fireEvent.click(screen.getByLabelText("Profile & settings"));
+  fireEvent.click(screen.getByLabelText(/^Account:/));
 
 test("profile menu: Empty Trash sits last, set apart and danger-styled",
   async () => {

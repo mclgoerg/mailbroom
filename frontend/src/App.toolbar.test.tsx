@@ -100,7 +100,7 @@ test("switching accounts discards an old response and starts the new fetch", asy
   await waitFor(() => expect(stateRequest.mock.calls.length).toBeGreaterThan(before));
   state = { ...baseState, account: "other", groups: { ...baseState.groups,
     sender: { "b@x.example": { ...group, key: "b@x.example", label: "Beta" } } } };
-  fireEvent.click(screen.getByRole("button", { name: "Profile & settings" }));
+  fireEvent.click(screen.getByRole("button", { name: /^Account:/ }));
   fireEvent.click(screen.getByRole("menuitemradio", { name: /other/ }));
   await screen.findAllByText("Beta");
   resolveOld(old);

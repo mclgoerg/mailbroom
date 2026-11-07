@@ -180,7 +180,7 @@ test("Set up later on the Welcome shows the app; the Welcome states its " +
     setup_needed: true });
   await screen.findByText("Welcome to Inboxrake");
   expect(screen.getByText("Clean up without fear")).toBeTruthy();
-  expect(screen.queryByRole("button", { name: "Profile & settings" }))
+  expect(screen.queryByRole("button", { name: /^Account:/ }))
     .toBeNull();
   fireEvent.click(screen.getByRole("button", { name: "Set up later" }));
   expect((await screen.findAllByRole("button",
@@ -198,7 +198,7 @@ test("first run: the wizard sits on a plain background - no toolbar, Scan " +
   await screen.findByText("Where is your mail?");
   expect(screen.queryByRole("button", { name: "Set up your mailbox" }))
     .toBeNull();
-  expect(screen.queryByRole("button", { name: "Profile & settings" }))
+  expect(screen.queryByRole("button", { name: /^Account:/ }))
     .toBeNull();
   expect(screen.queryByText("Inboxrake")).toBeNull();
   // closing shows the app as before
@@ -260,7 +260,7 @@ test("the profile menu's Add account opens the wizard, even with a single " +
   "account", async () => {
   sessionStorage.clear();
   await open({ password_set: true });
-  fireEvent.click(screen.getByRole("button", { name: "Profile & settings" }));
+  fireEvent.click(screen.getByRole("button", { name: /^Account:/ }));
   fireEvent.click(await screen.findByText(/Add account/));
   expect(await screen.findByText(/Where is your mail/)).toBeTruthy();
 });

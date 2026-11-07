@@ -128,8 +128,8 @@ afterEach(() => {
 
 const openMenu = async () => {
   await waitFor(() =>
-    expect(screen.getByLabelText("Profile & settings")).toBeTruthy());
-  fireEvent.click(screen.getByLabelText("Profile & settings"));
+    expect(screen.getByLabelText(/^Account:/)).toBeTruthy());
+  fireEvent.click(screen.getByLabelText(/^Account:/));
 };
 
 // Mounting with an empty stored account always fires exactly 2
@@ -145,7 +145,7 @@ test("profile menu lists every account with its address", async () => {
   render(<ToastProvider><DialogProvider><App /></DialogProvider></ToastProvider>);
   // Wait for config to load (multi-account trigger) before opening the
   // menu - opening too early would still show the single-account menu.
-  await waitFor(() => expect(screen.getByLabelText("Profile & settings")
+  await waitFor(() => expect(screen.getByLabelText(/^Account:/)
     .textContent).toContain("p"));
   await settleStateCalls();
   await openMenu();
@@ -160,7 +160,7 @@ test("the active account is marked and the trigger shows its name",
     cfg = multiCfg;
     state = { ...baseState };
     render(<ToastProvider><DialogProvider><App /></DialogProvider></ToastProvider>);
-    await waitFor(() => expect(screen.getByLabelText("Profile & settings")
+    await waitFor(() => expect(screen.getByLabelText(/^Account:/)
       .textContent).toContain("p"));
     await settleStateCalls();
     await openMenu();
@@ -178,7 +178,7 @@ test("clicking a different account switches; clicking the active one " +
   cfg = multiCfg;
   state = { ...baseState };
   render(<ToastProvider><DialogProvider><App /></DialogProvider></ToastProvider>);
-  await waitFor(() => expect(screen.getByLabelText("Profile & settings")
+  await waitFor(() => expect(screen.getByLabelText(/^Account:/)
     .textContent).toContain("p"));
   await settleStateCalls();
   await settleStateCalls();
@@ -192,7 +192,7 @@ test("clicking a different account switches; clicking the active one " +
   // Clicking a DIFFERENT account switches (new refresh, trigger updates).
   await openMenu();
   fireEvent.click(screen.getByText("marcel@icloud.example"));
-  await waitFor(() => expect(screen.getByLabelText("Profile & settings")
+  await waitFor(() => expect(screen.getByLabelText(/^Account:/)
     .textContent).toContain("i"));
   expect(stateCalls.n).toBeGreaterThan(callsAfterMount);
   expect(localStorage.getItem("pmc_account")).toBe("icloud");
@@ -220,12 +220,12 @@ test("the top bar has a single account control (the avatar), no pill strip",
     cfg = multiCfg;
     state = { ...baseState };
     render(<ToastProvider><DialogProvider><App /></DialogProvider></ToastProvider>);
-    await waitFor(() => expect(screen.getByLabelText("Profile & settings")
+    await waitFor(() => expect(screen.getByLabelText(/^Account:/)
       .textContent).toContain("p"));
     await settleStateCalls();
     // Before opening the menu no account name is shown at all: the avatar
     // button is the only account control, no per-account pill buttons.
-    expect(screen.getAllByLabelText("Profile & settings")).toHaveLength(1);
+    expect(screen.getAllByLabelText(/^Account:/)).toHaveLength(1);
     const matches = screen.queryAllByText((_, el) =>
       el?.textContent === "proton" || el?.textContent === "icloud"
       || el?.textContent === "gmail");

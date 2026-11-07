@@ -131,7 +131,7 @@ test("demo: AI filter, AI review and Add account are disabled with the hint",
   expect(review.textContent).toContain(HINT);
   openTab("Senders");
 
-  fireEvent.click(screen.getByLabelText("Profile & settings"));
+  fireEvent.click(screen.getByLabelText(/^Account:/));
   const add = screen.getByRole("menuitem", { name: /Add account/ });
   expect((add as HTMLButtonElement).disabled).toBe(true);
   expect(add.textContent).toContain(HINT);
@@ -161,7 +161,7 @@ test("no demo flag: AI entry points stay hidden without a key, Add account " +
   openTab("Clean up");
   expect(screen.queryByRole("button", { name: /AI review/ })).toBeNull();
   openTab("Senders");
-  fireEvent.click(screen.getByLabelText("Profile & settings"));
+  fireEvent.click(screen.getByLabelText(/^Account:/));
   expect((screen.getByRole("menuitem", { name: /Add account/ }) as
     HTMLButtonElement).disabled).toBe(false);
   expect(screen.queryByText(HINT)).toBeNull();

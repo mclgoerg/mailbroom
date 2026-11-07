@@ -29,6 +29,7 @@ vi.mock("./api", () => ({
     getConfig: () => Promise.resolve(cfg),
     state: () => { stateCalls.n++; return Promise.resolve(state); },
     emptyTrash: () => Promise.resolve({ ok: true }),
+    audit: () => Promise.resolve({ entries: [], total: 0 }),
     logout: () => Promise.resolve(),
     exportUrl: (mode: string, keys?: string[]) =>
       `/api/export?grouping=${mode}`
@@ -203,6 +204,45 @@ test("account menu in the sidebar carries the profile items", async () => {
   expect(screen.getByRole("menuitem", { name: /Add account/ })).toBeTruthy();
   expect(screen.getByRole("group", { name: "Appearance" })).toBeTruthy();
   expect(screen.getByRole("menuitem", { name: /Empty Trash/ })).toBeTruthy();
+});
+
+test("the phone avatar menu has Activity (opens the audit log); the sidebar "
+  + "menu does not, its footer has it", async () => {
+  mount(false);
+  fireEvent.click(await screen.findByRole("button", { name: /^Account:/ }));
+  fireEvent.click(await screen.findByRole("menuitem", { name: /Activity/ }));
+  expect(await screen.findByRole("dialog")).toBeTruthy();
+  expect(screen.getByText("Audit Log")).toBeTruthy();
+  cleanup();
+  mount(true);
+  fireEvent.click(within(await side()).getByRole("button", { name: /proton/ }));
+  await screen.findByRole("menuitem", { name: /Settings/ });
+  expect(screen.queryByRole("menuitem", { name: /Activity/ })).toBeNull();
+});
+
+test("#/cleanup at >= 1024: the sidebar's Senders rewrites the URL",
+  async () => {
+  window.location.hash = "#/cleanup";
+  mount(true);
+  const nav = within(await side());
+  expect(nav.getByRole("link", { name: /Senders/ })
+    .getAttribute("aria-current")).toBe("page");
+  fireEvent.click(nav.getByRole("link", { name: /Senders/ }));
+  expect(window.location.hash).toBe("#/senders");
+});
+
+test("the phone top bar is sticky and turns glass once the page scrolls",
+  async () => {
+  mount(false);
+  const head = (await screen.findByRole("heading", { level: 1 }))
+    .closest("header")!;
+  expect(head.className).toContain("sticky");
+  expect(head.className).not.toContain("bar-glass");
+  act(() => {
+    document.body.scrollTop = 40;
+    document.body.dispatchEvent(new Event("scroll"));
+  });
+  expect(head.className).toContain("bar-glass");
 });
 
 test("tool items open today's panels; Settings gear too", async () => {

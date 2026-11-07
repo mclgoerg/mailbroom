@@ -1391,10 +1391,10 @@ function ToastView({ toast, dismiss }: {
 
 /** Publishes the height of a fixed bottom bar as a CSS variable while
  *  `active` (`--bulkbar-h` for the selection bar, `--tabbar-h` for the phone
- *  tab bar), so the toast stack (`.pmc-toasts`) and the page padding clear
+ *  tab bar, `--topbar-h` for the sticky phone top bar), so the toast stack (`.pmc-toasts`) and the page padding clear
  *  it. */
 export function useBulkBarHeight(ref: RefObject<HTMLElement | null>,
-    active: boolean, prop: "--bulkbar-h" | "--tabbar-h" = "--bulkbar-h") {
+    active: boolean, prop: "--bulkbar-h" | "--tabbar-h" | "--topbar-h" = "--bulkbar-h") {
   useEffect(() => {
     const root = document.documentElement.style;
     const el = ref.current;

@@ -42,8 +42,8 @@ export function useNav(initial: Page = DEFAULT_PAGE): [Page, (p: Page) => void] 
   return [page, setPage];
 }
 
-/** From here the sidebar replaces the header, Tools menu and Junk / Trash
- *  links (Tailwind `lg`). Below it the old header stays. */
+/** From here the sidebar is the navigation (Tailwind `lg`); below it the
+ *  top bar and the bottom tab bar are. */
 export const SIDEBAR_QUERY = "(min-width: 1024px)";
 export const SIDEBAR_W = 244;
 

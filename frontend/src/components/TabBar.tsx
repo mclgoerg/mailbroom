@@ -55,8 +55,8 @@ export function ToolList({ label, children }: {
   label: string; children: ReactNode;
 }) {
   return (
-    <ul aria-label={label} className="mb-4 divide-y divide-line
-      overflow-hidden rounded-card bg-panel">
+    <ul aria-label={label} className="mb-4 overflow-hidden rounded-card
+      bg-panel">
       {children}
     </ul>
   );
@@ -69,7 +69,10 @@ export function ToolRow({ icon, label, sub, count, disabled, onClick }: {
   disabled?: boolean; onClick: () => void;
 }) {
   return (
-    <li>
+    // The hairline starts after the icon (inset list), not at the card edge.
+    <li className="relative not-first:after:absolute not-first:after:inset-x-0
+      not-first:after:top-0 not-first:after:ml-12 not-first:after:border-t
+      not-first:after:border-line not-first:after:content-['']">
       <button type="button" disabled={disabled} onClick={onClick}
         className="flex min-h-12 w-full items-center gap-3 px-3 py-2
           text-left transition-colors enabled:hover:bg-panel2

@@ -176,7 +176,6 @@ export const DE: Record<string, string> = {
   "tracker.menu": "Tracker",
   "tools.group_cleanup": "Aufräumen",
   "tools.group_insights": "Einblicke",
-  "tools.group_ai": "KI & Export",
   "col.status_tags": "Status & Tags",
   "tracker.title": "Tracker",
   "tracker.sub": "Wer deine Öffnungen und Klicks verfolgt",
@@ -337,8 +336,6 @@ export const DE: Record<string, string> = {
   "ratings.popover_title": "KI-Bewertungen pro Mail",
   "ratings.popover_hint":
     "Anzahl der Mails dieser Gruppe je Bewertung. Gruppe öffnen für Details.",
-  "trash.open_label": "Papierkorb ({n} Mails)",
-  "trash.open_label_one": "Papierkorb (1 Mail)",
   "page.first": "Erste Seite",
   "page.prev": "Vorherige Seite",
   "page.next": "Nächste Seite",
@@ -550,7 +547,6 @@ export const DE: Record<string, string> = {
     "{n} Mails aus dem Papierkorb nach {dest} wiederhergestellt - zum Anzeigen neu scannen.",
   "notice.trash_restored_rescan_one":
     "1 Mail aus dem Papierkorb nach {dest} wiederhergestellt - zum Anzeigen neu scannen.",
-  "trash.browse": "Papierkorb durchsuchen",
   "Junk": "Spam",
   "fp.delete_permanently": "Endgültig löschen…",
   "fp.older": "Ältere löschen…",
@@ -619,9 +615,6 @@ export const DE: Record<string, string> = {
     "Einige dieser Mails stammen von geschützten Absendern oder sind angeheftet. Trotzdem in den Papierkorb verschieben?",
   "fp.confirm_protected_title": "Geschützte Mails in den Papierkorb verschieben?",
   "fp.confirm_protected_btn": "Trotzdem verschieben",
-  "junk.browse": "Spam durchsuchen",
-  "junk.open_label": "Spam ({n} Mails)",
-  "junk.open_label_one": "Spam (1 Mail)",
   "notice.junk_rescued": "{n} Mails aus dem Spam-Ordner in den Posteingang verschoben.",
   "notice.junk_rescued_one": "1 Mail aus dem Spam-Ordner in den Posteingang verschoben.",
   "notice.junk_rescued_rescan":
@@ -1106,7 +1099,6 @@ export const DE: Record<string, string> = {
   "sort.ascending": "Aufsteigend",
   "sort.descending": "Absteigend",
   "view.group_by": "Gruppieren nach",
-  "Tools": "Werkzeuge",
   "chip.inactive": "Inaktiv:",
   "chip.inactive_6m": "6 Mo.",
   "chip.inactive_1y": "1 J.",

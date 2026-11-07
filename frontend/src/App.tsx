@@ -38,7 +38,7 @@ import { AccountAvatar, BarButton, BulkBar, Button,
   choiceDialog, confirmDialog, EmptyState, ensureAiAck, FILTER_ROW, Input, isModalOpen, LINK,
   Menu, MenuDivider, MenuGroup, MenuHeading, MenuItem, Notice, ProgressBar,
   promptDialog, Segmented, Select, Spinner, useAppearance, useMediaQuery, useToast,
-  type ToastVariant } from "./components/ui";
+  type ToastVariant, useBulkBarHeight } from "./components/ui";
 import { nowMs } from "./clock";
 import { demoHint, setDemo, useDemo } from "./demoMode";
 import { t } from "./i18n";
@@ -125,6 +125,20 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem("pmc_view", flat ? "mails" : "groups");
   }, [flat]);
+  // Phone top bar: sticky; translucent and compact once the page scrolled
+  // (body is the scroll container). Publishes --topbar-h for the table head.
+  const [scrolled, setScrolled] = useState(false);
+  const [topEl, setTopEl] = useState<HTMLElement | null>(null);
+  const topRef = useMemo(() => ({ current: topEl }), [topEl]);
+  useBulkBarHeight(topRef, !wide && !!topEl, "--topbar-h");
+  useEffect(() => {
+    if (wide) return;
+    const b = document.body;
+    const on = () => setScrolled(b.scrollTop > 8);
+    on();
+    b.addEventListener("scroll", on, { passive: true });
+    return () => b.removeEventListener("scroll", on);
+  }, [wide]);
   const [filter, setFilter] = useState("");
   // Sort field + direction survive reloads; every field has a natural
   // default direction (name A→Z, everything else biggest/newest first)
@@ -1721,14 +1735,18 @@ export default function App() {
 
   // Sidebar: a page change resets selection and detail like a grouping change.
   const goPage = (p: typeof page) => {
-    if (p === page) return;
-    pageByApp.current = true;
+    // Against the URL's page: on `#/cleanup` at >= 1024 the sidebar's
+    // Senders only rewrites the URL (the shown page is Senders already).
+    if (p === navPage) return;
+    if (p !== page) {
+      pageByApp.current = true;
+      setSelectMode(false);
+      setSelected(new Set());
+      setFocusIdx(-1);
+      cancelFollow();
+      setDetail(null);
+    }
     setPage(p);
-    setSelected(new Set());
-    setSelectMode(false);
-    setFocusIdx(-1);
-    cancelFollow();
-    setDetail(null);
   };
   const openTool = (tool: SidebarTool) => ({
     search: () => setSearchOpen(true),
@@ -1749,11 +1767,11 @@ export default function App() {
   // The profile menu: the header trigger below 1024, the sidebar's account
   // switcher from there (same items).
   const profileMenu = (
-    <Menu label={t("menu.profile")}
+    <Menu label={t("menu.account_switch", { name: account })}
       {...(wide ? { variant: "quiet" as const, align: "left" as const,
-        label: t("menu.account_switch", { name: account }),
         className: "w-full", triggerClass: "w-full justify-start" }
-        : { variant: "quiet" as const, icon: true as const })}
+        : { variant: "quiet" as const, icon: true as const,
+          triggerClass: "coarse:size-11" })}
       trigger={wide ? (
         <span className="flex w-full min-w-0 items-center gap-2.5 text-left">
           <AccountAvatar name={account || "?"} className="shrink-0" />
@@ -1930,24 +1948,29 @@ export default function App() {
           it was scanned), Search all mail, Scan and the account menu. The
           tab bar at the bottom replaces the Tools menu and the Junk / Trash
           links. */}
-      {!wide && <header className="mb-2 flex items-center gap-1 md:mb-4">
+      {!wide && <header ref={setTopEl}
+        className={`sticky top-0 z-(--z-bulkbar) -mx-3 mb-2 flex items-center
+          gap-1 border-b px-3 sm:-mx-5 sm:px-5 md:mb-4
+          ${scrolled ? "bar-glass" : "border-transparent bg-surface"}`}>
         <div className="min-w-0 flex-1">
-          <h1 className="truncate type-largetitle">
+          <h1 className={`truncate ${scrolled ? "type-title"
+            : "type-largetitle"}`}>
             {t(page === "cleanup" ? "tools.group_cleanup"
               : page === "insights" ? "tools.group_insights"
               : flat ? "nav.all_mail" : "nav.senders")}
           </h1>
-          {!toolPage && !!scannedAgo && (
+          {!toolPage && !!scannedAgo && !scrolled && (
             <div className="type-meta text-muted">
               {t("scan.age", { ago: scannedAgo })}
             </div>
           )}
         </div>
         <Button variant="quiet" size="icon" label={t("Search all mails")}
+          className="coarse:size-11"
           onClick={() => setSearchOpen(true)}><Search size={18} /></Button>
         {!toolPage && !cfg?.setup_needed && (
           <Button variant="quiet" size="icon" label={t("Scan")}
-            onClick={startScan}
+            className="coarse:size-11" onClick={startScan}
             disabled={scanning || aiRunning || deleting || attsRunning
               || unsubRunning}>
             {scanning ? <Spinner /> : <RefreshCw size={18} />}

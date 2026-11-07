@@ -3,7 +3,7 @@
  * Sender tab with exactly those senders selected; the bulk bar's Trash then
  * confirms with their counts (and Cancel leaves everything alone). */
 
-import { openTab, openTool } from "./toolTestUtils";
+import { openTab } from "./toolTestUtils";
 import { cleanup, fireEvent, render, screen, waitFor, within } from
   "@testing-library/react";
 import { afterEach, expect, test, vi } from "vitest";
@@ -97,8 +97,15 @@ const boot = async () => {
   await waitFor(() => expect(screen.getAllByText("a@big.example").length)
     .toBeGreaterThan(0), { timeout: 5000 });
 };
+// The row stays disabled until the scanned state has loaded.
+const openMapTool = async () => {
+  openTab("Insights");
+  const row = screen.getByRole("button", { name: /^Space map/ });
+  await waitFor(() => expect((row as HTMLButtonElement).disabled).toBe(false));
+  fireEvent.click(row);
+};
 const openMap = async () => {
-  openTool("Insights", /^Space map/);
+  await openMapTool();
   return screen.findByTestId("space-map");
 };
 const tickDomain = (map: HTMLElement, re: RegExp) => {
@@ -126,7 +133,7 @@ test("Done: Sender tab, exactly the non-protected senders selected, Trash "
     .toBeGreaterThan(0));
   // start on another grouping: Done must bring the list back to Sender
   fireEvent.click(screen.getByRole("tab", { name: "Subject" }));
-  openTool("Insights", /^Space map/);
+  await openMapTool();
   const map = await screen.findByTestId("space-map");
   fireEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Select" }));
   fireEvent.click(within(map).getByRole("button", { name: /^big\.example/ }));
@@ -149,7 +156,8 @@ test("Done replaces a selection made in another tab", async () => {
   await boot();
   fireEvent.click(screen.getByRole("tab", { name: "Subject" }));
   fireEvent.click(screen.getByRole("tab", { name: "Sender" }));
-  fireEvent.click(screen.getAllByRole("checkbox")[1]);        // a row ticked first
+  // a row ticked first (the Subject grouping loads before the list is back)
+  fireEvent.click((await screen.findAllByRole("checkbox"))[1]);
   const map = await openMap();
   tickDomain(map, /^other\.example/);
   fireEvent.click(screen.getByRole("button", { name: "Done" }));
@@ -185,7 +193,7 @@ test("switching account closes the map (it must not reopen on the other one)",
     try {
       await boot();
       await openMap();
-      fireEvent.click(screen.getByRole("button", { name: "Profile & settings" }));
+      fireEvent.click(screen.getByRole("button", { name: /^Account:/ }));
       fireEvent.click(await screen.findByRole("menuitemradio", { name: /second/ }));
       await waitFor(() => expect(screen.queryByTestId("space-map")).toBeNull());
       openTab("Senders");   // the map was opened from the Insights tab
