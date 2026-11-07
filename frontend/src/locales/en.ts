@@ -260,7 +260,7 @@ export const EN: Record<string, string> = {
   "atts.none_hint":
     "Use “Re-analyze” after new mail has been scanned.",
   "dups.none_hint":
-    "No two mails share a Message-ID, and no two mails without one share sender, subject and size.",
+    "No identical copies, no different versions of one mail and no possible double-sends (same sender and subject within minutes).",
   "audit.empty_hint":
     "Actions such as moving mails to Trash, rule runs and undo will be listed here.",
   "search.body_hint":

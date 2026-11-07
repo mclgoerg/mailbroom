@@ -95,11 +95,13 @@ the short version; [install.md](install.md) covers running it and
   or junk such as `<>`) that share sender + subject + size (and the
   identical id text, if there is one); the largest copy is tagged, nothing
   is selected for you. Two mails with their own, different Message-IDs (say,
-  two monthly statements) are never treated as duplicates. **Possible
-  duplicates** lists the same sender and subject sent within ten minutes of
-  each other (different Message-IDs, so they may differ in content), never
-  repeating a mail from the first two sections: nothing there is selected
-  for you either, open the mails to compare and tick what to trash.
+  two monthly statements) are never copies or versions of each other; at
+  most they show up under **Possible duplicates**: the same sender and
+  subject sent within ten minutes of each other (so they may differ in
+  content), never repeating a mail from the first two sections. Nothing
+  there is selected for you either, open the mails to compare and tick what
+  to trash. "Select all but newest" only changes the identical sets - rows
+  you ticked in the other two sections stay ticked.
 - **Rules + scheduler** - save a filter query (same syntax as the filter
   box) plus an action as a rule, run it manually or daily/weekly. Rules
   always start in **report mode** (they only tell you what they would do);

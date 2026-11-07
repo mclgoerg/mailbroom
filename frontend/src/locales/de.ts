@@ -1159,7 +1159,7 @@ export const DE: Record<string, string> = {
   "atts.none_hint":
     "Nach dem Scannen neuer Mails „Neu analysieren“ verwenden.",
   "dups.none_hint":
-    "Keine zwei Mails teilen sich eine Message-ID, und keine zwei Mails ohne eine haben denselben Absender, Betreff und dieselbe Größe.",
+    "Keine identischen Kopien, keine verschiedenen Versionen einer Mail und keine möglichen Doppelsendungen (gleicher Absender und Betreff innerhalb von Minuten).",
   "audit.empty_hint":
     "Aktionen wie Mails in den Papierkorb verschieben, Regelläufe und Rückgängig erscheinen hier.",
   "search.body_hint":
