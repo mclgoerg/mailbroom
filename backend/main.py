@@ -1090,6 +1090,11 @@ def get_duplicates(account: str | None = Query(None)):
     return mailops.duplicates_list(acc=_acc(account))
 
 
+@app.get("/api/duplicates/versions")
+def get_duplicate_versions(account: str | None = Query(None)):
+    return mailops.versions_list(acc=_acc(account))
+
+
 @app.get("/api/duplicates/possible")
 def get_possible_duplicates(account: str | None = Query(None)):
     return mailops.possible_duplicates_list(acc=_acc(account))

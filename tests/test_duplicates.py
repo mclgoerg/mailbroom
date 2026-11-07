@@ -47,19 +47,17 @@ def test_duplicate_sets(monkeypatch):
     })
 
     sets = client.get("/api/duplicates").json()
-    assert len(sets) == 2
-    # sorted by reclaimable size: msgid set (500) before tuple set (300)
-    assert sets[0]["wasted"] == 500 and sets[1]["wasted"] == 300
+    assert len(sets) == 1 and sets[0]["wasted"] == 500
     # newest first inside a set
-    a = sets[0]["mails"]
-    assert [m["folder"] for m in a] == ["INBOX", "Archive"]
-    b = sets[1]["mails"]
-    assert [m["uid"] for m in b] == [3, 2]
+    assert [m["folder"] for m in sets[0]["mails"]] == ["INBOX", "Archive"]
+    # the id-less pair is a versions set: nothing reclaimable
+    (v,) = client.get("/api/duplicates/versions").json()
+    assert v["wasted"] == 0 and [m["uid"] for m in v["mails"]] == [3, 2]
 
     # "all but newest" then trash via the normal per-mail action
     items = [[m["folder"], m["uid"]] for s in sets for m in s["mails"][1:]]
     r = client.post("/api/delete_messages", json={"items": items})
-    assert r.json()["queued"] == 2
+    assert r.json()["queued"] == 1
     wait_delete_done()
     assert client.get("/api/duplicates").json() == []
 
@@ -81,6 +79,7 @@ def test_no_false_positives(monkeypatch):
         "Trash": [], "Spam": [],
     })
     assert client.get("/api/duplicates").json() == []
+    assert client.get("/api/duplicates/versions").json() == []
 
 
 def test_distinct_message_ids_are_never_paired(monkeypatch):
@@ -97,6 +96,7 @@ def test_distinct_message_ids_are_never_paired(monkeypatch):
                      date="01-Oct-2026 08:00:00 +0000")],
         "Trash": [], "Spam": []})
     assert mailops.duplicates_list() == []
+    assert mailops.versions_list() == []
 
 
 def test_same_message_id_in_two_folders_is_paired(monkeypatch):
@@ -111,14 +111,15 @@ def test_same_message_id_in_two_folders_is_paired(monkeypatch):
         == [("INBOX", 1), ("Archive", 7)]
 
 
-def test_two_idless_copies_are_paired(monkeypatch):
+def test_two_idless_copies_are_versions(monkeypatch):
     _scan(monkeypatch, {
         "INBOX": [_idless(1, subject="Notice", size=640,
                           date="02-Oct-2026 08:00:00 +0000"),
                   _idless(2, subject="Notice", size=640,
                           date="01-Oct-2026 08:00:00 +0000")],
         "Trash": [], "Spam": []})
-    (s,) = mailops.duplicates_list()
+    assert mailops.duplicates_list() == []
+    (s,) = mailops.versions_list()
     assert [m["uid"] for m in s["mails"]] == [1, 2]
 
 
@@ -129,6 +130,7 @@ def test_an_idless_mail_is_not_paired_with_one_that_has_an_id(monkeypatch):
                            msgid="<n2@shop.example>")],
         "Trash": [], "Spam": []})
     assert mailops.duplicates_list() == []
+    assert mailops.versions_list() == []
 
 
 def test_junk_message_ids_never_pair_unrelated_mails(monkeypatch):
@@ -147,6 +149,7 @@ def test_junk_message_ids_never_pair_unrelated_mails(monkeypatch):
                               msgid=mid))
     _scan(monkeypatch, {"INBOX": inbox, "Trash": [], "Spam": []})
     assert mailops.duplicates_list() == []
+    assert mailops.versions_list() == []
 
 
 def test_truncated_long_message_ids_never_pair(monkeypatch):
@@ -160,6 +163,7 @@ def test_truncated_long_message_ids_never_pair(monkeypatch):
                            msgid=head + "-2@x.example>")],
         "Trash": [], "Spam": []})
     assert mailops.duplicates_list() == []
+    assert mailops.versions_list() == []
 
 
 def test_ordinary_message_ids_still_pair(monkeypatch):
@@ -178,7 +182,8 @@ def _pair(monkeypatch, id1, id2):
                   make_msg(2, frm="bank@bank.example", subject="Statement",
                            size=4321, msgid=id2)],
         "Trash": [], "Spam": []})
-    return mailops.duplicates_list()
+    assert mailops.duplicates_list() == []
+    return mailops.versions_list()
 
 
 def test_distinct_malformed_ids_are_not_paired(monkeypatch):
@@ -201,6 +206,7 @@ def test_identical_junk_id_alone_does_not_pair_unrelated_mails(monkeypatch):
                            msgid="-")],
         "Trash": [], "Spam": []})
     assert mailops.duplicates_list() == []
+    assert mailops.versions_list() == []
 
 
 def test_junk_id_is_not_paired_with_no_id(monkeypatch):
@@ -224,6 +230,7 @@ def test_double_send_within_ten_minutes_is_a_possible_duplicate(monkeypatch):
                  date=_stamp(9, 4))])
     assert [m["uid"] for m in s["mails"]] == [2, 1]
     assert mailops.duplicates_list() == []          # different Message-IDs
+    assert mailops.versions_list() == []
 
 
 def test_possible_duplicates_window_and_chaining(monkeypatch):
@@ -265,3 +272,82 @@ def test_exact_duplicates_are_left_out_of_possible(monkeypatch):
     assert mailops.possible_duplicates_list() == []
     r = client.get("/api/duplicates/possible")
     assert r.status_code == 200 and r.json() == []
+
+
+def _ids(sets):
+    return [sorted(m["uid"] for m in s["mails"]) for s in sets]
+
+
+def test_same_id_and_size_is_identical_only(monkeypatch):
+    _scan(monkeypatch, {
+        "INBOX": [make_msg(1, subject="S", msgid="<a@x.example>", size=700)],
+        "Archive": [make_msg(2, subject="S", msgid="<a@x.example>",
+                             size=700)],
+        "Trash": [], "Spam": []})
+    assert _ids(mailops.duplicates_list()) == [[1, 2]]
+    assert mailops.versions_list() == []
+
+
+def test_same_id_different_sizes_is_versions_only(monkeypatch):
+    """Guard: a group whose copies differ in size never reaches the
+    identical list, so "Select all but newest" can't touch it."""
+    _scan(monkeypatch, {
+        "INBOX": [make_msg(1, subject="S", msgid="<a@x.example>", size=700,
+                           date="02-Oct-2026 08:00:00 +0000")],
+        "Archive": [make_msg(2, subject="S", msgid="<a@x.example>",
+                             size=9000, date="01-Oct-2026 08:00:00 +0000")],
+        "Trash": [], "Spam": []})
+    assert mailops.duplicates_list() == []
+    assert client.get("/api/duplicates").json() == []
+    (v,) = client.get("/api/duplicates/versions").json()
+    assert v["wasted"] == 0
+    assert [(m["uid"], m["size"]) for m in v["mails"]] \
+        == [(1, 700), (2, 9000)]
+
+
+def test_mixed_group_goes_to_versions_whole(monkeypatch):
+    _scan(monkeypatch, {
+        "INBOX": [make_msg(1, subject="S", msgid="<a@x.example>", size=700),
+                  make_msg(2, subject="S", msgid="<a@x.example>", size=700)],
+        "Archive": [make_msg(3, subject="S", msgid="<a@x.example>",
+                             size=650)],
+        "Trash": [], "Spam": []})
+    assert mailops.duplicates_list() == []
+    assert _ids(mailops.versions_list()) == [[1, 2, 3]]
+
+
+def test_versions_account_param(monkeypatch):
+    from backend import accounts
+    from test_multiaccount import _two_accounts
+    fakes = _two_accounts(monkeypatch)
+    for host, mid, uids in (("host-one", "<one@x.example>", (101, 102)),
+                            ("host-two", "<two@x.example>", (201, 202))):
+        for uid, size in zip(uids, (700, 900)):
+            fakes[host].mailbox["INBOX"].append(
+                make_msg(uid, subject="S", msgid=mid, size=size))
+    mailops.run_scan(accounts.get("one"))
+    mailops.run_scan(accounts.get("two"))
+    r1 = client.get("/api/duplicates/versions", params={"account": "one"})
+    r2 = client.get("/api/duplicates/versions", params={"account": "two"})
+    assert _ids(r1.json()) == [[101, 102]]
+    assert _ids(r2.json()) == [[201, 202]]
+    r = client.get("/api/duplicates/versions", params={"account": "nope"})
+    assert r.status_code == 400
+
+
+def test_possible_leaves_out_versions_members(monkeypatch):
+    """Guard: mails already listed as versions are not listed again as
+    possible duplicates (uid 3 is a different-id double-send partner)."""
+    _scan(monkeypatch, {
+        "INBOX": [make_msg(1, frm="a@x.example", subject="S",
+                           msgid="<same@x.example>", size=700,
+                           date=_stamp(9, 0)),
+                  make_msg(2, frm="a@x.example", subject="S",
+                           msgid="<same@x.example>", size=900,
+                           date=_stamp(9, 1)),
+                  make_msg(3, frm="a@x.example", subject="S",
+                           msgid="<own@x.example>", size=500,
+                           date=_stamp(9, 2))],
+        "Trash": [], "Spam": []})
+    assert _ids(mailops.versions_list()) == [[1, 2]]
+    assert mailops.possible_duplicates_list() == []

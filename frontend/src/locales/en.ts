@@ -260,7 +260,7 @@ export const EN: Record<string, string> = {
   "atts.none_hint":
     "Use “Re-analyze” after new mail has been scanned.",
   "dups.none_hint":
-    "No mail shares a Message-ID or has the same sender, subject and size as another.",
+    "No two mails share a Message-ID, and no two mails without one share sender, subject and size.",
   "audit.empty_hint":
     "Actions such as moving mails to Trash, rule runs and undo will be listed here.",
   "search.body_hint":
@@ -641,15 +641,22 @@ export const EN: Record<string, string> = {
     "Nothing to unsubscribe from - every sender is already handled or "
     + "protected.",
   "dups.hint":
-    "Same Message-ID. Mails without a usable one: identical sender + subject + size.",
+    "Copies of the same mail, versions that differ in size, and possible double-sends.",
+  "dups.identical_title": "Identical copies",
+  "dups.identical_hint":
+    "Same Message-ID and the same size - true copies. Safe to keep just the newest.",
+  "dups.versions_title": "Same mail, different versions",
+  "dups.versions_hint":
+    "Same mail, but the copies differ in size (say, one lost its attachments) - or mails without a usable Message-ID that match in sender, subject and size. Compare them; nothing is preselected.",
   "dups.summary": "{n} duplicate sets · {size} reclaimable",
   "dups.summary_one": "1 duplicate set · {size} reclaimable",
-  "dups.possible_title": "Possible duplicates - same sender and subject, sent within minutes",
+  "dups.possible_title": "Possible duplicates",
   "dups.possible_hint":
-    "These have different Message-IDs and may differ in content. Open them to compare; nothing here is selected for you.",
+    "Same sender and subject, sent within minutes of each other, but different Message-IDs - they may differ in content. Open them to compare; nothing here is selected for you.",
   "dups.keep_newest": "Select all but newest",
   "dups.wasted": "{size} reclaimable",
   "dups.newest": "newest",
+  "dups.largest": "largest",
   "dups.none": "No duplicates found",
   "stats.this_month": "moved to Trash this month: {n} mails",
   "stats.this_month_one": "moved to Trash this month: 1 mail",

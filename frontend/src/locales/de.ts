@@ -481,15 +481,22 @@ export const DE: Record<string, string> = {
   "Starting…": "Starte…",
   "Duplicates": "Duplikate",
   "dups.hint":
-    "Gleiche Message-ID. Mails ohne brauchbare Message-ID: identischer Absender + Betreff + Größe.",
+    "Kopien derselben Mail, Versionen mit unterschiedlicher Größe und mögliche Doppelsendungen.",
+  "dups.identical_title": "Identische Kopien",
+  "dups.identical_hint":
+    "Gleiche Message-ID und gleiche Größe - echte Kopien. Es reicht, die neueste zu behalten.",
+  "dups.versions_title": "Dieselbe Mail, verschiedene Versionen",
+  "dups.versions_hint":
+    "Dieselbe Mail, aber die Kopien sind unterschiedlich groß (z. B. eine ohne Anhänge) - oder Mails ohne brauchbare Message-ID mit gleichem Absender, Betreff und gleicher Größe. Vergleiche sie; nichts ist vorausgewählt.",
   "dups.summary": "{n} Duplikat-Gruppen · {size} freigebbar",
   "dups.summary_one": "1 Duplikat-Gruppe · {size} freigebbar",
-  "dups.possible_title": "Mögliche Duplikate - gleicher Absender und Betreff, innerhalb von Minuten gesendet",
+  "dups.possible_title": "Mögliche Duplikate",
   "dups.possible_hint":
-    "Diese haben unterschiedliche Message-IDs und können sich im Inhalt unterscheiden. Öffne sie zum Vergleichen; hier wird nichts für dich vorausgewählt.",
+    "Gleicher Absender und Betreff, innerhalb von Minuten gesendet, aber unterschiedliche Message-IDs - sie können sich im Inhalt unterscheiden. Öffne sie zum Vergleichen; hier wird nichts für dich vorausgewählt.",
   "dups.keep_newest": "Alle außer der neuesten auswählen",
   "dups.wasted": "{size} freigebbar",
   "dups.newest": "neueste",
+  "dups.largest": "größte",
   "dups.none": "Keine Duplikate gefunden",
   "Statistics": "Statistik",
   "stats.this_month": "diesen Monat in den Papierkorb verschoben: {n} Mails",
@@ -1152,7 +1159,7 @@ export const DE: Record<string, string> = {
   "atts.none_hint":
     "Nach dem Scannen neuer Mails „Neu analysieren“ verwenden.",
   "dups.none_hint":
-    "Keine Mail teilt sich eine Message-ID oder hat denselben Absender, Betreff und dieselbe Größe wie eine andere.",
+    "Keine zwei Mails teilen sich eine Message-ID, und keine zwei Mails ohne eine haben denselben Absender, Betreff und dieselbe Größe.",
   "audit.empty_hint":
     "Aktionen wie Mails in den Papierkorb verschieben, Regelläufe und Rückgängig erscheinen hier.",
   "search.body_hint":
