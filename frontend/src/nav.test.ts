@@ -34,3 +34,16 @@ test("setPage writes the hash and back/forward (hashchange) follow", () => {
   });
   expect(result.current[0]).toBe("senders");
 });
+
+test("Back to an empty hash returns to the start page, whatever the fallback became", () => {
+  const { result, rerender } = renderHook(({ f }) => useNav(f),
+    { initialProps: { f: "senders" as const } });
+  act(() => result.current[1]("all"));
+  // the caller's fallback follows the page (persisted view); it must not matter
+  rerender({ f: "all" as unknown as "senders" });
+  act(() => {
+    window.location.hash = "";
+    window.dispatchEvent(new HashChangeEvent("hashchange"));
+  });
+  expect(result.current[0]).toBe("senders");
+});

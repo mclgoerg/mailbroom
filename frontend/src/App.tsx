@@ -1743,6 +1743,7 @@ export default function App() {
   const profileMenu = (
     <Menu label={t("menu.profile")}
       {...(wide ? { variant: "quiet" as const, align: "left" as const,
+        label: t("menu.account_switch", { name: account }),
         className: "w-full", triggerClass: "w-full justify-start" } : {})}
       trigger={wide ? (
         <span className="flex w-full min-w-0 items-center gap-2.5 text-left">

@@ -32,7 +32,7 @@ const renderMenu = (onPick: () => void) =>
 
 test("align=left pins the popover to the trigger's left edge", () => {
   render(<Menu label="Profile" align="left" className="w-full"
-    triggerClassName="w-full" trigger={<>👤</>}>
+    triggerClass="w-full" trigger={<>👤</>}>
     <MenuItem>Do it</MenuItem>
   </Menu>);
   fireEvent.click(screen.getByLabelText("Profile"));

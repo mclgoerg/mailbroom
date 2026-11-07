@@ -1311,6 +1311,7 @@ export const DE: Record<string, string> = {
   "Remove": "Entfernen",
   "View details": "Details anzeigen",
   "menu.more": "Mehr",
+  "menu.account_switch": "Konto: {name}",
   "nav.label": "Hauptnavigation",
   "nav.senders": "Absender",
   "nav.all_mail": "Alle Mails",

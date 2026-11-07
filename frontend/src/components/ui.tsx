@@ -683,6 +683,7 @@ export function Menu({ trigger, label, variant, icon, triggerClass,
         </Button>
       ) : variant ? (
         <Button variant={variant} aria-haspopup="menu" aria-expanded={open}
+          aria-label={label}
           className={`inline-flex items-center gap-1.5 ${triggerClass ?? ""}`}
           onClick={() => setOpen(!open)}>
           {trigger}

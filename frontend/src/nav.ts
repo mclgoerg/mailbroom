@@ -17,8 +17,11 @@ export const hashOf = (page: Page): string => `#/${page}`;
 
 /** The current page and a setter. The URL hash is the source of truth, so
  *  back/forward and reloads keep the page; no router dependency. An empty or
- *  unknown hash shows `fallback` without rewriting the URL. */
-export function useNav(fallback: Page = DEFAULT_PAGE): [Page, (p: Page) => void] {
+ *  unknown hash shows `initial` without rewriting the URL. */
+export function useNav(initial: Page = DEFAULT_PAGE): [Page, (p: Page) => void] {
+  // Frozen at mount: the caller's fallback may follow the page itself (the
+  // persisted view), and Back to an empty hash must land on the start page.
+  const [fallback] = useState(initial);
   const read = () => parseHash(window.location.hash) ?? fallback;
   const [page, setPageState] = useState<Page>(read);
   useEffect(() => {
@@ -26,7 +29,7 @@ export function useNav(fallback: Page = DEFAULT_PAGE): [Page, (p: Page) => void]
     window.addEventListener("hashchange", on);
     return () => window.removeEventListener("hashchange", on);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [fallback]);
+  }, []);
   const setPage = useCallback((p: Page) => {
     setPageState(p);
     if (parseHash(window.location.hash) !== p)

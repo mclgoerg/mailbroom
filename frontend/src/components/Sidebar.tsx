@@ -27,13 +27,13 @@ export interface SidebarProps {
 }
 
 const ITEM = `flex min-h-9 w-full items-center gap-2.5 rounded-control px-2.5
-  text-left type-body transition-colors coarse:min-h-10
+  text-left type-body transition-colors coarse:min-h-11
   disabled:cursor-not-allowed disabled:text-faint`;
 const IDLE = "text-body enabled:hover:bg-chip";
 const CURRENT = "bg-accent-tint font-medium text-accent";
 
 function Count({ n }: { n?: number | null }) {
-  return n == null ? null
+  return !n ? null
     : <span className="ml-auto type-meta tabular-nums text-muted">{n}</span>;
 }
 
@@ -78,7 +78,7 @@ export function Sidebar({ page, onPage, onOpen, account, senderCount,
       <button type="button" onClick={() => onOpen("search")}
         className="my-2 flex min-h-9 w-full items-center gap-2 rounded-control
           bg-chip px-2.5 text-left type-body text-muted transition-colors
-          hover:bg-chiph coarse:min-h-10">
+          hover:bg-chiph coarse:min-h-11">
         <Search size={16} aria-hidden />
         {t("Search all mails")}
       </button>
@@ -111,7 +111,7 @@ export function Sidebar({ page, onPage, onOpen, account, senderCount,
         </button>
         <button type="button" aria-label={t("Settings")} title={t("Settings")}
           className={`${IDLE} inline-flex size-9 shrink-0 items-center
-            justify-center rounded-control transition-colors coarse:size-10`}
+            justify-center rounded-control transition-colors coarse:size-11`}
           onClick={() => onOpen("settings")}>
           <SettingsIcon size={16} aria-hidden />
         </button>

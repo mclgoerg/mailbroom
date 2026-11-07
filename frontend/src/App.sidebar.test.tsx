@@ -223,3 +223,29 @@ test("a reload on #/all lands on All mail", async () => {
   expect((await within(await side()).findByRole("link", { name: /All mail/ }))
     .getAttribute("aria-current")).toBe("page");
 });
+
+test("fresh load, All mail, Back lands on Senders again (sidebar and segment)",
+  async () => {
+  mount();
+  const nav = within(await side());
+  fireEvent.click(nav.getByRole("link", { name: /All mail/ }));
+  expect(window.location.hash).toBe("#/all");
+  act(() => {
+    window.location.hash = "";
+    window.dispatchEvent(new HashChangeEvent("hashchange"));
+  });
+  await waitFor(() => expect(
+    nav.getByRole("link", { name: /Senders/ }).getAttribute("aria-current"))
+    .toBe("page"));
+  cleanup();
+  mount(false);
+  fireEvent.click(await screen.findByRole("tab", { name: "All mails" }));
+  expect(window.location.hash).toBe("#/all");
+  act(() => {
+    window.location.hash = "";
+    window.dispatchEvent(new HashChangeEvent("hashchange"));
+  });
+  await waitFor(() => expect(
+    screen.getByRole("tab", { name: "Sender" }).getAttribute("aria-selected"))
+    .toBe("true"));
+});

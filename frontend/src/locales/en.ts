@@ -423,6 +423,7 @@ export const EN: Record<string, string> = {
   "tools.group_cleanup": "Clean up",
   "tools.group_insights": "Insights",
   "tools.group_ai": "AI & export",
+  "menu.account_switch": "Account: {name}",
   "nav.label": "Main navigation",
   "nav.senders": "Senders",
   "nav.all_mail": "All mail",
