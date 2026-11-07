@@ -858,21 +858,37 @@ export const EN: Record<string, string> = {
   "status.filter_none": "0 of {n} groups match",
   "status.filter_none_one": "0 of 1 group matches",
   "status.no_mails": "No mails found in the scanned folders.",
+  "welcome.title": "Welcome to Inboxrake",
+  "welcome.sub": "Clear out years of mail in minutes, on your own server.",
+  "welcome.p1.title": "See who fills your inbox",
+  "welcome.p1.text":
+    "Mail is grouped by sender and company and sorted by how much space it "
+    + "takes.",
+  "welcome.p2.title": "Clean up without fear",
+  "welcome.p2.text":
+    "Mail is moved to Trash, never deleted outright, and you can undo it.",
+  "welcome.p3.title": "Your mail stays with you",
+  "welcome.p3.text":
+    "Inboxrake connects over IMAP and stores nothing elsewhere. AI is "
+    + "optional.",
+  "welcome.start": "Get started",
   "wizard.title": "Set up your mailbox",
-  "wizard.step": "Step {n} of {m}",
   "wizard.later": "Set up later",
   "wizard.cancel": "Cancel",
   "wizard.back": "Back",
-  "wizard.next": "Next",
+  "wizard.next": "Continue",
   "wizard.skip": "Skip",
-  "wizard.s_provider": "Provider",
+  "wizard.steps": "Setup steps",
+  "wizard.s_provider": "Choose provider",
   "wizard.s_signin": "Sign in",
-  "wizard.s_folders": "Folders",
-  "wizard.s_protect": "Protection",
+  "wizard.s_protect": "Password",
   "wizard.s_scan": "First scan",
+  "wizard.provider_title": "Where is your mail?",
   "wizard.provider_help":
-    "Where does your mail live? Pick your provider - you can add more "
-    + "accounts later.",
+    "Pick your provider. You can add more mailboxes later.",
+  "wizard.imap_other": "Another IMAP server",
+  "wizard.imap_other_hint": "Enter host and port yourself",
+  "wizard.stays_here": "Sign-in details stay on this server.",
   "wizard.custom_help":
     "Any mail server that speaks IMAP - enter its host, port and security "
     + "below.",
@@ -895,6 +911,7 @@ export const EN: Record<string, string> = {
   "wizard.testing": "Testing the connection…",
   "wizard.test_ok": "Connected - {n} folders found.",
   "wizard.oauth_needed": "Connect your account first, then test the connection.",
+  "wizard.folders_choose": "Choose folders… (optional)",
   "wizard.folders_help":
     "The ticked folders are scanned. The defaults skip Trash, Spam, Sent "
     + "and Drafts.",
@@ -909,16 +926,25 @@ export const EN: Record<string, string> = {
   "wizard.pw_mismatch": "The two passwords differ.",
   "wizard.pw_set": "Set password",
   "wizard.scan_title": "Reading your mailbox",
-  "wizard.scan_running": "Scanning… {progress}",
+  "wizard.scan_headers":
+    "Only headers are read: who sent what, when and how big. Nothing is "
+    + "changed.",
+  "wizard.scan_of": "{done} of {total}",
+  "wizard.scan_close": "You can close this; the scan keeps running.",
+  "wizard.ck_connected": "Connected to {name}",
+  "wizard.ck_folders": "{n} folders found",
+  "wizard.ck_folders_one": "1 folder found",
+  "wizard.ck_folders_ready": "Folders ready",
+  "wizard.ck_grouping": "Grouping senders…",
+  "wizard.ck_grouped": "Senders grouped",
   "wizard.scan_done": "All done - your mailbox is ready.",
   "wizard.scan_failed": "The scan did not work",
   "wizard.scan_again": "Try again",
   "wizard.scan_bg": "Continue in the background",
   "wizard.finish": "Show my mailbox",
-  "wizard.ai_note": "AI helpers are optional - you can set them up in Settings.",
   "wizard.setup_text":
-    "Connect your mail account in a few steps: provider, sign-in, "
-    + "folders, then a first scan.",
+    "Connect your mail account in a few steps: provider, sign-in "
+    + "and a first scan.",
   "wizard.setup_btn": "Set up your mailbox",
   "onboard.ready": "Ready for the first scan",
   "onboard.unverified": "Finish setting up {account}",

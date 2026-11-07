@@ -713,21 +713,41 @@ export const DE: Record<string, string> = {
   "status.filter_none": "0 von {n} Gruppen passen",
   "status.filter_none_one": "0 von 1 Gruppe passt",
   "status.no_mails": "In den gescannten Ordnern wurden keine Mails gefunden.",
+  "welcome.title": "Willkommen bei Inboxrake",
+  "welcome.sub":
+    "Räume jahrelang angesammelte Mails in Minuten auf – auf deinem "
+    + "eigenen Server.",
+  "welcome.p1.title": "Sieh, wer deinen Posteingang füllt",
+  "welcome.p1.text":
+    "Mails werden nach Absender und Firma gruppiert und danach sortiert, "
+    + "wie viel Platz sie belegen.",
+  "welcome.p2.title": "Aufräumen ohne Angst",
+  "welcome.p2.text":
+    "Mails landen im Papierkorb, werden nie sofort gelöscht, und du kannst "
+    + "alles rückgängig machen.",
+  "welcome.p3.title": "Deine Post bleibt bei dir",
+  "welcome.p3.text":
+    "Inboxrake verbindet sich per IMAP und speichert nichts anderswo. KI "
+    + "ist optional.",
+  "welcome.start": "Los geht's",
   "wizard.title": "Postfach einrichten",
-  "wizard.step": "Schritt {n} von {m}",
   "wizard.later": "Später einrichten",
   "wizard.cancel": "Abbrechen",
   "wizard.back": "Zurück",
   "wizard.next": "Weiter",
   "wizard.skip": "Überspringen",
-  "wizard.s_provider": "Anbieter",
+  "wizard.steps": "Einrichtungsschritte",
+  "wizard.s_provider": "Anbieter wählen",
   "wizard.s_signin": "Anmelden",
-  "wizard.s_folders": "Ordner",
-  "wizard.s_protect": "Schutz",
+  "wizard.s_protect": "Passwort",
   "wizard.s_scan": "Erster Scan",
+  "wizard.provider_title": "Wo liegt deine Post?",
   "wizard.provider_help":
-    "Wo liegt deine Post? Wähle deinen Anbieter – weitere Konten kannst "
-    + "du später hinzufügen.",
+    "Wähle deinen Anbieter. Weitere Postfächer kannst du später "
+    + "hinzufügen.",
+  "wizard.imap_other": "Anderer IMAP-Server",
+  "wizard.imap_other_hint": "Host und Port selbst eintragen",
+  "wizard.stays_here": "Anmeldedaten bleiben auf diesem Server.",
   "wizard.custom_help":
     "Jeder Mailserver, der IMAP spricht – trage unten Host, Port und "
     + "Sicherheit ein.",
@@ -751,6 +771,7 @@ export const DE: Record<string, string> = {
   "wizard.test_ok": "Verbunden – {n} Ordner gefunden.",
   "wizard.oauth_needed":
     "Verbinde zuerst dein Konto und teste dann die Verbindung.",
+  "wizard.folders_choose": "Ordner auswählen… (optional)",
   "wizard.folders_help":
     "Die angehakten Ordner werden gescannt. Papierkorb, Spam, Gesendet "
     + "und Entwürfe werden standardmäßig ausgelassen.",
@@ -765,18 +786,26 @@ export const DE: Record<string, string> = {
   "wizard.pw_mismatch": "Die beiden Passwörter unterscheiden sich.",
   "wizard.pw_set": "Passwort setzen",
   "wizard.scan_title": "Dein Postfach wird gelesen",
-  "wizard.scan_running": "Scan läuft… {progress}",
+  "wizard.scan_headers":
+    "Gelesen werden nur die Kopfzeilen: wer was wann geschickt hat und wie "
+    + "groß es ist. Es wird nichts verändert.",
+  "wizard.scan_of": "{done} von {total}",
+  "wizard.scan_close":
+    "Du kannst das schließen; der Scan läuft weiter.",
+  "wizard.ck_connected": "Mit {name} verbunden",
+  "wizard.ck_folders": "{n} Ordner gefunden",
+  "wizard.ck_folders_one": "1 Ordner gefunden",
+  "wizard.ck_folders_ready": "Ordner bereit",
+  "wizard.ck_grouping": "Absender werden gruppiert…",
+  "wizard.ck_grouped": "Absender gruppiert",
   "wizard.scan_done": "Fertig – dein Postfach ist bereit.",
   "wizard.scan_failed": "Der Scan hat nicht geklappt",
   "wizard.scan_again": "Nochmal versuchen",
   "wizard.scan_bg": "Im Hintergrund weitermachen",
   "wizard.finish": "Mein Postfach anzeigen",
-  "wizard.ai_note":
-    "KI-Helfer sind optional – du kannst sie in den Einstellungen "
-    + "einrichten.",
   "wizard.setup_text":
-    "Verbinde dein Mailkonto in wenigen Schritten: Anbieter, Anmeldung, "
-    + "Ordner, dann ein erster Scan.",
+    "Verbinde dein Mailkonto in wenigen Schritten: Anbieter, Anmeldung "
+    + "und ein erster Scan.",
   "wizard.setup_btn": "Postfach einrichten",
   "onboard.ready": "Bereit für den ersten Scan",
   "onboard.unverified": "Richte {account} fertig ein",

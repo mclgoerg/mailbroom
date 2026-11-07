@@ -19,6 +19,7 @@ import { RulesModal } from "./components/RulesModal";
 import { AllMailsView } from "./components/AllMailsView";
 import { SearchPanel } from "./components/SearchPanel";
 import { SettingsModal } from "./components/SettingsModal";
+import { Welcome } from "./components/Welcome";
 import { Wizard, WIZARD_RESUME_KEY, type WizardStep } from "./components/Wizard";
 import { SpaceMapPanel } from "./components/SpaceMapPanel";
 import { StatsPanel } from "./components/StatsPanel";
@@ -601,9 +602,11 @@ export default function App() {
       api.getConfig().then(setCfg).catch(() => {});
   }, [unverified, state?.status]);
   const multiAccount = !!cfg && Object.keys(cfg.accounts).length > 1;
-  // The wizard opens by itself while no account is set up (until the user
-  // sets it up later this session) and again after the OAuth consent
-  // redirect that it started.
+  // While no account is set up, the full-screen Welcome shows (until the
+  // user sets up later this session); the wizard opens from it, and again
+  // after the OAuth consent redirect that it started.
+  const [setupLater, setSetupLater] = useState(
+    () => !!sessionStorage.getItem("pmc_wizard_later"));
   useEffect(() => {
     if (!cfg) return;
     const resume = sessionStorage.getItem(WIZARD_RESUME_KEY);
@@ -618,8 +621,6 @@ export default function App() {
         }
       } catch { /* ignore a broken marker */ }
     }
-    if (cfg.setup_needed && !sessionStorage.getItem("pmc_wizard_later"))
-      setWizard((w) => w ?? { mode: "first" });
   }, [cfg?.setup_needed, !!cfg]);
   // >= 1280 px: the group detail is a pane beside the list. It is not a
   // modal - the list stays keyboard-navigable and nothing traps focus.
@@ -1639,6 +1640,14 @@ export default function App() {
     />
   );
 
+  if (cfg?.setup_needed && !setupLater && !wizard) {
+    return <Welcome onStart={() => setWizard({ mode: "first" })}
+      onLater={() => {
+        sessionStorage.setItem("pmc_wizard_later", "1");
+        setSetupLater(true);
+      }} />;
+  }
+
   return (
     <div className="mx-auto max-w-6xl p-3 xl:max-w-360 pb-[calc(var(--bulkbar-h,0px)+0.75rem)]
       sm:p-5 sm:pb-[calc(var(--bulkbar-h,0px)+1.25rem)]">
@@ -2455,8 +2464,10 @@ export default function App() {
               switchAccount(next.default_account);
           }}
           onClose={() => {
-            if (wizard.mode === "first")
+            if (wizard.mode === "first") {
               sessionStorage.setItem("pmc_wizard_later", "1");
+              setSetupLater(true);
+            }
             setWizard(null);
             refresh();
           }} />

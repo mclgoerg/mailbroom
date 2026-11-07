@@ -1,8 +1,10 @@
-import { Check } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { Check, CheckCircle2, ChevronRight, Circle, Lock, Server } from
+  "lucide-react";
+import { useEffect, useId, useRef, useState } from "react";
 import { api, errorText } from "../api";
 import { demoHint, useDemo } from "../demoMode";
 import { t } from "../i18n";
+import { parseProgress } from "../lib";
 import { PRESET_LABELS, PRESETS, presetLabel } from "../presets";
 import type { AuthMethod, Config, FoldersResp, OauthProvider, Preset,
   Security, SmtpSecurity } from "../types";
@@ -10,12 +12,12 @@ import { FolderSettings } from "./FolderSettings";
 import { Button, DemoHint, Field, Input, Modal, Notice, PanelHeader, Segmented,
   Select, Spinner, tabPanelProps } from "./ui";
 
-/* First-run setup wizard (also "Add account"): provider -> sign in + test ->
- * folders -> protect with a password -> first scan. Everything goes through
- * the endpoints Settings uses; the only state kept here is the form. */
+/* First-run setup wizard (also "Add account"): provider -> sign in + test
+ * (folders are an optional extra on that step) -> protect with a password ->
+ * first scan. Everything goes through the endpoints Settings uses; the only
+ * state kept here is the form. */
 
-export type WizardStep = "provider" | "signin" | "folders" | "protect"
-  | "scan";
+export type WizardStep = "provider" | "signin" | "protect" | "scan";
 
 /** Set before the OAuth consent redirect so App can reopen the wizard on
  *  the way back (the redirect reloads the page). */
@@ -60,12 +62,15 @@ export function Wizard({ cfg, mode, initialStep, initialAccount, scan,
   const created = useRef<string | null>(
     mode === "add" ? existing : null);
   const [tested, setTested] = useState(false);
+  // The sign-in as it stands has passed its test (editing the form resets it);
+  // `tested` only says that an account of this session was ever signed in.
+  const [passed, setPassed] = useState(false);
   const [connected, setConnected] = useState(0);   // folders seen by the test
   // Decided once: setting the password flips `cfg.auth.mode` mid-wizard,
   // which must not change the step count.
   const [protectApplies] = useState(() => mode === "first"
     && cfg.auth.mode === "none" && !!cfg.auth.is_admin);
-  const steps: WizardStep[] = ["provider", "signin", "folders",
+  const steps: WizardStep[] = ["provider", "signin",
     ...(protectApplies ? ["protect" as const] : []), "scan"];
   const [step, setStep] = useState<WizardStep>(initialStep
     ?? (existing ? "signin" : "provider"));
@@ -78,10 +83,13 @@ export function Wizard({ cfg, mode, initialStep, initialAccount, scan,
   const [f, setF] = useState(() => formFor(
     (im?.preset ?? "proton") as Preset, im));
   const set = (k: keyof typeof f) =>
-    (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
+    (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+      setPassed(false);
       setF({ ...f, [k]: e.target.value });
+    };
   const choosePreset = (p: Preset) => {
     setPreset(p);
+    setPassed(false);
     setF(formFor(p, null));
     setStep("signin");
   };
@@ -154,8 +162,11 @@ export function Wizard({ cfg, mode, initialStep, initialAccount, scan,
       if (ctl.signal.aborted) return;      // closed while that was loading
       if (fresh) onConfig(fresh, null);
       setTested(true);
+      setPassed(true);
       setConnected(r.folders);
-      setStep("folders");
+      // a new test starts the optional folder choice afresh
+      setFoldersOpen(false);
+      setFolders(null);
     } catch (e: any) {
       if (!ctl.signal.aborted) setErr(String(e.message ?? e));
     } finally {
@@ -240,10 +251,11 @@ export function Wizard({ cfg, mode, initialStep, initialAccount, scan,
         .map((x) => x.raw)));
     }).catch((e) => setFoldersErr(String(e.message ?? e)));
   };
+  const [foldersOpen, setFoldersOpen] = useState(false);
   useEffect(() => {
-    if (step === "folders") loadFolders();
+    if (foldersOpen) loadFolders();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [step, acct]);
+  }, [foldersOpen, acct]);
   const saveFolders = async () => {
     if (!acct || !folders) return true;
     const explicit = folders.folders.filter((x) => !included.has(x.raw))
@@ -300,6 +312,8 @@ export function Wizard({ cfg, mode, initialStep, initialAccount, scan,
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [step]);
   const mine = scan.account === acct;
+  const prog = mine && scan.status === "scanning"
+    ? parseProgress(scan.progress) : null;
   const scanDone = mine && scan.status === "done";
   const scanFailed = scanErr || (mine && scan.status === "error"
     ? errorText(scan.error) : "");
@@ -325,8 +339,13 @@ export function Wizard({ cfg, mode, initialStep, initialAccount, scan,
 
   const stepLabel: Record<WizardStep, string> = {
     provider: t("wizard.s_provider"), signin: t("wizard.s_signin"),
-    folders: t("wizard.s_folders"), protect: t("wizard.s_protect"),
-    scan: t("wizard.s_scan") };
+    protect: t("wizard.s_protect"), scan: t("wizard.s_scan") };
+  // Continue on the sign-in step: the folder choice is optional; only when
+  // it was opened is it saved (untouched, that equals the defaults).
+  const cont = async () => {
+    if (foldersOpen && folders && !(await saveFolders())) return;
+    next();
+  };
   const needOauth = method === "oauth" && !oauthConnected;
   const canTest = !busy && !!f.host.trim() && !!f.user.trim()
     && (method === "oauth" ? oauthConnected : hasPassword);
@@ -342,24 +361,55 @@ export function Wizard({ cfg, mode, initialStep, initialAccount, scan,
     <Modal full size="md" onClose={close} labelledBy={titleId}>
       <PanelHeader
         title={<span id={titleId}>{t("wizard.title")}</span>}
-        sub={`${t("wizard.step", { n: at + 1, m: steps.length })} - `
-          + stepLabel[step]}
         closeLabel={mode === "first" ? t("wizard.later") : t("wizard.cancel")}
         onClose={close} />
       <div className="flex-1 overflow-y-auto p-4 sm:p-5">
+        <ol aria-label={t("wizard.steps")}
+          className="mb-5 flex flex-wrap items-center gap-x-3 gap-y-1
+            type-meta text-muted">
+          {steps.map((s, i) => (
+            <li key={s} aria-current={s === step ? "step" : undefined}
+              className={`flex items-center gap-2
+                ${s === step ? "font-medium text-body" : ""}`}>
+              <span aria-hidden="true" className={`grid size-5 shrink-0
+                place-items-center rounded-full type-caption font-semibold
+                ${s === step ? "bg-accent text-on-accent"
+                : i < at ? "bg-accent-tint text-accent" : "bg-chip"}`}>
+                {i < at ? <Check size={14} /> : i + 1}</span>
+              {stepLabel[s]}
+            </li>
+          ))}
+        </ol>
         {step === "provider" && (<>
-          <p className="mb-3 type-body text-muted">
+          <h2 className="type-title2">{t("wizard.provider_title")}</h2>
+          <p className="mb-4 mt-1 type-body text-muted">
             {t("wizard.provider_help")}</p>
-          <div className="grid gap-2 sm:grid-cols-2">
-            {PROVIDERS.map((p) => (
-              <button key={p} type="button" onClick={() => choosePreset(p)}
-                className="min-h-11 rounded-card border border-line bg-panel2
-                  px-3 py-2 text-left type-body hover:bg-chip
-                  focus-visible:outline-offset-2">
-                {presetLabel(p)}
-              </button>
+          <div className="grid grid-cols-2 gap-2">
+            {PROVIDERS.filter((p) => p !== "custom").map((p) => (
+              <ProviderTile key={p} label={presetLabel(p)}
+                hint={APP_PASSWORD.includes(p) ? t("wizard.pw_app") : ""}
+                onClick={() => choosePreset(p)} />
             ))}
           </div>
+          <button type="button" onClick={() => choosePreset("custom")}
+            aria-label={t("wizard.imap_other")}
+            aria-describedby="wizard-other-hint"
+            className="mt-2 flex min-h-11 w-full items-center gap-3
+              rounded-card border border-line bg-panel2 px-3 py-2 text-left
+              hover:bg-chip focus-visible:outline-offset-2">
+            <span aria-hidden="true" className="grid size-9 shrink-0
+              place-items-center rounded-control bg-chip text-muted">
+              <Server size={18} /></span>
+            <span className="min-w-0 flex-1">
+              <span className="block type-body font-medium">
+                {t("wizard.imap_other")}</span>
+              <span id="wizard-other-hint"
+                className="block type-meta text-muted">
+                {t("wizard.imap_other_hint")}</span>
+            </span>
+            <ChevronRight size={16} aria-hidden="true"
+              className="shrink-0 text-faint" />
+          </button>
         </>)}
 
         {step === "signin" && (
@@ -375,7 +425,7 @@ export function Wizard({ cfg, mode, initialStep, initialAccount, scan,
             {preset === "gmail" && (
               <Segmented fill idPrefix="wizard-signin"
                 label={t("signin.label")} value={method}
-                onChange={(v) => setF({ ...f, auth: v })}
+                onChange={(v) => { setPassed(false); setF({ ...f, auth: v }); }}
                 options={[
                   { value: "password", label: t("signin.password") },
                   { value: "oauth", label: t("signin.oauth") }]} />
@@ -441,36 +491,44 @@ export function Wizard({ cfg, mode, initialStep, initialAccount, scan,
                 {t("wizard.test_cancel")}</Button>
             )}
             {err && <Notice tone="danger">{err}</Notice>}
+            {passed && (
+              <div className="grid gap-2 border-t border-line pt-3">
+                {connected > 0 && (
+                  <p className="inline-flex items-center gap-1.5 type-body
+                    text-safe-fg"><Check size={16} />
+                    {t("wizard.test_ok", { n: connected })}</p>
+                )}
+                <Button variant="secondary" className="justify-self-start"
+                  aria-expanded={foldersOpen} disabled={!!busy}
+                  onClick={() => setFoldersOpen((o) => !o)}>
+                  {t("wizard.folders_choose")}</Button>
+                {foldersOpen && (<>
+                  <p className="type-meta text-muted">
+                    {t("wizard.folders_help")}</p>
+                  {!folders && !foldersErr && <Busy label={t("loading…")} />}
+                  {foldersErr && (
+                    <Notice tone="danger">
+                      {foldersErr}{" "}
+                      <button className="underline"
+                        onClick={() => loadFolders()}>
+                        {t("folders.discover")}</button>
+                    </Notice>
+                  )}
+                  {folders && (
+                    <FolderSettings account={acct!} data={folders}
+                      included={included} setIncluded={setIncluded} simple
+                      wildcards={wildcards} setWildcards={setWildcards}
+                      reload={() => loadFolders(true)} />
+                  )}
+                </>)}
+              </div>
+            )}
             {needOauth && !err && (
               <p className="type-meta text-muted">{t("wizard.oauth_needed")}</p>
             )}
             <DemoHint />
           </div>
         )}
-
-        {step === "folders" && (<>
-          {connected > 0 && (
-            <p className="mb-2 inline-flex items-center gap-1.5 type-body
-              text-safe-fg"><Check size={16} />
-              {t("wizard.test_ok", { n: connected })}</p>
-          )}
-          <p className="mb-3 type-body text-muted">{t("wizard.folders_help")}</p>
-          {!folders && !foldersErr && <Busy label={t("loading…")} />}
-          {foldersErr && (
-            <Notice tone="danger">
-              {foldersErr}{" "}
-              <button className="underline" onClick={() => loadFolders()}>
-                {t("folders.discover")}</button>
-            </Notice>
-          )}
-          {folders && (
-            <FolderSettings account={acct!} data={folders}
-              included={included} setIncluded={setIncluded} simple
-              wildcards={wildcards} setWildcards={setWildcards}
-              reload={() => loadFolders(true)} />
-          )}
-          {err && <Notice tone="danger" className="mt-3">{err}</Notice>}
-        </>)}
 
         {step === "protect" && (
           <div className="grid gap-3">
@@ -493,43 +551,64 @@ export function Wizard({ cfg, mode, initialStep, initialAccount, scan,
         )}
 
         {step === "scan" && (
-          <div className="grid gap-3">
-            <div className="type-heading">{scanDone ? t("wizard.scan_title_done")
-              : t("wizard.scan_title")}</div>
+          <div className="grid justify-items-center gap-4 text-center">
+            {!scanFailed && <ScanRing
+              frac={scanDone ? 1 : prog ? prog.done / prog.total : null}
+              label={t("wizard.scan_title")}>
+              {scanDone ? <Check size={18} aria-hidden="true"
+                className="size-10 text-safe-fg" /> : prog && (<>
+                <span className="type-largetitle">
+                  {Math.round(prog.done / prog.total * 100)}%</span>
+                <span className="type-meta text-muted">
+                  {t("wizard.scan_of", { done: prog.done.toLocaleString(),
+                    total: prog.total.toLocaleString() })}</span>
+              </>)}
+            </ScanRing>}
+            <h2 className="type-title2">{scanDone ? t("wizard.scan_title_done")
+              : t("wizard.scan_title")}</h2>
             {scanFailed ? (
-              <Notice tone="danger">
+              <Notice tone="danger" className="w-full text-left">
                 <div className="font-medium">{t("wizard.scan_failed")}</div>
                 {scanFailed}
               </Notice>
-            ) : scanDone ? (
-              <p className="inline-flex items-center gap-2 type-body
-                text-safe-fg">
-                <Check size={18} /> {t("wizard.scan_done")}</p>
-            ) : (
-              <p className="inline-flex items-center gap-2 type-body">
-                <Spinner /> {t("wizard.scan_running",
-                  { progress: mine ? scan.progress : "" })}</p>
-            )}
-            <p className="type-meta text-muted">{t("wizard.ai_note")}</p>
+            ) : (<>
+              <p className="type-body text-muted">
+                {scanDone ? t("wizard.scan_done") : t("wizard.scan_headers")}
+              </p>
+              <ul className="w-full overflow-hidden rounded-card bg-panel2
+                text-left">
+                <ScanStep done label={t("wizard.ck_connected",
+                  { name: acct ?? "" })} />
+                <ScanStep done label={connected > 0
+                  ? t("wizard.ck_folders", { n: connected })
+                  : t("wizard.ck_folders_ready")} />
+                <ScanStep done={scanDone} label={scanDone
+                  ? t("wizard.ck_grouped") : t("wizard.ck_grouping")} />
+              </ul>
+              {!scanDone && <p className="type-meta text-muted">
+                {t("wizard.scan_close")}</p>}
+            </>)}
           </div>
         )}
       </div>
 
-      {step === "provider" && footer(
-        <Button variant="secondary" onClick={close}>
-          {mode === "first" ? t("wizard.later") : t("wizard.cancel")}
-        </Button>)}
+      {step === "provider" && (
+        <div className="flex flex-wrap items-center gap-2 border-t border-line
+          px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:px-5">
+          <p className="mr-auto inline-flex items-center gap-1.5 type-meta
+            text-muted"><Lock size={14} aria-hidden="true" />
+            {t("wizard.stays_here")}</p>
+          <Button variant="secondary" onClick={close}>
+            {mode === "first" ? t("wizard.later") : t("wizard.cancel")}
+          </Button>
+        </div>)}
       {step === "signin" && footer(
         <Button variant="secondary" onClick={back} disabled={!!busy}>
           {t("wizard.back")}</Button>,
-        <Button onClick={test} disabled={demo || !canTest}
-          title={demo ? demoHint() : undefined}>{t("wizard.test")}</Button>)}
-      {step === "folders" && footer(
-        <Button variant="secondary" onClick={back}>{t("wizard.back")}</Button>,
-        <Button variant="secondary" onClick={next} disabled={!!busy}>
-          {t("wizard.skip")}</Button>,
-        <Button disabled={!folders || !!busy}
-          onClick={async () => { if (await saveFolders()) next(); }}>
+        <Button variant={passed ? "secondary" : "primary"} onClick={test}
+          disabled={demo || !canTest}
+          title={demo ? demoHint() : undefined}>{t("wizard.test")}</Button>,
+        passed && <Button key="cont" onClick={cont} disabled={!!busy}>
           {t("wizard.next")}</Button>)}
       {step === "protect" && footer(
         <Button variant="secondary" onClick={back} disabled={!!busy}>
@@ -605,6 +684,72 @@ export function Wizard({ cfg, mode, initialStep, initialAccount, scan,
     );
   }
 }
+
+/** A provider on the first step: neutral monogram square, name, and a hint
+ *  only where we know one (the hint describes the button, it is not its name). */
+function ProviderTile({ label, hint, onClick }: {
+  label: string; hint: string; onClick: () => void;
+}) {
+  const id = useId();
+  return (
+    <button type="button" onClick={onClick}
+      aria-label={label} aria-describedby={hint ? id : undefined}
+      className="flex min-h-11 items-center gap-3 rounded-card border
+        border-line bg-panel2 px-3 py-2 text-left hover:bg-chip
+        focus-visible:outline-offset-2">
+      <span aria-hidden="true" className="grid size-9 shrink-0 place-items-center
+        rounded-control bg-chip type-body font-semibold text-muted">
+        {label.charAt(0).toUpperCase()}</span>
+      <span className="min-w-0">
+        <span className="block type-body font-medium">{label}</span>
+        {hint && <span id={id} className="block type-meta text-muted">
+          {hint}</span>}
+      </span>
+    </button>
+  );
+}
+
+/** The first-scan progress ring: determinate for a fraction, else a short
+ *  arc turning (static under reduced motion). `children` sit in its centre. */
+function ScanRing({ frac, label, children }: {
+  frac: number | null; label: string; children?: React.ReactNode;
+}) {
+  const R = 52;
+  const C = 2 * Math.PI * R;
+  const arc = (f: number) => `${C * f} ${C}`;
+  const props = { viewBox: "0 0 120 120", fill: "none", strokeWidth: 8,
+    className: "absolute inset-0 size-full" } as const;
+  return (
+    <div role="progressbar" aria-label={label} aria-valuemin={0}
+      aria-valuemax={100}
+      aria-valuenow={frac == null ? undefined : Math.round(frac * 100)}
+      className="relative grid size-40 place-items-center">
+      <svg {...props} aria-hidden="true">
+        <circle cx="60" cy="60" r={R} className="stroke-chip" />
+      </svg>
+      <svg {...props} aria-hidden="true" className={`absolute inset-0 size-full
+        -rotate-90 ${frac == null ? "animate-spin motion-reduce:animate-none"
+        : ""}`}>
+        <circle cx="60" cy="60" r={R} strokeLinecap="round"
+          className="stroke-accent"
+          strokeDasharray={arc(frac ?? 0.25)} />
+      </svg>
+      <div className="relative grid justify-items-center">{children}</div>
+    </div>
+  );
+}
+
+/** One line of the first-scan checklist. */
+const ScanStep = ({ done, label }: { done?: boolean; label: string }) => (
+  <li className="flex items-center gap-3 px-3 py-2.5 type-body
+    not-first:border-t not-first:border-line">
+    {done ? <CheckCircle2 size={18} aria-hidden="true"
+        className="shrink-0 text-safe-fg" />
+      : <Circle size={18} aria-hidden="true"
+        className="shrink-0 text-faint" />}
+    {label}
+  </li>
+);
 
 const Busy = ({ label }: { label: string }) => (
   <p className="inline-flex items-center gap-2 type-meta text-muted">

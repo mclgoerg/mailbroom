@@ -143,16 +143,21 @@ const openRaw = async (c: Config) => {
   render(<ToastProvider><DialogProvider><App /></DialogProvider></ToastProvider>);
 };
 
-test("with no account set up the wizard opens by itself; Set up later " +
-  "leaves a card that reopens it", async () => {
+test("with no account set up the Welcome shows; Get started opens the " +
+  "wizard, Set up later leaves a card that reopens it", async () => {
   sessionStorage.clear();
   await openRaw({ ...mkCfg({ user: "", password_set: false }),
     setup_needed: true });
-  expect(await screen.findByText("Where does your mail live?", { exact:
-    false })).toBeTruthy();
+  expect(await screen.findByRole("heading",
+    { name: "Welcome to Inboxrake" })).toBeTruthy();
+  expect(screen.queryByText(/Where is your mail/)).toBeNull();
+  fireEvent.click(screen.getByRole("button", { name: "Get started" }));
+  expect(await screen.findByText("Where is your mail?")).toBeTruthy();
   fireEvent.click(screen.getAllByRole("button", { name: "Set up later" })[0]);
-  await waitFor(() => expect(screen.queryByText(/Where does your mail live/))
+  await waitFor(() => expect(screen.queryByText(/Where is your mail/))
     .toBeNull());
+  expect(screen.queryByRole("heading", { name: "Welcome to Inboxrake" }))
+    .toBeNull();
   const setup = (await screen.findAllByRole("button",
     { name: "Set up your mailbox" }))[0];
   // it stays closed after a reload within the session
@@ -160,12 +165,34 @@ test("with no account set up the wizard opens by itself; Set up later " +
   await openRaw({ ...mkCfg({ user: "", password_set: false }),
     setup_needed: true });
   await screen.findAllByRole("button", { name: "Set up your mailbox" });
-  expect(screen.queryByText(/Where does your mail live/)).toBeNull();
+  expect(screen.queryByText(/Where is your mail/)).toBeNull();
   fireEvent.click(screen.getAllByRole("button",
     { name: "Set up your mailbox" })[0]);
-  expect(await screen.findByText(/Where does your mail live/)).toBeTruthy();
+  expect(await screen.findByText(/Where is your mail/)).toBeTruthy();
   expect(setup).toBeTruthy();
   sessionStorage.clear();
+});
+
+test("Set up later on the Welcome shows the app; the Welcome states its " +
+  "promises", async () => {
+  sessionStorage.clear();
+  await openRaw({ ...mkCfg({ user: "", password_set: false }),
+    setup_needed: true });
+  await screen.findByText("Welcome to Inboxrake");
+  expect(screen.getByText("Clean up without fear")).toBeTruthy();
+  expect(screen.queryByRole("button", { name: "Profile & settings" }))
+    .toBeNull();
+  fireEvent.click(screen.getByRole("button", { name: "Set up later" }));
+  expect((await screen.findAllByRole("button",
+    { name: "Set up your mailbox" })).length).toBeGreaterThan(0);
+  expect(sessionStorage.getItem("pmc_wizard_later")).toBe("1");
+  sessionStorage.clear();
+});
+
+test("a configured install never shows the Welcome", async () => {
+  sessionStorage.clear();
+  await open({ password_set: true });
+  expect(screen.queryByText("Welcome to Inboxrake")).toBeNull();
 });
 
 test("with no account the toolbar offers setup, not Scan, and the status " +
@@ -179,14 +206,14 @@ test("with no account the toolbar offers setup, not Scan, and the status " +
   expect(screen.queryByRole("button", { name: "Scan" })).toBeNull();
   expect(screen.queryByText(/hit “Scan”/)).toBeNull();
   fireEvent.click(btns[0]);                        // the toolbar's
-  expect(await screen.findByText(/Where does your mail live/)).toBeTruthy();
+  expect(await screen.findByText(/Where is your mail/)).toBeTruthy();
   sessionStorage.clear();
 });
 
 test("a configured install never opens the wizard by itself", async () => {
   sessionStorage.clear();
   await open({ password_set: true });
-  expect(screen.queryByText(/Where does your mail live/)).toBeNull();
+  expect(screen.queryByText(/Where is your mail/)).toBeNull();
 });
 
 test("the profile menu's Add account opens the wizard, even with a single " +
@@ -195,7 +222,7 @@ test("the profile menu's Add account opens the wizard, even with a single " +
   await open({ password_set: true });
   fireEvent.click(screen.getByRole("button", { name: "Profile & settings" }));
   fireEvent.click(await screen.findByText(/Add account/));
-  expect(await screen.findByText(/Where does your mail live/)).toBeTruthy();
+  expect(await screen.findByText(/Where is your mail/)).toBeTruthy();
 });
 
 test("an account whose connection was never confirmed shows a setup card, " +
@@ -210,7 +237,7 @@ test("an account whose connection was never confirmed shows a setup card, " +
     fireEvent.click(screen.getByRole("button", { name: "Continue setup" }));
     expect(await screen.findByRole("button", { name: "Test connection" }))
       .toBeTruthy();
-    expect(screen.queryByText(/Where does your mail live/)).toBeNull();
+    expect(screen.queryByText(/Where is your mail/)).toBeNull();
   });
 
 test("the setup card falls back to the account name without an address",
