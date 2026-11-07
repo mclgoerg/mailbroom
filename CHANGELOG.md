@@ -1,5 +1,22 @@
 # Changelog
 
+## [2.2.0](https://github.com/mclgoerg/inboxrake/compare/v2.1.0...v2.2.0) (2026-11-07)
+
+
+### Features
+
+* split duplicates into identical copies, different versions and possible duplicates ([#259](https://github.com/mclgoerg/inboxrake/issues/259)) ([c7461f6](https://github.com/mclgoerg/inboxrake/commit/c7461f6801d170d8336830fe40f011544abcb9af))
+  <!-- release-notes:259 -->
+  - Duplicates are now split into **Identical copies** (same Message-ID and size), **Same mail, different versions** and **Possible duplicates**.
+  - Copies of the same mail that differ in size (for example one with its attachments stripped) are listed separately, tagged "largest", and are no longer selected by "Select all but newest" or counted as reclaimable.
+
+
+### Bug Fixes
+
+* drop Proton-only wording from the attachments hint and docs ([#258](https://github.com/mclgoerg/inboxrake/issues/258)) ([94e1207](https://github.com/mclgoerg/inboxrake/commit/94e1207694e140c2c8924ffdaee4c01e7d171a58))
+  <!-- release-notes:258 -->
+  - The attachments panel no longer mentions Proton on other providers: it now says that no provider supports removing a single attachment over IMAP, so deleting removes the whole mail (which can be undone).
+
 ## [2.1.0](https://github.com/mclgoerg/inboxrake/compare/v2.0.0...v2.1.0) (2026-11-07)
 
 
