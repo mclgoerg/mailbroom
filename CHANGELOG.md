@@ -1,5 +1,26 @@
 # Changelog
 
+## [2.1.0](https://github.com/mclgoerg/inboxrake/compare/v2.0.0...v2.1.0) (2026-11-07)
+
+
+### Features
+
+* improve first-use guidance and mailbox cleanup feedback ([#257](https://github.com/mclgoerg/inboxrake/issues/257)) ([53ca670](https://github.com/mclgoerg/inboxrake/commit/53ca6702cecd76babdb8b63b396b0cda0ca220b5))
+  <!-- release-notes:257 -->
+  - Account switching, protected senders and Undo are safer; ambiguous server copies require manual restoration from the destination folder.
+  - Rules and duplicate cleanup show actual results and failures. Setup, encryption guidance and Trash warnings are clearer.
+  - **Upgrading SSO:** sign in again. Existing non-admin tenants require operator-verified `INBOXRAKE_OIDC_LEGACY_BINDINGS`, or settings backup/import and mailbox reconnection; see `docs/security.md`. Administrator ownership binds to a verified immutable provider identity.
+  - Settings imports that change connection identity or endpoints clear the corresponding credentials; reconnect before use.
+
+
+### Bug Fixes
+
+* harden mailbox actions, Undo and SSO identity ownership ([#257](https://github.com/mclgoerg/inboxrake/issues/257)) ([53ca670](https://github.com/mclgoerg/inboxrake/commit/53ca6702cecd76babdb8b63b396b0cda0ca220b5))
+* refresh app and website branding with release version ([#255](https://github.com/mclgoerg/inboxrake/issues/255)) ([47973c2](https://github.com/mclgoerg/inboxrake/commit/47973c28ee4611364a3b2a643051d164d9298de7))
+  <!-- release-notes:255 -->
+  - Refreshed the app, README and website with a smoother rake-and-envelope icon in coffee, caramel and cream.
+  - Website and documentation headers now show the current release version, linked to its release notes.
+
 ## [2.0.0](https://github.com/mclgoerg/inboxrake/compare/v1.11.0...v2.0.0) (2026-11-06)
 
 
