@@ -487,12 +487,12 @@ export const DE: Record<string, string> = {
     "Gleiche Message-ID und gleiche Größe - echte Kopien. Es reicht, die neueste zu behalten.",
   "dups.versions_title": "Dieselbe Mail, verschiedene Versionen",
   "dups.versions_hint":
-    "Dieselbe Mail, aber die Kopien sind unterschiedlich groß (z. B. eine ohne Anhänge) - oder Mails ohne Message-ID mit gleichem Absender, Betreff und gleicher Größe. Vergleiche sie; nichts ist vorausgewählt.",
+    "Dieselbe Mail, aber die Kopien sind unterschiedlich groß (z. B. eine ohne Anhänge) - oder Mails ohne brauchbare Message-ID mit gleichem Absender, Betreff und gleicher Größe. Vergleiche sie; nichts ist vorausgewählt.",
   "dups.summary": "{n} Duplikat-Gruppen · {size} freigebbar",
   "dups.summary_one": "1 Duplikat-Gruppe · {size} freigebbar",
   "dups.possible_title": "Mögliche Duplikate",
   "dups.possible_hint":
-    "Diese haben unterschiedliche Message-IDs und können sich im Inhalt unterscheiden. Öffne sie zum Vergleichen; hier wird nichts für dich vorausgewählt.",
+    "Gleicher Absender und Betreff, innerhalb von Minuten gesendet, aber unterschiedliche Message-IDs - sie können sich im Inhalt unterscheiden. Öffne sie zum Vergleichen; hier wird nichts für dich vorausgewählt.",
   "dups.keep_newest": "Alle außer der neuesten auswählen",
   "dups.wasted": "{size} freigebbar",
   "dups.newest": "neueste",

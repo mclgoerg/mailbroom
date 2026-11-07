@@ -113,7 +113,7 @@ test("possible duplicates: own section, never selected by select-all-but-newest,
     mails: [poss(8), poss(7)] }]);
   show();
   await screen.findByText(/Possible duplicates/);
-  expect(screen.getByText(/different Message-IDs and may differ/)).toBeTruthy();
+  expect(screen.getByText(/different Message-IDs - they may differ/)).toBeTruthy();
   fireEvent.click(screen.getByRole("button", { name: "Select all but newest" }));
   expect(screen.getByRole("button", { name: "Trash selected (1)" })).toBeTruthy();
   fireEvent.click(screen.getAllByRole("checkbox", { name: /Offer/ })[0]);
@@ -163,6 +163,7 @@ test("three headed sections, each with an explanation", async () => {
   expect(screen.getByText(/Same Message-ID and the same size/)).toBeTruthy();
   expect(screen.getByText("Same mail, different versions")).toBeTruthy();
   expect(screen.getByText(/the copies differ in size/)).toBeTruthy();
+  expect(screen.getByText(/Same sender and subject, sent within minutes/)).toBeTruthy();
   expect(screen.getByText("Possible duplicates")).toBeTruthy();
   // only the identical section is "reclaimable"; versions tag the largest
   expect(screen.getAllByText(/reclaimable/)).toHaveLength(2);   // header + set

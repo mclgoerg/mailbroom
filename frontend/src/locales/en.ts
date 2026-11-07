@@ -647,12 +647,12 @@ export const EN: Record<string, string> = {
     "Same Message-ID and the same size - true copies. Safe to keep just the newest.",
   "dups.versions_title": "Same mail, different versions",
   "dups.versions_hint":
-    "Same mail, but the copies differ in size (say, one lost its attachments) - or mails without a Message-ID that match in sender, subject and size. Compare them; nothing is preselected.",
+    "Same mail, but the copies differ in size (say, one lost its attachments) - or mails without a usable Message-ID that match in sender, subject and size. Compare them; nothing is preselected.",
   "dups.summary": "{n} duplicate sets · {size} reclaimable",
   "dups.summary_one": "1 duplicate set · {size} reclaimable",
   "dups.possible_title": "Possible duplicates",
   "dups.possible_hint":
-    "These have different Message-IDs and may differ in content. Open them to compare; nothing here is selected for you.",
+    "Same sender and subject, sent within minutes of each other, but different Message-IDs - they may differ in content. Open them to compare; nothing here is selected for you.",
   "dups.keep_newest": "Select all but newest",
   "dups.wasted": "{size} reclaimable",
   "dups.newest": "newest",
