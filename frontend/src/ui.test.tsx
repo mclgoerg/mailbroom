@@ -8,7 +8,7 @@ import { useState } from "react";
 import { afterEach, expect, test, vi } from "vitest";
 
 import {
-  isModalOpen, AccountAvatar, BulkBar, Button, Checkbox, Chip, ChipGroup, ChipSegment,
+  isModalOpen, AccountAvatar, BarButton, BulkBar, Button, Checkbox, Chip, ChipGroup, ChipSegment,
   ConfirmDialog, DIALOG_ARM_MS, choiceDialog, DialogProvider, PromptDialog, EmptyState, MailRow, Menu, MenuDivider,
   MenuGroup, MenuHeading, MenuItem, Modal, Notice, ProgressBar, Segmented, ToastProvider,
   confirmDialog,
@@ -1101,6 +1101,37 @@ test("BulkBar renders every slot, Clear works, and --bulkbar-h follows its mount
   unmount();
   expect(root.getPropertyValue("--bulkbar-h")).toBe("");
   offset.mockRestore();
+});
+
+test("BarButton is icon-only on phones: the label stays as accessible name",
+  () => {
+  render(<BarButton icon={<svg data-testid="i" />}>Archive</BarButton>);
+  const b = screen.getByRole("button", { name: "Archive" });
+  expect(screen.getByText("Archive").className).toContain("sr-only");
+  expect(screen.getByText("Archive").className).toContain("md:not-sr-only");
+  expect(b.className).toContain("rounded-full");
+});
+
+test("Menu `up` opens above its trigger", () => {
+  render(<Menu variant="secondary" up trigger="More"><MenuItem>One</MenuItem></Menu>);
+  fireEvent.click(screen.getByRole("button", { name: "More" }));
+  expect(screen.getByRole("menu").className).toContain("bottom-full");
+  cleanup();
+  render(<Menu variant="secondary" trigger="More"><MenuItem>One</MenuItem></Menu>);
+  fireEvent.click(screen.getByRole("button", { name: "More" }));
+  expect(screen.getByRole("menu").className).toContain("top-full");
+});
+
+test("BulkBar moves focus into a swapped-in picker and back on close", () => {
+  const Bar = ({ swap }: { swap: "move" | null }) => (
+    <BulkBar summary="x" onClear={() => {}} swap={swap} primary={<i />}
+      actions={swap ? <select data-bar-field="" aria-label="Folder" />
+        : <button data-bar-move="">Move</button>} />);
+  const { rerender } = render(<Bar swap={null} />);
+  rerender(<Bar swap="move" />);
+  expect(document.activeElement).toBe(screen.getByLabelText("Folder"));
+  rerender(<Bar swap={null} />);
+  expect(document.activeElement).toBe(screen.getByRole("button", { name: "Move" }));
 });
 
 test("MailRow: every part of the row is a target (no dead strips)", () => {

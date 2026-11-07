@@ -602,6 +602,18 @@ export default function App() {
   }, [state?.groups_rev, state?.account, mode, selected, retention,
       retentionN]);
 
+  // Total size of the selected groups where every one is known (not under a
+  // limit, which acts on only part of each group).
+  const selSize = useMemo(() => {
+    if (retentionParams().some(Boolean)) return null;
+    let total = 0;
+    for (const k of selected) {
+      const g = allGroups.find((x) => x.key === k);
+      if (!g) return null;
+      total += g.size;
+    }
+    return selected.size ? total : null;
+  }, [selected, allGroups, retention, retentionN]);
   // Everything in the selection is pinned: nothing would move. Shown in
   // the bar itself, right where the user just acted.
   const selAllPinned = !selCountPending && selected.size > 0 && selCount === 0
@@ -2240,11 +2252,13 @@ export default function App() {
               : selected.size === 1 && selCount === 1
                 ? t("bar.selected_one_mail")
                 : t("bar.selected", { n: selected.size, mails: selCount })}
+            {selSize != null && ` · ${fmtSize(selSize)}`}
             {selAllPinned && (
               <span className="text-accent"> · {t("bar.all_pinned")}</span>
             )}
           </>}
           onClear={() => setSelected(new Set())}
+          swap={moveDest === "?" ? "move" : limitOpen ? "limit" : null}
           token={retention !== "none" && retentionParams().some(Boolean) && (
             <span className="inline-flex shrink-0 items-center gap-0.5
               rounded-full bg-accent-tint py-0.5 pl-2.5 pr-0.5 type-meta
@@ -2257,7 +2271,7 @@ export default function App() {
                 title={t("bar.limit_remove")}
                 className="relative inline-flex size-6 items-center
                   justify-center rounded-full hover:bg-accent-tint
-                  after:absolute after:-inset-2 after:content-['']"
+                  after:absolute after:-inset-2.5 after:content-['']"
                 onClick={() => { setRetention("none"); setRetentionN(""); }}>
                 <X size={14} aria-hidden />
               </button>
@@ -2265,7 +2279,7 @@ export default function App() {
           )}
           actions={moveDest === "?" ? (
             <>
-              <Select value=""
+              <Select value="" data-bar-field=""
                 className="min-w-0 flex-1 md:w-44 md:flex-none xl:w-56"
                 onChange={(e) => {
                   if (e.target.value) act([...selected], "move",
@@ -2280,37 +2294,43 @@ export default function App() {
                 ))}
               </Select>
               <Button variant="secondary" size="icon" label={t("Cancel")}
-                className="shrink-0 rounded-full"
+                data-bar-cancel="" className="shrink-0 rounded-full"
                 onClick={() => setMoveDest("")}>
                 <X size={18} />
               </Button>
             </>
           ) : limitOpen ? (
-            <>
-              <span className="shrink-0 type-meta text-muted">
-                {t("bar.limit_to")}</span>
-              <Select value={retention} title={t("retention.help")}
-                className="min-w-0 flex-1 md:w-44 md:flex-none xl:w-56"
-                onChange={(e) =>
-                  setRetention(e.target.value as typeof retention)}>
-                <option value="none">{t("retention.none")}</option>
-                <option value="keep_latest">
-                  {t("retention.keep_latest")}</option>
-                <option value="older_than_days">
-                  {t("retention.older_than_days")}
-                </option>
-              </Select>
+            <div className="flex w-full flex-wrap items-center gap-1.5
+              md:w-auto md:flex-nowrap md:gap-2">
+              <div className="flex w-full min-w-0 items-center gap-1.5
+                md:w-auto md:gap-2">
+                <span className="shrink-0 type-meta text-muted">
+                  {t("bar.limit_to")}</span>
+                <Select value={retention} title={t("retention.help")}
+                  data-bar-field=""
+                  className="min-w-0 flex-1 md:w-44 md:flex-none xl:w-56"
+                  onChange={(e) =>
+                    setRetention(e.target.value as typeof retention)}>
+                  <option value="none">{t("retention.none")}</option>
+                  <option value="keep_latest">
+                    {t("retention.keep_latest")}</option>
+                  <option value="older_than_days">
+                    {t("retention.older_than_days")}
+                  </option>
+                </Select>
+              </div>
               {retention !== "none" && (
                 <Input type="number" min={1} className="w-16 shrink-0"
                   placeholder={t("retention.n_placeholder")}
                   value={retentionN}
                   onChange={(e) => setRetentionN(e.target.value)} />
               )}
-              <Button variant="tinted" className="shrink-0 rounded-full"
+              <Button variant="tinted" data-bar-cancel=""
+                className="shrink-0 rounded-full"
                 onClick={() => setLimitOpen(false)}>
                 {t("bar.limit_done")}
               </Button>
-            </>
+            </div>
           ) : (
             <>
               <BarButton icon={<BellOff size={16} aria-hidden />}
@@ -2323,11 +2343,11 @@ export default function App() {
                 {t("Archive")}
               </BarButton>
               <BarButton icon={<FolderInput size={16} aria-hidden />}
-                onClick={() => onAction("move")}>
+                data-bar-move="" onClick={() => onAction("move")}>
                 {t("bar.move")}
               </BarButton>
-              <Menu variant="secondary" up triggerClass={`min-h-8
-                coarse:min-h-9 rounded-full px-2.5 type-meta`}
+              <Menu variant="secondary" up triggerSize="sm"
+                triggerClass="rounded-full"
                 trigger={<>{t("menu.more")}
                   <ChevronDown size={14} aria-hidden /></>}>
                 <MenuItem onClick={() => onAction("mark_read")}>
@@ -2343,7 +2363,8 @@ export default function App() {
                     downloadFile(api.exportUrl(mode, [...selected]))}>
                   {t("bar.export")}
                 </MenuItem>
-                <MenuItem onClick={() => setLimitOpen(true)}>
+                <MenuItem sub={t("bar.limit_hint")}
+                  onClick={() => setLimitOpen(true)}>
                   {t("bar.limit_open")}
                 </MenuItem>
               </Menu>

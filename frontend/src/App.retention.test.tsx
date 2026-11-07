@@ -290,3 +290,18 @@ test("an active limit shows as a labelled token in the capsule and can be " +
   fireEvent.click(screen.getByRole("button", { name: "Remove limit" }));
   expect(screen.queryByText("Keep newest 3")).toBeNull();
 });
+
+test("the limit editor is closed again after the selection was cleared",
+  async () => {
+  state = { ...baseState };
+  mountReady();
+  render(<ToastProvider><DialogProvider><App /></DialogProvider></ToastProvider>);
+  await selectFirstGroup();
+  openLimit();
+  expect(screen.getByRole("button", { name: "Done" })).toBeTruthy();
+  fireEvent.click(screen.getByRole("button", { name: "Clear selection" }));
+  expect(screen.queryByRole("button", { name: "Done" })).toBeNull();
+  await selectFirstGroup();
+  expect(screen.queryByRole("button", { name: "Done" })).toBeNull();
+  expect(screen.getByRole("button", { name: "Move" })).toBeTruthy();
+});

@@ -1326,6 +1326,7 @@ export const DE: Record<string, string> = {
   "bar.limit_to": "Beschränken auf:",
   "bar.move": "Verschieben",
   "bar.limit_open": "Beschränken auf…",
+  "bar.limit_hint": "Nur ein Teil jeder Gruppe",
   "bar.limit_done": "Fertig",
   "bar.limit_remove": "Beschränkung entfernen",
   "bar.token_keep_latest": "Neueste {n} behalten",

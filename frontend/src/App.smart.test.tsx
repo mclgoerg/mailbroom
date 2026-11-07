@@ -659,7 +659,11 @@ test("with only pooled rows selected, Unsubscribe is not offered", async () => {
   tickRow("Newsletters");
   tickRow("Accounts & security");
   expect(unsubOption().disabled).toBe(true);
-  barAction("unsubscribe");               // even forced: nothing is sent
+  // Even forced (the handler called directly, past `disabled`): nothing is
+  // sent.
+  const btn = unsubOption();
+  const propsKey = Object.keys(btn).find((k) => k.startsWith("__reactProps$"))!;
+  (btn as any)[propsKey].onClick();
   await new Promise((r) => setTimeout(r, 50));
   expect(unsubscribeBulk).not.toHaveBeenCalled();
 });

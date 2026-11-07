@@ -605,7 +605,7 @@ export function SectionLabel({ children, className = "" }: {
  * on outside click, Escape, or after any click inside (items just run
  * their onClick). Sits BELOW modals (z-modal). */
 export function Menu({ trigger, label, variant, icon, up, triggerClass,
-  className = "", align, children }: {
+  triggerSize = "md", className = "", align, children }: {
   trigger: ReactNode;
   children: ReactNode;
   /** Variant-less trigger: replaces the compact header look (e.g. the
@@ -619,6 +619,8 @@ export function Menu({ trigger, label, variant, icon, up, triggerClass,
   align?: "left";
   /** Open upward (a menu on a bottom bar). */
   up?: boolean;
+  /** Size of a labelled `variant` trigger (`sm` = a bar button). */
+  triggerSize?: "md" | "sm";
 } & (
   /** `variant` renders the trigger as a design-system `Button` (a labelled
    *  "Tools ▾" button; with `icon` a square icon button, whose `label` is
@@ -684,8 +686,8 @@ export function Menu({ trigger, label, variant, icon, up, triggerClass,
           {trigger}
         </Button>
       ) : variant ? (
-        <Button variant={variant} aria-haspopup="menu" aria-expanded={open}
-          aria-label={label}
+        <Button variant={variant} size={triggerSize} aria-haspopup="menu"
+          aria-expanded={open} aria-label={label}
           className={`inline-flex items-center gap-1.5 ${triggerClass ?? ""}`}
           onClick={() => setOpen(!open)}>
           {trigger}
@@ -1381,19 +1383,39 @@ export const BAR_BTN = `inline-flex shrink-0 items-center justify-center
   rounded-full max-md:min-w-10 max-md:px-0 coarse:max-md:min-w-11`;
 
 /** The floating selection bar, shared by the group list and All mails.
- *  >= md a centred capsule (translucent `bar-glass`, `rounded-full` from lg)
+ *  >= md a centred capsule (translucent `bar-glass`, `rounded-full` from xl)
  *  inside the page's `max-w-6xl` width: `summary`, Clear, the active
  *  limiter `token`, `actions`, `primary` (the destructive button). Below md
- *  a full-width bar on two rows (summary + Clear + token, then actions +
- *  primary) above the safe area. A caller swaps `actions` for a picker with
- *  its own Cancel. Publishes its height as `--bulkbar-h` (page padding,
- *  toasts). Mount it only while something is selected. */
-export function BulkBar({ summary, onClear, token, actions, primary }: {
+ *  a full-width bar (summary + Clear + token, then actions + primary) above
+ *  the safe area. A caller swaps `actions` for a picker/editor with its own
+ *  Cancel/Done and says so in `swap` ("move" | "limit"): the bar then moves
+ *  focus into it (its `data-bar-field`; on a touch device its
+ *  `data-bar-cancel`, since focusing a select opens the picker there) and
+ *  back to `data-bar-move` / the More menu when it closes. The "limit"
+ *  editor gets a full-width row on phones. Publishes its height as
+ *  `--bulkbar-h` (page padding, toasts). Mount it only while something is
+ *  selected. */
+export function BulkBar({ summary, onClear, token, actions, primary, swap }: {
   summary: ReactNode; onClear: () => void; token?: ReactNode;
-  actions: ReactNode; primary: ReactNode;
+  actions: ReactNode; primary: ReactNode; swap?: "move" | "limit" | null;
 }) {
   const ref = useRef<HTMLDivElement>(null);
   useBulkBarHeight(ref, true);
+  const prev = useRef<"move" | "limit" | null>(null);
+  useEffect(() => {
+    const was = prev.current, now = swap ?? null;
+    prev.current = now;
+    const bar = ref.current;
+    if (!bar || was === now) return;
+    const pick = (sel: string) => bar.querySelector<HTMLElement>(sel);
+    if (now) {
+      const coarse = window.matchMedia?.("(pointer: coarse)").matches;
+      pick(coarse ? "[data-bar-cancel]" : "[data-bar-field]")?.focus();
+    } else {
+      (was === "move" ? pick("[data-bar-move]")
+        : pick('[aria-haspopup="menu"]'))?.focus();
+    }
+  }, [swap]);
   return (
     <div ref={ref} role="region" aria-label={t("bar.label")}
       className="pointer-events-none fixed inset-x-0 bottom-0 lg:left-61
@@ -1403,7 +1425,7 @@ export function BulkBar({ summary, onClear, token, actions, primary }: {
       <div className="pointer-events-auto mx-auto flex w-fit max-w-6xl
         flex-col gap-1.5 rounded-card border bar-glass px-3 py-2 shadow-bar
         max-md:w-full md:flex-row md:flex-wrap md:items-center
-        md:justify-center md:gap-x-2 lg:rounded-full lg:px-4 xl:max-w-360">
+        md:justify-center md:gap-x-2 xl:rounded-full xl:px-4 xl:max-w-360">
         <div className="flex min-w-0 items-center gap-2 md:contents">
           <span className="min-w-0 flex-1 truncate type-meta text-muted
             md:flex-none md:whitespace-nowrap">{summary}</span>
@@ -1413,9 +1435,10 @@ export function BulkBar({ summary, onClear, token, actions, primary }: {
         </div>
         <div className="flex flex-wrap items-center gap-1.5 md:flex-nowrap
           md:gap-2">
-          <div className="flex min-w-0 flex-1 items-center gap-1.5
-            md:flex-none md:gap-2">{actions}</div>
-          <div className="shrink-0">{primary}</div>
+          <div className={`flex min-w-0 flex-1 items-center gap-1.5
+            md:flex-none md:gap-2
+            ${swap === "limit" ? "max-md:basis-full" : ""}`}>{actions}</div>
+          <div className="shrink-0 max-md:ml-auto">{primary}</div>
         </div>
       </div>
     </div>

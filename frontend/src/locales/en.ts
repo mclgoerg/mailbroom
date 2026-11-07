@@ -1132,6 +1132,7 @@ export const EN: Record<string, string> = {
   "bar.limit_to": "Limit to:",
   "bar.move": "Move",
   "bar.limit_open": "Limit to…",
+  "bar.limit_hint": "Only part of each group",
   "bar.limit_done": "Done",
   "bar.limit_remove": "Remove limit",
   "bar.token_keep_latest": "Keep newest {n}",

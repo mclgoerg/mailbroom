@@ -243,9 +243,10 @@ export function AllMailsView({ state, onChanged, toolbarSlot }: {
         <BulkBar
           summary={t("detail.n_selected", { n: sel.size })}
           onClear={() => setSel(new Set())}
+          swap={moveDest === "?" ? "move" : null}
           actions={moveDest === "?" ? (
             <>
-              <Select value=""
+              <Select value="" data-bar-field=""
                 className="min-w-0 flex-1 md:w-44 md:flex-none xl:w-56"
                 onChange={(e) => {
                   if (e.target.value) act("move", e.target.value);
@@ -257,7 +258,7 @@ export function AllMailsView({ state, onChanged, toolbarSlot }: {
                 ))}
               </Select>
               <Button variant="secondary" size="icon" label={t("Cancel")}
-                className="shrink-0 rounded-full"
+                data-bar-cancel="" className="shrink-0 rounded-full"
                 onClick={() => setMoveDest("")}>
                 <X size={18} />
               </Button>
@@ -269,7 +270,8 @@ export function AllMailsView({ state, onChanged, toolbarSlot }: {
                 {t("Archive")}
               </BarButton>
               <BarButton icon={<FolderInput size={16} aria-hidden />}
-                disabled={busy} onClick={() => onAction("move")}>
+                disabled={busy} data-bar-move=""
+                onClick={() => onAction("move")}>
                 {t("bar.move")}
               </BarButton>
               <BarButton icon={<MailOpen size={16} aria-hidden />}

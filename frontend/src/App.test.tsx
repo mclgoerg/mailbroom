@@ -4,7 +4,7 @@
  * (frontend/src/App.tsx header) - see ai-workspaces/proton-mail-cleaner
  * PLAN.md "header redesign + account switcher". */
 
-import { barAction, barMore } from "./barTestUtil";
+import { barAction, barMore, openLimit } from "./barTestUtil";
 import { cleanup, fireEvent, render, screen, waitFor } from
   "@testing-library/react";
 import { afterEach, expect, test, vi } from "vitest";
@@ -627,10 +627,65 @@ test("mark as read is no move: its confirm has no undo line", async () => {
   expect(dlg).not.toContain("undo");
 });
 
-test("the Action menu has no separate re-rate entry", async () => {
+test("the More menu has no separate re-rate entry", async () => {
   await mixed();
   await selectAll();
-  expect(screen.queryByRole("option", { name: /re-rate/i })).toBeNull();
+  fireEvent.click(screen.getByRole("button", { name: "More" }));
+  const items = screen.getAllByRole("menuitem").map((i) => i.textContent);
+  expect(items.some((x) => /^Mark read/.test(x!))).toBe(true);
+  expect(items.some((x) => /^Export CSV/.test(x!))).toBe(true);
+  expect(items.some((x) => /re-rate/i.test(x!))).toBe(false);
+});
+
+// Focus must not drop to <body> when a control swaps in or out of the bar.
+test("the folder picker takes focus, and Cancel hands it back to Move",
+  async () => {
+  renderWithOneSenderGroup();
+  await waitFor(() => expect(screen.getAllByText("DHL Paket").length)
+    .toBeGreaterThan(0));
+  await selectRowCheckbox();
+  await waitFor(() => expect(screen.getByText(/^Trash \d+$/)).toBeTruthy());
+  barAction("move");
+  await waitFor(() => expect(document.activeElement)
+    .toBe(screen.getByDisplayValue("Move to folder…")));
+  fireEvent.click(screen.getByTitle("Cancel"));
+  await waitFor(() => expect(document.activeElement)
+    .toBe(screen.getByRole("button", { name: "Move" })));
+});
+
+test("on a touch device the picker's Cancel takes focus, not the select " +
+  "(focusing a select opens its picker there)", async () => {
+  const mm = vi.fn().mockReturnValue({ matches: true,
+    addEventListener() {}, removeEventListener() {} });
+  vi.stubGlobal("matchMedia", mm);
+  try {
+    renderWithOneSenderGroup();
+    await waitFor(() => expect(screen.getAllByText("DHL Paket").length)
+      .toBeGreaterThan(0));
+    await selectRowCheckbox();
+    await waitFor(() => expect(screen.getByText(/^Trash \d+$/)).toBeTruthy());
+    barAction("move");
+    await waitFor(() => expect(document.activeElement)
+      .toBe(screen.getByTitle("Cancel")));
+  } finally { vi.unstubAllGlobals(); }
+});
+
+test("Limit to… focuses its select; Done returns to More; a cancelled " +
+  "confirm from a More item returns to More", async () => {
+  await mixed();
+  await selectAll();
+  openLimit();
+  await waitFor(() => expect(document.activeElement)
+    .toBe(screen.getByTitle(/^Restrict this action/)));
+  fireEvent.click(screen.getByRole("button", { name: "Done" }));
+  const more = screen.getByRole("button", { name: "More" });
+  await waitFor(() => expect(document.activeElement).toBe(more));
+
+  barAction("mark_read");
+  await findDialog();
+  await cancelDialog();
+  await expectNoDialog();
+  expect(document.activeElement).toBe(more);
 });
 
 test("AI review of a mixed selection asks: new only, or re-rate all", async () => {
