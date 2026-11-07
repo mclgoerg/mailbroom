@@ -12,6 +12,7 @@ import { setLang } from "./i18n";
 
 const duplicates = vi.fn();
 const possibleDuplicates = vi.fn();
+const duplicateVersions = vi.fn();
 const deleteMessages = vi.fn();
 const jobState = vi.fn();
 
@@ -19,6 +20,7 @@ vi.mock("./api", () => ({
   api: { duplicates: () => duplicates(),
     state: () => jobState(),
     possibleDuplicates: () => possibleDuplicates(),
+    duplicateVersions: () => duplicateVersions(),
     deleteMessages: (...a: unknown[]) => deleteMessages(...a) },
   fmtSize: () => "1 KB",
   mailKey: (m: { folder: string; uid: number }) => `${m.folder}\0${m.uid}`,
@@ -50,13 +52,16 @@ test("a queued deletion keeps candidates visible and reconciles a failed job", a
 
 beforeEach(() => {
   possibleDuplicates.mockResolvedValue([]);
+  duplicateVersions.mockResolvedValue([]);
+  duplicates.mockResolvedValue([]);
   jobState.mockResolvedValue({ delete: { status: "running", error: "" } });
 });
 
 afterEach(() => {
   cleanup();
-  duplicates.mockReset();
+  duplicates.mockReset().mockResolvedValue([]);
   possibleDuplicates.mockReset().mockResolvedValue([]);
+  duplicateVersions.mockReset().mockResolvedValue([]);
   deleteMessages.mockReset();
   setLang("en");
 });
@@ -141,4 +146,68 @@ test("the possible section is hidden when empty and worded in German", async () 
     mails: [poss(8), poss(7)] }]);
   show();
   await screen.findByText(/Mögliche Duplikate - gleicher Absender und Betreff/);
+});
+
+
+const ver = (uid: number, size: number, folder = "INBOX") =>
+  ({ ...mk(uid, folder), subject: "Report", size });
+
+const verSet = () => ({ wasted: 0, mails: [ver(6, 100), ver(5, 900, "Archive")] });
+
+test("three headed sections, each with an explanation", async () => {
+  duplicates.mockResolvedValue([{ wasted: 10, mails: [mk(3), mk(1)] }]);
+  duplicateVersions.mockResolvedValue([verSet()]);
+  possibleDuplicates.mockResolvedValue([{ wasted: 10, mails: [poss(8), poss(7)] }]);
+  show();
+  await screen.findByText("Identical copies");
+  expect(screen.getByText(/Same Message-ID and the same size/)).toBeTruthy();
+  expect(screen.getByText("Same mail, different versions")).toBeTruthy();
+  expect(screen.getByText(/Same Message-ID but different sizes/)).toBeTruthy();
+  expect(screen.getByText(/Possible duplicates - same sender/)).toBeTruthy();
+  // only the identical section is "reclaimable"; versions tag the largest
+  expect(screen.getAllByText(/reclaimable/)).toHaveLength(2);   // header + set
+  expect(screen.getByText("largest")).toBeTruthy();
+  expect(screen.getAllByText("newest")).toHaveLength(1);
+});
+
+test("select-all-but-newest selects only identical sets, never versions", async () => {
+  duplicates.mockResolvedValue([{ wasted: 10, mails: [mk(3), mk(1)] }]);
+  duplicateVersions.mockResolvedValue([verSet()]);
+  show();
+  await screen.findByText("Same mail, different versions");
+  fireEvent.click(screen.getByRole("button", { name: "Select all but newest" }));
+  expect(screen.getByRole("button", { name: "Trash selected (1)" })).toBeTruthy();
+  screen.getAllByRole("checkbox", { name: /Report/ }).forEach((c) =>
+    expect((c as HTMLInputElement).checked).toBe(false));
+});
+
+test("only versions: no select-all button, no empty state; a manually "
+  + "ticked versions row is trashed", async () => {
+  duplicateVersions.mockResolvedValue([verSet()]);
+  show();
+  await screen.findByText("Same mail, different versions");
+  expect(screen.queryByText("No duplicates found")).toBeNull();
+  expect(screen.queryByRole("button", { name: /Select all but newest/ })).toBeNull();
+  fireEvent.click(screen.getAllByRole("checkbox", { name: /Report/ })[0]);
+  fireEvent.click(screen.getByRole("button", { name: "Trash selected (1)" }));
+  await pressDialog(/Move to Trash \(1\)/);
+  await waitFor(() => expect(deleteMessages).toHaveBeenCalledWith(
+    [["INBOX", 6]], "trash"));
+});
+
+test("a failing versions fetch keeps the identical list", async () => {
+  duplicates.mockResolvedValue([{ wasted: 10, mails: [mk(3), mk(1)] }]);
+  duplicateVersions.mockRejectedValue(new Error("boom"));
+  show();
+  await screen.findByText("Identical copies");
+  expect(screen.getAllByText("Invoice")).toHaveLength(2);
+  expect(screen.queryByText("Same mail, different versions")).toBeNull();
+});
+
+test("the version sections are worded in German", async () => {
+  setLang("de");
+  duplicateVersions.mockResolvedValue([verSet()]);
+  show();
+  await screen.findByText("Dieselbe Mail, verschiedene Versionen");
+  expect(screen.getByText("größte")).toBeTruthy();
 });

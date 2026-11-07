@@ -85,16 +85,21 @@ the short version; [install.md](install.md) covers running it and
   card saves a summary image, generated in your browser with sender names
   hidden unless you tick "Show names". Based on the mail in the mailbox
   now; metadata only, nothing is uploaded.
-- **Duplicate finder** - mails with the same Message-ID (e.g. copies
-  across folders), grouped into sets with one click to select everything
-  but the newest copy. Only mails without a usable Message-ID (missing,
-  or junk such as `<>`) are matched by identical sender + subject + size
-  instead (and the identical id text, if there is one); two mails with their own, different Message-IDs (say, two
-  monthly statements) are never treated as duplicates.
-  Below the exact sets, **possible duplicates** lists the same sender and
-  subject sent within ten minutes of each other (different Message-IDs, so
-  they may differ in content): nothing there is selected for you, open the
-  mails to compare and tick what to trash.
+- **Duplicate finder** - three sections. **Identical copies**: mails with
+  the same Message-ID and the same size (e.g. copies across folders),
+  grouped into sets with one click to select everything but the newest
+  copy - the only place that button and the "reclaimable" figure apply.
+  **Same mail, different versions**: the same Message-ID but different
+  sizes (a mailing-list copy next to a direct one, a copy whose attachments
+  another client stripped), plus mails without a usable Message-ID (missing,
+  or junk such as `<>`) that share sender + subject + size (and the
+  identical id text, if there is one); the largest copy is tagged, nothing
+  is selected for you. Two mails with their own, different Message-IDs (say,
+  two monthly statements) are never treated as duplicates. **Possible
+  duplicates** lists the same sender and subject sent within ten minutes of
+  each other (different Message-IDs, so they may differ in content), never
+  repeating a mail from the first two sections: nothing there is selected
+  for you either, open the mails to compare and tick what to trash.
 - **Rules + scheduler** - save a filter query (same syntax as the filter
   box) plus an action as a rule, run it manually or daily/weekly. Rules
   always start in **report mode** (they only tell you what they would do);

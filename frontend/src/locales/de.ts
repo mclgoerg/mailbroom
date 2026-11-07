@@ -481,7 +481,13 @@ export const DE: Record<string, string> = {
   "Starting…": "Starte…",
   "Duplicates": "Duplikate",
   "dups.hint":
-    "Gleiche Message-ID. Mails ohne brauchbare Message-ID: identischer Absender + Betreff + Größe.",
+    "Kopien derselben Mail, Versionen mit unterschiedlicher Größe und mögliche Doppelsendungen.",
+  "dups.identical_title": "Identische Kopien",
+  "dups.identical_hint":
+    "Gleiche Message-ID und gleiche Größe - echte Kopien. Es reicht, die neueste zu behalten.",
+  "dups.versions_title": "Dieselbe Mail, verschiedene Versionen",
+  "dups.versions_hint":
+    "Gleiche Message-ID, aber unterschiedliche Größe (z. B. eine Kopie ohne Anhänge), oder keine brauchbare Message-ID und identischer Absender, Betreff und identische Größe. Öffne sie zum Vergleichen; hier wird nichts für dich vorausgewählt.",
   "dups.summary": "{n} Duplikat-Gruppen · {size} freigebbar",
   "dups.summary_one": "1 Duplikat-Gruppe · {size} freigebbar",
   "dups.possible_title": "Mögliche Duplikate - gleicher Absender und Betreff, innerhalb von Minuten gesendet",
@@ -490,6 +496,7 @@ export const DE: Record<string, string> = {
   "dups.keep_newest": "Alle außer der neuesten auswählen",
   "dups.wasted": "{size} freigebbar",
   "dups.newest": "neueste",
+  "dups.largest": "größte",
   "dups.none": "Keine Duplikate gefunden",
   "Statistics": "Statistik",
   "stats.this_month": "diesen Monat in den Papierkorb verschoben: {n} Mails",
@@ -1152,7 +1159,7 @@ export const DE: Record<string, string> = {
   "atts.none_hint":
     "Nach dem Scannen neuer Mails „Neu analysieren“ verwenden.",
   "dups.none_hint":
-    "Keine Mail teilt sich eine Message-ID oder hat denselben Absender, Betreff und dieselbe Größe wie eine andere.",
+    "Keine Mail teilt sich eine Message-ID mit einer anderen, und keine ohne brauchbare Message-ID hat denselben Absender, Betreff und dieselbe Größe wie eine andere.",
   "audit.empty_hint":
     "Aktionen wie Mails in den Papierkorb verschieben, Regelläufe und Rückgängig erscheinen hier.",
   "search.body_hint":

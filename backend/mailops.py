@@ -3513,12 +3513,24 @@ def _usable_msgid(msgid: str) -> bool:
     return bool(at and local.strip() and domain.strip())
 
 
-def _exact_dup_sets(mails: list[dict]) -> list[list[dict]]:
+def _dup_groups(mails: list[dict]) -> tuple[list[list[dict]],
+                                            list[list[dict]]]:
+    """(identical copies, different versions). A usable Message-ID shared by
+    two or more mails is one group: identical when every copy has the same
+    size, otherwise a versions group - as a whole, never split (a copy with
+    stripped attachments or a different header set is not a safe deletion
+    candidate). Mails without a usable id pair by (stored id, sender,
+    subject, size) and always land in versions: nothing proves they are the
+    same mail."""
     by_msgid: dict[str, list] = {}
     for m in mails:
         if _usable_msgid(m["msgid"]):
             by_msgid.setdefault(m["msgid"], []).append(m)
-    sets = [v for v in by_msgid.values() if len(v) > 1]
+    identical, versions = [], []
+    for v in by_msgid.values():
+        if len(v) > 1:
+            (identical if len({m["size"] for m in v}) == 1
+             else versions).append(v)
     by_tuple: dict[tuple, list] = {}
     for m in mails:
         if _usable_msgid(m["msgid"]) or not m["subject"] or not m["size"]:
@@ -3528,53 +3540,70 @@ def _exact_dup_sets(mails: list[dict]) -> list[list[dict]]:
         # only when sender, subject and size match too; "" = id-less.
         by_tuple.setdefault((m["msgid"] or "", m["addr"], m["subject"],
                              m["size"]), []).append(m)
-    return sets + [v for v in by_tuple.values() if len(v) > 1]
+    versions += [v for v in by_tuple.values() if len(v) > 1]
+    return identical, versions
 
 
-def _dup_payload(sets: list[list[dict]], limit: int) -> list[dict]:
+def _dup_payload(sets: list[list[dict]], limit: int,
+                 reclaimable: bool = True) -> list[dict]:
     out = []
     for s in sets:
         s = sorted(s, key=lambda m: -m["ts"])
         out.append({
-            "wasted": sum(m["size"] for m in s[1:]),
+            "wasted": sum(m["size"] for m in s[1:]) if reclaimable else 0,
             "mails": [{"uid": m["uid"], "folder": m["folder"],
                        "date": m["date"], "ts": m["ts"],
                        "subject": m["subject"], "addr": m["addr"],
                        "size": m["size"], "seen": m["seen"], "ai": None}
                       for m in s]})
-    out.sort(key=lambda x: -x["wasted"])
+    # Reclaimable sets by what they would free, the rest by how much mail
+    # they hold; the sort is stable, so ties keep their scan order.
+    out.sort(key=(lambda x: -x["wasted"]) if reclaimable
+             else (lambda x: -sum(m["size"] for m in x["mails"])))
     return out[:limit]
 
 
 def duplicates_list(limit: int = 200, acc=None) -> list[dict]:
-    """Duplicate sets from the scanned index: the same Message-ID anywhere,
-    or - only among mails WITHOUT a usable Message-ID (see _usable_msgid) -
-    the same exact (stored id, sender, subject, size): id-less mails pair
-    with each other, a malformed id only with the identical one. A mail with
-    its own usable Message-ID is never paired by the tuple: two statements
-    with the same sender, subject and size but different ids are two mails. Newest
-    mail first inside each set; 'wasted' is what deleting all but the newest
-    would free."""
+    """Identical copies from the scanned index: a usable Message-ID (see
+    _usable_msgid) shared by two or more mails that ALL have the same size.
+    Newest mail first inside each set; 'wasted' is what deleting all but the
+    newest would free. Copies that differ in size are versions_list."""
     acc = acc or accounts.get()
     with acc.lock:
         mails = list(acc.index.values())
-    return _dup_payload(_exact_dup_sets(mails), limit)
+    return _dup_payload(_dup_groups(mails)[0], limit)
+
+
+def versions_list(limit: int = 200, acc=None) -> list[dict]:
+    """Same mail in different versions: a Message-ID group whose copies
+    differ in size (the whole group, never split), plus - only among mails
+    WITHOUT a usable Message-ID - the same (stored id, sender, subject,
+    size): id-less mails pair with each other, a malformed id only with the
+    identical one. A mail with its own usable Message-ID is never paired by
+    the tuple: two statements with the same sender, subject and size but
+    different ids are two mails. Same shape as duplicates_list, but nothing
+    is reclaimable ('wasted' is 0): the UI never auto-selects these."""
+    acc = acc or accounts.get()
+    with acc.lock:
+        mails = list(acc.index.values())
+    return _dup_payload(_dup_groups(mails)[1], limit, reclaimable=False)
 
 
 POSSIBLE_DUP_WINDOW = 600       # seconds: "sent twice within minutes"
 
 
 def possible_duplicates_list(limit: int = 200, acc=None) -> list[dict]:
-    """Likely double-sends that are NOT exact duplicates (different
-    Message-IDs): the same sender address and the same subject (whitespace
-    collapsed, case-insensitive, non-empty), each mail within 10 minutes of
-    another in its group (chained by time). Mails already in an exact
-    duplicate set are left out. Same shape as duplicates_list; the UI never
+    """Likely double-sends that are NOT identical copies or versions
+    (different Message-IDs): the same sender address and the same subject
+    (whitespace collapsed, case-insensitive, non-empty), each mail within 10
+    minutes of another in its group (chained by time). Mails already in an
+    identical or versions set are left out. Same shape as duplicates_list;
+    the UI never
     auto-selects these - the user compares and decides."""
     acc = acc or accounts.get()
     with acc.lock:
         mails = list(acc.index.values())
-    exact = {id(m) for s in _exact_dup_sets(mails) for m in s}
+    exact = {id(m) for g in _dup_groups(mails) for s in g for m in s}
     by_key: dict[tuple, list] = {}
     for m in mails:
         subject = " ".join((m["subject"] or "").split()).casefold()

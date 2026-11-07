@@ -8,14 +8,17 @@ import { MessageView } from "./MailList";
 import { Button, EmptyState, Loading, MailRow, Modal,
   PanelHeader, SectionLabel, Tag, Toolbar } from "./ui";
 
-/** Duplicate finder: exact sets (same Message-ID anywhere, ...) with "Select
- *  all but newest", then a separate list of POSSIBLE duplicates (same sender
- *  and subject within minutes) that is never selected for the user. */
+/** Duplicate finder in three sections: identical copies (same Message-ID,
+ *  same size) with "Select all but newest"; different versions (same
+ *  Message-ID but different sizes, or id-less matches); and possible
+ *  duplicates (same sender and subject within minutes). Only the first is
+ *  ever selected for the user. */
 export function DuplicatesPanel({ onClose, onDeleted }: {
   onClose: () => void;
   onDeleted: () => void;
 }) {
   const [sets, setSets] = useState<DupSet[] | null>(null);
+  const [versions, setVersions] = useState<DupSet[]>([]);
   const [possible, setPossible] = useState<DupSet[]>([]);
   const [error, setError] = useState("");
   const [sel, setSel] = useState<Set<string>>(new Set());
@@ -35,10 +38,11 @@ export function DuplicatesPanel({ onClose, onDeleted }: {
           timer = setTimeout(poll, 800);
           return;
         }
-        const [exact, likely] = await Promise.all([
-          api.duplicates(), api.possibleDuplicates()]);
+        const [exact, vers, likely] = await Promise.all([
+          api.duplicates(), api.duplicateVersions(), api.possibleDuplicates()]);
         if (!alive) return;
         setSets(exact);
+        setVersions(vers);
         setPossible(likely);
         setSel(new Set());
         setNote(state.delete.error ? t("err.generic", { msg: state.delete.error }) : "");
@@ -58,9 +62,11 @@ export function DuplicatesPanel({ onClose, onDeleted }: {
     let alive = true;
     api.duplicates()
       .then(async (s) => {
-        // the second list is a bonus: its failure must not hide the first
-        const p = await api.possibleDuplicates().catch(() => []);
-        if (alive) { setPossible(p); setSets(s); }
+        // the other lists are a bonus: their failure must not hide the first
+        const [v, p] = await Promise.all([
+          api.duplicateVersions().catch(() => []),
+          api.possibleDuplicates().catch(() => [])]);
+        if (alive) { setVersions(v); setPossible(p); setSets(s); }
       })
       .catch((e) => alive && setError(String(e.message ?? e)));
     return () => { alive = false; };
@@ -88,7 +94,7 @@ export function DuplicatesPanel({ onClose, onDeleted }: {
     if (!await confirmTrashMails(sel.size)) return;
     try {
       const items: [string, number][] = [];
-      [...sets, ...possible].forEach((s) => s.mails.forEach((m) => {
+      [...sets, ...versions, ...possible].forEach((s) => s.mails.forEach((m) => {
         if (sel.has(mailKey(m))) items.push([m.folder, m.uid]);
       }));
       await api.deleteMessages(items, "trash");
@@ -100,7 +106,12 @@ export function DuplicatesPanel({ onClose, onDeleted }: {
     }
   };
 
-  const setBlock = (s: DupSet, key: string, exact: boolean) => (
+  const setBlock = (s: DupSet, key: string,
+    kind: "identical" | "versions" | "possible") => {
+    const exact = kind === "identical";
+    let largest = 0;
+    s.mails.forEach((m, i) => { if (m.size > s.mails[largest].size) largest = i; });
+    return (
     <div key={key} className="my-2 border-y border-line bg-panel2">
       <div className="flex items-baseline gap-2 px-3 pt-2 type-meta
         text-muted md:px-2">
@@ -120,18 +131,33 @@ export function DuplicatesPanel({ onClose, onDeleted }: {
             { subject: m.subject || t("(no subject)") })}
           meta={[fmtSize(m.size), m.folder].join(" · ")}
           trailing={exact && mi === 0
-            ? <Tag tone="safe">{t("dups.newest")}</Tag> : undefined} />
+            ? <Tag tone="safe">{t("dups.newest")}</Tag>
+            : kind === "versions" && mi === largest
+              ? <Tag>{t("dups.largest")}</Tag> : undefined} />
       ))}
     </div>
+    );
+  };
+
+  const section = (id: string, title: string, hint: string,
+    list: DupSet[], kind: "identical" | "versions" | "possible") => (
+    list.length > 0 && (
+      <div data-testid={id}>
+        <SectionLabel className="px-3 pt-3 md:px-2">{title}</SectionLabel>
+        <p className="px-3 pb-1 type-meta text-muted md:px-2">{hint}</p>
+        {list.map((s, si) => setBlock(s, `${kind}${si}`, kind))}
+      </div>
+    )
   );
 
   return (
-    <Modal onClose={onClose} size="lg" full={!!view || !sets || sets.length > 0 || possible.length > 0}>
+    <Modal onClose={onClose} size="lg" full={!!view || !sets || sets.length > 0 || versions.length > 0
+      || possible.length > 0}>
       <PanelHeader
         title={<span className="inline-flex items-center gap-2">
           <Copy size={18} /> {t("Duplicates")}
         </span>}
-        sub={sets
+        sub={sets?.length
           ? t("dups.summary", { n: sets.length, size: fmtSize(wastedTotal) })
           : t("dups.hint")}
         onClose={onClose}
@@ -159,22 +185,17 @@ export function DuplicatesPanel({ onClose, onDeleted }: {
           <div className="min-h-0 flex-1 overflow-y-auto pb-4">
             {error && <div className="p-4 type-body text-danger-fg">{error}</div>}
             {!sets && !error && <Loading />}
-            {sets && sets.length === 0 && possible.length === 0 && (
+            {sets && sets.length === 0 && versions.length === 0
+              && possible.length === 0 && (
               <EmptyState icon={<Copy size={18} />} title={t("dups.none")}
                 hint={t("dups.none_hint")} />
             )}
-            {sets?.map((s, si) => setBlock(s, `e${si}`, true))}
-            {possible.length > 0 && (
-              <div data-testid="possible-dups">
-                <SectionLabel className="px-3 pt-3 md:px-2">
-                  {t("dups.possible_title")}
-                </SectionLabel>
-                <p className="px-3 pb-1 type-meta text-muted md:px-2">
-                  {t("dups.possible_hint")}
-                </p>
-                {possible.map((s, si) => setBlock(s, `p${si}`, false))}
-              </div>
-            )}
+            {section("identical-dups", t("dups.identical_title"),
+              t("dups.identical_hint"), sets ?? [], "identical")}
+            {section("versions-dups", t("dups.versions_title"),
+              t("dups.versions_hint"), versions, "versions")}
+            {section("possible-dups", t("dups.possible_title"),
+              t("dups.possible_hint"), possible, "possible")}
           </div>
         </>
       )}
