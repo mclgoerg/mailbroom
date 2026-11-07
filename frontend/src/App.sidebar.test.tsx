@@ -249,3 +249,17 @@ test("fresh load, All mail, Back lands on Senders again (sidebar and segment)",
     screen.getByRole("tab", { name: "Sender" }).getAttribute("aria-selected"))
     .toBe("true"));
 });
+
+test("Welcome and the first-run wizard cover the whole viewport: no sidebar", async () => {
+  (cfg as { setup_needed?: boolean }).setup_needed = true;
+  try {
+    mount();
+    expect(await screen.findByText("Welcome to Inboxrake")).toBeTruthy();
+    expect(screen.queryByRole("navigation", { name: "Main navigation" })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: /Get started/ }));
+    expect(await screen.findByRole("dialog")).toBeTruthy();
+    expect(screen.queryByRole("navigation", { name: "Main navigation" })).toBeNull();
+  } finally {
+    delete (cfg as { setup_needed?: boolean }).setup_needed;
+  }
+});
