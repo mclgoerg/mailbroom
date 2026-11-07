@@ -119,7 +119,7 @@ const open = async () => {
   state = { ...baseState, groups: { ...baseState.groups,
     sender: { [group.key]: group } } };
   render(<ToastProvider><DialogProvider><App /></DialogProvider></ToastProvider>);
-  await screen.findByPlaceholderText("filter groups…");
+  await screen.findByPlaceholderText("Search or filter…");
   await waitFor(() => expect(screen.getAllByText("Acme").length)
     .toBeGreaterThan(0));
 };
@@ -164,7 +164,7 @@ test("Tools -> Trackers: tapping a sender closes the panel and filters the "
   fireEvent.click(await screen.findByRole("button",
     { name: "Show mails from Acme" }));
   await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
-  expect((screen.getByPlaceholderText("filter groups…") as HTMLInputElement)
+  expect((screen.getByPlaceholderText("Search or filter…") as HTMLInputElement)
     .value).toBe("from:a@x.example");
   expect(screen.getByRole("tab", { name: "Sender" })
     .getAttribute("aria-selected")).toBe("true");
@@ -194,15 +194,22 @@ test("the grouping segments mark the current one with aria-selected",
 
 test("each Inactive segment applies its own preset", async () => {
   await open();
-  const box = () => (screen.getByPlaceholderText("filter groups…") as
+  const box = () => (screen.getByPlaceholderText("Search or filter…") as
     HTMLInputElement).value;
-  expect(screen.getByRole("group", { name: "Inactive:" })).toBeTruthy();
+  const menu = () => fireEvent.click(screen.getByRole("button",
+    { name: "Filter" }));
+  menu();
+  expect(screen.getByRole("group", { name: "Quick filters" })).toBeTruthy();
+  fireEvent.keyDown(document, { key: "Escape" });
   for (const [name, q] of [["6 mo", "age:>6m"], ["1 yr", "age:>1y"],
     ["2 yr", "age:>2y"]]) {
-    fireEvent.click(screen.getByRole("button", { name }));
+    menu();
+    fireEvent.click(screen.getByRole("menuitemradio", { name }));
     expect(box()).toBe(q);
-    expect(screen.getByRole("button", { name })
-      .getAttribute("aria-pressed")).toBe("true");
+    menu();
+    expect(screen.getByRole("menuitemradio", { name })
+      .getAttribute("aria-checked")).toBe("true");
+    fireEvent.keyDown(document, { key: "Escape" });
   }
 });
 
@@ -232,7 +239,7 @@ test("All mails keeps its filter and sort in the toolbar row", async () => {
   await open();
   const rowA = screen.getByRole("tablist").parentElement!.parentElement!;
   expect(rowA.nextElementSibling?.contains(
-    screen.getByPlaceholderText("filter groups…"))).toBe(true);
+    screen.getByPlaceholderText("Search or filter…"))).toBe(true);
   fireEvent.click(screen.getByRole("tab", { name: "All mails" }));
   const input = await screen.findByPlaceholderText("filter mails…");
   expect(screen.getByDisplayValue("Date")).toBeTruthy();

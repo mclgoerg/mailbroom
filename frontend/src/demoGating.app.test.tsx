@@ -118,10 +118,11 @@ test("demo: AI filter, AI review and Add account are disabled with the hint",
   async () => {
   probeDemo = true;
   await mount();
-  expect((screen.getByRole("button", { name: /Describe a filter/ }) as
-    HTMLButtonElement).disabled).toBe(true);
-  expect(screen.getByRole("button", { name: /Describe a filter/ })
-    .getAttribute("aria-label")).toContain(HINT);
+  fireEvent.click(screen.getByRole("button", { name: "Filter" }));
+  const aiFilter = screen.getByRole("menuitem", { name: /Describe a filter/ });
+  expect((aiFilter as HTMLButtonElement).disabled).toBe(true);
+  expect(aiFilter.textContent).toContain(HINT);
+  fireEvent.keyDown(document, { key: "Escape" });
 
   fireEvent.click(screen.getByRole("button", { name: "Tools" }));
   const review = screen.getByRole("menuitem", { name: /AI review/ });
@@ -152,7 +153,10 @@ test("demo: the bulk bar's AI review option is disabled with the hint",
 test("no demo flag: AI entry points stay hidden without a key, Add account " +
   "is enabled", async () => {
   await mount();
-  expect(screen.queryByLabelText("Describe a filter")).toBeNull();
+  fireEvent.click(screen.getByRole("button", { name: "Filter" }));
+  expect(screen.queryByRole("menuitem", { name: /Describe a filter/ }))
+    .toBeNull();
+  fireEvent.keyDown(document, { key: "Escape" });
   fireEvent.click(screen.getByRole("button", { name: "Tools" }));
   expect(screen.queryByRole("menuitem", { name: /AI review/ })).toBeNull();
   fireEvent.click(screen.getByRole("button", { name: "Tools" }));

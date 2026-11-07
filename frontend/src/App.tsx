@@ -1,4 +1,4 @@
-import { Archive, BarChart3, BellOff, BookmarkPlus, ChevronDown, ChevronsUpDown, ClipboardList,
+import { Archive, BarChart3, BellOff, ChevronDown, ChevronsUpDown, ClipboardList,
   Copy, Download, Eye, FolderInput, Info, Layers, LayoutGrid, Mail, Monitor, Moon, Paperclip, Pencil, Plus,
   MoreHorizontal, Power,
   ScrollText, Search, Settings as SettingsIcon, ShieldAlert, Sparkles, Star, Sun,
@@ -29,10 +29,11 @@ import { AiFilterPanel } from "./components/AiFilterPanel";
 import { TriagePanel } from "./components/TriagePanel";
 import { WrappedStory } from "./components/WrappedStory";
 import { QueryBuilder } from "./components/QueryBuilder";
+import { activeFilterLabel, FilterMenu, FilterToken } from "./components/FilterMenu";
 import { QuickWins } from "./components/QuickWins";
 import type { QuickWinCard } from "./quickwins";
 import { FoldersPanel } from "./components/FoldersPanel";
-import { AccountAvatar, BarButton, BulkBar, Button, Chip, ChipGroup, ChipSegment,
+import { AccountAvatar, BarButton, BulkBar, Button,
   choiceDialog, confirmDialog, EmptyState, ensureAiAck, FILTER_ROW, Input, isModalOpen, LINK,
   Menu, MenuDivider, MenuGroup, MenuHeading, MenuItem, Notice, ProgressBar,
   promptDialog, Segmented, Select, Spinner, useAppearance, useToast,
@@ -72,21 +73,6 @@ const SORT_OPTIONS: { k: SortKey; label: string }[] = [
   { k: "unreadPct", label: "Sort: unread %" },
   { k: "engagement", label: "Sort: engagement" },
   { k: "label", label: "Sort: name" },
-];
-
-// Quick-select presets, rendered as one-tap chips: each ADDS matching
-// groups to the selection (it is not a toggle) AND narrows the filter
-// box to the same condition, so the selected handful isn't left
-// scattered across a long unfiltered list.
-const PRESET_CHIPS: { key: string; label: string }[] = [
-  { key: "aisafe", label: "AI-safe groups" },
-  { key: "unsub_pending", label: "sel.unsub_pending" },
-];
-// The three "Inactive" presets share one segmented chip between the two.
-const INACTIVE_PRESETS: { key: string; label: string }[] = [
-  { key: "older6", label: "chip.inactive_6m" },
-  { key: "older12", label: "chip.inactive_1y" },
-  { key: "older24", label: "chip.inactive_2y" },
 ];
 
 const sortValue = (g: Group, k: SortKey): number | string => {
@@ -1867,6 +1853,35 @@ export default function App() {
     </Menu>
   );
 
+  // Toolbar helpers: counts over the FULL mailbox (allGroups), so another
+  // active filter can't hide the New / Still mailing entries.
+  const newCount = allGroups.filter((g) => g.new).length;
+  const stillCount = allGroups.filter((g) => g.still_mailing).length;
+  const tokenLabel = activeFilterLabel(filter, state?.presets ?? [],
+    presetFilterQuery, { new: newCount, still: stillCount });
+  const scannedAgo = fmtAgo(state?.scanned_ts);
+  // Acts on the current grouping, so only the sender pages carry it (below
+  // 1024 the Tools menu still holds the same two entries).
+  const moreMenu = wide && (
+    <Menu variant="secondary" icon label={t("menu.more")}
+      trigger={<MoreHorizontal size={18} aria-hidden />}>
+      {(aiEnabled || demo) && (
+        <MenuItem onClick={() => reviewWithAi()}
+          sub={demo ? demoHint() : undefined}
+          disabled={demo || scanning || aiRunning
+            || state?.status !== "done"}>
+          <Wand2 size={16} className="mr-1 inline align-text-bottom" />
+          {t("AI review")}
+        </MenuItem>
+      )}
+      <MenuItem onClick={() => downloadFile(api.exportUrl(mode))}
+        sub={t("export.csv_tip")}>
+        <Download size={16} className="mr-1 inline align-text-bottom" />
+        {t("export.csv")}
+      </MenuItem>
+    </Menu>
+  );
+
   return (
     <div className={wide ? "pl-61" : undefined}>
     {wide && (
@@ -1935,20 +1950,17 @@ export default function App() {
         {t("smart.first_use")}
       </Notice>}
 
-      {/* Row A: Scan (the one solid-accent element) · grouping segments ·
-          Search · Tools. On phones the segments take their own full-width
-          line below Scan / Search / Tools. Identical in every mode. */}
-      <div className="mb-2 flex flex-wrap items-center gap-2">
-        {cfg?.setup_needed ? (
-          // no account yet: the primary action is the setup card's
-          <Button onClick={() => setWizard({ mode: "first" })}>
-            {t("wizard.setup_btn")}</Button>
-        ) : (
-        <Button onClick={startScan}
-          disabled={scanning || aiRunning || deleting || attsRunning
-            || unsubRunning}>
-          {scanning ? <Spinner className="text-on-accent" /> : t("Scan")}
-        </Button>
+      {/* Row 1 - the page toolbar: title (sidebar layouts) · grouping
+          segments · scanned ago + Scan (the quiet secondary button; primary
+          only as the setup entry while there is no account). Below 1024 the
+          old Search / Tools entries stay here until the tab bar replaces
+          them. On phones the segments take a line of their own. */}
+      <div className="mb-2 flex flex-wrap items-center gap-2 border-b
+        border-line pb-2">
+        {wide && (
+          <h1 className="mr-2 type-heading">
+            {t(flat ? "nav.all_mail" : "nav.senders")}
+          </h1>
         )}
         {/* order-last + fill: below 768 the segments get a line of their own. */}
         <div className={`order-last w-full md:order-none md:w-auto
@@ -1972,6 +1984,11 @@ export default function App() {
             }} />
         </div>
         <div className="ml-auto flex items-center gap-2">
+          {wide && !!scannedAgo && (
+            <span className="type-meta text-muted">
+              {t("scan.age", { ago: scannedAgo })}
+            </span>
+          )}
           {!wide && <Button variant="secondary" size="icon" label={t("Search all mails")}
             onClick={() => setSearchOpen(true)}><Search size={18} /></Button>}
           {!wide && <Menu variant="secondary" trigger={<>
@@ -2042,39 +2059,39 @@ export default function App() {
               </MenuItem>
             </MenuGroup>
           </Menu>}
-          {wide && (
-            <Menu variant="secondary" icon label={t("menu.more")}
-              trigger={<MoreHorizontal size={18} aria-hidden />}>
-              {(aiEnabled || demo) && (
-                <MenuItem onClick={() => reviewWithAi()}
-                  sub={demo ? demoHint() : undefined}
-                  disabled={demo || scanning || aiRunning
-                    || state?.status !== "done"}>
-                  <Wand2 size={16} className="mr-1 inline align-text-bottom" />
-                  {t("AI review")}
-                </MenuItem>
-              )}
-              <MenuItem onClick={() => downloadFile(api.exportUrl(mode))}
-                sub={t("export.csv_tip")}>
-                <Download size={16} className="mr-1 inline align-text-bottom" />
-                {t("export.csv")}
-              </MenuItem>
-            </Menu>
+          {cfg?.setup_needed ? (
+            // no account yet: the primary action is the setup card's
+            <Button onClick={() => setWizard({ mode: "first" })}>
+              {t("wizard.setup_btn")}</Button>
+          ) : (
+            <Button variant="secondary" onClick={startScan}
+              disabled={scanning || aiRunning || deleting || attsRunning
+                || unsubRunning}>
+              {scanning ? <Spinner /> : t("Scan")}
+            </Button>
           )}
         </div>
       </div>
-      {/* Row B: filter + builder + save preset + sort. All mails renders its
-          own filter + sort into the same slot (portal), so nothing moves
-          when switching tabs. */}
+      {/* Row 2 - search / filter: the filter input (+ clear, QueryBuilder) ·
+          token naming an active quick / saved filter · Filter menu · Sort ·
+          More. All mails renders its own filter + sort into the same slot
+          (portal), so nothing moves when switching tabs. */}
       {flat ? (
-        <div ref={setToolbarSlot} />
+        <div className={FILTER_ROW}>
+          <div ref={setToolbarSlot} className="contents" />
+          {moreMenu}
+        </div>
       ) : (
         <div className={FILTER_ROW}>
+          {tokenLabel && (
+            <FilterToken label={tokenLabel}
+              onRemove={() => { setFilter(""); setActiveChip(null); }} />
+          )}
           <div className="relative min-w-0 flex-1 md:min-w-70">
             <Input
               ref={filterRef}
               className="w-full pr-9 coarse:pr-10"
-              placeholder={t("filter groups…")}
+              placeholder={t("filter.placeholder")}
               title={t("filter.syntax_hint")}
               value={filter}
               onChange={(e) => setFilter(e.target.value)}
@@ -2092,20 +2109,17 @@ export default function App() {
             )}
           </div>
           <QueryBuilder value={filter} onChange={setFilter} />
-          {(aiEnabled || demo) && (
-            <Button variant="secondary" size="icon" disabled={demo}
-              label={demo ? `${t("aif.button")} - ${demoHint()}`
-                : t("aif.button")}
-              onClick={() => setAiFilterOpen(true)}>
-              <Sparkles size={18} />
-            </Button>
-          )}
-          <Button variant="secondary" size="icon"
-            label={t("saved_filter.save_tip")}
-            disabled={!filter.trim()}
-            onClick={() => saveFilterPreset()}>
-            <BookmarkPlus size={18} />
-          </Button>
+          <FilterMenu filter={filter} quick={presetFilterQuery}
+            newCount={newCount} stillCount={stillCount}
+            presets={state?.presets ?? []}
+            onQuick={selectPreset}
+            onApply={(p) => setFilter(filter === p.query ? "" : p.query)}
+            onEdit={(p) => { setEditingPreset(p); setEditQuery(p.query); }}
+            onDelete={(p) => deleteFilterPreset(p.id, p.name)}
+            onSave={() => saveFilterPreset()}
+            onAi={aiEnabled || demo ? { disabled: demo,
+              hint: demo ? demoHint() : undefined,
+              run: () => setAiFilterOpen(true) } : undefined} />
           <SortControl options={SORT_OPTIONS} value={sortK}
             dir={sortDir < 0 ? "desc" : "asc"}
             onValue={(k) => {
@@ -2113,98 +2127,8 @@ export default function App() {
               setSortDir(k === "label" ? 1 : -1);
             }}
             onDir={(d) => setSortDir(d === "asc" ? 1 : -1)} />
+          {moreMenu}
         </div>
-      )}
-      {/* Row C: quick-select chips (grouping modes only). No
-          selection-dependent chrome here (that lives in the bottom bar,
-          which only renders once something is selected). */}
-      {!flat && (
-      <div className="mb-2 flex items-center gap-2 overflow-x-auto pb-1
-        md:flex-wrap md:overflow-visible md:pb-0" data-testid="chip-row">
-        {PRESET_CHIPS.slice(0, 1).map((p) => (
-          <Chip key={p.key} className="shrink-0"
-            on={filter === presetFilterQuery(p.key)}
-            onClick={() => selectPreset(p.key)}>
-            {t(p.label)}
-          </Chip>
-        ))}
-        {/* One segmented chip, one tap per preset (same toggling as chips). */}
-        <ChipGroup label={t("chip.inactive")} className="shrink-0">
-          {INACTIVE_PRESETS.map((p) => (
-            <ChipSegment key={p.key}
-              on={filter === presetFilterQuery(p.key)}
-              onClick={() => selectPreset(p.key)}>
-              {t(p.label)}
-            </ChipSegment>
-          ))}
-        </ChipGroup>
-        {PRESET_CHIPS.slice(1).map((p) => (
-          <Chip key={p.key} className="shrink-0"
-            on={filter === presetFilterQuery(p.key)}
-            onClick={() => selectPreset(p.key)}>
-            {t(p.label)}
-          </Chip>
-        ))}
-        {/* New-sender review: only shown once there's something to review -
-            an always-visible "New (0)" chip would just be clutter. Count
-            and visibility come from the FULL mailbox (allGroups), not the
-            currently-filtered groups - otherwise another active chip's
-            filter could hide this one. */}
-        {allGroups.some((g) => g.new) && (
-          <Chip className="shrink-0" on={filter === "is:new"}
-            onClick={() => selectPreset("new")}>
-            {t("chip.new_count",
-              { n: allGroups.filter((g) => g.new).length })}
-          </Chip>
-        )}
-        {/* Unsubscribe watchdog: same rule as the new-senders chip (only
-            with something to show, counted over the full mailbox). */}
-        {allGroups.some((g) => g.still_mailing) && (
-          <Chip className="shrink-0" on={filter === "is:still-mailing"}
-            onClick={() => selectPreset("still")}>
-            {t("chip.still_count",
-              { n: allGroups.filter((g) => g.still_mailing).length })}
-          </Chip>
-        )}
-        {/* Saved filter presets: user-defined, visually distinct (outlined
-            accent vs. the built-ins' filled muted look above) - tapping one
-            REPLACES the filter query instead of adding to the selection.
-            The pencil opens an inline editor (below, same Input +
-            QueryBuilder pairing the filter box itself uses) on the
-            preset's OWN stored query - not whatever's in the filter box;
-            the x deletes it. */}
-        {(state?.presets ?? []).map((p) => (
-          <span key={p.id}
-            className="inline-flex shrink-0 items-center gap-1 rounded-full
-              border border-accent/50 bg-transparent px-3 py-1.5 type-meta
-              whitespace-nowrap text-accent hover:bg-chip">
-            <button onClick={() => setFilter(p.query)} title={p.query}>
-              {p.name}
-            </button>
-            <button
-              className="opacity-60 hover:opacity-100"
-              title={t("saved_filter.edit_tip")}
-              aria-label={t("Edit")}
-              onClick={(e) => {
-                e.stopPropagation();
-                setEditingPreset(p);
-                setEditQuery(p.query);
-              }}>
-              <Pencil size={14} />
-            </button>
-            <button
-              className="opacity-60 hover:opacity-100"
-              title={t("Delete")}
-              aria-label={t("Delete")}
-              onClick={(e) => {
-                e.stopPropagation();
-                deleteFilterPreset(p.id, p.name);
-              }}>
-              <X size={14} />
-            </button>
-          </span>
-        ))}
-      </div>
       )}
 
       {/* Quick wins: suggestions on the Sender tab only, and only while

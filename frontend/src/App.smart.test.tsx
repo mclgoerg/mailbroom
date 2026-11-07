@@ -262,7 +262,7 @@ test("a server-side English label never shows in the German UI", async () => {
 
 test("the free-text filter matches a bucket's member addresses", async () => {
   await openSmart();
-  const box = await screen.findByPlaceholderText("filter groups…");
+  const box = await screen.findByPlaceholderText("Search or filter…");
   fireEvent.change(box, { target: { value: "zine" } });
   await waitFor(() => expect(screen.queryAllByText("Big Shop")).toHaveLength(0));
   expect(screen.getAllByText("Newsletters").length).toBeGreaterThan(0);
@@ -298,7 +298,7 @@ test("the filter reaches EVERY member of a big pool, not the capped list",
     try {
       await openSmart();
       expect(screen.getAllByText("650 senders").length).toBeGreaterThan(0);
-      const box = await screen.findByPlaceholderText("filter groups…");
+      const box = await screen.findByPlaceholderText("Search or filter…");
       for (const q of ["s649@rnd649", "s301@", "from:s500@rnd500.example",
         "domain:rnd450.example"]) {
         fireEvent.change(box, { target: { value: q } });

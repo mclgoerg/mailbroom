@@ -111,20 +111,28 @@ test("the chip counts flagged groups; tap 1 filters, tap 2 selects the " +
   renderApp();
   await waitFor(() => expect(screen.getAllByText("Sender A").length)
     .toBeGreaterThan(0));
-  const chip = await screen.findByText("Still mailing (2)");
+  await screen.findByRole("button", { name: "Filter" });
+  // The quick filter now lives in the Filter menu (one open + click per tap).
+  const tap = () => {
+    fireEvent.click(screen.getByRole("button", { name: "Filter" }));
+    fireEvent.click(screen.getByRole("menuitemradio", { name: /^Still mailing \(2\)/ }));
+  };
 
-  fireEvent.click(chip);                                    // tap 1: filter
-  expect((screen.getByPlaceholderText("filter groups…") as HTMLInputElement)
+  tap();                                    // tap 1: filter
+  expect((screen.getByPlaceholderText("Search or filter…") as HTMLInputElement)
     .value).toBe("is:still-mailing");
   expect(screen.queryAllByText("Sender C").length).toBe(0);
   expect(screen.queryAllByText("Sender B").length).toBeGreaterThan(0);
-  expect(screen.getByText("Still mailing (2)")).toBeTruthy();
+  fireEvent.click(screen.getByRole("button", { name: "Filter" }));
+  expect(screen.getByRole("menuitemradio", { name: /^Still mailing \(2\)/ })
+    .getAttribute("aria-checked")).toBe("true");
+  fireEvent.keyDown(document, { key: "Escape" });
 
-  fireEvent.click(chip);                                    // tap 2: select
+  tap();                                    // tap 2: select
   await waitFor(() => expect(screen.getByText("Trash 5")).toBeTruthy());
 
-  fireEvent.click(chip);                                    // tap 3: clear
-  await waitFor(() => expect((screen.getByPlaceholderText("filter groups…") as
+  tap();                                    // tap 3: clear
+  await waitFor(() => expect((screen.getByPlaceholderText("Search or filter…") as
     HTMLInputElement).value).toBe(""));
   expect(screen.queryAllByText("Sender C").length).toBeGreaterThan(0);
   expect(screen.queryByText(/^Trash \d+$/)).toBeNull();

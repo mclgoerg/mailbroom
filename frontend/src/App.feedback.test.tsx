@@ -167,7 +167,7 @@ test("an error toast persists while an info toast times out", async () => {
 test("an empty filter reads '0 of N' and Clear filter brings the list back",
   async () => {
     const { container } = await mount({ ...baseState });
-    fireEvent.change(screen.getByPlaceholderText("filter groups…"),
+    fireEvent.change(screen.getByPlaceholderText("Search or filter…"),
       { target: { value: "zzz-nothing" } });
     expect(await screen.findByText("0 of 1 group matches")).toBeTruthy();
     expect(screen.getByText("No groups match this filter")).toBeTruthy();
@@ -175,7 +175,7 @@ test("an empty filter reads '0 of N' and Clear filter brings the list back",
     fireEvent.click(screen.getByText("Clear filter"));
     await waitFor(() => expect(container.querySelectorAll("tbody tr").length)
       .toBe(1));
-    expect((screen.getByPlaceholderText("filter groups…") as HTMLInputElement)
+    expect((screen.getByPlaceholderText("Search or filter…") as HTMLInputElement)
       .value).toBe("");
   });
 
@@ -269,7 +269,7 @@ test("a partly failed move also shows its error", async () => {
 test("a zero-match filter after a failed rescan still offers Clear filter",
   async () => {
     await mount({ ...baseState });
-    fireEvent.change(screen.getByPlaceholderText("filter groups…"),
+    fireEvent.change(screen.getByPlaceholderText("Search or filter…"),
       { target: { value: "zzz-nothing" } });
     tick({ status: "error", error: "x" } as any);
     expect(await screen.findByText("No groups match this filter")).toBeTruthy();

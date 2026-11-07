@@ -10,9 +10,9 @@ import { afterEach, expect, test, vi } from "vitest";
 let state: any;
 
 const createPreset = vi.fn().mockResolvedValue(
-  { id: "p1", name: "Old DHL", query: "from:dhl age:>1y", account: "proton" });
+  { id: "p1", name: "Old parcels", query: "from:parcels@shipping.example age:>1y", account: "proton" });
 const updatePreset = vi.fn().mockResolvedValue(
-  { id: "p1", name: "Old DHL", query: "from:dhl age:>1y", account: "proton" });
+  { id: "p1", name: "Old parcels", query: "from:parcels@shipping.example age:>1y", account: "proton" });
 const deletePreset = vi.fn().mockResolvedValue(undefined);
 
 vi.mock("./api", () => ({
@@ -85,42 +85,51 @@ afterEach(() => {
   deletePreset.mockClear();
 });
 
-test("a saved preset renders as a chip with its name", async () => {
+const openFilterMenu = async () => {
+  fireEvent.click(await screen.findByRole("button", { name: "Filter" }));
+};
+// The saved filters live in the Filter menu; leaves it open.
+const openSaved = async () => {
+  await openFilterMenu();
+  await screen.findByRole("group", { name: "Saved filters" });
+};
+
+test("a saved preset is listed in the Filter menu with its name", async () => {
   localStorage.setItem("pmc_account", "proton");
   state = { ...baseState, presets: [
-    { id: "p1", name: "Old DHL", query: "from:dhl age:>1y",
+    { id: "p1", name: "Old parcels", query: "from:parcels@shipping.example age:>1y",
       account: "proton" }] };
   render(<ToastProvider><DialogProvider><App /></DialogProvider></ToastProvider>);
-  await waitFor(() => expect(screen.getByText("Old DHL")).toBeTruthy());
+  await openSaved();
 });
 
-test("tapping a saved preset chip replaces the filter query", async () => {
+test("tapping a saved filter replaces the filter query", async () => {
   localStorage.setItem("pmc_account", "proton");
   state = { ...baseState, presets: [
-    { id: "p1", name: "Old DHL", query: "from:dhl age:>1y",
+    { id: "p1", name: "Old parcels", query: "from:parcels@shipping.example age:>1y",
       account: "proton" }] };
   render(<ToastProvider><DialogProvider><App /></DialogProvider></ToastProvider>);
-  await waitFor(() => expect(screen.getByText("Old DHL")).toBeTruthy());
+  await openSaved();
   const filterInput = screen.getByPlaceholderText(
-    "filter groups…") as HTMLInputElement;
+    "Search or filter…") as HTMLInputElement;
   fireEvent.change(filterInput, { target: { value: "something else" } });
   expect(filterInput.value).toBe("something else");
 
-  fireEvent.click(screen.getByText("Old DHL"));
+  fireEvent.click(screen.getByText("Old parcels"));
   // REPLACES, not appends.
-  expect(filterInput.value).toBe("from:dhl age:>1y");
+  expect(filterInput.value).toBe("from:parcels@shipping.example age:>1y");
 });
 
 test("deleting a saved preset confirms, then calls api.deletePreset",
   async () => {
     localStorage.setItem("pmc_account", "proton");
     state = { ...baseState, presets: [
-      { id: "p1", name: "Old DHL", query: "from:dhl age:>1y",
+      { id: "p1", name: "Old parcels", query: "from:parcels@shipping.example age:>1y",
         account: "proton" }] };
     render(<ToastProvider><DialogProvider><App /></DialogProvider></ToastProvider>);
-    await waitFor(() => expect(screen.getByText("Old DHL")).toBeTruthy());
-    fireEvent.click(screen.getByLabelText("Delete"));
-    expect((await findDialog()).textContent).toContain("Old DHL");
+    await openSaved();
+    fireEvent.click(screen.getByRole("menuitem", { name: "Delete: Old parcels" }));
+    expect((await findDialog()).textContent).toContain("Old parcels");
     await pressDialog("Delete");
     await waitFor(() => expect(deletePreset).toHaveBeenCalledWith("p1"));
   });
@@ -129,38 +138,41 @@ test("declining the delete confirmation never calls api.deletePreset",
   async () => {
     localStorage.setItem("pmc_account", "proton");
     state = { ...baseState, presets: [
-      { id: "p1", name: "Old DHL", query: "from:dhl age:>1y",
+      { id: "p1", name: "Old parcels", query: "from:parcels@shipping.example age:>1y",
         account: "proton" }] };
     render(<ToastProvider><DialogProvider><App /></DialogProvider></ToastProvider>);
-    await waitFor(() => expect(screen.getByText("Old DHL")).toBeTruthy());
-    fireEvent.click(screen.getByLabelText("Delete"));
+    await openSaved();
+    fireEvent.click(screen.getByRole("menuitem", { name: "Delete: Old parcels" }));
     await cancelDialog();
     await expectNoDialog();
     expect(deletePreset).not.toHaveBeenCalled();
   });
 
-test("the save button is disabled until the filter has text, then " +
+test("the save entry is disabled until the filter has text, then " +
   "prompts for a name and saves", async () => {
   localStorage.setItem("pmc_account", "proton");
   state = { ...baseState };
   render(<ToastProvider><DialogProvider><App /></DialogProvider></ToastProvider>);
-  await waitFor(() => expect(screen.getByPlaceholderText("filter groups…"))
+  await waitFor(() => expect(screen.getByPlaceholderText("Search or filter…"))
     .toBeTruthy());
-  const saveBtn =
-    screen.getByTitle("Save current filter as a preset") as HTMLButtonElement;
-  expect(saveBtn.disabled).toBe(true);
+  const saveBtn = () => screen.getByRole("menuitem",
+    { name: /^Save current filter/ }) as HTMLButtonElement;
+  await openFilterMenu();
+  expect(saveBtn().disabled).toBe(true);
+  fireEvent.keyDown(document, { key: "Escape" });
 
-  const filterInput = screen.getByPlaceholderText("filter groups…");
-  fireEvent.change(filterInput, { target: { value: "from:dhl age:>1y" } });
-  expect(saveBtn.disabled).toBe(false);
+  const filterInput = screen.getByPlaceholderText("Search or filter…");
+  fireEvent.change(filterInput, { target: { value: "from:parcels@shipping.example age:>1y" } });
+  await openFilterMenu();
+  expect(saveBtn().disabled).toBe(false);
 
-  fireEvent.click(saveBtn);
+  fireEvent.click(saveBtn());
   const dlg = await findDialog();
   fireEvent.change(within(dlg).getByLabelText("Name"),
-    { target: { value: "Old DHL" } });
+    { target: { value: "Old parcels" } });
   await pressDialog("Save");
   await waitFor(() => expect(createPreset).toHaveBeenCalledWith(
-    "Old DHL", "from:dhl age:>1y"));
+    "Old parcels", "from:parcels@shipping.example age:>1y"));
 });
 
 test("declining the save name prompt never calls api.createPreset",
@@ -168,11 +180,13 @@ test("declining the save name prompt never calls api.createPreset",
     localStorage.setItem("pmc_account", "proton");
     state = { ...baseState };
     render(<ToastProvider><DialogProvider><App /></DialogProvider></ToastProvider>);
-    await waitFor(() => expect(screen.getByPlaceholderText("filter groups…"))
+    await waitFor(() => expect(screen.getByPlaceholderText("Search or filter…"))
       .toBeTruthy());
-    const filterInput = screen.getByPlaceholderText("filter groups…");
-    fireEvent.change(filterInput, { target: { value: "from:dhl" } });
-    fireEvent.click(screen.getByTitle("Save current filter as a preset"));
+    const filterInput = screen.getByPlaceholderText("Search or filter…");
+    fireEvent.change(filterInput, { target: { value: "from:parcels@shipping.example" } });
+    await openFilterMenu();
+    fireEvent.click(screen.getByRole("menuitem",
+      { name: /^Save current filter/ }));
     await cancelDialog();
     await expectNoDialog();
     expect(createPreset).not.toHaveBeenCalled();
@@ -183,25 +197,25 @@ test("editing a preset opens an inline editor prefilled with ITS OWN " +
   "its name", async () => {
   localStorage.setItem("pmc_account", "proton");
   state = { ...baseState, presets: [
-    { id: "p1", name: "Old DHL", query: "from:dhl age:>1y",
+    { id: "p1", name: "Old parcels", query: "from:parcels@shipping.example age:>1y",
       account: "proton" }] };
   render(<ToastProvider><DialogProvider><App /></DialogProvider></ToastProvider>);
-  await waitFor(() => expect(screen.getByText("Old DHL")).toBeTruthy());
+  await openSaved();
 
   // Unrelated text sitting in the filter box must NOT leak into the edit.
   const filterInput = screen.getByPlaceholderText(
-    "filter groups…") as HTMLInputElement;
+    "Search or filter…") as HTMLInputElement;
   fireEvent.change(filterInput, { target: { value: "something unrelated" } });
 
-  fireEvent.click(screen.getByLabelText("Edit"));
+  fireEvent.click(screen.getByRole("menuitem", { name: "Edit: Old parcels" }));
   const editInput =
-    screen.getByDisplayValue("from:dhl age:>1y") as HTMLInputElement;
+    screen.getByDisplayValue("from:parcels@shipping.example age:>1y") as HTMLInputElement;
   expect(editInput).not.toBe(filterInput);
 
-  fireEvent.change(editInput, { target: { value: "from:dhl age:>2y" } });
+  fireEvent.change(editInput, { target: { value: "from:parcels@shipping.example age:>2y" } });
   fireEvent.click(screen.getByText("Save"));
   await waitFor(() => expect(updatePreset).toHaveBeenCalledWith(
-    "p1", "Old DHL", "from:dhl age:>2y"));
+    "p1", "Old parcels", "from:parcels@shipping.example age:>2y"));
   // the editor closes itself once the save lands
   await waitFor(() => expect(screen.queryByText("Save")).toBeNull());
   // the main filter box is still exactly what the user typed into it
@@ -212,12 +226,12 @@ test("Cancel closes the inline editor without calling api.updatePreset",
   async () => {
     localStorage.setItem("pmc_account", "proton");
     state = { ...baseState, presets: [
-      { id: "p1", name: "Old DHL", query: "from:dhl age:>1y",
+      { id: "p1", name: "Old parcels", query: "from:parcels@shipping.example age:>1y",
         account: "proton" }] };
     render(<ToastProvider><DialogProvider><App /></DialogProvider></ToastProvider>);
-    await waitFor(() => expect(screen.getByText("Old DHL")).toBeTruthy());
-    fireEvent.click(screen.getByLabelText("Edit"));
-    expect(screen.getByDisplayValue("from:dhl age:>1y")).toBeTruthy();
+    await openSaved();
+    fireEvent.click(screen.getByRole("menuitem", { name: "Edit: Old parcels" }));
+    expect(screen.getByDisplayValue("from:parcels@shipping.example age:>1y")).toBeTruthy();
 
     fireEvent.click(screen.getByText("Cancel"));
     expect(screen.queryByText("Save")).toBeNull();
@@ -229,16 +243,42 @@ test("a clear button appears once the filter has text and empties it",
     localStorage.setItem("pmc_account", "proton");
     state = { ...baseState };
     render(<ToastProvider><DialogProvider><App /></DialogProvider></ToastProvider>);
-    await waitFor(() => expect(screen.getByPlaceholderText("filter groups…"))
+    await waitFor(() => expect(screen.getByPlaceholderText("Search or filter…"))
       .toBeTruthy());
     expect(screen.queryByLabelText("Clear filter")).toBeNull();
 
     const filterInput = screen.getByPlaceholderText(
-      "filter groups…") as HTMLInputElement;
-    fireEvent.change(filterInput, { target: { value: "from:dhl age:>1y" } });
+      "Search or filter…") as HTMLInputElement;
+    fireEvent.change(filterInput, { target: { value: "from:parcels@shipping.example age:>1y" } });
     const clearBtn = screen.getByLabelText("Clear filter");
 
     fireEvent.click(clearBtn);
     expect(filterInput.value).toBe("");
     expect(screen.queryByLabelText("Clear filter")).toBeNull();
   });
+
+test("an applied saved filter shows as a removable token; picking it again "
+  + "clears the filter", async () => {
+  localStorage.setItem("pmc_account", "proton");
+  state = { ...baseState, presets: [
+    { id: "p1", name: "Old parcels", query: "from:parcels@shipping.example age:>1y",
+      account: "proton" }] };
+  render(<ToastProvider><DialogProvider><App /></DialogProvider></ToastProvider>);
+  await openSaved();
+  const box = screen.getByPlaceholderText("Search or filter…") as
+    HTMLInputElement;
+  fireEvent.click(screen.getByRole("menuitemradio", { name: "Old parcels" }));
+  expect(box.value).toBe("from:parcels@shipping.example age:>1y");
+  expect(screen.getByTestId("filter-token").textContent).toContain("Old parcels");
+
+  await openFilterMenu();
+  fireEvent.click(screen.getByRole("menuitemradio", { name: "Old parcels" }));
+  expect(box.value).toBe("");
+  expect(screen.queryByTestId("filter-token")).toBeNull();
+
+  await openFilterMenu();
+  fireEvent.click(screen.getByRole("menuitemradio", { name: "Old parcels" }));
+  fireEvent.click(screen.getByRole("button",
+    { name: "Remove filter “Old parcels”" }));
+  expect(box.value).toBe("");
+});

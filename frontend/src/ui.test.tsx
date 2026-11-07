@@ -9,7 +9,7 @@ import { afterEach, expect, test, vi } from "vitest";
 
 import {
   isModalOpen, AccountAvatar, BarButton, BulkBar, Button, Checkbox, Chip, ChipGroup, ChipSegment,
-  ConfirmDialog, DIALOG_ARM_MS, choiceDialog, DialogProvider, PromptDialog, EmptyState, MailRow, Menu, MenuDivider,
+  ConfirmDialog, DIALOG_ARM_MS, choiceDialog, placeMenu, DialogProvider, PromptDialog, EmptyState, MailRow, Menu, MenuDivider,
   MenuGroup, MenuHeading, MenuItem, Modal, Notice, ProgressBar, Segmented, ToastProvider,
   confirmDialog,
   LINK, RatingChips, Tag, AppearanceControl, getAppearance, applyTheme,
@@ -1368,4 +1368,43 @@ test("Button danger-tint: tinted red fill, danger text, no transparent base",
   expect(c).toContain("bg-keep-bg");
   expect(c).toContain("text-danger-fg");
   expect(c).not.toContain("bg-transparent");
+});
+
+test("placeMenu keeps a popover inside the viewport on both sides", () => {
+  // Fits right-aligned: no flip, no shift.
+  expect(placeMenu({ left: 300, right: 340 }, 200, 390))
+    .toEqual({ left: false, shift: 0 });
+  // Too wide for the room left of the trigger: flips left-aligned, then the
+  // overflow past the right edge is shifted back (360 px phone, 298 px menu).
+  const p = placeMenu({ left: 260, right: 300 }, 298, 360);
+  expect(p.left).toBe(true);
+  expect(260 + p.shift + 298).toBeLessThanOrEqual(360 - 8);
+  expect(260 + p.shift).toBeGreaterThanOrEqual(8);
+  // A forced-left menu is clamped the same way.
+  expect(placeMenu({ left: 10, right: 50 }, 100, 390, true))
+    .toEqual({ left: true, shift: 0 });
+});
+
+test("a Menu that overflows after flipping is shifted into the viewport", () => {
+  const rect = (l: number, w: number) => ({ left: l, right: l + w, width: w,
+    top: 0, bottom: 0, height: 0, x: l, y: 0, toJSON: () => ({}) }) as DOMRect;
+  const spy = vi.spyOn(HTMLElement.prototype, "getBoundingClientRect")
+    .mockImplementation(function (this: HTMLElement) {
+      // A 298 px popover beside a trigger ending at x=300: no room on the
+      // left, and left-aligned it would run past the 360 px viewport.
+      return this.getAttribute("role") === "menu" ? rect(2, 298)
+        : rect(260, 40);
+    });
+  vi.stubGlobal("innerWidth", 360);
+  render(<Menu label="Filter" trigger={<>F</>}>
+    <MenuItem>One</MenuItem>
+  </Menu>);
+  fireEvent.click(screen.getByRole("button", { name: "Filter" }));
+  const pop = screen.getByRole("menu");
+  expect(pop.className).toContain("left-0");
+  const shift = Number(/translateX\((-?[\d.]+)px\)/.exec(
+    pop.style.transform)?.[1]);
+  expect(260 + shift + 298).toBeLessThanOrEqual(352);
+  spy.mockRestore();
+  vi.unstubAllGlobals();
 });

@@ -604,6 +604,21 @@ export function SectionLabel({ children, className = "" }: {
  * phone). Closes
  * on outside click, Escape, or after any click inside (items just run
  * their onClick). Sits BELOW modals (z-modal). */
+/** Where a menu popover of `width` goes relative to its trigger wrapper:
+ *  right-aligned unless that leaves the left viewport edge (or `forceLeft`),
+ *  then a horizontal `shift` that keeps it 8 px inside the viewport on both
+ *  sides, so no menu can overflow the page. */
+export function placeMenu(wrap: { left: number; right: number }, width: number,
+  vw: number, forceLeft = false): { left: boolean; shift: number } {
+  const edge = 8;
+  const left = forceLeft || wrap.right - width < edge;
+  const x = left ? wrap.left : wrap.right - width;
+  let shift = 0;
+  if (x + width > vw - edge) shift = vw - edge - (x + width);
+  if (x + shift < edge) shift = edge - x;
+  return { left, shift };
+}
+
 export function Menu({ trigger, label, variant, icon, up, triggerClass,
   triggerSize = "md", className = "", align, children }: {
   trigger: ReactNode;
@@ -630,13 +645,18 @@ export function Menu({ trigger, label, variant, icon, up, triggerClass,
 )) {
   const [open, setOpen] = useState(false);
   const [alignLeft, setAlignLeft] = useState(false);
+  const [shift, setShift] = useState(0);
   const ref = useRef<HTMLDivElement>(null);
   const pop = useRef<HTMLDivElement>(null);
   // Measure right-aligned first, then flip if it overflows the viewport.
   useLayoutEffect(() => {
-    if (!open) { setAlignLeft(false); return; }
+    if (!open) { setAlignLeft(false); setShift(0); return; }
     const r = pop.current?.getBoundingClientRect();
-    if (r && r.width > 0 && r.left < 8) setAlignLeft(true);
+    const wr = ref.current?.getBoundingClientRect();
+    if (!r || !wr || r.width <= 0) return;
+    const p = placeMenu(wr, r.width, window.innerWidth, align === "left");
+    setAlignLeft(p.left);
+    setShift(p.shift);
   }, [open]);
   const focusTrigger = () =>
     ref.current?.querySelector<HTMLElement>(":scope > button")?.focus();
@@ -704,6 +724,7 @@ export function Menu({ trigger, label, variant, icon, up, triggerClass,
       )}
       {open && (
         <div ref={pop} role="menu" onKeyDown={onMenuKey}
+          style={shift ? { transform: `translateX(${shift}px)` } : undefined}
           className={`absolute z-(--z-dropdown) min-w-52
             ${up ? "bottom-full mb-2" : "top-full mt-1"}
             max-w-[calc(100vw-1rem)] rounded-card border border-line bg-panel
