@@ -1563,6 +1563,8 @@ export default function App() {
         unsubscribedNow={live?.unsubscribed ?? sender.unsubscribed}
         onTrash={(g) => actOn("sender", state?.groups?.sender ?? {}, [g.key],
           "trash")}
+        onMove={(g, dest) => actOn("sender", state?.groups?.sender ?? {},
+          [g.key], "move", dest)}
         onProtect={(g) => toggleProtect(g, "sender")}
         onBlock={(g) => blockGroup(g, "sender")}
         onUnblock={(g) => unblockGroup(g,
@@ -1612,6 +1614,7 @@ export default function App() {
       unsubscribedNow={state?.groups[mode][detail.key]?.unsubscribed
         ?? detail.unsubscribed}
       onTrash={(g) => act([g.key], "trash")}
+      onMove={(g, dest) => act([g.key], "move", dest)}
       onProtect={shortcutTarget(mode, detail) ? toggleProtect : undefined}
       onBlock={shortcutTarget(mode, detail) ? blockGroup : undefined}
       onUnblock={shortcutTarget(mode, detail) ? unblockGroup : undefined}

@@ -837,7 +837,7 @@ describe("DetailPanel header and action row", () => {
   });
 
   it("a still-mailing sender shows the callout with Block inside and a "
-    + "'Still mailing' action instead of Unsubscribed", async () => {
+    + "no 'Still mailing' action (the callout says it)", async () => {
     const onBlock = vi.fn();
     renderPanel([mkMail(1)], { onBlock, unsubscribedNow: doneUnsub,
       group: mkGroup({ unsub: true, still_mailing: { n: 3, since_ts: 0,
@@ -851,42 +851,66 @@ describe("DetailPanel header and action row", () => {
   });
 
   describe("Move (whole group)", () => {
-    it("opens the folder picker with a Cancel that acts on nothing",
-      async () => {
-      renderPanel([mkMail(1), mkMail(2)]);
+    const pick = async (onMove: (g: Group, d: string) => Promise<boolean>, extra = {}) => {
+      renderPanel([mkMail(1), mkMail(2)], { onMove, ...extra });
       await waitFor(() => screen.getByText("Mail 1"));
       fireEvent.click(screen.getByRole("button", { name: "Move" }));
+    };
+
+    it("opens the folder picker with a Cancel that acts on nothing",
+      async () => {
+      const onMove = vi.fn().mockResolvedValue(false);
+      await pick(onMove);
       expect(screen.getByDisplayValue("Move to folder…")).toBeTruthy();
       fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
       expect(screen.queryByDisplayValue("Move to folder…")).toBeNull();
+      expect(onMove).not.toHaveBeenCalled();
       expect(deleteMessages).not.toHaveBeenCalled();
     });
 
-    it("moves every mail through the usual confirmation", async () => {
-      const onDeleted = vi.fn();
-      renderPanel([mkMail(1), mkMail(2)], { onDeleted });
-      await waitFor(() => screen.getByText("Mail 1"));
-      fireEvent.click(screen.getByRole("button", { name: "Move" }));
+    it("hands the group and folder to onMove (the bulk path), never "
+      + "deleteMessages, and closes once it resolves true", async () => {
+      const onMove = vi.fn().mockResolvedValue(true);
+      const onClose = vi.fn();
+      await pick(onMove, { onClose });
       fireEvent.change(screen.getByDisplayValue("Move to folder…"),
         { target: { value: "Archive" } });
-      await pressDialog("Move → Archive (2)");
-      await waitFor(() => expect(deleteMessages).toHaveBeenCalledWith(
-        [["INBOX", 1], ["INBOX", 2]], "move", "Archive", false));
+      await waitFor(() => expect(onMove).toHaveBeenCalledWith(
+        expect.objectContaining({ key: "s@x.example" }), "Archive"));
+      await waitFor(() => expect(onClose).toHaveBeenCalled());
+      expect(deleteMessages).not.toHaveBeenCalled();
     });
 
-    it("declining the confirmation moves nothing", async () => {
+    it("stays open when the move was declined (resolves false)", async () => {
+      const onMove = vi.fn().mockResolvedValue(false);
+      const onClose = vi.fn();
+      await pick(onMove, { onClose });
+      fireEvent.change(screen.getByDisplayValue("Move to folder…"),
+        { target: { value: "Archive" } });
+      await waitFor(() => expect(onMove).toHaveBeenCalled());
+      expect(onClose).not.toHaveBeenCalled();
+    });
+
+    it("is absent without onMove, and steps aside for a mail selection or "
+      + "hideGroupActions", async () => {
       renderPanel([mkMail(1), mkMail(2)]);
       await waitFor(() => screen.getByText("Mail 1"));
-      fireEvent.click(screen.getByRole("button", { name: "Move" }));
-      fireEvent.change(screen.getByDisplayValue("Move to folder…"),
-        { target: { value: "Archive" } });
-      await cancelDialog();
-      await expectNoDialog();
-      expect(deleteMessages).not.toHaveBeenCalled();
+      expect(screen.queryByRole("button", { name: "Move" })).toBeNull();
+      cleanup();
+      renderPanel([mkMail(1), mkMail(2)], { onMove: noopAsync as never });
+      await waitFor(() => screen.getByText("Mail 1"));
+      fireEvent.click(document.querySelectorAll('input[type="checkbox"]')[0]);
+      await screen.findByText("1 selected");
+      expect(screen.queryByRole("button", { name: "Move" })).toBeNull();
+      cleanup();
+      renderPanel([mkMail(1)], { onMove: noopAsync as never, hideGroupActions: true });
+      await waitFor(() => screen.getByText("Mail 1"));
+      expect(screen.queryByRole("button", { name: "Move" })).toBeNull();
     });
 
-    it("is not offered on a pooled row's Senders view", async () => {
-      renderPanel([mkMail(1)], { grouping: "smart",
+    it("is not offered on a pooled row's Senders view, and neither is an "
+      + "empty More menu", async () => {
+      renderPanel([mkMail(1)], { grouping: "smart", onMove: noopAsync as never,
         group: mkGroup({ key: "k:newsletter", kind: "newsletter",
           n_senders: 2, count: 6 }),
         senders: [mkGroup({ key: "a@x.example", label: "A" })],
@@ -894,8 +918,29 @@ describe("DetailPanel header and action row", () => {
         renderSender: () => <div /> });
       await screen.findByRole("tab", { name: "Senders (1)" });
       expect(screen.queryByRole("button", { name: "Move" })).toBeNull();
-      expect(screen.getByRole("button", { name: "More" })).toBeTruthy();
+      expect(screen.queryByRole("button", { name: "More" })).toBeNull();
     });
+
+    it("AI rate is not offered on the Senders view (no mails loaded there): "
+      + "More stays hidden even with an AI configured", async () => {
+      renderPanel([mkMail(1)], { grouping: "smart", aiEnabled: true,
+        group: mkGroup({ key: "k:newsletter", kind: "newsletter",
+          n_senders: 2, count: 6 }),
+        senders: [mkGroup({ key: "a@x.example", label: "A" })],
+        onSenderAct: async () => true, onSenderProtect: async () => true,
+        renderSender: () => <div /> });
+      await screen.findByRole("tab", { name: "Senders (1)" });
+      expect(screen.queryByRole("button", { name: "More" })).toBeNull();
+    });
+  });
+
+  it("a still-mailing sender has no disabled action slot for it",
+    async () => {
+    renderPanel([mkMail(1)], { unsubscribedNow: doneUnsub,
+      group: mkGroup({ unsub: true, still_mailing: { n: 3, since_ts: 0,
+        senders: 1, addrs: ["s@x.example"] } as Group["still_mailing"] }) });
+    await waitFor(() => screen.getByText("Mail 1"));
+    expect(screen.queryByRole("button", { name: "Still mailing" })).toBeNull();
   });
 
   it("an open message keeps the compact header (no tiles, no action row)",

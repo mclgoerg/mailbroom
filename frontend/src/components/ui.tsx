@@ -797,7 +797,7 @@ export function Avatar({ name, size = "sm", className = "" }: {
  *  the icon alone never carries the meaning. `label` is the visible caption;
  *  `ariaLabel` may extend it (it must contain the caption). `on` = a toggle
  *  that is currently set (Protect). */
-export const ACTION_BTN = `group flex min-w-16 cursor-pointer flex-col
+export const ACTION_BTN = `group flex min-w-0 cursor-pointer flex-col
   items-center gap-1 rounded-control px-1 py-1 text-center type-caption text-muted
   enabled:hover:text-body disabled:cursor-not-allowed disabled:text-faint`;
 

@@ -26,6 +26,9 @@ import { ACTION_BTN, ActionButton, ActionFace, AiTag, Button, Chip,
 // Rating filter chips: same green/yellow/red/unrated buckets as the
 // select they replace, now an exclusive pill row (like the overview's
 // quick-select chips) instead of a dropdown.
+// One cell of the action row: equal shares, five fit on a 390 px phone.
+const CELL = "min-w-0 flex-1 basis-16";
+
 const RATING_FILTERS: { key: string; label: string }[] = [
   { key: "delete_safe", label: "🟢 " + t("v.delete_safe") },
   { key: "review", label: "🟡 " + t("v.review") },
@@ -34,7 +37,7 @@ const RATING_FILTERS: { key: string; label: string }[] = [
 ];
 
 export function DetailPanel({ grouping, group, aiEnabled, protectedNow,
-  unsubscribedNow, onTrash, onProtect, onBlock, onUnblock, blocked, folders,
+  unsubscribedNow, onTrash, onMove, onProtect, onBlock, onUnblock, blocked, folders,
   sieve = true, smartMin = 10, onClose, onEmptied, onDeleted, variant = "modal", hideGroupActions = false,
   senders, onSenderAct, onSenderProtect, renderSender, onAckUnsub, backLabel,
   aiSort, onFile, categories, filingBox }: {
@@ -48,6 +51,10 @@ export function DetailPanel({ grouping, group, aiEnabled, protectedNow,
   // if the user declined the confirmation, in which case the panel stays
   // open instead of closing on a no-op.
   onTrash: (g: Group) => Promise<boolean>;
+  // Move the whole group to a folder: the same group path as the list's bulk
+  // bar (protection, pinned mails, confirm wording, undo). Resolves false if
+  // declined or nothing moved. Absent: no Move action.
+  onMove?: (g: Group, dest: string) => Promise<boolean>;
   onProtect?: (g: Group) => void;        // rows with a sender/domain only
   onBlock?: (g: Group) => void;          // rows with a sender/domain only
   onUnblock?: (g: Group) => void;
@@ -418,7 +425,18 @@ export function DetailPanel({ grouping, group, aiEnabled, protectedNow,
   const since = group.first
     ? fmtDate(group.first, nowDate(), { lang: getLang() }) : "";
   const canBlock = !!onBlock && !blocked;
-  const canMove = tab === "mails" && !!mails && mails.length > 0;
+  // One scope at a time: group Move steps aside like the footer button does.
+  const canMove = !!onMove && tab === "mails" && group.count > 0
+    && sel.size === 0 && !hideGroupActions;
+  const aiRate = (aiEnabled || demo) && !busy && sel.size === 0
+    && tab === "mails";
+  const canRead = grouping === "thread" && !!mails && mails.length > 0;
+  const canPinAll = !!mails && mails.length > 0 && pinnedCount < mails.length;
+  const canSieve = sieve && !!sieveTarget;
+  // Only what works in the current view (a pooled row's Senders view loads no
+  // mails); no items, no button.
+  const hasMore = (aiEnabled && busy) || aiRate || canRead || canPinAll
+    || pinnedCount > 0 || canSieve;
 
   // Header: who this is, then the quiet signals the rows no longer carry.
   const header = (
@@ -483,49 +501,53 @@ export function DetailPanel({ grouping, group, aiEnabled, protectedNow,
 
   const unsubButtons = !canUnsub ? null
     : unsubscribedNow?.status === "done" ? (
-      <ActionButton disabled
-        icon={group.still_mailing ? <TriangleAlert size={18} />
-          : <Check size={18} />}
-        label={group.still_mailing ? t("still.badge") : t("Unsubscribed")} />
+      // (still mailing: the callout says so; no action slot)
+      group.still_mailing ? null : (
+        <ActionButton disabled icon={<Check size={18} />}
+          label={t("Unsubscribed")} className={CELL} />
+      )
     ) : unsubscribedNow?.status === "link" ? (
       <>
-        <ActionButton disabled={busy} icon={<ExternalLink size={18} />}
+        <ActionButton className={CELL} disabled={busy} icon={<ExternalLink size={18} />}
           label={t("unsub.open_link")}
           onClick={() => setNote(openUnsubPage(unsubscribedNow.link))} />
-        <ActionButton disabled={busy} icon={<Check size={18} />}
+        <ActionButton className={CELL} disabled={busy} icon={<Check size={18} />}
           label={t("unsub.mark_done")} onClick={ackUnsubscribe} />
       </>
     ) : (
-      <ActionButton disabled={busy} icon={<BellOff size={18} />}
+      <ActionButton className={CELL} disabled={busy} icon={<BellOff size={18} />}
         label={unsubscribedNow?.status === "failed"
           ? t("unsub.retry") : t("Unsubscribe")}
         onClick={unsubscribe} />
     );
 
   const actionRow = (
-    <div className="flex flex-wrap items-start justify-around gap-y-2 px-4
-      pt-4">
+    <div className="flex flex-wrap items-start gap-y-2 px-4 pt-4">
       {unsubButtons}
       {canBlock && (
-        <ActionButton icon={<Ban size={18} />} label={t("detail.block")}
+        <ActionButton className={CELL} icon={<Ban size={18} />}
+          label={t("detail.block")}
           ariaLabel={t("block.btn")} title={t("block.tip")}
           onClick={() => onBlock!(group)} />
       )}
       {onUnblock && blocked && (
-        <ActionButton icon={<Ban size={18} />} label={t("Unblock")}
+        <ActionButton className={CELL} icon={<Ban size={18} />}
+          label={t("Unblock")}
           title={t("unblock.tip")} onClick={() => onUnblock(group)} />
       )}
       {onProtect && (
-        <ActionButton on={protectedNow} icon={<Shield size={18} />}
+        <ActionButton className={CELL} on={protectedNow} icon={<Shield size={18} />}
           label={t(protectedNow ? "btn.protected" : "btn.protect")}
           ariaLabel={t(protectedNow ? "unprotect.tip" : "protect.tip")}
           onClick={() => onProtect({ ...group, protected: protectedNow })} />
       )}
       {canMove && (
-        <ActionButton icon={<FolderInput size={18} />}
+        <ActionButton className={CELL} icon={<FolderInput size={18} />}
           label={t("detail.move")} on={moveOpen}
           onClick={() => setMoveOpen(!moveOpen)} />
       )}
+      {hasMore && (
+      <div className={`${CELL} flex justify-center`}>
       <Menu label={t("menu.more")} triggerClass={ACTION_BTN}
         trigger={<ActionFace icon={<MoreHorizontal size={18} />}
           label={t("menu.more")} />}>
@@ -542,21 +564,21 @@ export function DetailPanel({ grouping, group, aiEnabled, protectedNow,
             {t("cancel")}
           </MenuItem>
         )}
-        {(aiEnabled || demo) && !busy && sel.size === 0 && (
+        {aiRate && (
           <MenuItem onClick={aiSelect} disabled={demo}
             sub={demo ? demoHint() : undefined}>
             <Wand2 size={16} className="mr-1 inline align-text-bottom" />
             {t("ai.rate")}
           </MenuItem>
         )}
-        {grouping === "thread" && mails && mails.length > 0 && (
-          <MenuItem onClick={() => setReading(mails[0])}>
+        {canRead && (
+          <MenuItem onClick={() => setReading(mails![0])}>
             <MessagesSquare size={16}
               className="mr-1 inline align-text-bottom" />
             {t("thread.read")}
           </MenuItem>
         )}
-        {mails && mails.length > 0 && pinnedCount < mails.length && (
+        {canPinAll && (
           <MenuItem onClick={() => pinAll(true)}>
             <Pin size={16} className="mr-1 inline align-text-bottom" />
             {t("pin.group_on")}
@@ -569,12 +591,14 @@ export function DetailPanel({ grouping, group, aiEnabled, protectedNow,
             {t("pin.group_off")}
           </MenuItem>
         )}
-        {sieve && sieveTarget && (
+        {canSieve && (
           <MenuItem onClick={() => setSieveOpen(!sieveOpen)}>
             {t("sieve.button")}
           </MenuItem>
         )}
       </Menu>
+      </div>
+      )}
     </div>
   );
 
@@ -584,8 +608,11 @@ export function DetailPanel({ grouping, group, aiEnabled, protectedNow,
     <div className="flex items-center gap-2 px-4 pt-3">
       <Select value="" className="min-w-0 flex-1"
         onChange={(e) => {
-          if (e.target.value) actOn(mails!, "move", e.target.value);
+          const dest = e.target.value;
           setMoveOpen(false);
+          if (dest) onMove!(group, dest).then((ok) => {
+            if (ok) (onEmptied ?? onClose)();
+          });
         }}>
         <option value="" disabled>{t("Move to folder…")}</option>
         {folders.map((f) => <option key={f} value={f}>{f}</option>)}
@@ -759,7 +786,7 @@ export function DetailPanel({ grouping, group, aiEnabled, protectedNow,
               <option value="size">{t("Sort: size")}</option>
             </Select>
           )}
-          <Select value="" className="w-28 min-w-0 shrink"
+          <Select value="" className="w-auto min-w-0 shrink"
             onChange={(e) => selectPreset(e.target.value)}>
             <option value="" disabled>{t("Select…")}</option>
             <option value="all">{t("All / none")}</option>

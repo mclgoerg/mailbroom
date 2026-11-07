@@ -390,6 +390,49 @@ test("declining the detail panel's Trash confirmation leaves it open and " +
   expect(screen.getAllByRole("button", { name: "Block sender" }).length).toBeGreaterThan(0);
 });
 
+// Group-level Move in the detail goes through the same group path as the
+// bulk bar (api.deleteGroups), never the mail-level one.
+const renderMovable = (over: Record<string, unknown> = {}) => {
+  cfg = singleCfg;
+  localStorage.setItem("pmc_account", "proton");
+  state = { ...baseState, status: "done", folders_raw: ["Archive"],
+    groups: { sender: { [groupFixture.key]: { ...groupFixture, ...over } },
+              smart: {}, domain: {}, subject: {}, thread: {} } };
+  return render(<ToastProvider><DialogProvider><App /></DialogProvider></ToastProvider>);
+};
+const moveTo = async (dest: string) => {
+  await openDetail();
+  fireEvent.click(await screen.findByRole("button", { name: "Move" }));
+  fireEvent.change(screen.getByDisplayValue("Move to folder…"),
+    { target: { value: dest } });
+};
+
+test("the detail's Move sends the whole group to the group path", async () => {
+  renderMovable();
+  await moveTo("Archive");
+  expect((await findDialog()).textContent).toContain("3 mails from DHL Paket");
+  await pressDialog(/^Move/);
+  await waitFor(() => expect(deleteGroups).toHaveBeenCalledWith(
+    "sender", [groupFixture.key], "move", "Archive", false, null, null));
+});
+
+test("the detail's Move on a protected sender takes the group path too "
+  + "(not rejected like a mail-level move)", async () => {
+  renderMovable({ protected: true });
+  await moveTo("Archive");
+  await pressDialog(/^Move/);
+  await waitFor(() => expect(deleteGroups).toHaveBeenCalledWith(
+    "sender", [groupFixture.key], "move", "Archive", false, null, null));
+});
+
+test("the detail's Move on an all-pinned group keeps it and says so",
+  async () => {
+  renderMovable({ pinned: 3 });
+  await moveTo("Archive");
+  expect(await screen.findByText(/pinned|protected/i)).toBeTruthy();
+  expect(deleteGroups).not.toHaveBeenCalled();
+});
+
 // The contextual bulk-action bar: the ONLY bulk-action chrome in the app -
 // it must not exist at all until something is selected, and disappear
 // again once the selection is cleared.
