@@ -1,4 +1,4 @@
-import { BookmarkPlus, ChevronDown, ListFilter, Pencil, Sparkles, X }
+import { BookmarkPlus, Check, ChevronDown, ListFilter, Pencil, Sparkles, X }
   from "lucide-react";
 import { t } from "../i18n";
 import type { FilterPreset } from "../types";
@@ -110,13 +110,18 @@ export function FilterMenu({ filter, quick, newCount, stillCount, presets,
           // beside it (built-ins above have neither).
           <div key={p.id} className="flex items-center">
             <button role="menuitemradio" aria-checked={filter === p.query}
-              title={p.query}
+              title={`${p.name}: ${p.query}`}
               className="flex min-w-0 flex-1 items-center gap-2
                 rounded-control px-3 py-2 text-left type-body text-accent
                 hover:bg-chip"
               onClick={() => onApply(p)}>
               <BookmarkPlus size={16} aria-hidden className="shrink-0" />
-              <span className="max-w-64 truncate">{p.name}</span>
+              {/* Capped so the menu stays inside a phone's viewport; the
+                  full name is the button's accessible name and its title. */}
+              <span className="max-w-40 truncate md:max-w-64">{p.name}</span>
+              {filter === p.query && (
+                <Check size={16} aria-hidden className="ml-auto shrink-0" />
+              )}
             </button>
             <button role="menuitem" title={t("saved_filter.edit_tip")}
               aria-label={`${t("Edit")}: ${p.name}`}
@@ -180,6 +185,8 @@ export function FilterToken({ label, onRemove }: {
   label: string; onRemove: () => void;
 }) {
   return (
+    // Own line below 768 px, so the input keeps its width.
+    <div className="min-w-0 max-w-full basis-full md:basis-auto">
     <span data-testid="filter-token" className="inline-flex min-h-9
       max-w-full items-center gap-1 rounded-full bg-accent-tint pl-3 pr-1
       type-meta text-accent coarse:min-h-10">
@@ -192,5 +199,6 @@ export function FilterToken({ label, onRemove }: {
         <X size={14} aria-hidden />
       </button>
     </span>
+    </div>
   );
 }

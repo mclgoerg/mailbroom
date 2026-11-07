@@ -103,3 +103,22 @@ test("FilterToken removes via its labelled button", () => {
     { name: "Remove filter “Old news”" }));
   expect(onRemove).toHaveBeenCalled();
 });
+
+test("a saved filter row shows its active check and caps a long name", () => {
+  const long: FilterPreset = { id: "p2", account: "a",
+    name: "Newsletters I stopped reading", query: "from:long.example" };
+  setup({ presets: [long], filter: "from:long.example" });
+  const row = screen.getByRole("menuitemradio",
+    { name: "Newsletters I stopped reading" });
+  expect(row.getAttribute("aria-checked")).toBe("true");
+  expect(row.querySelector("svg.lucide-check")).toBeTruthy();   // visible
+  const name = row.querySelector("span")!;
+  expect(name.className).toContain("truncate");
+  expect(name.className).toContain("max-w-40");   // phone clamp
+});
+
+test("the token takes its own line on phones", () => {
+  render(<FilterToken label="x" onRemove={() => {}} />);
+  expect(screen.getByTestId("filter-token").parentElement!.className)
+    .toContain("basis-full");
+});
