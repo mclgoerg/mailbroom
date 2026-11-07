@@ -7,6 +7,7 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from
 import { afterEach, expect, test, vi } from "vitest";
 
 let state: any;
+const stateRequest = vi.fn();
 const mails = vi.fn().mockResolvedValue({
   total: 1, offset: 0, ignored: [],
   mails: [{ uid: 7, folder: "INBOX", date: "2026-01-02", ts: 1,
@@ -18,7 +19,8 @@ vi.mock("./api", () => ({
   api: {
     authProbe: () => Promise.resolve({ mode: "none", authed: true }),
     getConfig: () => Promise.resolve(cfg),
-    state: () => Promise.resolve(state),
+    state: () => stateRequest() ?? Promise.resolve(state),
+    scan: () => Promise.resolve({ ok: true }),
     version: () => Promise.resolve({ build: "v1" }),
     mails: (...a: unknown[]) => mails(...a),
     group: () => Promise.resolve([]),
@@ -78,10 +80,31 @@ const baseState: AppState = {
 };
 
 afterEach(() => {
+  stateRequest.mockReset();
+  delete cfg.accounts.other;
   cleanup();
   cfg.ai.available = true;
   localStorage.clear();
   vi.unstubAllGlobals();
+});
+
+test("switching accounts discards an old response and starts the new fetch", async () => {
+  cfg.accounts.other = { ...cfg.accounts.proton, user: "other@x.example" };
+  await open();
+  const old = state;
+  let resolveOld!: (value: unknown) => void;
+  const before = stateRequest.mock.calls.length;
+  stateRequest.mockReturnValueOnce(new Promise((resolve) => { resolveOld = resolve; }));
+  fireEvent.click(screen.getByRole("button", { name: "Scan" }));
+  await waitFor(() => expect(stateRequest.mock.calls.length).toBeGreaterThan(before));
+  state = { ...baseState, account: "other", groups: { ...baseState.groups,
+    sender: { "b@x.example": { ...group, key: "b@x.example", label: "Beta" } } } };
+  fireEvent.click(screen.getByRole("button", { name: "Profile & settings" }));
+  fireEvent.click(screen.getByRole("menuitemradio", { name: /other/ }));
+  await screen.findAllByText("Beta");
+  resolveOld(old);
+  await waitFor(() => expect(screen.queryByText("Acme")).toBeNull());
+  expect(screen.getAllByText("Beta").length).toBeGreaterThan(0);
 });
 
 const group = {

@@ -7,7 +7,7 @@ from backend import auditlog, mailops
 from conftest import FakeIMAP, make_msg, wait_delete_done, wait_scan_done
 
 
-def _trashed(monkeypatch, stub_rescan=True, **server):
+def _trashed(monkeypatch, stub_rescan=True, legacy=False, **server):
     """Two mails of a sender moved to Trash; returns the fake server and the
     recorded undo entries. A restore starts a background rescan; it is
     stubbed unless a test is about it."""
@@ -25,6 +25,8 @@ def _trashed(monkeypatch, stub_rescan=True, **server):
     if stub_rescan:
         monkeypatch.setattr(mailops, "_rescan_after_restore",
                             lambda *a, **k: False)
+    if legacy:
+        accounts_undo_log()[-1].pop("copies", None)
     return fake, [dict(e) for e in accounts_undo_log()]
 
 
@@ -228,7 +230,7 @@ def test_reinsertion_survives_a_changed_list(monkeypatch):
 def test_a_failing_message_id_verification_keeps_the_entry(monkeypatch,
                                                            failure):
     import imaplib
-    fake, before = _trashed(monkeypatch)
+    fake, before = _trashed(monkeypatch, legacy=True)
     real = fake.uid
     broken = {"on": True}
 
@@ -253,7 +255,7 @@ def test_a_failing_message_id_verification_keeps_the_entry(monkeypatch,
 
 
 def test_a_failing_message_id_search_keeps_the_entry(monkeypatch):
-    fake, before = _trashed(monkeypatch)
+    fake, before = _trashed(monkeypatch, legacy=True)
     real = fake.uid
     broken = {"on": True}
 

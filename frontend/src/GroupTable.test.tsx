@@ -356,7 +356,7 @@ describe("engagement indicator", () => {
   it("the column header sorts by engagement", () => {
     const onSort = vi.fn();
     const { getByText } = renderTable({ onSort });
-    fireEvent.click(getByText("Eng."));
+    fireEvent.click(getByText("Engagement"));
     expect(onSort).toHaveBeenCalledWith("engagement");
   });
 
@@ -365,7 +365,7 @@ describe("engagement indicator", () => {
     const { container, getByText } = renderTable({ groups: [eng(10)] });
     expect(container.querySelector("[data-eng]")!.getAttribute("title"))
       .toContain("Interaktion 10/100 (niedrig)");
-    getByText("Inter.");
+    getByText("Interaktion");
   });
 });
 

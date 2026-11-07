@@ -62,6 +62,9 @@ export function saveBlob(name: string, blob: Blob): void {
 /* Stable error codes the backend answers with (the HTTP `detail`; see
  * mailops.py / knowledgestore.py) -> the `t()` key of the translated text. */
 const ERROR_CODES: Record<string, string> = {
+  action_cancelled: "ferr.action_cancelled",
+  protected_sender_selected: "ferr.protected_sender_selected",
+  undo_copy_unknown: "ferr.undo_copy_unknown",
   no_message_id: "pin.no_message_id",
   pinned_mails: "pin.refused",
   protected_mails: "fp.protected_refused",

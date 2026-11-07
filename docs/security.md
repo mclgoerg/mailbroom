@@ -60,9 +60,9 @@ could then fake `X-Forwarded-For`. When a proxy fronts Inboxrake, keep
   the admin or the identity provider (also via `.env` + restart) signs every
   browser out, as does Settings -> Server -> *Sign out all sessions*. Logging
   out only clears that browser's cookie.
-- **SSO and `email_verified`.** An identity whose email the provider reports
-  as unverified (`email_verified: false`) is refused; providers that omit the
-  claim are accepted. Keep the allowed-users list filled: **empty means every
+- **SSO and `email_verified`.** An identity returning an email must also return
+  `email_verified: true`. Missing, false or malformed verification is refused.
+  Tenant ownership uses the immutable issuer and provider subject, not email. Keep the allowed-users list filled: **empty means every
   account at the provider may sign in** and gets its own workspace (a startup
   warning says so).
 
@@ -71,8 +71,8 @@ could then fake `X-Forwarded-For`. When a proxy fronts Inboxrake, keep
 With SSO enabled, **every signed-in identity gets its own isolated
 workspace**: their own mail accounts, scans, AI verdicts, rules, statistics
 and settings - nothing is shared or visible across users. One identity is the
-**admin** (set `OIDC_ADMIN`, enter it in settings, or let the first login
-claim it): the admin owns the workspace that existed before SSO was enabled,
+**admin** (set `OIDC_ADMIN` or enter it in settings; first-login bootstrap
+is allowed only with an allow-list containing exactly one identity): the admin owns the workspace that existed before SSO was enabled,
 plus the server-level settings (login config and the optional **shared AI
 key** - users without their own key can use the admin's, capped by a
 per-user monthly budget). Password mode and "none" stay single-workspace.
@@ -101,15 +101,17 @@ client ID, if you run one, is `INBOXRAKE_MS_CLIENT_ID` (see
   Trash folder, behind a confirmation (the mail count; a single protected
   group or pinned mail asks "anyway?" naming it instead). UIDVALIDITY is checked before acting on cached UIDs, and scans
   are read-only.
-- **Everything is undoable** except the explicit permanent-delete actions
-  in Trash and Junk. The manual ones confirm with exact counts; an opt-in
+- **Moves normally offer Undo**, limited to the last 10 actions until a
+  restart. When the server cannot identify the moved copies safely, the
+  entry is kept and recovery must be done manually from the destination.
+  Permanent-delete actions in Trash and Junk cannot be undone. The manual ones confirm with exact counts; an opt-in
   purge rule only acts after you have reviewed a report run, then runs on
   its schedule within its age limit and per-run cap. Rules start in report
   mode too.
 - **Protected senders and pinned mails:** rules and the Folders-panel
   purges always skip them. Moving a protected group, or a single pinned
-  mail, to Trash asks for an extra confirmation; individually selected
-  mails from a protected sender are not checked. **Empty Trash empties
+  mail, to Trash asks for an extra confirmation. Individual-message moves
+  refuse protected senders until they are unprotected in their group. **Empty Trash empties
   everything in Trash**, protected or not.
 - **Accounts stay strictly separate** - nothing is aggregated across
   accounts, and with SSO nothing is shared between users.
@@ -130,3 +132,28 @@ up and consent in the UI.
 ## Reporting a vulnerability
 
 See [SECURITY.md](../SECURITY.md).
+
+
+## SSO identity upgrade and legacy workspaces
+
+Upgrading to immutable SSO identities invalidates existing SSO sessions;
+sign in again. The configured administrator binds to the first verified
+matching provider subject and keeps the existing root workspace. Later
+identities with a recycled email cannot take it over. Configure the admin
+before exposing SSO with a broad allow-list.
+
+Existing non-admin email-owned tenant directories are retained, but are
+not automatically assigned to new identities. Before upgrading, export each
+user's settings backup. Restore it in the new workspace and reconnect the
+mail accounts, or explicitly map the old directory identity to the new one
+with `INBOXRAKE_OIDC_LEGACY_BINDINGS`. This environment variable is a JSON
+object mapping an immutable `oidc:<sha256>` identity to the old email/subject,
+for example `{"oidc:<identity hash>": "member@team.example"}`. The signed-in
+user's immutable identity is returned as `identity` by `/api/auth`. Only the
+operator should create these mappings after verifying the provider subject;
+never derive them automatically from matching emails.
+
+Importing a settings backup never imports secrets. If it changes a mail
+server, account identity, transport/certificate settings, or the AI provider
+endpoint, the corresponding stored credentials are cleared. Re-enter them
+before connecting to the changed endpoint.

@@ -2,6 +2,16 @@
  * the key itself, so this file only lists template/notice keys. */
 
 export const EN: Record<string, string> = {
+  "ferr.action_cancelled": "The action was cancelled; queued mails were not moved.",
+  "confirm.empty_trash_protection": "Protected senders and pinned mails in Trash will also be permanently deleted.",
+  "smart.first_use": "Smart pools small senders by company or type, while large senders keep their own rows. Open a pile to review its senders before cleaning it up.",
+  "demo.first_steps": "Try opening a sender, moving its mails to Trash, then restoring them with Undo. Reset starts over with the same made-up mailboxes.",
+  "confirm.b_space": "Moving to Trash does not free server space until the mails are permanently deleted.",
+  "notice.rule_queued": "Rule \"{name}\": {queued} mails queued. Completion is shown in the action progress.",
+  "ferr.protected_sender_selected": "Some selected mails belong to a protected sender. Unprotect that sender in its group before moving these mails.",
+  "rule.queued": "{n} mails queued; completion is shown in the action progress.",
+  "ferr.undo_copy_unknown": "Some moved copies could not be identified safely. The Undo entry is kept; open the destination folder to restore those mails manually.",
+  "secrets.plaintext_warning": "Stored passwords and API keys are not encrypted. Set INBOXRAKE_SECRET_KEY in the container environment before entering credentials, then restart Inboxrake. See the installation guide.",
   "notice.scan_cancelled": "Scan cancelled.",
   "notice.action_cancelled": "Action cancelled.",
   "status.cached_verdicts": "{n} cached AI verdicts",
@@ -96,8 +106,8 @@ export const EN: Record<string, string> = {
     "The allowed-users list is empty: anyone with an account at your "
     + "identity provider can sign in and gets their own workspace.",
   "login.oidc_noadmin_warn":
-    "No admin is set: the first identity to sign in becomes the admin and "
-    + "owns the server settings.",
+    "No admin is set: restrict allowed users to exactly one identity for "
+    + "bootstrap, or set the administrator before enabling SSO.",
   "login.err.email_unverified":
     "Sign-in refused: your identity provider has not verified this email "
     + "address.",
@@ -132,7 +142,7 @@ export const EN: Record<string, string> = {
   "menu.light": "light",
   "menu.dark": "dark",
   "login.oidc_admin": "Admin identity (email or subject)",
-  "login.oidc_admin_ph": "empty: first login claims it",
+  "login.oidc_admin_ph": "set an identity, or allow exactly one user for bootstrap",
   "login.tenancy_note":
     "With SSO every user gets their OWN workspace (accounts, scans, "
     + "settings). The admin keeps this one.",
@@ -372,7 +382,7 @@ export const EN: Record<string, string> = {
   "confirm.unpin_group_one":
     "Remove the protection from the 1 protected mail of this group?",
   "Sort: engagement": "Sort: engagement",
-  "Eng.": "Eng.",
+  "Eng.": "Engagement",
   "eng.col_tip":
     "Engagement: how much you actually read and answer this sender",
   "eng.popover_title": "Engagement score {score}/100 · {tier}",
@@ -546,7 +556,7 @@ export const EN: Record<string, string> = {
     'Rule "{name}" (report): {groups} groups · {mails} mails would be '
     + "affected.",
   "notice.rule_executed":
-    'Rule "{name}" executed: {acted} mails queued ({groups} groups).',
+    'Rule "{name}" completed: {acted} mails affected ({groups} groups).',
   "rules.help":
     "A rule saves a group filter (same syntax as the filter box) plus an "
     + "action. New rules only REPORT what they would do; switch to execute "
@@ -555,7 +565,7 @@ export const EN: Record<string, string> = {
   "rules.empty": "No rules yet - create one below.",
   "rule.never_ran": "never ran",
   "rule.run_report": "report: {groups} groups · {mails} mails would be affected",
-  "rule.run_executed": "executed: {acted} mails queued ({groups} groups, {mails} matched)",
+  "rule.run_executed": "completed: {acted} mails affected ({groups} groups, {mails} matched)",
   "rule.capped": "{n} mails beyond the per-run cap",
   "rule.capped_one": "1 mail beyond the per-run cap",
   "rule.protected_skipped": "{n} protected skipped",
@@ -796,7 +806,7 @@ export const EN: Record<string, string> = {
   "import.settings": "Settings are overwritten.",
   "import.rules": "Rules are replaced (back in report mode).",
   "import.merged": "AI verdicts, replied data and filed senders are merged.",
-  "import.secrets": "Passwords and API keys are never imported.",
+  "import.secrets": "Passwords and API keys are never imported. Changing a server or account identity clears its stored credentials; reconnect afterwards.",
   "import.confirm": "Import backup",
   "import.skipped": " Not imported: {names}.",
   "import.done": "Imported: {rules} rules, {verdicts} verdicts, {knowledge} filed senders.",
@@ -1107,7 +1117,7 @@ export const EN: Record<string, string> = {
   "confirm.b_mails_from": "{n} mails from {names}",
   "confirm.b_mails_from_one": "1 mail from {names}",
   "confirm.names_more": "{names} and {k} more",
-  "confirm.b_undo": "You can undo this from the result message.",
+  "confirm.b_undo": "You can normally undo this from the result message. If the server cannot identify the moved copies safely, restore them manually from the destination folder.",
   "confirm.btn_anyway": "{verb} anyway",
   "select.named": "Select {subject}",
   "bar.groups": "{n} groups",

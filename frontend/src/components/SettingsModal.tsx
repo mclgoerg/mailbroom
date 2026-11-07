@@ -626,6 +626,9 @@ export function SettingsModal({ cfg, account, onClose, onSaved,
         className="grid flex-1 content-start gap-4 overflow-y-auto p-4 sm:p-5
         sm:grid-cols-2 sm:items-end">
         {tab === "general" && (<>
+          {cfg.secret_key_set === false && <Notice tone="warn">
+            {t("secrets.plaintext_warning")}
+          </Notice>}
         <Field label={t("Language")}>
           <Select className="w-full" value={getLang()}
             onChange={(e) => {

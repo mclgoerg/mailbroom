@@ -21,6 +21,38 @@ export function DuplicatesPanel({ onClose, onDeleted }: {
   const [sel, setSel] = useState<Set<string>>(new Set());
   const [view, setView] = useState<Mail | null>(null);
   const [note, setNote] = useState("");
+  const [working, setWorking] = useState(false);
+
+  useEffect(() => {
+    if (!working) return;
+    let alive = true;
+    let timer: ReturnType<typeof setTimeout>;
+    const poll = async () => {
+      try {
+        const state = await api.state();
+        if (!alive) return;
+        if (state.delete.status === "running") {
+          timer = setTimeout(poll, 800);
+          return;
+        }
+        const [exact, likely] = await Promise.all([
+          api.duplicates(), api.possibleDuplicates()]);
+        if (!alive) return;
+        setSets(exact);
+        setPossible(likely);
+        setSel(new Set());
+        setNote(state.delete.error ? t("err.generic", { msg: state.delete.error }) : "");
+        setWorking(false);
+        onDeleted();
+      } catch (e: any) {
+        if (!alive) return;
+        setNote(t("err.generic", { msg: e.message ?? e }));
+        setWorking(false);
+      }
+    };
+    timer = setTimeout(poll, 800);
+    return () => { alive = false; clearTimeout(timer); };
+  }, [working]);
 
   useEffect(() => {
     let alive = true;
@@ -37,6 +69,7 @@ export function DuplicatesPanel({ onClose, onDeleted }: {
   const wastedTotal = (sets ?? []).reduce((n, s) => n + s.wasted, 0);
 
   const toggle = (k: string) => {
+    if (working) return;
     const next = new Set(sel);
     next.has(k) ? next.delete(k) : next.add(k);
     setSel(next);
@@ -51,7 +84,7 @@ export function DuplicatesPanel({ onClose, onDeleted }: {
   };
 
   const trash = async () => {
-    if (!sets || sel.size === 0) return;
+    if (!sets || sel.size === 0 || working) return;
     if (!await confirmTrashMails(sel.size)) return;
     try {
       const items: [string, number][] = [];
@@ -59,13 +92,7 @@ export function DuplicatesPanel({ onClose, onDeleted }: {
         if (sel.has(mailKey(m))) items.push([m.folder, m.uid]);
       }));
       await api.deleteMessages(items, "trash");
-      const without = (l: DupSet[]) => l
-        .map((s) => ({ ...s,
-          mails: s.mails.filter((m) => !sel.has(mailKey(m))) }))
-        .filter((s) => s.mails.length > 1);
-      setSets(without(sets));
-      setPossible(without(possible));
-      setSel(new Set());
+      setWorking(true);
       setNote(t("note.background", { verb: t("Move to Trash") }));
       onDeleted();
     } catch (e: any) {
@@ -117,12 +144,12 @@ export function DuplicatesPanel({ onClose, onDeleted }: {
           {(!!sets?.length || sel.size > 0 || note) && (
             <Toolbar>
               {!!sets?.length && (
-                <Button variant="secondary" onClick={selectAllButNewest}>
+                <Button variant="secondary" disabled={working} onClick={selectAllButNewest}>
                   {t("dups.keep_newest")}
                 </Button>
               )}
               {sel.size > 0 && (
-                <Button variant="danger" onClick={trash}>
+                <Button variant="danger" disabled={working} onClick={trash}>
                   {t("Trash selected")} ({sel.size})
                 </Button>
               )}

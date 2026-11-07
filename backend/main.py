@@ -134,8 +134,8 @@ def _warn_open_oidc() -> None:
             "identity provider can sign in and gets their own workspace")
     if not (auth_cfg.get("admin") or "").strip():
         log.warning(
-            "no SSO admin is set - the first identity to sign in becomes "
-            "the admin (set OIDC_ADMIN or enter it in Settings -> Server)")
+            "no SSO admin is set - restrict the allow-list to one identity for "
+            "bootstrap, or set OIDC_ADMIN / enter it in Settings -> Server")
 
 
 def _check_data_dir() -> None:
@@ -245,6 +245,19 @@ def _resolve_tenant(mode: str, auth_cfg: dict, sub: str) -> tenants.Tenant:
     if mode != "oidc":
         return tenants.DEFAULT
     admin = (auth_cfg.get("admin") or "").strip().lower()
+    if sub.startswith("oidc:"):
+        if sub == auth_cfg.get("admin_subject") or sub == admin:
+            return tenants.DEFAULT
+        # Explicit operator mapping for pre-upgrade email-owned workspaces.
+        # Never attach legacy mailboxes merely because an IdP reused an email.
+        try:
+            bindings = json.loads(os.environ.get("INBOXRAKE_OIDC_LEGACY_BINDINGS", "{}"))
+        except ValueError:
+            raise HTTPException(503, "INBOXRAKE_OIDC_LEGACY_BINDINGS must be a JSON object; fix the container environment.")
+        legacy = bindings.get(sub) if isinstance(bindings, dict) else None
+        if isinstance(legacy, str) and legacy:
+            return tenants.for_subject(legacy)
+        return tenants.for_subject(sub)
     if sub.strip().lower() == admin:
         return tenants.DEFAULT
     return tenants.for_subject(sub)
@@ -344,8 +357,11 @@ def get_auth(request: Request):
         out["demo"] = True      # the UI disables what the demo can't do
     if authed:
         # The middleware already resolved the tenant for this request.
-        out["sub"] = sub if mode == "oidc" else ""
+        out["sub"] = (cfgmod.load_server()["auth"].get("identity_labels", {}).get(sub, sub)
+                      if mode == "oidc" else "")
         out["is_admin"] = tenants.current().is_default
+        if mode == "oidc":
+            out["identity"] = sub
     return out
 
 
@@ -467,13 +483,19 @@ def get_oidc_callback(request: Request, code: str = Query(""),
         raise HTTPException(403, "this account is not allowed to sign in")
     # No admin configured yet: the first allowed identity to sign in
     # claims the pre-tenancy workspace (set OIDC_ADMIN to pin it upfront).
+    oidc = cfg["auth"]["oidc"]
+    if not cfg["auth"].get("admin") and len(oidc.get("allowed") or []) != 1:
+        raise HTTPException(403, "Configure the SSO administrator before signing in, or restrict allowed users to one identity for bootstrap.")
+    identity = authmod.oidc_identity(claims, oidc["issuer"])
+    cfgmod.bind_oidc_admin(identity, sub, str(claims.get("sub") or ""))
     if cfgmod.claim_admin(sub):
         logging.getLogger("inboxrake.auth").warning(
             "OIDC admin claimed by %s - this identity now owns the "
             "existing workspace and the server settings", sub)
     resp = RedirectResponse("/")
     resp.delete_cookie(_PKCE_COOKIE)          # one roundtrip, one verifier
-    _set_session(resp, request, sub)
+    _sync_session_epoch()
+    _set_session(resp, request, identity)
     logging.getLogger("inboxrake.auth").info("OIDC login ok: %s", sub)
     return resp
 
@@ -1760,7 +1782,7 @@ def post_import_config(body: dict):
     if isinstance(update.get("ai"), dict):
         update["ai"] = cfgmod.strip_ai_secrets(update["ai"])
     try:
-        cfgmod.update_config(update)
+        cfgmod.update_config(update, safe_import=True)
     except ValueError as exc:
         raise HTTPException(400, str(exc))
     # The sender knowledge goes in AFTER the config (a `cat:` entry needs its

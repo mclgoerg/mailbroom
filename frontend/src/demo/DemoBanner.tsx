@@ -14,6 +14,7 @@ export function DemoBanner({ onReset }: { onReset: () => void }) {
       <Notice icon={<Info size={14} />}>
         <span className="flex flex-wrap items-center gap-x-3 gap-y-1">
           <span>{t("demo.banner")}</span>
+          <span>{t("demo.first_steps")}</span>
           <Button variant="quiet" size="sm" className="-my-1"
             onClick={reset}>{t("demo.reset")}</Button>
         </span>

@@ -366,6 +366,9 @@ export function Wizard({ cfg, mode, initialStep, initialAccount, scan,
           <div className="grid gap-3">
             <div className="type-heading">{presetLabel(preset)}</div>
             <p className="type-meta text-muted">{hint(preset, cfg)}</p>
+            {cfg.secret_key_set === false && <Notice tone="warn">
+              {t("secrets.plaintext_warning")}
+            </Notice>}
             {preset === "proton" && (
               <p className="type-meta text-muted">{t("wizard.proton_cert")}</p>
             )}

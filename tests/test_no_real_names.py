@@ -272,7 +272,8 @@ def scan_files(root: Path, paths: list[str],
     return out
 
 
-SKIP_DIRS = frozenset({".git", "node_modules", "dist", "build", "coverage",
+SKIP_DIRS = frozenset({".git", ".astro", "node_modules", "dist", "build", "coverage",
+                       "dist-demo", "dist-landing", "site-dist", "test-results", ".wrangler",
                        "__pycache__", ".pytest_cache", ".venv", "venv",
                        ".mypy_cache"})
 
@@ -437,6 +438,9 @@ def test_without_git_every_file_below_the_root_is_listed(tmp_path, monkeypatch):
     (tmp_path / "a" / "x.py").write_text("x = 1\n")
     (tmp_path / "node_modules").mkdir()
     (tmp_path / "node_modules" / "y.js").write_text("y")
+    for directory in (".astro", "dist-demo"):
+        (tmp_path / directory).mkdir()
+        (tmp_path / directory / "generated.js").write_text("generated")
 
     def no_git(*args, **kwargs):
         raise FileNotFoundError("git")

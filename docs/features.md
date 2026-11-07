@@ -185,7 +185,9 @@ the short version; [install.md](install.md) covers running it and
   button, so future mail never clutters the mailbox again.
 - **Undo** - every move to Trash ends in a toast ("Moved 618 mails to
   Trash") with an **Undo** button; older deletions can be restored from
-  the Undo list in the status line above the list (matched by Message-ID).
+  the Undo list in the status line above the list (destination UID and
+  UIDVALIDITY tracking). If a server cannot identify a moved copy safely,
+  its Undo entry is kept for manual recovery from the destination.
 - **Trash browser** - the Trash button in the header (shown while the
   Trash has mail; the count is as of the last scan) opens the real Trash
   (also mail deleted outside the app): search it, restore selected mails

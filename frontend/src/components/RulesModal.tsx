@@ -31,6 +31,7 @@ function RunSummary({ rule }: { rule: Rule }) {
   const r = rule.last_run;
   if (!r) return <span className="text-muted">{t("rule.never_ran")}</span>;
   if (r.error) return <span className="text-danger-fg">{errorText(r.error)}</span>;
+  if (r.pending) return <span className="text-muted">{t("rule.queued", { n: r.queued ?? 0 })}</span>;
   const purge = isPurge(rule.scope);
   return (
     <>

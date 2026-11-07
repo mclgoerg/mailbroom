@@ -12,3 +12,6 @@ ai_usage.json
 test-results/
 site-dist/
 website/.wrangler/
+
+# Astro generated metadata
+.astro/

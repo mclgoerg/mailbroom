@@ -13,9 +13,11 @@ import { setLang } from "./i18n";
 const duplicates = vi.fn();
 const possibleDuplicates = vi.fn();
 const deleteMessages = vi.fn();
+const jobState = vi.fn();
 
 vi.mock("./api", () => ({
   api: { duplicates: () => duplicates(),
+    state: () => jobState(),
     possibleDuplicates: () => possibleDuplicates(),
     deleteMessages: (...a: unknown[]) => deleteMessages(...a) },
   fmtSize: () => "1 KB",
@@ -30,7 +32,26 @@ const show = () => render(<DialogProvider>
   <DuplicatesPanel onClose={() => {}} onDeleted={() => {}} />
 </DialogProvider>);
 
-beforeEach(() => { possibleDuplicates.mockResolvedValue([]); });
+test("a queued deletion keeps candidates visible and reconciles a failed job", async () => {
+  const sets = [{ wasted: 10, mails: [mk(3), mk(1)] }];
+  duplicates.mockResolvedValue(sets);
+  deleteMessages.mockResolvedValue({ ok: true, queued: 1 });
+  jobState.mockResolvedValue({ delete: { status: "error", error: "move refused" } });
+  show();
+  fireEvent.click(await screen.findByRole("button", { name: "Select all but newest" }));
+  fireEvent.click(screen.getByRole("button", { name: "Trash selected (1)" }));
+  await pressDialog(/Move to Trash \(1\)/);
+  await waitFor(() => expect(deleteMessages).toHaveBeenCalled());
+  expect(screen.getAllByRole("checkbox", { name: /Invoice/ })).toHaveLength(2);
+  await waitFor(() => expect(screen.getByText(/move refused/)).toBeTruthy(), { timeout: 2500 });
+  expect(screen.getAllByRole("checkbox", { name: /Invoice/ })).toHaveLength(2);
+  expect(screen.getByRole("button", { name: "Select all but newest" }).hasAttribute("disabled")).toBe(false);
+});
+
+beforeEach(() => {
+  possibleDuplicates.mockResolvedValue([]);
+  jobState.mockResolvedValue({ delete: { status: "running", error: "" } });
+});
 
 afterEach(() => {
   cleanup();

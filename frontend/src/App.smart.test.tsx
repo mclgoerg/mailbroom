@@ -483,7 +483,7 @@ test("trashing ticked senders acts on exactly those addresses", async () => {
   expect(within(dlg).getByText("3 mails from promo@lone.example"))
     .toBeTruthy();
   expect(within(dlg).getByText(
-    "You can undo this from the result message.")).toBeTruthy();
+    "You can normally undo this from the result message. If the server cannot identify the moved copies safely, restore them manually from the destination folder.")).toBeTruthy();
   await pressDialog("Move to Trash (3)");
   await waitFor(() => expect(deleteGroups).toHaveBeenCalledWith(
     "sender", ["promo@lone.example"], "trash", "", false, null, null));

@@ -24,10 +24,11 @@ mode.
 
 ## What leaves my machine?
 
-Nothing, unless you turn on AI review - and then only metadata, never mail
-bodies or attachments (see [what exactly](security.md#what-the-optional-ai-review-sends)).
-Pick a cloud provider or a local model (Ollama, LM Studio, vLLM) and nothing
-leaves your network at all. The AI is optional and you can set a monthly
+Mailbox access goes to your mail provider. Unsubscribe actions contact the
+sender, and SSO contacts your identity provider. Optional AI review sends
+only metadata, never mail bodies or attachments (see
+[what exactly](security.md#what-the-optional-ai-review-sends)). A local model
+(Ollama, LM Studio, vLLM) keeps the AI traffic on your own network. The AI is optional and you can set a monthly
 budget in Settings -> AI. The UI loads no external assets.
 
 ## Why not just use filters or Sieve?
@@ -104,7 +105,11 @@ are internal and may change in any release.
 
 Each account keeps its last 10 undoable actions, in memory only: a restart
 or an image update (e.g. an auto-updated `:latest`) empties the list. An
-undo looks for the mails (by Message-ID) in the folder they were moved to -
+undo tracks destination UIDs and UIDVALIDITY, using server COPYUID responses
+when available and otherwise identifying newly arrived copies. It never
+restores a pre-existing matching copy. If identity cannot be established
+safely, the entry is kept and you must restore those mails manually from
+the destination folder -
 Trash for a trash action, the destination folder for an archive or move -
 so it only works while they are still there; once they are emptied from
 Trash or moved on, they cannot be brought back this way.

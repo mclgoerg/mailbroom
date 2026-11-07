@@ -731,7 +731,6 @@ def _record_run(rule_id: str, result: dict) -> None:
         account=rule.get("account"),
         # a purge rule's execute run counts what it really deleted
         count=(result.get("acted", 0) if result.get("mode") == "execute"
-               and rule.get("scope", "mail") in PURGE_SCOPES
                else result.get("mails", 0)),
         label=rule.get("name", ""),
         outcome="error" if result.get("error") else "ok",
@@ -836,12 +835,26 @@ def run_rule(rule_id: str, rescan: bool = True) -> dict:
                         mailops.UNKNOWN_TARGET,
                         folder=mailops.decode_mutf7(rule["dest"])))
         if rule["mode"] == "execute" and picked:
+            completion: dict = {}
             r = mailops.delete_groups(
                 rule["grouping"], [g["key"] for g in picked],
                 rule["action"], rule["dest"], keep_latest=keep_latest,
                 older_than_days=older_than_days, acc=acc,
-                actor=f"rule:{rule_id}")
-            result["acted"] = r["queued"]
+                actor=f"rule:{rule_id}", completion=completion)
+            if demo.enabled():
+                result["queued"] = r["queued"]
+                result["pending"] = True
+            else:
+                deadline = time.monotonic() + 600
+                while not completion.get("done") and time.monotonic() < deadline:
+                    time.sleep(0.05)
+                result["acted"] = completion.get("moved", 0)
+                if not completion.get("done"):
+                    raise RuntimeError("mail action did not finish; check its progress before retrying")
+                if completion.get("error"):
+                    cause = completion["error"]
+                    raise RuntimeError(mailops.coded(mailops.MOVED_THEN_FAILED,
+                        n=result["acted"], cause=cause) if result["acted"] else cause)
         log.info("rule %s (%r, %s) ran: %d groups / %d mails matched, "
                  "%d acted, %d capped, %d protected / %d pinned skipped",
                  rule["id"], rule["name"], rule["mode"], result["groups"],
@@ -849,10 +862,11 @@ def run_rule(rule_id: str, rescan: bool = True) -> dict:
                  result["skipped_protected"], result["skipped_pinned"])
         with acc.lock:
             acc.state["notice"] = {
-                "key": "rule_executed" if rule["mode"] == "execute"
+                "key": "rule_queued" if result.get("pending") else "rule_executed" if rule["mode"] == "execute"
                        else "rule_report",
                 "params": {"name": rule["name"], "groups": result["groups"],
-                           "mails": total, "acted": result["acted"]}}
+                           "mails": total, "acted": result["acted"],
+                           "queued": result.get("queued", 0)}}
     except _RunFailed:
         raise                      # a purge run, already recorded
     except Exception as exc:

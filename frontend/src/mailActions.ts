@@ -43,6 +43,7 @@ export async function planMailAction(chosen: Mail[], action: string,
       bullets.push(t("confirm.b_pinned_skipped",
         { n: chosen.length - acting.length }));
     }
+    if (action === "trash") bullets.push(t("confirm.b_space"));
     if (!await confirmDialog({ title: verb, bullets, tone,
       confirmLabel: t("confirm.btn_n", { verb, n: acting.length }) }))
       return { kind: "cancelled" };
@@ -66,6 +67,6 @@ export { mailKey };
 export const confirmTrashMails = (n: number): Promise<boolean> => {
   const verb = actionVerb("trash");
   return confirmDialog({ title: verb, tone: "danger",
-    bullets: [t("confirm.b_selected", { n })],
+    bullets: [t("confirm.b_selected", { n }), t("confirm.b_space")],
     confirmLabel: t("confirm.btn_n", { verb, n }) });
 };

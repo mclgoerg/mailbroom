@@ -2,6 +2,16 @@
  * the values, and register it in ../i18n.ts. */
 
 export const DE: Record<string, string> = {
+  "ferr.action_cancelled": "Die Aktion wurde abgebrochen; eingereihte Mails wurden nicht verschoben.",
+  "confirm.empty_trash_protection": "Auch Mails geschützter Absender und angeheftete Mails im Papierkorb werden endgültig gelöscht.",
+  "smart.first_use": "Smart fasst kleine Absender nach Unternehmen oder Art zusammen; große Absender behalten eigene Zeilen. Öffne eine Gruppe und prüfe ihre Absender vor dem Aufräumen.",
+  "demo.first_steps": "Öffne einen Absender, verschiebe seine Mails in den Papierkorb und stelle sie mit Rückgängig wieder her. Zurücksetzen beginnt mit denselben erfundenen Postfächern neu.",
+  "confirm.b_space": "Das Verschieben in den Papierkorb gibt erst nach dem endgültigen Löschen Speicher auf dem Server frei.",
+  "notice.rule_queued": "Regel \"{name}\": {queued} Mails eingereiht. Der Abschluss wird im Aktionsfortschritt angezeigt.",
+  "ferr.protected_sender_selected": "Einige ausgewählte Mails gehören zu einem geschützten Absender. Hebe dessen Schutz in der Gruppe auf, bevor du diese Mails verschiebst.",
+  "rule.queued": "{n} Mails eingereiht; der Abschluss wird im Aktionsfortschritt angezeigt.",
+  "ferr.undo_copy_unknown": "Einige verschobene Kopien konnten nicht sicher erkannt werden. Der Rückgängig-Eintrag bleibt erhalten; öffne den Zielordner und stelle diese Mails dort manuell wieder her.",
+  "secrets.plaintext_warning": "Gespeicherte Passwörter und API-Schlüssel sind nicht verschlüsselt. Setze INBOXRAKE_SECRET_KEY in der Container-Umgebung, bevor du Zugangsdaten eingibst, und starte Inboxrake neu. Siehe die Installationsanleitung.",
   "notice.scan_cancelled": "Scan abgebrochen.",
   "notice.action_cancelled": "Aktion abgebrochen.",
   "status.cached_verdicts": "{n} KI-Bewertungen aus dem Cache",
@@ -124,7 +134,7 @@ export const DE: Record<string, string> = {
   "confirm.unpin_group_one":
     "Den Schutz der 1 geschützten Mail dieser Gruppe aufheben?",
   "Sort: engagement": "Sortierung: Interaktion",
-  "Eng.": "Inter.",
+  "Eng.": "Interaktion",
   "eng.col_tip":
     "Interaktion: wie viel du von diesem Absender wirklich liest und "
     + "beantwortest",
@@ -388,7 +398,7 @@ export const DE: Record<string, string> = {
   "rule.run_report":
     "Bericht: {groups} Gruppen · {mails} Mails wären betroffen",
   "rule.run_executed":
-    "ausgeführt: {acted} Mails eingereiht ({groups} Gruppen, {mails} Treffer)",
+    "abgeschlossen: {acted} Mails bearbeitet ({groups} Gruppen, {mails} Treffer)",
   "rule.capped": "{n} Mails über dem Limit pro Lauf",
   "rule.capped_one": "1 Mail über dem Limit pro Lauf",
   "rule.protected_skipped": "{n} geschützte übersprungen",
@@ -648,7 +658,7 @@ export const DE: Record<string, string> = {
   "import.settings": "Einstellungen werden überschrieben.",
   "import.rules": "Regeln werden ersetzt (wieder im Bericht-Modus).",
   "import.merged": "Bewertungen, Antwortdaten und eingeordnete Absender werden zusammengeführt.",
-  "import.secrets": "Passwörter und API-Schlüssel werden nie importiert.",
+  "import.secrets": "Passwörter und API-Schlüssel werden nie importiert. Bei geändertem Server oder Konto werden gespeicherte Zugangsdaten entfernt; verbinde das Konto danach erneut.",
   "import.confirm": "Backup importieren",
   "import.skipped": " Nicht importiert: {names}.",
   "import.done": "Importiert: {rules} Regeln, {verdicts} Bewertungen, {knowledge} eingeordnete Absender.",
@@ -983,8 +993,8 @@ export const DE: Record<string, string> = {
     + "Identity Provider kann sich anmelden und bekommt einen eigenen "
     + "Arbeitsbereich.",
   "login.oidc_noadmin_warn":
-    "Es ist kein Admin gesetzt: Die erste Identität, die sich anmeldet, "
-    + "wird Admin und verwaltet die Server-Einstellungen.",
+    "Es ist kein Admin gesetzt: Erlaube zur Einrichtung genau eine Identität "
+    + "oder setze den Administrator, bevor du SSO aktivierst.",
   "login.err.email_unverified":
     "Anmeldung abgelehnt: Dein Identity Provider hat diese E-Mail-Adresse "
     + "nicht bestätigt.",
@@ -1019,7 +1029,7 @@ export const DE: Record<string, string> = {
   "menu.light": "hell",
   "menu.dark": "dunkl",
   "login.oidc_admin": "Admin-Identität (E-Mail oder Subject)",
-  "login.oidc_admin_ph": "leer: erste Anmeldung übernimmt sie",
+  "login.oidc_admin_ph": "Identität setzen oder genau einen Benutzer für die Einrichtung erlauben",
   "login.tenancy_note":
     "Mit SSO bekommt jeder Nutzer einen EIGENEN Arbeitsbereich (Konten, "
     + "Scans, Einstellungen). Der Admin behält diesen hier.",
@@ -1297,7 +1307,7 @@ export const DE: Record<string, string> = {
   "confirm.b_mails_from": "{n} Mails von {names}",
   "confirm.b_mails_from_one": "1 Mail von {names}",
   "confirm.names_more": "{names} und {k} weiteren",
-  "confirm.b_undo": "Das lässt sich über die Ergebnismeldung rückgängig machen.",
+  "confirm.b_undo": "Das lässt sich normalerweise über die Ergebnismeldung rückgängig machen. Kann der Server die verschobenen Kopien nicht sicher erkennen, stelle sie manuell im Zielordner wieder her.",
   "confirm.btn_anyway": "Trotzdem: {verb}",
   "select.named": "{subject} auswählen",
   "bar.groups": "{n} Gruppen",

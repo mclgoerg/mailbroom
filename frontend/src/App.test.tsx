@@ -562,7 +562,7 @@ test("the trash confirm names the groups and points to Undo", async () => {
   fireEvent.click(screen.getByText(/^Trash \d+$/));
   const dlg = (await findDialog()).textContent!;
   expect(dlg).toContain("mails from DHL Paket, Shop News");
-  expect(dlg).toContain("You can undo this from the result message.");
+  expect(dlg).toContain("You can normally undo this from the result message. If the server cannot identify the moved copies safely, restore them manually from the destination folder.");
   await pressDialog(/^Move to Trash/);
 });
 
