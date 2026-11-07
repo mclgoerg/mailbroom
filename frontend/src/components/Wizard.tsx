@@ -340,10 +340,11 @@ export function Wizard({ cfg, mode, initialStep, initialAccount, scan,
   const stepLabel: Record<WizardStep, string> = {
     provider: t("wizard.s_provider"), signin: t("wizard.s_signin"),
     protect: t("wizard.s_protect"), scan: t("wizard.s_scan") };
-  // Continue on the sign-in step: the folder choice is optional; only when
-  // it was opened is it saved (untouched, that equals the defaults).
+  // Continue on the sign-in step: the folder choice is optional; once the
+  // list was opened its ticks are saved, even if the block was collapsed
+  // again (untouched, that equals the defaults).
   const cont = async () => {
-    if (foldersOpen && folders && !(await saveFolders())) return;
+    if (folders && !(await saveFolders())) return;
     next();
   };
   const needOauth = method === "oauth" && !oauthConnected;

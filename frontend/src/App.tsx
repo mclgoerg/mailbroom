@@ -151,8 +151,16 @@ export default function App() {
   const [editQuery, setEditQuery] = useState("");
   const [settingsOpen, setSettingsOpen] = useState(false);
   // First-run / "Add account" wizard (components/Wizard.tsx).
+  // Coming back from the OAuth consent redirect it starts out resumed (the
+  // marker is validated against the config once that has loaded).
   const [wizard, setWizard] = useState<{ mode: "first" | "add";
-    step?: WizardStep; account?: string; previous?: string } | null>(null);
+    step?: WizardStep; account?: string; previous?: string } | null>(() => {
+    try {
+      const r = JSON.parse(sessionStorage.getItem(WIZARD_RESUME_KEY) ?? "");
+      return r?.account ? { mode: r.mode === "add" ? "add" : "first",
+        step: "signin", account: r.account } : null;
+    } catch { return null; }
+  });
   const [searchOpen, setSearchOpen] = useState(false);
   const [rulesOpen, setRulesOpen] = useState(false);
   // A filter handed to the rules form ("Save as rule" of the AI filter panel).
@@ -620,6 +628,7 @@ export default function App() {
             step: "signin", account: r.account });
           return;
         }
+        setWizard(null);
       } catch { /* ignore a broken marker */ }
     }
   }, [cfg?.setup_needed, !!cfg]);

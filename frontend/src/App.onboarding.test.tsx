@@ -208,6 +208,27 @@ test("first run: the wizard sits on a plain background - no toolbar, Scan " +
   sessionStorage.clear();
 });
 
+test("returning from the OAuth redirect resumes the wizard without ever " +
+  "showing the Welcome", async () => {
+  sessionStorage.clear();
+  sessionStorage.setItem("pmc_wizard", JSON.stringify(
+    { mode: "first", account: "proton" }));
+  let flashed = false;
+  const mo = new MutationObserver(() => {
+    if (document.body.textContent?.includes("Welcome to Inboxrake"))
+      flashed = true;
+  });
+  mo.observe(document.body, { childList: true, subtree: true,
+    characterData: true });
+  await openRaw({ ...mkCfg({ user: "", password_set: false }),
+    setup_needed: true });
+  expect(await screen.findByLabelText("Email address")).toBeTruthy();
+  mo.disconnect();
+  expect(flashed).toBe(false);
+  expect(screen.queryByText("Welcome to Inboxrake")).toBeNull();
+  sessionStorage.clear();
+});
+
 test("a configured install never shows the Welcome", async () => {
   sessionStorage.clear();
   await open({ password_set: true });

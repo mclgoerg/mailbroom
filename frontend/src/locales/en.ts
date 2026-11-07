@@ -862,8 +862,8 @@ export const EN: Record<string, string> = {
   "welcome.sub": "Clear out years of mail in minutes, on your own server.",
   "welcome.p1.title": "See who fills your inbox",
   "welcome.p1.text":
-    "Mail is grouped by sender and company and sorted by how much space it "
-    + "takes.",
+    "Mail is grouped by sender and company, so you see at a glance who "
+    + "sends the most.",
   "welcome.p2.title": "Clean up without fear",
   "welcome.p2.text":
     "Mail is moved to Trash, never deleted outright, and you can undo it.",

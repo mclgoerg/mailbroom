@@ -719,8 +719,8 @@ export const DE: Record<string, string> = {
     + "eigenen Server.",
   "welcome.p1.title": "Sieh, wer deinen Posteingang füllt",
   "welcome.p1.text":
-    "Mails werden nach Absender und Firma gruppiert und danach sortiert, "
-    + "wie viel Platz sie belegen.",
+    "Mails werden nach Absender und Firma gruppiert, sodass du auf einen "
+    + "Blick siehst, wer dir am meisten schickt.",
   "welcome.p2.title": "Aufräumen ohne Angst",
   "welcome.p2.text":
     "Mails landen im Papierkorb, werden nie sofort gelöscht, und du kannst "

@@ -226,8 +226,9 @@ test("skipping the folders leaves the same exclusions that accepting the " +
   await toFolders();
   pick("Continue");
   await screen.findByText(/Protect this page/);
-  // what the backend already holds as the defaults: the wildcard rules plus
-  // every folder listed as excluded - skipping keeps exactly that
+  // accepting saves the wildcard rules plus every folder listed as excluded.
+  // Skipping saves nothing and keeps the backend's DEFAULT_EXCLUDED; that it
+  // scans the same folders is proven in tests/test_folder_skip_equivalence.py
   const listed = await (await fetch("/api/folders")).json();
   const defaults = [...listed.wildcards, ...listed.folders
     .filter((x: any) => x.excluded).map((x: any) => x.raw)];
@@ -245,6 +246,18 @@ test("Choose folders opens the list inline on the sign-in step; Continue " +
   expect(saves().pop()!.body.excluded_folders).toEqual(
     ["Labels/*", "INBOX", "Trash"]);
 });
+
+test("folder ticks survive collapsing the block: Continue still saves them",
+  async () => {
+    await toFolders();
+    fireEvent.click(screen.getByLabelText("INBOX"));
+    pick(/Choose folders/);                       // collapse again
+    expect(screen.queryByText("INBOX")).toBeNull();
+    pick("Continue");
+    await screen.findByText(/Protect this page/);
+    expect(saves().pop()!.body.excluded_folders).toEqual(
+      ["Labels/*", "INBOX", "Trash"]);
+  });
 
 test("editing the sign-in after a passed test asks for a new test", async () => {
   await toConnected();
