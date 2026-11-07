@@ -47,13 +47,24 @@ const TAG_TONE: Record<TagTone, string> = {
   category: "border border-line text-muted",
 };
 
-/** Small badge (caption layer). `tone` picks a semantic bg/fg pair. */
-export function Tag({ children, tone = "neutral", className = "" }: {
-  children: ReactNode; tone?: TagTone; className?: string;
+/** The semantic tones render as status pills (fully rounded); neutral,
+ *  accent and category stay small rounded badges. */
+const PILL_TONES = new Set<TagTone>(["safe", "review", "keep", "info",
+  "attach", "new"]);
+
+/** Small badge / status pill (caption layer). `tone` picks a semantic bg/fg
+ *  pair; `dot` adds a leading 6 px dot in the tone's colour. */
+export function Tag({ children, tone = "neutral", dot = false,
+  className = "" }: {
+  children: ReactNode; tone?: TagTone; dot?: boolean; className?: string;
 }) {
+  const pill = PILL_TONES.has(tone);
   return (
-    <span className={`inline-block rounded-badge px-1.5 py-0.5 type-caption
-      ${TAG_TONE[tone]} ${className}`}>
+    <span className={`${dot ? "inline-flex items-center gap-1.5" : "inline-block"}
+      ${pill ? "rounded-full px-2" : "rounded-badge px-1.5"} py-0.5
+      type-caption ${TAG_TONE[tone]} ${className}`}>
+      {dot && <span aria-hidden className="size-1.5 shrink-0 rounded-full
+        bg-current" />}
       {children}
     </span>
   );
@@ -383,7 +394,7 @@ export function TrackerBadge({ g }: { g: { trackers?: GroupTrackers } }) {
 
 /** The app-wide loading animation (see .pmc-spinner in index.css).
  *  Colored via currentColor - defaults to the accent; pass e.g.
- *  className="text-white" inside primary buttons. */
+ *  className="text-on-accent" inside primary buttons. */
 export function Spinner({ size = "sm", className = "" }: {
   size?: "sm" | "md" | "lg"; className?: string;
 }) {
@@ -443,12 +454,14 @@ export function Loading({ label, className = "" }: {
  *  faint text, no opacity (a disabled red button must not read as an alarm). */
 const DISABLED = "disabled:cursor-not-allowed disabled:bg-chip disabled:text-faint";
 
-type ButtonVariant = "primary" | "secondary" | "quiet" | "danger"
+type ButtonVariant = "primary" | "secondary" | "tinted" | "quiet" | "danger"
   | "danger-quiet";
 
 const BUTTON_VARIANT: Record<ButtonVariant, string> = {
-  primary: "bg-accent enabled:hover:bg-accenth text-white",
+  primary: "bg-accent enabled:hover:bg-accenth text-on-accent",
   secondary: "bg-chip enabled:hover:bg-chiph text-body",
+  // Secondary call to action ("Review", "Done", an active Filter).
+  tinted: "bg-accent-tint enabled:hover:bg-accent/22 enabled:hover:text-accenth text-accent",
   quiet: "bg-transparent enabled:hover:bg-chip text-body",
   danger: "bg-danger enabled:hover:bg-danger-h text-white",
   "danger-quiet":
@@ -938,7 +951,7 @@ export function Modal({ children, onClose, full = false, size, label,
   return (
     <div
       className={`fixed inset-0 z-(--z-modal) flex justify-center bg-overlay
-        p-0 sm:p-6 ${sz === "sm" ? "items-end sm:items-center"
+        backdrop-blur-sm p-0 sm:p-6 ${sz === "sm" ? "items-end sm:items-center"
           : "items-center"}`}
       onClick={(e) => e.target === e.currentTarget && onClose()}>
       <div ref={dialog} tabIndex={-1} role="dialog" aria-modal="true"
@@ -1688,15 +1701,78 @@ export function MailRow({ checked = false, onToggle, unread = false, subject,
   );
 }
 
-export const applyTheme = (theme: "dark" | "light"): void => {
-  document.documentElement.dataset.theme = theme;
-  localStorage.setItem("pmc_theme", theme);
-  // Keep the iOS status bar style in sync with a live theme switch too
-  // (index.html sets the initial value before first paint).
-  const bar = document.querySelector(
-    'meta[name="apple-mobile-web-app-status-bar-style"]');
-  if (bar) bar.setAttribute("content", theme === "dark" ? "black" : "default");
+/** What the user picked: `system` (default, nothing stored) follows
+ *  `prefers-color-scheme` live. `pmc_theme` keeps "dark" / "light". */
+export type Appearance = "system" | "light" | "dark";
+
+const APPEARANCE_EVENT = "pmc-appearance";
+// Page background per effective theme (= `surface` in index.css): the
+// browser chrome colour of `meta[name=theme-color]`.
+const THEME_COLOR = { dark: "#181716", light: "#faf9f7" };
+
+export const getAppearance = (): Appearance => {
+  const v = localStorage.getItem("pmc_theme");
+  return v === "dark" || v === "light" ? v : "system";
 };
 
+const systemTheme = (): "dark" | "light" =>
+  window.matchMedia?.("(prefers-color-scheme: light)").matches
+    ? "light" : "dark";
+
+/** Sets `data-theme` and the browser-chrome metas to the effective theme
+ *  (index.html does the same before first paint). */
+function paintTheme(): void {
+  const a = getAppearance();
+  const theme = a === "system" ? systemTheme() : a;
+  document.documentElement.dataset.theme = theme;
+  document.querySelector('meta[name="theme-color"]')
+    ?.setAttribute("content", THEME_COLOR[theme]);
+  // "black"/"default", never "black-translucent": the iOS status bar stays
+  // opaque (see index.html).
+  document.querySelector('meta[name="apple-mobile-web-app-status-bar-style"]')
+    ?.setAttribute("content", theme === "dark" ? "black" : "default");
+}
+
+export const applyTheme = (a: Appearance): void => {
+  if (a === "system") localStorage.removeItem("pmc_theme");
+  else localStorage.setItem("pmc_theme", a);
+  paintTheme();
+  window.dispatchEvent(new Event(APPEARANCE_EVENT));
+};
+
+/** The theme actually shown (never "system"). */
 export const currentTheme = (): "dark" | "light" =>
   (document.documentElement.dataset.theme as "dark" | "light") || "dark";
+
+/** Re-paints when the OS scheme flips while "System" is chosen. Call once at
+ *  start-up; returns the unsubscribe. */
+export function watchSystemTheme(): () => void {
+  const mq = window.matchMedia?.("(prefers-color-scheme: light)");
+  if (!mq) return () => {};
+  const on = () => { if (getAppearance() === "system") paintTheme(); };
+  mq.addEventListener("change", on);
+  return () => mq.removeEventListener("change", on);
+}
+
+/** The chosen appearance, kept in sync across every control showing it. */
+export function useAppearance(): [Appearance, (a: Appearance) => void] {
+  const [a, setA] = useState(getAppearance);
+  useEffect(() => {
+    const on = () => setA(getAppearance());
+    window.addEventListener(APPEARANCE_EVENT, on);
+    return () => window.removeEventListener(APPEARANCE_EVENT, on);
+  }, []);
+  return [a, applyTheme];
+}
+
+/** System | Light | Dark as a Segmented control (Settings > General). */
+export function AppearanceControl({ className = "" }: { className?: string }) {
+  const [a, set] = useAppearance();
+  return (
+    <Segmented fill value={a} onChange={set} label={t("Appearance")}
+      className={className}
+      options={[{ value: "system", label: t("appearance.system") },
+        { value: "light", label: t("appearance.light") },
+        { value: "dark", label: t("appearance.dark") }]} />
+  );
+}

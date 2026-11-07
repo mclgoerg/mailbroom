@@ -91,7 +91,7 @@ export function SearchPanel({ bodySearch = false, bodyMode = "server",
               onKeyDown={(e) => e.key === "Enter" && run()}
             />
             <Button onClick={run} disabled={busy || q.trim().length < 2}>
-              {busy ? <Spinner className="text-white" /> : t("Search")}
+              {busy ? <Spinner className="text-on-accent" /> : t("Search")}
             </Button>
             {bodySearch && (
               <Checkbox className="type-meta text-muted" checked={inBody}

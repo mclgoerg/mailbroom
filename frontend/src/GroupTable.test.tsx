@@ -501,13 +501,13 @@ describe("GroupTable status badges vs category tags", () => {
       .toContain("Status & Tags");
   });
 
-  const tagEls = (el: Element) => [...el.querySelectorAll("span.rounded-badge")]
+  const tagEls = (el: Element) => [...el.querySelectorAll("span.type-caption")]
     .filter((e) => ["newsletter", "shopping"].includes(e.textContent!));
 
   it("table: categories come after the state badges, in the outlined style", () => {
     const { container } = renderTable({ groups: [g] });
     const cell = container.querySelector("tbody tr td:nth-child(4)")!;
-    const all = [...cell.querySelectorAll("span.rounded-badge")];
+    const all = [...cell.querySelectorAll("span.type-caption")];
     const tags = tagEls(cell);
     expect(tags).toHaveLength(2);
     for (const tg of tags) {
@@ -528,7 +528,7 @@ describe("GroupTable status badges vs category tags", () => {
     const card = container.querySelector(".md\\:hidden")!;
     const tags = tagEls(card);
     expect(tags).toHaveLength(2);
-    const ai = [...card.querySelectorAll("span.rounded-badge")]
+    const ai = [...card.querySelectorAll("span.type-caption")]
       .find((e) => e.textContent === "review")!;
     expect(ai.compareDocumentPosition(tags[0])
       & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();

@@ -12,7 +12,8 @@ import {
   ConfirmDialog, DIALOG_ARM_MS, choiceDialog, DialogProvider, PromptDialog, EmptyState, MailRow, Menu, MenuDivider,
   MenuGroup, MenuHeading, MenuItem, Modal, Notice, ProgressBar, Segmented, ToastProvider,
   confirmDialog,
-  LINK, RatingChips, Tag, ensureAiAck, promptDialog, ProtectButton, useToast,
+  LINK, RatingChips, Tag, AppearanceControl, getAppearance, applyTheme,
+  currentTheme, watchSystemTheme, ensureAiAck, promptDialog, ProtectButton, useToast,
 } from "./components/ui";
 
 afterEach(cleanup);
@@ -143,8 +144,15 @@ test("index.css defines the type layers, semantic pairs, radii and shadows", asy
     expect(css).toContain(`--radius-${r}:`);
   }
   expect(css).toContain("@custom-variant coarse (@media (pointer: coarse))");
-  expect(css).toContain("--color-faint: #9a8a70");
-  expect(css).toContain("--color-faint: #7a6a50");
+  expect(css).toContain("--color-faint: #6f6a63");
+  expect(css).toContain("--color-faint: #a39d95");
+  for (const k of ["side", "on-accent", "accent-tint"]) {
+    expect(css).toContain(`--color-${k}:`);
+  }
+  for (const l of ["largetitle", "title2", "hero"]) {
+    expect(css).toContain(`@utility type-${l} `);
+  }
+  expect(css).toContain('"SF Pro Text"');
   expect(css).toMatch(/:focus-visible \{\s*outline: 2px solid var\(--color-accent\)/);
   // shadows have a dark default and a light override
   expect(css.match(/--shadow-popover:/g)).toHaveLength(2);
@@ -839,6 +847,72 @@ test("Tag tones map to the semantic bg/fg pairs on the caption layer", () => {
   expect(screen.getByText("safe").className).toContain("bg-safe-bg");
   expect(screen.getByText("safe").className).toContain("text-safe-fg");
   expect(screen.getByText("attach").className).toContain("bg-attach-bg");
+});
+
+test("semantic tones are status pills, a dot is optional", () => {
+  render(<>
+    <Tag tone="review" dot>pill</Tag>
+    <Tag tone="category">cat</Tag>
+  </>);
+  expect(screen.getByText("pill").className).toContain("rounded-full");
+  expect(screen.getByText("pill").querySelector("span")).not.toBeNull();
+  expect(screen.getByText("cat").className).toContain("rounded-badge");
+});
+
+test("Button: primary text is on-accent, tinted is the quiet call to action", () => {
+  render(<>
+    <Button>go</Button>
+    <Button variant="tinted">review</Button>
+  </>);
+  expect(screen.getByText("go").className).toContain("text-on-accent");
+  expect(screen.getByText("review").className).toContain("bg-accent-tint");
+});
+
+/** matchMedia whose `light` flag and change listeners the test controls. */
+function stubScheme(light: boolean) {
+  const ls = new Set<() => void>();
+  const state = { light };
+  vi.stubGlobal("matchMedia", () => ({
+    get matches() { return state.light; },
+    addEventListener: (_: string, f: () => void) => ls.add(f),
+    removeEventListener: (_: string, f: () => void) => ls.delete(f),
+  }));
+  return { flip: (l: boolean) => { state.light = l; ls.forEach((f) => f()); } };
+}
+
+test("appearance: System follows the OS live, a pick overrides and persists", () => {
+  localStorage.removeItem("pmc_theme");
+  document.head.innerHTML = `<meta name="theme-color" content="x">
+    <meta name="apple-mobile-web-app-status-bar-style" content="x">`;
+  const os = stubScheme(false);
+  const stop = watchSystemTheme();
+  render(<AppearanceControl />);
+  expect(getAppearance()).toBe("system");
+  expect(screen.getByRole("tab", { name: "System" })
+    .getAttribute("aria-selected")).toBe("true");
+  applyTheme("system");
+  expect(currentTheme()).toBe("dark");
+  os.flip(true);
+  expect(currentTheme()).toBe("light");
+  expect(document.querySelector('meta[name="theme-color"]')!
+    .getAttribute("content")).toBe("#faf9f7");
+  expect(document.querySelector(
+    'meta[name="apple-mobile-web-app-status-bar-style"]')!
+    .getAttribute("content")).toBe("default");
+
+  fireEvent.click(screen.getByRole("tab", { name: "Dark" }));
+  expect(localStorage.getItem("pmc_theme")).toBe("dark");
+  expect(currentTheme()).toBe("dark");
+  expect(screen.getByRole("tab", { name: "Dark" })
+    .getAttribute("aria-selected")).toBe("true");
+  os.flip(false); os.flip(true);                 // a pick ignores the OS
+  expect(currentTheme()).toBe("dark");
+
+  fireEvent.click(screen.getByRole("tab", { name: "System" }));
+  expect(localStorage.getItem("pmc_theme")).toBeNull();
+  expect(currentTheme()).toBe("light");
+  stop();
+  vi.unstubAllGlobals();
 });
 
 test("LINK is the shared underline look for text buttons", () => {

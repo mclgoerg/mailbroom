@@ -1,5 +1,5 @@
 import { BarChart3, BookmarkPlus, ChevronDown, ClipboardList,
-  Copy, Download, Eye, Info, Layers, LayoutGrid, Mail, Moon, Paperclip, Pencil, Plus,
+  Copy, Download, Eye, Info, Layers, LayoutGrid, Mail, Monitor, Moon, Paperclip, Pencil, Plus,
   Power,
   ScrollText, Search, Settings as SettingsIcon, ShieldAlert, Sparkles, Star, Sun,
   Trash2, User, Wand2, Wrench, X }
@@ -29,10 +29,10 @@ import { QueryBuilder } from "./components/QueryBuilder";
 import { QuickWins } from "./components/QuickWins";
 import type { QuickWinCard } from "./quickwins";
 import { FoldersPanel } from "./components/FoldersPanel";
-import { AccountAvatar, applyTheme, BAR_ICON_BTN, BulkBar, Button, Chip, ChipGroup, ChipSegment,
-  choiceDialog, confirmDialog, currentTheme, EmptyState, ensureAiAck, FILTER_ROW, Input, isModalOpen, LINK,
+import { AccountAvatar, BAR_ICON_BTN, BulkBar, Button, Chip, ChipGroup, ChipSegment,
+  choiceDialog, confirmDialog, EmptyState, ensureAiAck, FILTER_ROW, Input, isModalOpen, LINK,
   Menu, MenuDivider, MenuGroup, MenuHeading, MenuItem, Notice, ProgressBar,
-  promptDialog, Segmented, Select, Spinner, useToast,
+  promptDialog, Segmented, Select, Spinner, useAppearance, useToast,
   type ToastVariant } from "./components/ui";
 import { nowMs } from "./clock";
 import { demoHint, setDemo, useDemo } from "./demoMode";
@@ -199,7 +199,7 @@ export default function App() {
   const fail = (e: any, key = "err.generic") =>
     notify(t(key, { msg: e.message ?? e }), "error");
   const connToast = useRef<number | null>(null);   // one lost-connection toast
-  const [theme, setTheme] = useState<"dark" | "light">(currentTheme());
+  const [appearance, setAppearance] = useAppearance();
   const [smartHelp, setSmartHelp] = useState(() => localStorage.getItem("pmc_smart_help_seen") !== "1");
   const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
   const sse = useRef<EventSource | null>(null);
@@ -1411,12 +1411,6 @@ export default function App() {
     try { await api.clearNotice(); refresh(); } catch { /* cosmetic */ }
   };
 
-  const toggleTheme = () => {
-    const next = theme === "dark" ? "light" : "dark";
-    applyTheme(next);
-    setTheme(next);
-  };
-
   /* Keyboard shortcuts: j/k move, x select, Enter open, # trash, / filter. */
   const move = (to: number) => {
     focusRef.current = to;
@@ -1697,7 +1691,7 @@ export default function App() {
                 </span>}>
             {multiAccount && (
               <>
-                <MenuHeading>{t("menu.accounts")}</MenuHeading>
+                <MenuGroup label={t("menu.accounts")}>
                 {Object.entries(cfg!.accounts).map(([n, a]) => (
                   <MenuItem key={n} active={n === account} sub={a.user}
                     onClick={() => n !== account && switchAccount(n)}>
@@ -1707,6 +1701,7 @@ export default function App() {
                     </span>
                   </MenuItem>
                 ))}
+                </MenuGroup>
               </>
             )}
             <MenuItem disabled={demo} sub={demo ? demoHint() : undefined}
@@ -1725,13 +1720,20 @@ export default function App() {
                 )}
               </MenuHeading>
             )}
-            <MenuItem onClick={toggleTheme}>
-              {theme === "dark"
-                ? <Sun size={16} className="mr-1 inline align-text-bottom" />
-                : <Moon size={16} className="mr-1 inline align-text-bottom" />}
-              {t("menu.theme", {
-                next: theme === "dark" ? t("menu.light") : t("menu.dark") })}
-            </MenuItem>
+            <MenuGroup label={t("Appearance")}>
+            {(["system", "light", "dark"] as const).map((a) => (
+              <MenuItem key={a} active={appearance === a}
+                onClick={() => setAppearance(a)}>
+                {a === "system"
+                  ? <Monitor size={16} className="mr-1 inline align-text-bottom" />
+                  : a === "light"
+                    ? <Sun size={16} className="mr-1 inline align-text-bottom" />
+                    : <Moon size={16} className="mr-1 inline align-text-bottom" />}
+                {t(`appearance.${a}`)}
+              </MenuItem>
+            ))}
+            </MenuGroup>
+            <MenuDivider />
             <MenuItem onClick={() => setSettingsOpen(true)}>
               <SettingsIcon size={16} className="mr-1 inline align-text-bottom" />
               {t("Settings")}
@@ -1792,7 +1794,7 @@ export default function App() {
         <Button onClick={startScan}
           disabled={scanning || aiRunning || deleting || attsRunning
             || unsubRunning}>
-          {scanning ? <Spinner className="text-white" /> : t("Scan")}
+          {scanning ? <Spinner className="text-on-accent" /> : t("Scan")}
         </Button>
         )}
         {/* order-last + fill: below 768 the segments get a line of their own. */}
