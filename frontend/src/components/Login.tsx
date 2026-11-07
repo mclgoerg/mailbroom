@@ -52,7 +52,7 @@ export function Login({ mode, onLogin }: {
             value={password}
             onChange={(e) => setPassword(e.target.value)} />
           <Button className="w-full" disabled={busy || !password}>
-            {busy ? <Spinner size="sm" className="text-white" />
+            {busy ? <Spinner size="sm" className="text-on-accent" />
               : t("login.submit")}
           </Button>
         </form>
@@ -60,7 +60,7 @@ export function Login({ mode, onLogin }: {
       {mode === "oidc" && (
         <a href="/api/oidc/login"
           className="block rounded-control bg-accent px-3 py-2 text-center
-            type-body font-medium text-white hover:bg-accenth">
+            type-body font-medium text-on-accent hover:bg-accenth">
           {t("login.sso")}
         </a>
       )}

@@ -13,7 +13,7 @@ import { IndexPanel } from "./IndexPanel";
 import { KnowledgeSettings } from "./KnowledgeSettings";
 import { demoHint, useDemo } from "../demoMode";
 import { Button, Checkbox, confirmDialog, DemoFieldset, DemoHint, Field, Input, LINK_ACCENT, Loading,
-  Modal, Notice, PanelHeader, promptDialog, SectionLabel, Segmented, Select, Spinner,
+  AppearanceControl, Modal, Notice, PanelHeader, promptDialog, SectionLabel, Segmented, Select, Spinner,
   Tag, tabPanelProps, TextArea, useMediaQuery } from "./ui";
 
 export function SettingsModal({ cfg, account, onClose, onSaved,
@@ -638,6 +638,9 @@ export function SettingsModal({ cfg, account, onClose, onSaved,
             <option value="en">English</option>
             <option value="de">Deutsch</option>
           </Select>
+        </Field>
+        <Field label={t("Appearance")}>
+          <AppearanceControl />
         </Field>
         <Checkbox className="sm:col-span-2"
           label={t("notify.toggle")}

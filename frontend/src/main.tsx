@@ -2,10 +2,11 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import "./index.css";
 import App from "./App";
-import { DialogProvider, ToastProvider } from "./components/ui";
+import { DialogProvider, ToastProvider, watchSystemTheme } from "./components/ui";
 import { installViewportGuard } from "./viewport";
 
 installViewportGuard();
+watchSystemTheme();
 
 const root = createRoot(document.getElementById("root")!);
 

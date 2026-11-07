@@ -7,7 +7,7 @@
     <title>Inboxrake</title>
     <link rel="icon" href="/icon.svg" type="image/svg+xml" />
     <link rel="manifest" href="/manifest.webmanifest" />
-    <meta name="theme-color" content="#a16207" />
+    <meta name="theme-color" content="#181716" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <!-- Without an explicit style, iOS defaults an installed ("Add to
@@ -20,11 +20,18 @@
     <!-- This file's content is hashed by GET /api/version (see
          backend/main.py) so an already-open tab can detect a new build. -->
     <script>
-      // Apply the persisted theme before first paint to avoid a flash,
-      // and match the iOS status bar style to it (see the comment above).
+      // Apply the appearance before first paint to avoid a flash: a stored
+      // "dark"/"light", else (System, the default) the OS scheme. The theme
+      // colour and the iOS status bar style follow the effective theme (see
+      // the comment above). ui.tsx keeps them in sync afterwards.
       try {
-        var theme = localStorage.getItem("pmc_theme") || "dark";
+        var stored = localStorage.getItem("pmc_theme");
+        var theme = stored === "dark" || stored === "light" ? stored
+          : window.matchMedia("(prefers-color-scheme: light)").matches
+            ? "light" : "dark";
         document.documentElement.dataset.theme = theme;
+        document.querySelector('meta[name="theme-color"]').content =
+          theme === "dark" ? "#181716" : "#faf9f7";
         document.querySelector(
           'meta[name="apple-mobile-web-app-status-bar-style"]',
         ).content = theme === "dark" ? "black" : "default";

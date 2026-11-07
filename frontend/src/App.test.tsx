@@ -160,7 +160,9 @@ test("the active account is marked and the trigger shows its name",
     await waitFor(() => expect(screen.getByLabelText("Profile & settings")
       .textContent).toContain("proton"));
     await openMenu();
-    const rows = screen.getAllByRole("menuitemradio");
+    // Account rows only: the Appearance radios are menuitemradio too.
+    const rows = screen.getAllByRole("menuitemradio")
+      .filter((r) => !/^(System|Light|Dark)$/.test(r.textContent ?? ""));
     const active = rows.find((r) => r.getAttribute("aria-checked") === "true");
     expect(active?.textContent).toContain("proton");
     expect(rows.filter((r) => r.getAttribute("aria-checked") === "true"))
@@ -198,7 +200,14 @@ test("single account: no Accounts section, header keeps the plain " +
   render(<ToastProvider><DialogProvider><App /></DialogProvider></ToastProvider>);
   await openMenu();
   expect(screen.queryByText("Accounts")).toBeNull();
-  expect(screen.queryByRole("menuitemradio")).toBeNull();
+  expect(screen.queryByText("proton")).toBeNull();
+  // Appearance: System / Light / Dark radios, System checked by default.
+  const radios = screen.getAllByRole("menuitemradio");
+  expect(radios.map((r) => r.textContent)).toEqual(["System", "Light", "Dark"]);
+  expect(radios[0].getAttribute("aria-checked")).toBe("true");
+  fireEvent.click(radios[2]);
+  expect(localStorage.getItem("pmc_theme")).toBe("dark");
+  localStorage.removeItem("pmc_theme");
 });
 
 test("header has a single account control, not a separate pill strip",

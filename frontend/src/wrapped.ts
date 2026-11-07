@@ -110,7 +110,7 @@ export function paletteFromTheme(): SummaryPalette {
   const css = getComputedStyle(document.documentElement);
   const v = (name: string, fb: string) =>
     css.getPropertyValue(`--color-${name}`).trim() || fb;
-  return { bg: v("surface", "#171310"), panel: v("panel2", "#272017"),
-    line: v("line", "#372c1e"), body: v("body", "#f0e8d8"),
-    muted: v("muted", "#b5a68d"), accent: v("accenth", "#bd7609") };
+  return { bg: v("surface", "#181716"), panel: v("panel2", "#2c2a27"),
+    line: v("line", "#36322d"), body: v("body", "#f4f0ea"),
+    muted: v("muted", "#a19b93"), accent: v("accenth", "#e49a3a") };
 }

@@ -11,7 +11,7 @@ import { Button, Checkbox, Chip, EmptyState, Modal, PanelHeader, SectionLabel,
 const HEAT: Record<Heat, string> = {
   0: "bg-chip text-body",
   1: "bg-accent/45 text-body",
-  2: "bg-accent text-white",
+  2: "bg-accent text-on-accent",
 };
 const VERDICT_CLS: Record<Verdict, string> = {
   delete_safe: "bg-safe-bg text-safe-fg",

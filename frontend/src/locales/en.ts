@@ -138,9 +138,9 @@ export const EN: Record<string, string> = {
   "tab.general": "General",
   "tab.ai": "AI",
   "tab.server": "Server (admin)",
-  "menu.theme": "Switch to {next} theme",
-  "menu.light": "light",
-  "menu.dark": "dark",
+  "appearance.system": "System",
+  "appearance.light": "Light",
+  "appearance.dark": "Dark",
   "login.oidc_admin": "Admin identity (email or subject)",
   "login.oidc_admin_ph": "set an identity, or allow exactly one user for bootstrap",
   "login.tenancy_note":
