@@ -324,45 +324,55 @@ describe("DetailPanel", () => {
     expect(deleteMessages).not.toHaveBeenCalled();
   });
 
-  it("list view: header has only Protect + Close; the footer offers Block "
-    + "sender and 'Trash all N'", async () => {
+  it("list view: the action row offers Protect and Block, the footer the "
+    + "one destructive 'Move N mails to Trash'", async () => {
     renderPanel([mkMail(1), mkMail(2)], {
       onProtect: vi.fn(), onBlock: vi.fn() });
     await waitFor(() => screen.getByText("Mail 1"));
     expect(screen.getByRole("button", { name: /Protect this sender/ })
       .getAttribute("aria-pressed")).toBe("false");
     expect(screen.getByRole("button", { name: "Block sender" })).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Trash all 2" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Move 2 mails to Trash" })).toBeTruthy();
     expect(screen.queryByText("Trash this mail")).toBeNull();
+  });
+
+  it("hideGroupActions (a list selection) hides the footer button only",
+    async () => {
+    renderPanel([mkMail(1), mkMail(2)],
+      { hideGroupActions: true, onBlock: vi.fn() });
+    await screen.findByRole("button", { name: "Block sender" });
+    expect(screen.queryByRole("button", { name: /Move \d+ mails? to Trash/ }))
+      .toBeNull();
   });
 
   it("an empty group shows no 'Trash all' button", async () => {
     renderPanel([], { group: mkGroup({ count: 0 }) });
     await waitFor(() => expect(group_).toHaveBeenCalled());
-    expect(screen.queryByRole("button", { name: /Trash all/ })).toBeNull();
+    expect(screen.queryByRole("button", { name: /Move \d+ mails? to Trash/ })).toBeNull();
   });
 
   it("'Trash all N' counts only unpinned mails and hides when none are left",
     async () => {
     const { unmount } = renderPanel([mkMail(1, { pinned: true }),
       mkMail(2, { pinned: true }), mkMail(3), mkMail(4)]);
-    await screen.findByRole("button", { name: "Trash all 2" });
+    await screen.findByRole("button", { name: "Move 2 mails to Trash" });
     unmount();
     renderPanel([mkMail(1, { pinned: true }), mkMail(2, { pinned: true })]);
     await waitFor(() => screen.getByText("Mail 1"));
-    expect(screen.queryByRole("button", { name: /Trash all/ })).toBeNull();
+    expect(screen.queryByRole("button", { name: /Move \d+ mails? to Trash/ })).toBeNull();
   });
 
   it("with a selection the group footer gives way to the selection bar "
     + "(never two red buttons)", async () => {
     renderPanel([mkMail(1), mkMail(2)], { onBlock: vi.fn() });
-    await screen.findByRole("button", { name: "Trash all 2" });
+    await screen.findByRole("button", { name: "Move 2 mails to Trash" });
     fireEvent.click(document.querySelectorAll('input[type="checkbox"]')[0]);
     await screen.findByText(/Trash selected/);
-    expect(screen.queryByRole("button", { name: /Trash all/ })).toBeNull();
-    expect(screen.queryByRole("button", { name: "Block sender" })).toBeNull();
+    expect(screen.queryByRole("button", { name: /Move \d+ mails? to Trash/ })).toBeNull();
+    // (Block is not destructive: it stays in the action row)
+    expect(screen.getByRole("button", { name: "Block sender" })).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Clear selection" }));
-    await screen.findByRole("button", { name: "Trash all 2" });
+    await screen.findByRole("button", { name: "Move 2 mails to Trash" });
   });
 
   describe("message view footer", () => {
@@ -380,7 +390,7 @@ describe("DetailPanel", () => {
         .toBeTruthy();
       expect(screen.getByRole("button", { name: /Protect this mail/ }))
         .toBeTruthy();
-      expect(screen.queryByRole("button", { name: /Trash all/ })).toBeNull();
+      expect(screen.queryByRole("button", { name: /Move \d+ mails? to Trash/ })).toBeNull();
       expect(screen.queryByRole("button", { name: "Block sender" })).toBeNull();
     });
 
@@ -392,7 +402,7 @@ describe("DetailPanel", () => {
       await pressDialog("Move to Trash (1)");
       await waitFor(() => expect(deleteMessages).toHaveBeenCalledWith(
         [["INBOX", 1]], "trash", "", false));
-      await screen.findByRole("button", { name: "Trash 1 mail" });
+      await screen.findByRole("button", { name: "Move 1 mail to Trash" });
       expect(screen.queryByText("Mail 1")).toBeNull();
     });
 
@@ -520,7 +530,7 @@ describe("DetailPanel", () => {
     const onClose = vi.fn();
     renderPanel([mkMail(1)], { onTrash, onClose });
     await waitFor(() => screen.getByText("Mail 1"));
-    fireEvent.click(screen.getByRole("button", { name: "Trash 1 mail" }));
+    fireEvent.click(screen.getByRole("button", { name: "Move 1 mail to Trash" }));
     await waitFor(() => expect(onClose).toHaveBeenCalled());
     expect(onTrash).toHaveBeenCalled();
   });
@@ -748,6 +758,210 @@ describe("DetailPanel", () => {
     await waitFor(() => screen.getByText("Mail 1"));
     fireEvent.click(await screen.findByLabelText("More"));
     expect(screen.queryByText("Read conversation")).toBeNull();
+  });
+});
+
+describe("DetailPanel header and action row", () => {
+  afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
+  const doneUnsub = { n: 1, of: 1, status: "done" as const, link: "",
+    addr: "s@x.example" };
+
+  it("shows who it is: name, address, categories, since, and the stat tiles",
+    async () => {
+    renderPanel([mkMail(1), mkMail(2), mkMail(3), mkMail(4)], {
+      group: mkGroup({ label: "Acme", sub: "news@acme.example", count: 4,
+        unread: 1, size: 2048, tags: ["newsletter"], first: "2024-09-02",
+        replied: true, att_size: 4096 }) });
+    await waitFor(() => screen.getByText("Mail 1"));
+    expect(screen.getByRole("heading", { name: "Acme" })).toBeTruthy();
+    expect(screen.getByText("news@acme.example")).toBeTruthy();
+    expect(screen.getByText("newsletter")).toBeTruthy();
+    expect(screen.getByText(/^since /)).toBeTruthy();
+    const tile = (label: string) =>
+      screen.getAllByText(label)[0].parentElement!.textContent;   // (the "Mails" heading follows its tile)
+    expect(tile("Mails")).toBe("Mails4");
+    expect(tile("Size")).toBe("Size2 KB");
+    expect(tile("Opened")).toBe("Opened75%");     // 100 - 25 % unread
+    expect(screen.getByText(/replied/)).toBeTruthy();
+    expect(screen.getByText(/4 KB/)).toBeTruthy();   // attachments
+  });
+
+  it("carries the signals the rows dropped: AI verdict, protected, blocked",
+    async () => {
+    renderPanel([mkMail(1)], { protectedNow: true, blocked: true,
+      group: mkGroup({ ai: { verdict: "review", reason: "r" } as Group["ai"],
+        new: true }) });
+    await waitFor(() => screen.getByText("Mail 1"));
+    expect(screen.getByText("review")).toBeTruthy();
+    expect(screen.getByText(/New/)).toBeTruthy();
+    expect(screen.getByText("protected")).toBeTruthy();
+    expect(screen.getByText("Blocked")).toBeTruthy();
+  });
+
+  it("Block turns into Unblock for a blocked sender", async () => {
+    const onUnblock = vi.fn();
+    renderPanel([mkMail(1)], { blocked: true, onBlock: vi.fn(), onUnblock });
+    await waitFor(() => screen.getByText("Mail 1"));
+    expect(screen.queryByRole("button", { name: "Block sender" })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Unblock" }));
+    expect(onUnblock).toHaveBeenCalled();
+  });
+
+  it("Protect is a toggle with its state in aria-pressed", async () => {
+    const onProtect = vi.fn();
+    renderPanel([mkMail(1)], { protectedNow: true, onProtect });
+    await waitFor(() => screen.getByText("Mail 1"));
+    const b = screen.getByRole("button", { name: /Protected - click/ });
+    expect(b.getAttribute("aria-pressed")).toBe("true");
+    fireEvent.click(b);
+    expect(onProtect).toHaveBeenCalled();
+  });
+
+  it("an unsubscribed sender shows a disabled Unsubscribed action",
+    async () => {
+    renderPanel([mkMail(1)], { group: mkGroup({ unsub: true }),
+      unsubscribedNow: doneUnsub });
+    await waitFor(() => screen.getByText("Mail 1"));
+    expect(screen.getByText("Unsubscribed").closest("button")!.disabled)
+      .toBe(true);
+    expect(screen.queryByRole("button", { name: "Unsubscribe" })).toBeNull();
+  });
+
+  it("a link result offers the page and 'Mark as done'", async () => {
+    renderPanel([mkMail(1)], { group: mkGroup({ unsub: true }),
+      unsubscribedNow: { ...doneUnsub, status: "link", link: "https://u.example" } });
+    await waitFor(() => screen.getByText("Mail 1"));
+    expect(screen.getByRole("button", { name: "Open unsubscribe page" }))
+      .toBeTruthy();
+    expect(screen.getByRole("button", { name: "Mark as done" })).toBeTruthy();
+  });
+
+  it("a still-mailing sender shows the callout with Block inside and a "
+    + "no 'Still mailing' action (the callout says it)", async () => {
+    const onBlock = vi.fn();
+    renderPanel([mkMail(1)], { onBlock, unsubscribedNow: doneUnsub,
+      group: mkGroup({ unsub: true, still_mailing: { n: 3, since_ts: 0,
+        senders: 1, addrs: ["s@x.example"] } as Group["still_mailing"] }) });
+    await waitFor(() => screen.getByText("Mail 1"));
+    expect(screen.getByText("Still mailing after you unsubscribed"))
+      .toBeTruthy();
+    expect(screen.queryByText("Unsubscribed")).toBeNull();
+    const inside = screen.getAllByRole("button", { name: /Block sender/ });
+    expect(inside.length).toBe(2);   // the callout's + the action row's
+  });
+
+  describe("Move (whole group)", () => {
+    const pick = async (onMove: (g: Group, d: string) => Promise<boolean>, extra = {}) => {
+      renderPanel([mkMail(1), mkMail(2)], { onMove, ...extra });
+      await waitFor(() => screen.getByText("Mail 1"));
+      fireEvent.click(screen.getByRole("button", { name: "Move" }));
+    };
+
+    it("opens the folder picker with a Cancel that acts on nothing",
+      async () => {
+      const onMove = vi.fn().mockResolvedValue(false);
+      await pick(onMove);
+      expect(screen.getByDisplayValue("Move to folder…")).toBeTruthy();
+      fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+      expect(screen.queryByDisplayValue("Move to folder…")).toBeNull();
+      expect(onMove).not.toHaveBeenCalled();
+      expect(deleteMessages).not.toHaveBeenCalled();
+    });
+
+    it("hands the group and folder to onMove (the bulk path), never "
+      + "deleteMessages, and closes once it resolves true", async () => {
+      const onMove = vi.fn().mockResolvedValue(true);
+      const onClose = vi.fn();
+      await pick(onMove, { onClose });
+      fireEvent.change(screen.getByDisplayValue("Move to folder…"),
+        { target: { value: "Archive" } });
+      await waitFor(() => expect(onMove).toHaveBeenCalledWith(
+        expect.objectContaining({ key: "s@x.example" }), "Archive"));
+      await waitFor(() => expect(onClose).toHaveBeenCalled());
+      expect(deleteMessages).not.toHaveBeenCalled();
+    });
+
+    it("stays open when the move was declined (resolves false)", async () => {
+      const onMove = vi.fn().mockResolvedValue(false);
+      const onClose = vi.fn();
+      await pick(onMove, { onClose });
+      fireEvent.change(screen.getByDisplayValue("Move to folder…"),
+        { target: { value: "Archive" } });
+      await waitFor(() => expect(onMove).toHaveBeenCalled());
+      expect(onClose).not.toHaveBeenCalled();
+    });
+
+    it("is absent without onMove, and steps aside for a mail selection or "
+      + "hideGroupActions", async () => {
+      renderPanel([mkMail(1), mkMail(2)]);
+      await waitFor(() => screen.getByText("Mail 1"));
+      expect(screen.queryByRole("button", { name: "Move" })).toBeNull();
+      cleanup();
+      renderPanel([mkMail(1), mkMail(2)], { onMove: noopAsync as never });
+      await waitFor(() => screen.getByText("Mail 1"));
+      fireEvent.click(document.querySelectorAll('input[type="checkbox"]')[0]);
+      await screen.findByText("1 selected");
+      expect(screen.queryByRole("button", { name: "Move" })).toBeNull();
+      cleanup();
+      renderPanel([mkMail(1)], { onMove: noopAsync as never, hideGroupActions: true });
+      await waitFor(() => screen.getByText("Mail 1"));
+      expect(screen.queryByRole("button", { name: "Move" })).toBeNull();
+    });
+
+    it("an open picker resets when a mail gets ticked (no pop-back after "
+      + "clearing)", async () => {
+      await pick(vi.fn().mockResolvedValue(false));
+      expect(screen.getByDisplayValue("Move to folder…")).toBeTruthy();
+      fireEvent.click(document.querySelectorAll('input[type="checkbox"]')[0]);
+      await screen.findByText("1 selected");
+      fireEvent.click(screen.getByRole("button", { name: "Clear selection" }));
+      await screen.findByRole("button", { name: "Move" });
+      expect(screen.queryByDisplayValue("Move to folder…")).toBeNull();
+    });
+
+    it("is not offered on a pooled row's Senders view, and neither is an "
+      + "empty More menu", async () => {
+      renderPanel([mkMail(1)], { grouping: "smart", onMove: noopAsync as never,
+        group: mkGroup({ key: "k:newsletter", kind: "newsletter",
+          n_senders: 2, count: 6 }),
+        senders: [mkGroup({ key: "a@x.example", label: "A" })],
+        onSenderAct: async () => true, onSenderProtect: async () => true,
+        renderSender: () => <div /> });
+      await screen.findByRole("tab", { name: "Senders (1)" });
+      expect(screen.queryByRole("button", { name: "Move" })).toBeNull();
+      expect(screen.queryByRole("button", { name: "More" })).toBeNull();
+    });
+
+    it("AI rate is not offered on the Senders view (no mails loaded there): "
+      + "More stays hidden even with an AI configured", async () => {
+      renderPanel([mkMail(1)], { grouping: "smart", aiEnabled: true,
+        group: mkGroup({ key: "k:newsletter", kind: "newsletter",
+          n_senders: 2, count: 6 }),
+        senders: [mkGroup({ key: "a@x.example", label: "A" })],
+        onSenderAct: async () => true, onSenderProtect: async () => true,
+        renderSender: () => <div /> });
+      await screen.findByRole("tab", { name: "Senders (1)" });
+      expect(screen.queryByRole("button", { name: "More" })).toBeNull();
+    });
+  });
+
+  it("a still-mailing sender has no disabled action slot for it",
+    async () => {
+    renderPanel([mkMail(1)], { unsubscribedNow: doneUnsub,
+      group: mkGroup({ unsub: true, still_mailing: { n: 3, since_ts: 0,
+        senders: 1, addrs: ["s@x.example"] } as Group["still_mailing"] }) });
+    await waitFor(() => screen.getByText("Mail 1"));
+    expect(screen.queryByRole("button", { name: "Still mailing" })).toBeNull();
+  });
+
+  it("an open message keeps the compact header (no tiles, no action row)",
+    async () => {
+    renderPanel([mkMail(1), mkMail(2)], { onProtect: vi.fn() });
+    await waitFor(() => screen.getByText("Mail 1"));
+    fireEvent.click(screen.getByText("Mail 1"));
+    await screen.findByText("back to list");
+    expect(screen.queryByText("Opened")).toBeNull();
+    expect(screen.queryByRole("button", { name: "Move" })).toBeNull();
   });
 });
 

@@ -13,6 +13,7 @@ import {
   MenuGroup, MenuHeading, MenuItem, Modal, Notice, ProgressBar, Segmented, ToastProvider,
   confirmDialog,
   LINK, RatingChips, Tag, AppearanceControl, getAppearance, applyTheme,
+  ActionButton, ActionFace, ACTION_BTN, StatTile, Avatar,
   currentTheme, watchSystemTheme, ensureAiAck, promptDialog, ProtectButton, useToast,
 } from "./components/ui";
 
@@ -1270,4 +1271,60 @@ test("the list fallback takes focus without scrolling the page to it", () => {
   const focus = vi.spyOn(screen.getByTestId("list"), "focus");
   fireEvent.keyDown(window, { key: "Escape" });
   expect(focus).toHaveBeenCalledWith({ preventScroll: true });
+});
+
+test("ActionButton: caption, aria-label, click, pressed and disabled", () => {
+  const onClick = vi.fn();
+  const { rerender } = render(
+    <ActionButton icon={<i />} label="Block" ariaLabel="Block sender"
+      onClick={onClick} />);
+  const b = screen.getByRole("button", { name: "Block sender" });
+  expect(b.textContent).toBe("Block");   // the caption is always visible
+  fireEvent.click(b);
+  expect(onClick).toHaveBeenCalledOnce();
+  rerender(<ActionButton icon={<i />} label="Protect" on disabled
+    onClick={onClick} />);
+  const p = screen.getByRole("button", { name: "Protect" }) as HTMLButtonElement;
+  expect(p.getAttribute("aria-pressed")).toBe("true");
+  expect(p.disabled).toBe(true);
+  fireEvent.click(p);
+  expect(onClick).toHaveBeenCalledOnce();
+});
+
+test("ActionFace as a Menu trigger: triggerClass replaces the header look",
+  () => {
+  render(
+    <Menu label="More" triggerClass={ACTION_BTN}
+      trigger={<ActionFace icon={<i />} label="More" />}>
+      <MenuItem>Item</MenuItem>
+    </Menu>);
+  const t = screen.getByRole("button", { name: "More" });
+  expect(t.className).toContain("flex-col");
+  expect(t.className).not.toContain("border-line");
+  fireEvent.click(t);
+  expect(screen.getByRole("menuitem", { name: "Item" })).toBeTruthy();
+});
+
+test("StatTile shows label over value", () => {
+  render(<StatTile label="Size" value="7.2 MB" />);
+  expect(screen.getByText("Size").nextElementSibling!.textContent)
+    .toBe("7.2 MB");
+});
+
+test("Avatar size lg is the big disc with the first letter", () => {
+  const { container } = render(<Avatar name="acme" size="lg" />);
+  const el = container.firstElementChild!;
+  expect(el.textContent).toBe("a");
+  expect(el.className).toContain("size-16");
+  expect(render(<Avatar name="acme" />).container.firstElementChild!
+    .className).toContain("size-5");
+});
+
+test("Button danger-tint: tinted red fill, danger text, no transparent base",
+  () => {
+  render(<Button variant="danger-tint">Go</Button>);
+  const c = screen.getByRole("button", { name: "Go" }).className;
+  expect(c).toContain("bg-keep-bg");
+  expect(c).toContain("text-danger-fg");
+  expect(c).not.toContain("bg-transparent");
 });

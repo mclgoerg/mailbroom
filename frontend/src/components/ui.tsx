@@ -455,7 +455,7 @@ export function Loading({ label, className = "" }: {
 const DISABLED = "disabled:cursor-not-allowed disabled:bg-chip disabled:text-faint";
 
 type ButtonVariant = "primary" | "secondary" | "tinted" | "quiet" | "danger"
-  | "danger-quiet";
+  | "danger-quiet" | "danger-tint";
 
 const BUTTON_VARIANT: Record<ButtonVariant, string> = {
   primary: "bg-accent enabled:hover:bg-accenth text-on-accent",
@@ -466,6 +466,9 @@ const BUTTON_VARIANT: Record<ButtonVariant, string> = {
   danger: "bg-danger enabled:hover:bg-danger-h text-white",
   "danger-quiet":
     "bg-transparent enabled:hover:bg-keep-bg text-danger-fg",
+  // A destructive action that is the panel's one big button, without the
+  // alarm of a solid red fill (the sender detail's "Move N mails to Trash").
+  "danger-tint": "bg-keep-bg enabled:hover:bg-keep-fg/16 text-danger-fg",
 };
 
 // sm: 32 / 36 px visual on touch, the ::after extends the hit area to 44.
@@ -601,9 +604,13 @@ export function SectionLabel({ children, className = "" }: {
  * phone). Closes
  * on outside click, Escape, or after any click inside (items just run
  * their onClick). Sits BELOW modals (z-modal). */
-export function Menu({ trigger, label, variant, icon, children }: {
+export function Menu({ trigger, label, variant, icon, triggerClass,
+  children }: {
   trigger: ReactNode;
   children: ReactNode;
+  /** Variant-less trigger only: replaces the compact header look (e.g. the
+   *  `ActionButton` "More" in the sender detail's action row). */
+  triggerClass?: string;
 } & (
   /** `variant` renders the trigger as a design-system `Button` (a labelled
    *  "Tools ▾" button; with `icon` a square icon button, whose `label` is
@@ -674,8 +681,9 @@ export function Menu({ trigger, label, variant, icon, children }: {
           {trigger}
         </Button>
       ) : (
-        <button className="flex min-h-8 items-center rounded-control border
-          border-line bg-panel2 px-2 type-body hover:bg-chip"
+        <button className={triggerClass ?? `flex min-h-8 items-center
+          rounded-control border border-line bg-panel2 px-2 type-body
+          hover:bg-chip`}
           title={label} aria-label={label} aria-haspopup="menu"
           aria-expanded={open}
           onClick={() => setOpen(!open)}>
@@ -768,17 +776,70 @@ const hueOf = (name: string): string => {
 
 /** Letter avatar identifying one account/sender/domain, tinted by a
  *  stable hash of its name so entries stay visually distinct. `size`
- *  controls the diameter: "sm" (account switcher) or "md" (group rows). */
+ *  controls the diameter: "sm" (account switcher), "md" (group rows) or "lg"
+ *  (the sender detail header). */
 export function Avatar({ name, size = "sm", className = "" }: {
-  name: string; size?: "sm" | "md"; className?: string;
+  name: string; size?: "sm" | "md" | "lg"; className?: string;
 }) {
-  const dims = size === "md" ? "size-8 type-meta" : "size-5 type-caption";
+  const dims = size === "lg" ? "size-16 type-title2"
+    : size === "md" ? "size-8 type-meta" : "size-5 type-caption";
   return (
     <span className={`inline-flex ${dims} shrink-0 items-center
       justify-center rounded-full font-semibold uppercase
       ${hueOf(name)} ${className}`}>
       {name.charAt(0)}
     </span>
+  );
+}
+
+/** Round icon button with its label underneath (the sender detail's action
+ *  row: Unsubscribe, Block, Protect, Move...). The label is always visible -
+ *  the icon alone never carries the meaning. `label` is the visible caption;
+ *  `ariaLabel` may extend it (it must contain the caption). `on` = a toggle
+ *  that is currently set (Protect). */
+export const ACTION_BTN = `group flex min-w-0 cursor-pointer flex-col
+  items-center gap-1 rounded-control px-1 py-1 text-center type-caption text-muted
+  enabled:hover:text-body disabled:cursor-not-allowed disabled:text-faint`;
+
+/** The icon disc + caption of an `ActionButton`; also the trigger content of
+ *  a `Menu` (pass `ACTION_BTN` as its `triggerClass`). */
+export function ActionFace({ icon, label, on = false }: {
+  icon: ReactNode; label: string; on?: boolean;
+}) {
+  return (
+    <>
+      <span aria-hidden className={`flex size-11 items-center justify-center
+        rounded-full text-accent transition-colors group-disabled:text-faint
+        ${on ? "bg-accent-tint" : "bg-chip group-enabled:group-hover:bg-chiph"}`}>
+        {icon}
+      </span>
+      <span>{label}</span>
+    </>
+  );
+}
+
+export function ActionButton({ icon, label, ariaLabel, title, on, onClick,
+  disabled, className = "" }: {
+  icon: ReactNode; label: string; ariaLabel?: string; title?: string;
+  on?: boolean; onClick?: () => void; disabled?: boolean; className?: string;
+}) {
+  return (
+    <button type="button" aria-label={ariaLabel} title={title ?? ariaLabel}
+      aria-pressed={on} disabled={disabled} onClick={onClick}
+      className={`${ACTION_BTN} ${className}`}>
+      <ActionFace icon={icon} label={label} on={on} />
+    </button>
+  );
+}
+
+/** Quiet figure tile (label over a bold value): the sender detail's
+ *  Mails / Size / Opened row. */
+export function StatTile({ label, value }: { label: string; value: ReactNode }) {
+  return (
+    <div className="min-w-0 rounded-card bg-panel2 px-3 py-2">
+      <div className="truncate type-meta text-muted">{label}</div>
+      <div className="truncate type-heading">{value}</div>
+    </div>
   );
 }
 

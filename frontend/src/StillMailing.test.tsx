@@ -109,7 +109,10 @@ describe("still-mailing notice", () => {
       unsubscribedNow: { n: 1, of: 1, status: "done", link: "", addr: "" } });
     await waitFor(() => expect(screen.getByText("Sender")).toBeTruthy());
     expect(screen.queryByText("Unsubscribed")).toBeNull();
-    expect(screen.getAllByText("Still mailing").length).toBeGreaterThan(0);
+    // the callout carries the warning; no disabled action slot for it
+    expect(screen.getByText("Still mailing after you unsubscribed"))
+      .toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Still mailing" })).toBeNull();
   });
 
   it("is absent for a group nobody is still mailing from", async () => {

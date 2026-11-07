@@ -116,6 +116,15 @@ for (const [name, tk] of Object.entries(themes)) {
         over(tk["accent-tint"], tk[base]));
       min(`tinted hover over ${base}`, tk.accenth, over(hover, tk[base]));
     }
+    // `danger-tint` Button: rest (danger-fg on keep-bg) and hover (danger-fg
+    // on keep-fg at 16%).
+    const dHover: Rgba = [...tk["keep-fg"].slice(0, 3), 0.16] as unknown as Rgba;
+    for (const base of ["surface", "panel"]) {
+      min(`danger-tint rest over ${base}`, tk["danger-fg"],
+        over(tk["keep-bg"], tk[base]));
+      min(`danger-tint hover over ${base}`, tk["danger-fg"],
+        over(dHover, tk[base]));
+    }
     min("chiptext on chip", tk.chiptext, tk.chip);
     min("body on chip", tk.body, tk.chip);
   });
