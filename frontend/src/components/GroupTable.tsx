@@ -135,17 +135,20 @@ const VERDICT_PILL: Record<string, TagTone> = {
   delete_safe: "safe", review: "review", keep: "keep",
 };
 
-/** The row's one meta line: the sub (address, Smart summary...) truncates,
- *  "76% unread · last 6 Nov" stays whole. */
+const Stats = ({ g }: { g: Group }) => (
+  <>{unreadPct(g)}% {t("unread")} · {t("row.last")} <ShortDate iso={g.last} /></>
+);
+
+/** The desktop row's one meta line: the sub (address, Smart summary...)
+ *  truncates in front, "76% unread · last 6 Nov" stays whole. */
 function MetaLine({ g }: { g: Group }) {
   return (
-    <div className="flex min-w-0 type-meta text-muted">
+    <div className="flex min-w-0 overflow-hidden type-meta text-muted">
       {g.sub && (
         <span className="min-w-0 truncate">{localizedSub(g.sub)}</span>
       )}
       <span className="shrink-0 whitespace-nowrap">
-        {g.sub ? " · " : ""}{unreadPct(g)}% {t("unread")} · {t("row.last")}{" "}
-        <ShortDate iso={g.last} />
+        {g.sub ? "\u00a0· " : ""}<Stats g={g} />
       </span>
     </div>
   );
@@ -225,7 +228,7 @@ function DesktopTable({ slice, baseIdx, selected, focusedKey, openKey, compact, 
           <th className={sortableTh} aria-sort={ariaSort("label")}>
             {sortBtn("label", groupLabel)}
           </th>
-          <th className={`${th} ${compact ? "w-36" : "w-44"}`} />
+          {!compact && <th className={`${th} w-44`} />}
           <th className={`${th} w-32 text-right`}
             aria-sort={ariaSort(sortK === "size" ? "size" : "count")}>
             <span className="group/th inline-flex items-center gap-3">
@@ -239,6 +242,7 @@ function DesktopTable({ slice, baseIdx, selected, focusedKey, openKey, compact, 
       <tbody>
         {slice.map((g, i) => {
           const on = g.key === openKey || selected.has(g.key);
+          const pill = rowPill(g, !!blockedKeys?.has(g.key));
           return (
           <tr key={g.key} data-gidx={baseIdx + i}
             aria-current={g.key === openKey || undefined}
@@ -260,21 +264,26 @@ function DesktopTable({ slice, baseIdx, selected, focusedKey, openKey, compact, 
               <RowAvatar g={g} grouping={grouping} />
             </td>
             <td className={`min-w-0 px-2 py-2.5 ${td}`}>
-              <button
-                className="block w-full cursor-pointer truncate text-left
-                  type-body font-medium hover:underline"
-                onClick={() => onOpen(g)}>
-                {g.label}
-              </button>
+              {/* Beside the list (compact) the pill joins the name line: a
+                  column of its own would leave the meta line no room. */}
+              <div className="flex items-center gap-2">
+                <button
+                  className="min-w-0 cursor-pointer truncate text-left
+                    type-body font-medium hover:underline"
+                  onClick={() => onOpen(g)}>
+                  {g.label}
+                </button>
+                {compact && <span className="shrink-0">{pill}</span>}
+              </div>
               {rowNote?.(g) && (
                 <div className="truncate type-meta text-muted"
                   title={rowNote(g)}>{rowNote(g)}</div>
               )}
               <MetaLine g={g} />
             </td>
-            <td className={`px-2 py-2.5 text-right ${td}`}>
-              {rowPill(g, !!blockedKeys?.has(g.key))}
-            </td>
+            {!compact && (
+              <td className={`px-2 py-2.5 text-right ${td}`}>{pill}</td>
+            )}
             <td className={`whitespace-nowrap px-2 py-2.5 text-right
               tabular-nums ${td}`}>
               <div className="font-semibold">{g.count}</div>
@@ -337,7 +346,19 @@ function MobileCards({ slice, baseIdx, selected, focusedKey, onToggle,
                   {rowNote?.(g) && (
                     <div className="type-meta text-muted">{rowNote(g)}</div>
                   )}
-                  <MetaLine g={g} />
+                  {/* Phones: the address gets a line of its own (it would
+                      truncate to nothing beside the stats); the stats and
+                      the pill share the next one, the pill wrapping under. */}
+                  {g.sub && (
+                    <div className="truncate type-meta text-muted">
+                      {localizedSub(g.sub)}
+                    </div>
+                  )}
+                  <div className="flex flex-wrap items-center gap-x-2 gap-y-1
+                    type-meta text-muted">
+                    <span className="whitespace-nowrap"><Stats g={g} /></span>
+                    {pill}
+                  </div>
                 </div>
                 <div className="shrink-0 whitespace-nowrap text-right
                   tabular-nums">
@@ -347,7 +368,6 @@ function MobileCards({ slice, baseIdx, selected, focusedKey, onToggle,
                 <ChevronRight aria-hidden size={18}
                   className="shrink-0 text-faint" />
               </div>
-              {pill && <div className="mt-1 flex">{pill}</div>}
             </div>
           </div>
         </div>

@@ -104,6 +104,7 @@ export default function App() {
   // The page (URL hash) is the source of truth for it: "All mail" is the
   // `#/all` page (sidebar from 1024 px, the 5th segment below).
   const wide = useSidebar();
+  const phoneRow = useMediaQuery("(width < 48rem)");
   const [page, setPage] = useNav(
     localStorage.getItem("pmc_view") === "mails" ? "all" : "senders");
   const flat = page === "all";
@@ -1860,10 +1861,7 @@ export default function App() {
   const tokenLabel = activeFilterLabel(filter, state?.presets ?? [],
     presetFilterQuery, { new: newCount, still: stillCount });
   const scannedAgo = fmtAgo(state?.scanned_ts);
-  // Acts on the current grouping, so only the sender pages carry it (below
-  // 1024 the Tools menu still holds the same two entries).
   // Select mode button: an icon on phones (row 2 is tight), text above.
-  const phoneRow = useMediaQuery("(width < 48rem)");
   const toggleSelectMode = () => {
     if (selectMode) setSelected(new Set());
     setSelectMode(!selectMode);
@@ -1881,6 +1879,8 @@ export default function App() {
       {selectLabel}
     </Button>
   );
+  // Acts on the current grouping, so only the sender pages carry it (below
+  // 1024 the Tools menu still holds the same two entries).
   const moreMenu = wide && (
     <Menu variant="secondary" icon label={t("menu.more")}
       trigger={<MoreHorizontal size={18} aria-hidden />}>
@@ -2107,7 +2107,7 @@ export default function App() {
             <FilterToken label={tokenLabel}
               onRemove={() => { setFilter(""); setActiveChip(null); }} />
           )}
-          <div className="relative min-w-0 flex-1 md:min-w-70">
+          <div className="relative min-w-0 flex-1 max-md:basis-full md:min-w-70">
             <Input
               ref={filterRef}
               className="w-full pr-9 coarse:pr-10"
@@ -2128,6 +2128,9 @@ export default function App() {
               </span>
             )}
           </div>
+          {/* Below 768 the input has its own line and the buttons sit
+              right-aligned under it; from 768 the wrapper vanishes. */}
+          <div className="flex items-center gap-2 max-md:ml-auto md:contents">
           <QueryBuilder value={filter} onChange={setFilter} />
           <FilterMenu filter={filter} quick={presetFilterQuery}
             newCount={newCount} stillCount={stillCount}
@@ -2149,6 +2152,7 @@ export default function App() {
             onDir={(d) => setSortDir(d === "asc" ? 1 : -1)} />
           {selectBtn}
           {moreMenu}
+          </div>
         </div>
       )}
 

@@ -335,7 +335,7 @@ describe("GroupTable rows and header", () => {
     expect(row.querySelectorAll("td").length).toBe(6);
     const meta = row.querySelector("td:nth-child(3) div:last-child")!;
     // the sub (address) truncates in front; the stats stay whole
-    expect(meta.textContent).toBe("s2@x.example · 75% unread · last 1 Jan 2025");
+    expect(meta.textContent).toBe("s2@x.example\u00a0· 75% unread · last 1 Jan 2025");
     expect(meta.children[0].className).toContain("truncate");
     expect(meta.children[1].className).toContain("whitespace-nowrap");
     expect(meta.children[1].className).toContain("shrink-0");
@@ -348,6 +348,18 @@ describe("GroupTable rows and header", () => {
     expect(num.children[1].textContent).toBe("7.2 MB");
   });
 
+  it("phone cards: the address has its own line, the stats share one with the pill", () => {
+    const { container } = renderTable({ groups: [{ ...mk(2), new: true }] });
+    const card = container.querySelector(".md\\:hidden [data-gidx]")!;
+    const lines = [...card.querySelector("button[data-no-open]")!
+      .parentElement!.children].slice(1);
+    expect(lines[0].textContent).toBe("s2@x.example");
+    expect(lines[0].className).toContain("truncate");
+    expect(lines[1].textContent).toBe("0% unread · last 1 Jan 2025New");
+    expect(lines[1].className).toContain("flex-wrap");
+    expect(lines[1].querySelector(".type-caption")!.textContent).toBe("New");
+  });
+
   it("a row without a sub starts its meta line with the stats", () => {
     const { container } = renderTable({ groups: [{ ...mk(0), sub: "" }] });
     expect(container.querySelector("tbody td:nth-child(3) div:last-child")!
@@ -358,8 +370,18 @@ describe("GroupTable rows and header", () => {
     const g = { ...mk(0), sub: "2 mails, 1 sender" };
     const { container } = renderTable({ groups: [g], rowNote: () => "why" });
     const td = container.querySelector("tbody td:nth-child(3)")!;
-    expect(td.textContent).toContain("2 mails, 1 sender · 0% unread");
-    expect(td.querySelectorAll("div").length).toBe(2);   // note + meta
+    expect(td.textContent).toContain("2 mails, 1 sender\u00a0· 0% unread");
+    expect(td.querySelectorAll("div").length).toBe(3);   // name line, note, meta
+  });
+
+  it("beside the detail pane the pill joins the name line instead of a column", () => {
+    const { container } = renderTable({ compact: true,
+      groups: [{ ...mk(0), new: true }] });
+    const row = container.querySelector("tbody tr")!;
+    expect(row.querySelectorAll("td").length).toBe(5);
+    expect(container.querySelectorAll("thead th").length).toBe(5);
+    expect(row.querySelector("td:nth-child(3) .type-caption")!.textContent)
+      .toBe("New");
   });
 
   it("the header keeps Name / Mails / Size sortable and drops the rest", () => {
