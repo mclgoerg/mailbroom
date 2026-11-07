@@ -1,12 +1,14 @@
-import { BarChart3, BookmarkPlus, ChevronDown, ClipboardList,
+import { BarChart3, BookmarkPlus, ChevronDown, ChevronsUpDown, ClipboardList,
   Copy, Download, Eye, Info, Layers, LayoutGrid, Mail, Monitor, Moon, Paperclip, Pencil, Plus,
-  Power,
+  MoreHorizontal, Power,
   ScrollText, Search, Settings as SettingsIcon, ShieldAlert, Sparkles, Star, Sun,
   Trash2, User, Wand2, Wrench, X }
   from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api, downloadFile, errorText, noticeParams,
   setAccount as apiSetAccount, undoLabel, withAccount } from "./api";
+import { Sidebar, type SidebarTool } from "./components/Sidebar";
+import { useNav, useSidebar } from "./nav";
 import { AuditLogPanel } from "./components/AuditLogPanel";
 import { DetailPanel } from "./components/DetailPanel";
 import { Login } from "./components/Login";
@@ -113,8 +115,20 @@ export default function App() {
   const [mode, setMode] = useState<Grouping>("sender");
   // The flat "All mails" view sits beside the grouping tabs; the choice
   // survives reloads like the sort settings.
-  const [flat, setFlat] = useState(
-    () => localStorage.getItem("pmc_view") === "mails");
+  // The page (URL hash) is the source of truth for it: "All mail" is the
+  // `#/all` page (sidebar from 1024 px, the 5th segment below).
+  const wide = useSidebar();
+  const [page, setPage] = useNav(
+    localStorage.getItem("pmc_view") === "mails" ? "all" : "senders");
+  const flat = page === "all";
+  // Pages the app itself switched (it resets its own state); a hash change
+  // from outside (back / forward) gets the same reset below.
+  const pageByApp = useRef(false);
+  const lastPage = useRef(page);
+  const setFlat = (v: boolean) => {
+    if (v !== flat) pageByApp.current = true;
+    setPage(v ? "all" : "senders");
+  };
   useEffect(() => {
     localStorage.setItem("pmc_view", flat ? "mails" : "groups");
   }, [flat]);
@@ -660,6 +674,15 @@ export default function App() {
     followTimer.current = undefined;
   };
   useEffect(() => cancelFollow, []);
+  useEffect(() => {
+    if (lastPage.current === page) return;
+    lastPage.current = page;
+    if (pageByApp.current) { pageByApp.current = false; return; }
+    setSelected(new Set());
+    setFocusIdx(-1);
+    cancelFollow();
+    setDetail(null);
+  }, [page]);
   useEffect(() => { if (!paneOpen) cancelFollow(); }, [paneOpen]);
   const swapDetail = (g: Group) => {
     if (focusInPane()) focusPane.current = true;
@@ -1689,10 +1712,164 @@ export default function App() {
       }} />;
   }
 
+  // Sidebar: a page change resets selection and detail like a grouping change.
+  const goPage = (p: typeof page) => {
+    if (p === page) return;
+    pageByApp.current = true;
+    setPage(p);
+    setSelected(new Set());
+    setFocusIdx(-1);
+    cancelFollow();
+    setDetail(null);
+  };
+  const openTool = (tool: SidebarTool) => ({
+    search: () => setSearchOpen(true),
+    triage: () => setTriageOpen(true),
+    duplicates: () => setDupsOpen(true),
+    attachments: () => setAttsOpen(true),
+    rules: () => setRulesOpen(true),
+    junk: () => setFoldersOpen("junk"),
+    trash: () => setFoldersOpen("trash"),
+    stats: () => setStatsOpen(true),
+    space: () => setSpaceOpen(true),
+    wrapped: () => setWrappedOpen(true),
+    trackers: () => setTrackersOpen(true),
+    activity: () => setAuditOpen(true),
+    settings: () => setSettingsOpen(true),
+  })[tool]();
+
+  // The profile menu: the header trigger below 1024, the sidebar's account
+  // switcher from there (same items).
+  const profileMenu = (
+    <Menu label={t("menu.profile")}
+      {...(wide ? { variant: "quiet" as const, align: "left" as const,
+        label: t("menu.account_switch", { name: account }),
+        className: "w-full", triggerClass: "w-full justify-start" } : {})}
+      trigger={wide ? (
+        <span className="flex w-full min-w-0 items-center gap-2.5 text-left">
+          <AccountAvatar name={account || "?"} className="shrink-0" />
+          <span className="min-w-0 flex-1">
+            <span className="block truncate type-body font-medium">
+              {account || t("menu.profile")}
+            </span>
+            {!!acct?.user && (
+              <span className="block truncate type-meta text-muted">
+                {acct.user}
+              </span>
+            )}
+          </span>
+          {auth.is_admin && auth.mode === "oidc"
+            ? <Star size={14} className="shrink-0" /> : null}
+          <ChevronsUpDown size={16} aria-hidden
+            className="shrink-0 text-faint" />
+        </span>
+      ) : multiAccount
+        ? <span className="inline-flex items-center gap-1.5">
+            <AccountAvatar name={account} />
+            <span className="max-w-24 truncate" title={account}>
+              {account}
+            </span>
+            {auth.is_admin && auth.mode === "oidc"
+              ? <Star size={14} className="shrink-0" /> : null}
+            <ChevronDown size={14} className="shrink-0 text-faint" />
+          </span>
+        : <span className="inline-flex items-center gap-0.5">
+            <User size={18} />
+            {auth.is_admin && auth.mode === "oidc"
+              && <Star size={14} />}
+          </span>}>
+      {multiAccount && (
+        <>
+          <MenuGroup label={t("menu.accounts")}>
+          {Object.entries(cfg!.accounts).map(([n, a]) => (
+            <MenuItem key={n} active={n === account} sub={a.user}
+              onClick={() => n !== account && switchAccount(n)}>
+              <span className="flex items-center gap-2">
+                <AccountAvatar name={n} />
+                {n}
+              </span>
+            </MenuItem>
+          ))}
+          </MenuGroup>
+        </>
+      )}
+      <MenuItem disabled={demo} sub={demo ? demoHint() : undefined}
+        onClick={() => setWizard({ mode: "add", previous: account })}>
+        <Plus size={16} className="mr-1 inline align-text-bottom" />
+        {t("account.add")}…
+      </MenuItem>
+      <div className="my-1 border-t border-line" />
+      {auth.mode === "oidc" && !!auth.sub && (
+        <MenuHeading>
+          {auth.sub}
+          {auth.is_admin && (
+            <span className="inline-flex items-center gap-1">
+              {" "}<Star size={14} /> {t("login.admin_tip")}
+            </span>
+          )}
+        </MenuHeading>
+      )}
+      <MenuGroup label={t("Appearance")}>
+      {(["system", "light", "dark"] as const).map((a) => (
+        <MenuItem key={a} active={appearance === a}
+          onClick={() => setAppearance(a)}>
+          {a === "system"
+            ? <Monitor size={16} className="mr-1 inline align-text-bottom" />
+            : a === "light"
+              ? <Sun size={16} className="mr-1 inline align-text-bottom" />
+              : <Moon size={16} className="mr-1 inline align-text-bottom" />}
+          {t(`appearance.${a}`)}
+        </MenuItem>
+      ))}
+      </MenuGroup>
+      <MenuDivider />
+      <MenuItem onClick={() => setSettingsOpen(true)}>
+        <SettingsIcon size={16} className="mr-1 inline align-text-bottom" />
+        {t("Settings")}
+      </MenuItem>
+      {auth.mode !== "none" && (
+        <MenuItem onClick={async () => {
+          try { await api.logout(); } catch { /* session gone */ }
+          window.location.reload();
+        }}>
+          <Power size={16} className="mr-1 inline align-text-bottom" />
+          {t("login.logout")}
+        </MenuItem>
+      )}
+      {state?.trash_count != null && state.trash_count > 0 && (
+        <>
+          <MenuDivider />
+          <MenuItem danger onClick={() => emptyTrash()}>
+            <Trash2 size={16} className="mr-1 inline align-text-bottom" />
+            {t("Empty Trash")}…
+          </MenuItem>
+        </>
+      )}
+      {buildId && (
+        <MenuHeading>
+          {t("menu.version", { version: __APP_VERSION__, id: buildId })}
+        </MenuHeading>
+      )}
+    </Menu>
+  );
+
   return (
+    <div className={wide ? "pl-61" : undefined}>
+    {wide && (
+      <Sidebar page={page} onPage={goPage} onOpen={openTool}
+        account={profileMenu}
+        senderCount={state?.scanned_ts ? allGroups.length : undefined}
+        mailCount={state?.scanned_ts
+          ? Object.values(state.groups.sender ?? {})
+            .reduce((n, g) => n + g.count, 0) : undefined}
+        junkCount={state?.junk_count} trashCount={state?.trash_count}
+        disabled={{ triage: triageDisabled,
+          duplicates: state?.status !== "done",
+          space: state?.status !== "done" }} />
+    )}
     <div className="mx-auto max-w-6xl p-3 xl:max-w-360 pb-[calc(var(--bulkbar-h,0px)+0.75rem)]
       sm:p-5 sm:pb-[calc(var(--bulkbar-h,0px)+1.25rem)]">
-      <header className="mb-2 flex items-center gap-3 md:mb-4">
+      {!wide && <header className="mb-2 flex items-center gap-3 md:mb-4">
         <h1 className="type-title flex items-center gap-2">
           <img src={`${import.meta.env.BASE_URL}icon.svg`} alt=""
             width="32" height="32" className="shrink-0" />
@@ -1723,100 +1900,9 @@ export default function App() {
               {state.trash_count}
             </Button>
           )}
-          {/* Profile menu: account switcher (when >1 account), identity,
-              theme, settings, trash, logout - keeps the header to three
-              elements on one min-h-8 baseline on phones. */}
-          <Menu label={t("menu.profile")}
-            trigger={multiAccount
-              ? <span className="inline-flex items-center gap-1.5">
-                  <AccountAvatar name={account} />
-                  <span className="max-w-24 truncate" title={account}>
-                    {account}
-                  </span>
-                  {auth.is_admin && auth.mode === "oidc"
-                    ? <Star size={14} className="shrink-0" /> : null}
-                  <ChevronDown size={14} className="shrink-0 text-faint" />
-                </span>
-              : <span className="inline-flex items-center gap-0.5">
-                  <User size={18} />
-                  {auth.is_admin && auth.mode === "oidc"
-                    && <Star size={14} />}
-                </span>}>
-            {multiAccount && (
-              <>
-                <MenuGroup label={t("menu.accounts")}>
-                {Object.entries(cfg!.accounts).map(([n, a]) => (
-                  <MenuItem key={n} active={n === account} sub={a.user}
-                    onClick={() => n !== account && switchAccount(n)}>
-                    <span className="flex items-center gap-2">
-                      <AccountAvatar name={n} />
-                      {n}
-                    </span>
-                  </MenuItem>
-                ))}
-                </MenuGroup>
-              </>
-            )}
-            <MenuItem disabled={demo} sub={demo ? demoHint() : undefined}
-              onClick={() => setWizard({ mode: "add", previous: account })}>
-              <Plus size={16} className="mr-1 inline align-text-bottom" />
-              {t("account.add")}…
-            </MenuItem>
-            <div className="my-1 border-t border-line" />
-            {auth.mode === "oidc" && !!auth.sub && (
-              <MenuHeading>
-                {auth.sub}
-                {auth.is_admin && (
-                  <span className="inline-flex items-center gap-1">
-                    {" "}<Star size={14} /> {t("login.admin_tip")}
-                  </span>
-                )}
-              </MenuHeading>
-            )}
-            <MenuGroup label={t("Appearance")}>
-            {(["system", "light", "dark"] as const).map((a) => (
-              <MenuItem key={a} active={appearance === a}
-                onClick={() => setAppearance(a)}>
-                {a === "system"
-                  ? <Monitor size={16} className="mr-1 inline align-text-bottom" />
-                  : a === "light"
-                    ? <Sun size={16} className="mr-1 inline align-text-bottom" />
-                    : <Moon size={16} className="mr-1 inline align-text-bottom" />}
-                {t(`appearance.${a}`)}
-              </MenuItem>
-            ))}
-            </MenuGroup>
-            <MenuDivider />
-            <MenuItem onClick={() => setSettingsOpen(true)}>
-              <SettingsIcon size={16} className="mr-1 inline align-text-bottom" />
-              {t("Settings")}
-            </MenuItem>
-            {auth.mode !== "none" && (
-              <MenuItem onClick={async () => {
-                try { await api.logout(); } catch { /* session gone */ }
-                window.location.reload();
-              }}>
-                <Power size={16} className="mr-1 inline align-text-bottom" />
-                {t("login.logout")}
-              </MenuItem>
-            )}
-            {state?.trash_count != null && state.trash_count > 0 && (
-              <>
-                <MenuDivider />
-                <MenuItem danger onClick={() => emptyTrash()}>
-                  <Trash2 size={16} className="mr-1 inline align-text-bottom" />
-                  {t("Empty Trash")}…
-                </MenuItem>
-              </>
-            )}
-            {buildId && (
-              <MenuHeading>
-                {t("menu.version", { version: __APP_VERSION__, id: buildId })}
-              </MenuHeading>
-            )}
-          </Menu>
+          {profileMenu}
         </span>
-      </header>
+      </header>}
 
       {updateAvailable && (
         <div className="mb-3 flex items-center justify-between gap-2
@@ -1851,14 +1937,16 @@ export default function App() {
         </Button>
         )}
         {/* order-last + fill: below 768 the segments get a line of their own. */}
-        <div className="order-last w-full md:order-none md:w-auto">
+        <div className={`order-last w-full md:order-none md:w-auto
+          ${wide && flat ? "hidden" : ""}`}>
           <Segmented label={t("view.group_by")} fill
             className="md:w-auto"
             value={flat ? "flat" : mode}
             options={[
               ...TAB_GROUPINGS.map((g) =>
                 ({ value: g as Grouping | "flat", label: t(GROUPING_LABEL[g]) })),
-              { value: "flat", label: t("view.all_mails") },
+              ...(wide ? [] : [{ value: "flat" as const,
+                label: t("view.all_mails") }]),
             ]}
             onChange={(v) => {
               if (v === "flat") setFlat(true);
@@ -1870,9 +1958,9 @@ export default function App() {
             }} />
         </div>
         <div className="ml-auto flex items-center gap-2">
-          <Button variant="secondary" size="icon" label={t("Search all mails")}
-            onClick={() => setSearchOpen(true)}><Search size={18} /></Button>
-          <Menu variant="secondary" trigger={<>
+          {!wide && <Button variant="secondary" size="icon" label={t("Search all mails")}
+            onClick={() => setSearchOpen(true)}><Search size={18} /></Button>}
+          {!wide && <Menu variant="secondary" trigger={<>
               <Wrench size={16} aria-hidden /> {t("Tools")}
               <ChevronDown size={16} aria-hidden className="text-muted" />
             </>}>
@@ -1939,7 +2027,26 @@ export default function App() {
                 {t("export.csv")}
               </MenuItem>
             </MenuGroup>
-          </Menu>
+          </Menu>}
+          {wide && (
+            <Menu variant="secondary" icon label={t("menu.more")}
+              trigger={<MoreHorizontal size={18} aria-hidden />}>
+              {(aiEnabled || demo) && (
+                <MenuItem onClick={() => reviewWithAi()}
+                  sub={demo ? demoHint() : undefined}
+                  disabled={demo || scanning || aiRunning
+                    || state?.status !== "done"}>
+                  <Wand2 size={16} className="mr-1 inline align-text-bottom" />
+                  {t("AI review")}
+                </MenuItem>
+              )}
+              <MenuItem onClick={() => downloadFile(api.exportUrl(mode))}
+                sub={t("export.csv_tip")}>
+                <Download size={16} className="mr-1 inline align-text-bottom" />
+                {t("export.csv")}
+              </MenuItem>
+            </Menu>
+          )}
         </div>
       </div>
       {/* Row B: filter + builder + save preset + sort. All mails renders its
@@ -2508,6 +2615,7 @@ export default function App() {
           }}
         />
       )}
+    </div>
     </div>
   );
 }

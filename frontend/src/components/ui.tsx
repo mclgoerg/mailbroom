@@ -605,12 +605,18 @@ export function SectionLabel({ children, className = "" }: {
  * on outside click, Escape, or after any click inside (items just run
  * their onClick). Sits BELOW modals (z-modal). */
 export function Menu({ trigger, label, variant, icon, triggerClass,
-  children }: {
+  className = "", align, children }: {
   trigger: ReactNode;
   children: ReactNode;
-  /** Variant-less trigger only: replaces the compact header look (e.g. the
-   *  `ActionButton` "More" in the sender detail's action row). */
+  /** Variant-less trigger: replaces the compact header look (e.g. the
+   *  `ActionButton` "More" in the sender detail's action row). With a
+   *  `variant`: extra classes on the Button (e.g. `w-full`). */
   triggerClass?: string;
+  /** Wrapper classes (e.g. `w-full` for a sidebar-width trigger). */
+  className?: string;
+  /** Popover edge: "left" pins it to the trigger's left edge; default is
+   *  right-aligned, flipped when it would overflow the viewport. */
+  align?: "left";
 } & (
   /** `variant` renders the trigger as a design-system `Button` (a labelled
    *  "Tools ▾" button; with `icon` a square icon button, whose `label` is
@@ -667,16 +673,18 @@ export function Menu({ trigger, label, variant, icon, triggerClass,
     if (to) { e.preventDefault(); to.focus(); }
   };
   return (
-    <div className="relative" ref={ref}>
+    <div className={`relative ${className}`} ref={ref}>
       {variant && icon ? (
         <Button variant={variant} size="icon" label={label}
+          className={triggerClass}
           aria-haspopup="menu" aria-expanded={open}
           onClick={() => setOpen(!open)}>
           {trigger}
         </Button>
       ) : variant ? (
         <Button variant={variant} aria-haspopup="menu" aria-expanded={open}
-          className="inline-flex items-center gap-1.5"
+          aria-label={label}
+          className={`inline-flex items-center gap-1.5 ${triggerClass ?? ""}`}
           onClick={() => setOpen(!open)}>
           {trigger}
         </Button>
@@ -694,7 +702,7 @@ export function Menu({ trigger, label, variant, icon, triggerClass,
         <div ref={pop} role="menu" onKeyDown={onMenuKey}
           className={`absolute top-full z-(--z-dropdown) mt-1 min-w-52
             max-w-[calc(100vw-1rem)] rounded-card border border-line bg-panel
-            p-1 shadow-popover ${alignLeft ? "left-0" : "right-0"}`}
+            p-1 shadow-popover ${alignLeft || align === "left" ? "left-0" : "right-0"}`}
           onClick={() => close()}>
           {children}
         </div>
@@ -1370,7 +1378,7 @@ export function BulkBar({ summary, onClear, secondary, modifiers, action,
   useBulkBarHeight(ref, true);
   return (
     <div ref={ref} role="region" aria-label={t("bar.label")}
-      className="fixed inset-x-0 bottom-0 z-(--z-bulkbar) border-t border-line
+      className="fixed inset-x-0 bottom-0 lg:left-61 z-(--z-bulkbar) border-t border-line
         bg-panel pt-1.5 shadow-bar"
       style={{ paddingBottom:
         "calc(env(safe-area-inset-bottom) + 0.375rem)" }}>

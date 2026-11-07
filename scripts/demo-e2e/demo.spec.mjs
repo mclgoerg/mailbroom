@@ -79,7 +79,9 @@ test("Trash and Undo through the UI", async () => {
   const before = await senders();
   const row = page.locator("[data-gidx]").first();
   await row.locator('input[type="checkbox"]').check();
-  await page.getByRole("button", { name: /^Trash \d+$/ }).click();
+  // The bulk bar's button (the sidebar also has a "Trash 70" item).
+  await page.getByRole("region", { name: "Selection actions" })
+    .getByRole("button", { name: /^Trash \d+$/ }).click();
   const dialog = page.getByRole("dialog");
   await expect(dialog).toBeVisible();
   // confirm buttons ignore a click this soon after the dialog opens
