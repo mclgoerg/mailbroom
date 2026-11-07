@@ -1,10 +1,11 @@
 // @vitest-environment jsdom
-/* Toolbar: labelled Tools menu, grouping segments, merged Inactive chip,
+/* Toolbar: tab pages for the tools, grouping segments, merged Inactive chip,
  * phone sort menu. */
 
 import { cleanup, fireEvent, render, screen, waitFor, within } from
   "@testing-library/react";
 import { afterEach, expect, test, vi } from "vitest";
+import { openTab, openTool } from "./toolTestUtils";
 
 let state: any;
 const stateRequest = vi.fn();
@@ -99,7 +100,7 @@ test("switching accounts discards an old response and starts the new fetch", asy
   await waitFor(() => expect(stateRequest.mock.calls.length).toBeGreaterThan(before));
   state = { ...baseState, account: "other", groups: { ...baseState.groups,
     sender: { "b@x.example": { ...group, key: "b@x.example", label: "Beta" } } } };
-  fireEvent.click(screen.getByRole("button", { name: "Profile & settings" }));
+  fireEvent.click(screen.getByRole("button", { name: /^Account:/ }));
   fireEvent.click(screen.getByRole("menuitemradio", { name: /other/ }));
   await screen.findAllByText("Beta");
   resolveOld(old);
@@ -124,43 +125,82 @@ const open = async () => {
     .toBeGreaterThan(0));
 };
 
-test("the Tools menu lists every tool with a label; no loose tool icons",
+test("the tool pages list every tool with a label; no loose tool icons",
   async () => {
     await open();
     for (const n of ["Rules", "Attachments", "Duplicates", "Statistics",
-      "Audit Log"]) expect(screen.queryByLabelText(n)).toBeNull();
-    expect(screen.queryByLabelText("More")).toBeNull();
-    fireEvent.click(screen.getByRole("button", { name: "Tools" }));
-    for (const n of ["Rules", "Attachments", "Duplicates", "Statistics",
-      "Audit Log", "Trackers", "AI review", "Export CSV"])
-      expect(screen.getByRole("menuitem", { name: new RegExp(`^${n}`) }))
+      "Activity"]) expect(screen.queryByLabelText(n)).toBeNull();
+    expect(screen.queryByRole("button", { name: "Tools" })).toBeNull();
+    openTab("Clean up");
+    for (const n of ["Triage", "Rules", "Duplicates", "Attachments", "Junk",
+      "Trash", "AI review"])
+      expect(screen.getByRole("button", { name: new RegExp(`^${n}`) }))
         .toBeTruthy();
+    openTab("Insights");
+    for (const n of ["Statistics", "Space map", "Your year in mail",
+      "Trackers", "Activity"])
+      expect(screen.getByRole("button", { name: new RegExp(`^${n}`) }))
+        .toBeTruthy();
+    // Search all mail is a top-bar icon on every page
     expect(screen.getByLabelText("Search all mails")).toBeTruthy();
   });
 
-test("the Tools menu is grouped: Clean up / Insights / AI & export, in order",
+test("Clean up and Insights are tab pages with their tools in order",
   async () => {
     await open();
-    fireEvent.click(screen.getByRole("button", { name: "Tools" }));
-    const names = (g: string) => within(screen.getByRole("group", { name: g }))
-      .getAllByRole("menuitem")
-      .map((i) => i.textContent!.replace(/(Triage|Rules|Duplicates|Attachments|Junk & Trash|Statistics|Space map|Your year in mail|Trackers|Audit Log|AI review|Export CSV).*/, "$1"));
-    expect(within(screen.getByRole("menu")).getAllByRole("group")
-      .map((g) => g.getAttribute("aria-label")))
-      .toEqual(["Clean up", "Insights", "AI & export"]);
-    expect(names("Clean up")).toEqual(["Triage", "Rules", "Duplicates",
-      "Attachments", "Junk & Trash"]);
+    const names = (list: string) => within(screen.getByRole("list",
+      { name: list })).getAllByRole("button")
+      .map((i) => i.textContent!.replace(/(Triage|Rules|Duplicates|Attachments|Junk|Trash|Statistics|Space map|Your year in mail|Trackers|Activity|AI review).*/, "$1"));
+    openTab("Clean up");
+    expect(names("Clean up")).toEqual(["Triage", "Duplicates", "Attachments",
+      "Rules", "Junk", "Trash", "AI review"]);
+    openTab("Insights");
     expect(names("Insights")).toEqual(["Statistics", "Space map",
-      "Your year in mail", "Trackers", "Audit Log"]);
-    expect(names("AI & export")).toEqual(["AI review", "Export CSV"]);
+      "Your year in mail", "Trackers", "Activity"]);
+    expect(window.location.hash).toBe("#/insights");
   });
 
-test("Tools -> Trackers: tapping a sender closes the panel and filters the "
+test("the tab bar marks the current tab; All mail keeps Senders current",
+  async () => {
+    await open();
+    const cur = () => screen.getAllByRole("link")
+      .filter((l) => l.getAttribute("aria-current") === "page")
+      .map((l) => l.textContent);
+    expect(cur()).toEqual(["Senders"]);
+    openTab("Clean up");
+    expect(cur()).toEqual(["Clean up"]);
+    openTab("Senders");
+    fireEvent.click(screen.getByRole("tab", { name: "All mails" }));
+    expect(cur()).toEqual(["Senders"]);
+  });
+
+test("the top bar: large title, Search all mail, Scan icon on Senders only",
+  async () => {
+    await open();
+    expect(screen.getByRole("heading", { level: 1 }).textContent)
+      .toBe("Senders");
+    expect(screen.getByLabelText("Scan")).toBeTruthy();
+    fireEvent.click(screen.getByLabelText("Search all mails"));
+    expect(await screen.findByRole("dialog")).toBeTruthy();
+    fireEvent.keyDown(document, { key: "Escape" });
+    openTab("Insights");
+    expect(screen.getByRole("heading", { level: 1 }).textContent)
+      .toBe("Insights");
+    expect(screen.queryByLabelText("Scan")).toBeNull();
+  });
+
+test("Export CSV and AI review stay reachable from the More menu",
+  async () => {
+    await open();
+    fireEvent.click(screen.getByRole("button", { name: "More" }));
+    expect(screen.getByRole("menuitem", { name: /^Export CSV/ })).toBeTruthy();
+  });
+
+test("Insights -> Trackers: tapping a sender closes the panel and filters the "
   + "Sender tab to it", async () => {
   await open();
   fireEvent.click(screen.getByRole("tab", { name: "Smart" }));
-  fireEvent.click(screen.getByRole("button", { name: "Tools" }));
-  fireEvent.click(screen.getByRole("menuitem", { name: /^Trackers/ }));
+  openTool("Insights", /^Trackers/);
   fireEvent.click(await screen.findByRole("button",
     { name: "Show mails from Acme" }));
   await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
@@ -170,10 +210,9 @@ test("Tools -> Trackers: tapping a sender closes the panel and filters the "
     .getAttribute("aria-selected")).toBe("true");
 });
 
-test("a Tools entry opens its panel", async () => {
+test("a tool row opens its panel", async () => {
   await open();
-  fireEvent.click(screen.getByRole("button", { name: "Tools" }));
-  fireEvent.click(screen.getByRole("menuitem", { name: /^Rules/ }));
+  openTool("Clean up", /^Rules/);
   expect(await screen.findByRole("dialog")).toBeTruthy();
 });
 
@@ -255,10 +294,10 @@ test("while scanning with AI unavailable: Duplicates disabled, no AI review",
     render(<ToastProvider><DialogProvider><App /></DialogProvider></ToastProvider>);
     await waitFor(() => expect(screen.getAllByText("Acme").length)
       .toBeGreaterThan(0));
-    fireEvent.click(screen.getByRole("button", { name: "Tools" }));
-    expect((screen.getByRole("menuitem", { name: /^Duplicates/ }) as
+    openTab("Clean up");
+    expect((screen.getByRole("button", { name: /^Duplicates/ }) as
       HTMLButtonElement).disabled).toBe(true);
-    expect(screen.queryByRole("menuitem", { name: /^AI review/ })).toBeNull();
+    expect(screen.queryByRole("button", { name: /^AI review/ })).toBeNull();
   });
 
 test("Enter on a focused grouping tab doesn't trigger the list's Enter-opens-" +

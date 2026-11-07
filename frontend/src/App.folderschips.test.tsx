@@ -1,8 +1,6 @@
 // @vitest-environment jsdom
-/* Entry points of the Folders panel: the Junk count chip beside the Trash
- * chip (icon + number, translated aria-labels), the Trash chip opens Trash,
- * the Junk chip and the Tools entry open Junk; the phone header with both
- * chips, the multi-account avatar and German labels. */
+/* Entry points of the Folders panel on phones / tablets: the Junk and Trash
+ * rows (with their counts) on the Clean up tab; each opens its panel. */
 
 import { cleanup, fireEvent, render, screen, waitFor } from
   "@testing-library/react";
@@ -109,83 +107,64 @@ const mount = async (over: Partial<AppState> = {},
     folder: role === "junk" ? "Spam" : "Trash", uv: 1, total: 0, max_uid: 0,
     mails: [], senders: [] }));
   render(<ToastProvider><DialogProvider><App /></DialogProvider></ToastProvider>);
-  await screen.findByRole("button", { name: /Tools|Werkzeuge/ });
+  await screen.findByRole("link", { name: /Clean up|Aufräumen/ });
   await waitFor(() => expect(stateLoaded).toBe(true));
+  fireEvent.click(screen.getByRole("link", { name: /Clean up|Aufräumen/ }));
 };
 
-test("Junk chip beside the Trash chip: icon + number, translated aria-labels",
-  async () => {
-    await mount();
-    const junk = await screen.findByLabelText("Junk (3 mails)");
-    const trash = screen.getByLabelText("Trash (12 mails)");
-    // icon + number on phones, plus a word from md up (see the label test)
-    expect(junk.textContent).toBe("Junk3");
-    expect(trash.textContent).toBe("Trash12");
-    expect(junk.querySelector("svg")).toBeTruthy();
-    // Junk first, then Trash, in the same header cluster
-    expect(junk.compareDocumentPosition(trash)
-      & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(junk.parentElement).toBe(trash.parentElement);
-  });
+test("Junk row before the Trash row: icon + count", async () => {
+  await mount();
+  const junk = await screen.findByRole("button", { name: /^Junk/ });
+  const trash = screen.getByRole("button", { name: /^Trash/ });
+  expect(junk.textContent).toBe("Junk3");
+  expect(trash.textContent).toBe("Trash12");
+  expect(junk.querySelector("svg")).toBeTruthy();
+  expect(junk.compareDocumentPosition(trash)
+    & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+});
 
-test("singular label and German labels", async () => {
-  await mount({ junk_count: 1, trash_count: 1 });
-  expect(await screen.findByLabelText("Junk (1 mail)")).toBeTruthy();
-  cleanup();
+test("German labels", async () => {
   setLang("de");
   await mount({ junk_count: 4 }, multiCfg);
-  expect((await screen.findByLabelText("Spam (4 Mails)")).textContent)
+  expect((await screen.findByRole("button", { name: /^Spam/ })).textContent)
     .toBe("Spam4");
-  expect(screen.getByLabelText("Papierkorb (12 Mails)").textContent)
+  expect(screen.getByRole("button", { name: /^Papierkorb/ }).textContent)
     .toBe("Papierkorb12");
 });
 
-test("no Junk chip while Junk is empty or the count is unknown", async () => {
+test("the rows stay, without a count, while Junk is empty or unknown",
+  async () => {
   await mount({ junk_count: 0 });
-  expect(screen.queryByLabelText(/^Junk \(/)).toBeNull();
+  expect((await screen.findByRole("button", { name: /^Junk/ })).textContent)
+    .toBe("Junk");
   cleanup();
   await mount({ junk_count: null });
-  expect(screen.queryByLabelText(/^Junk \(/)).toBeNull();
+  expect((await screen.findByRole("button", { name: /^Junk/ })).textContent)
+    .toBe("Junk");
   cleanup();
   await mount({ junk_count: undefined });
-  expect(screen.queryByLabelText(/^Junk \(/)).toBeNull();
-  expect(screen.getByLabelText("Trash (12 mails)")).toBeTruthy();
+  expect((await screen.findByRole("button", { name: /^Junk/ })).textContent)
+    .toBe("Junk");
+  expect(screen.getByRole("button", { name: /^Trash/ }).textContent)
+    .toBe("Trash12");
 });
 
-test("the Trash chip opens the panel on Trash, the Junk chip on Junk",
+test("the Trash row opens the panel on Trash, the Junk row on Junk",
   async () => {
     await mount();
-    fireEvent.click(await screen.findByLabelText("Trash (12 mails)"));
+    fireEvent.click(await screen.findByRole("button", { name: /^Trash/ }));
     await waitFor(() => expect(foldersPanel).toHaveBeenLastCalledWith("trash"));
     expect(screen.getByRole("tab", { name: "Trash" })
       .getAttribute("aria-selected")).toBe("true");
     fireEvent.click(screen.getByRole("button", { name: "Close" }));
-    fireEvent.click(screen.getByLabelText("Junk (3 mails)"));
+    fireEvent.click(screen.getByRole("button", { name: /^Junk/ }));
     await waitFor(() => expect(foldersPanel).toHaveBeenLastCalledWith("junk"));
     expect(screen.getByRole("tab", { name: "Junk" })
       .getAttribute("aria-selected")).toBe("true");
   });
 
-test("the Tools menu has a Junk & Trash entry that opens Junk", async () => {
-  await mount({ junk_count: 0, trash_count: 0 });     // works without chips
-  fireEvent.click(screen.getByRole("button", { name: /Tools/ }));
-  fireEvent.click(await screen.findByRole("menuitem", { name: /Junk & Trash/ }));
+test("the Junk row works without any count", async () => {
+  await mount({ junk_count: 0, trash_count: 0 });
+  fireEvent.click(await screen.findByRole("button", { name: /^Junk/ }));
   await waitFor(() => expect(foldersPanel).toHaveBeenLastCalledWith("junk"));
 });
-
-test("header chips carry a word from md up; phones keep icon + number",
-  async () => {
-    await mount({ junk_count: 120, trash_count: 4500 }, multiCfg);
-    const junk = await screen.findByLabelText("Junk (120 mails)");
-    const word = junk.querySelector("span")!;
-    expect(word.textContent).toBe("Junk");
-    expect(word.className).toContain("hidden");           // hidden on phones
-    expect(word.className).toContain("md:inline");        // shown from md
-    expect(screen.getByLabelText("Trash (4500 mails)").querySelector("span")!
-      .className).toContain("md:inline");
-    expect(junk.className).toContain("whitespace-nowrap");
-    // the header cluster does not wrap on phones
-    expect(junk.parentElement!.className).toContain("flex");
-    expect(screen.getByLabelText("Trash (4500 mails)").textContent)
-      .toContain("4500");
-  });

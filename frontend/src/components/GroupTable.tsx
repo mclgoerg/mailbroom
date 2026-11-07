@@ -217,7 +217,8 @@ function DesktopTable({ slice, baseIdx, selected, focusedKey, openKey, compact, 
     <div className="group/table overflow-clip rounded-card bg-panel">
     <table className="w-full table-fixed border-collapse type-body">
       <thead>
-        <tr className="sticky top-0 z-(--z-sticky) bg-panel text-left text-muted">
+        {/* top: below the sticky phone/tablet top bar (--topbar-h, 0 elsewhere) */}
+        <tr className="sticky top-[var(--topbar-h,0px)] z-(--z-sticky) bg-panel text-left text-muted">
           <th className={`${th} w-10`}>
             <Checkbox checked={allChecked} className={`-mx-2 -my-1 ${showChecks
               ? "" : `${hiddenCls} hoverable:group-hover/table:opacity-100`}`}

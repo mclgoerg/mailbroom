@@ -422,7 +422,6 @@ export const EN: Record<string, string> = {
   "tracker.menu": "Trackers",
   "tools.group_cleanup": "Clean up",
   "tools.group_insights": "Insights",
-  "tools.group_ai": "AI & export",
   "menu.account_switch": "Account: {name}",
   "nav.label": "Main navigation",
   "nav.senders": "Senders",
@@ -548,8 +547,6 @@ export const EN: Record<string, string> = {
   "ratings.popover_title": "Per-mail AI ratings",
   "ratings.popover_hint":
     "Counts of this group's mails by rating. Open the group for details.",
-  "trash.open_label": "Trash ({n} mails)",
-  "trash.open_label_one": "Trash (1 mail)",
   "page.first": "First page",
   "page.prev": "Previous page",
   "page.next": "Next page",
@@ -711,7 +708,6 @@ export const EN: Record<string, string> = {
     "Restored {n} mails from Trash to {dest} - rescan to see them again.",
   "notice.trash_restored_rescan_one":
     "Restored 1 mail from Trash to {dest} - rescan to see it again.",
-  "trash.browse": "Browse Trash",
   "fp.delete_permanently": "Delete permanently…",
   "fp.older": "Delete older than…",
   "fp.older_title": "Delete old mails permanently",
@@ -777,9 +773,6 @@ export const EN: Record<string, string> = {
     "Some of these mails are from protected senders or are pinned. Move them to Trash anyway?",
   "fp.confirm_protected_title": "Move protected mails to Trash?",
   "fp.confirm_protected_btn": "Move anyway",
-  "junk.browse": "Browse Junk",
-  "junk.open_label": "Junk ({n} mails)",
-  "junk.open_label_one": "Junk (1 mail)",
   "notice.junk_rescued": "Moved {n} mails from Junk to your inbox.",
   "notice.junk_rescued_one": "Moved 1 mail from Junk to your inbox.",
   "notice.junk_rescued_rescan":

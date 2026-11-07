@@ -5,8 +5,9 @@
  * PLAN.md "header redesign + account switcher". */
 
 import { barAction, barMore, openLimit } from "./barTestUtil";
-import { cleanup, fireEvent, render, screen, waitFor } from
+import { cleanup, fireEvent, render, screen, waitFor, within } from
   "@testing-library/react";
+import { openTool } from "./toolTestUtils";
 import { afterEach, expect, test, vi } from "vitest";
 
 const stateCalls = { n: 0 };
@@ -127,8 +128,8 @@ afterEach(() => {
 
 const openMenu = async () => {
   await waitFor(() =>
-    expect(screen.getByLabelText("Profile & settings")).toBeTruthy());
-  fireEvent.click(screen.getByLabelText("Profile & settings"));
+    expect(screen.getByLabelText(/^Account:/)).toBeTruthy());
+  fireEvent.click(screen.getByLabelText(/^Account:/));
 };
 
 // Mounting with an empty stored account always fires exactly 2
@@ -144,8 +145,9 @@ test("profile menu lists every account with its address", async () => {
   render(<ToastProvider><DialogProvider><App /></DialogProvider></ToastProvider>);
   // Wait for config to load (multi-account trigger) before opening the
   // menu - opening too early would still show the single-account menu.
-  await waitFor(() => expect(screen.getByLabelText("Profile & settings")
-    .textContent).toContain("proton"));
+  await waitFor(() => expect(screen.getByLabelText(/^Account:/)
+    .textContent).toContain("p"));
+  await settleStateCalls();
   await openMenu();
   expect(screen.getByText("Accounts")).toBeTruthy();
   expect(screen.getByText("marcel@proton.example")).toBeTruthy();
@@ -158,8 +160,9 @@ test("the active account is marked and the trigger shows its name",
     cfg = multiCfg;
     state = { ...baseState };
     render(<ToastProvider><DialogProvider><App /></DialogProvider></ToastProvider>);
-    await waitFor(() => expect(screen.getByLabelText("Profile & settings")
-      .textContent).toContain("proton"));
+    await waitFor(() => expect(screen.getByLabelText(/^Account:/)
+      .textContent).toContain("p"));
+    await settleStateCalls();
     await openMenu();
     // Account rows only: the Appearance radios are menuitemradio too.
     const rows = screen.getAllByRole("menuitemradio")
@@ -175,8 +178,9 @@ test("clicking a different account switches; clicking the active one " +
   cfg = multiCfg;
   state = { ...baseState };
   render(<ToastProvider><DialogProvider><App /></DialogProvider></ToastProvider>);
-  await waitFor(() => expect(screen.getByLabelText("Profile & settings")
-    .textContent).toContain("proton"));
+  await waitFor(() => expect(screen.getByLabelText(/^Account:/)
+    .textContent).toContain("p"));
+  await settleStateCalls();
   await settleStateCalls();
   const callsAfterMount = stateCalls.n;
 
@@ -188,8 +192,8 @@ test("clicking a different account switches; clicking the active one " +
   // Clicking a DIFFERENT account switches (new refresh, trigger updates).
   await openMenu();
   fireEvent.click(screen.getByText("marcel@icloud.example"));
-  await waitFor(() => expect(screen.getByLabelText("Profile & settings")
-    .textContent).toContain("icloud"));
+  await waitFor(() => expect(screen.getByLabelText(/^Account:/)
+    .textContent).toContain("i"));
   expect(stateCalls.n).toBeGreaterThan(callsAfterMount);
   expect(localStorage.getItem("pmc_account")).toBe("icloud");
 });
@@ -211,19 +215,21 @@ test("single account: no Accounts section, header keeps the plain " +
   localStorage.removeItem("pmc_theme");
 });
 
-test("header has a single account control, not a separate pill strip",
+test("the top bar has a single account control (the avatar), no pill strip",
   async () => {
     cfg = multiCfg;
     state = { ...baseState };
     render(<ToastProvider><DialogProvider><App /></DialogProvider></ToastProvider>);
-    await waitFor(() => expect(screen.getByLabelText("Profile & settings")
-      .textContent).toContain("proton"));
-    // Before opening the menu, only the trigger mentions account names -
-    // no standalone per-account pill buttons sit in the header.
-    const matches = screen.getAllByText((_, el) =>
+    await waitFor(() => expect(screen.getByLabelText(/^Account:/)
+      .textContent).toContain("p"));
+    await settleStateCalls();
+    // Before opening the menu no account name is shown at all: the avatar
+    // button is the only account control, no per-account pill buttons.
+    expect(screen.getAllByLabelText(/^Account:/)).toHaveLength(1);
+    const matches = screen.queryAllByText((_, el) =>
       el?.textContent === "proton" || el?.textContent === "icloud"
       || el?.textContent === "gmail");
-    expect(matches).toHaveLength(1);
+    expect(matches).toHaveLength(0);
   });
 
 test("shows an update banner once the server build changes, and " +
@@ -517,12 +523,12 @@ test("a quick filter first narrows the filter box, then (tapped " +
   expect(screen.queryByText(/^Trash \d+$/)).toBeNull();
 });
 
-test("the Tools menu exposes CSV export without requiring a selection",
+test("the More menu exposes CSV export without requiring a selection",
   async () => {
   renderWithOneSenderGroup();
   await waitFor(() => expect(screen.getAllByText("DHL Paket").length)
     .toBeGreaterThan(0));
-  fireEvent.click(screen.getByText("Tools"));
+  fireEvent.click(screen.getByRole("button", { name: "More" }));
   fireEvent.click(screen.getByText("Export CSV"));
   expect(downloadFile).toHaveBeenCalledWith("/api/export?grouping=sender");
 });
@@ -634,7 +640,8 @@ test("mark as read is no move: its confirm has no undo line", async () => {
 test("the More menu has no separate re-rate entry", async () => {
   await mixed();
   await selectAll();
-  fireEvent.click(screen.getByRole("button", { name: "More" }));
+  fireEvent.click(within(screen.getByRole("region",
+    { name: "Selection actions" })).getByRole("button", { name: "More" }));
   const items = screen.getAllByRole("menuitem").map((i) => i.textContent);
   expect(items.some((x) => /^Mark read/.test(x!))).toBe(true);
   expect(items.some((x) => /^Export CSV/.test(x!))).toBe(true);
@@ -682,7 +689,8 @@ test("Limit to… focuses its select; Done returns to More; a cancelled " +
   await waitFor(() => expect(document.activeElement)
     .toBe(screen.getByTitle(/^Restrict this action/)));
   fireEvent.click(screen.getByRole("button", { name: "Done" }));
-  const more = screen.getByRole("button", { name: "More" });
+  const more = within(screen.getByRole("region",
+    { name: "Selection actions" })).getByRole("button", { name: "More" });
   await waitFor(() => expect(document.activeElement).toBe(more));
 
   barAction("mark_read");
@@ -736,22 +744,20 @@ test("when every group is rated only re-rating is offered", async () => {
     "sender", [groupFixture.key], true));
 });
 
-test("Tools > AI review with rated groups asks the same question for the " +
+test("Clean up > AI review with rated groups asks the same question for the " +
   "whole grouping", async () => {
   await mixed();
-  fireEvent.click(screen.getByRole("button", { name: "Tools" }));
-  fireEvent.click(screen.getByRole("menuitem", { name: /^AI review/ }));
+  openTool("Clean up", /^AI review/);
   expect((await findDialog()).textContent).toContain("Already rated: 1 of 2");
   await pressDialog("Review new only (1)");
   await waitFor(() => expect(aiReview).toHaveBeenCalledWith(
     "sender", undefined, false));
 });
 
-test("Tools > AI review with nothing rated starts right away", async () => {
+test("Clean up > AI review with nothing rated starts right away", async () => {
   await renderAiScope({ [groupFixture.key]: groupFixture,
                         [second.key]: second });
-  fireEvent.click(screen.getByRole("button", { name: "Tools" }));
-  fireEvent.click(screen.getByRole("menuitem", { name: /^AI review/ }));
+  openTool("Clean up", /^AI review/);
   await waitFor(() => expect(aiReview).toHaveBeenCalledWith(
     "sender", undefined, false));
   await expectNoDialog();

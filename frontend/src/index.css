@@ -297,9 +297,13 @@ body {
   .pmc-indeterminate { animation: none; width: 100%; opacity: 0.5; }
 }
 
-/* Toast stack: bottom-centre above the bulk bar and the safe area. */
+/* The phone tab bar gives the bottom edge to the selection bar. */
+:root[data-bulkbar] .pmc-tabbar { display: none; }
+
+/* Toast stack: bottom-centre above the selection bar / phone tab bar (only
+   one of them is visible at a time) and the safe area. */
 .pmc-toasts {
-  bottom: calc(var(--bulkbar-h, 0px) + env(safe-area-inset-bottom) + 1rem);
+  bottom: calc(var(--bulkbar-h, 0px) + var(--tabbar-h, 0px) + env(safe-area-inset-bottom) + 1rem);
 }
 /* A phone bottom sheet (Modal sm) owns the bottom edge: toasts go to the top. */
 @media (width < 40rem) {

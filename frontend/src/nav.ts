@@ -2,9 +2,13 @@ import { useCallback, useEffect, useState } from "react";
 import { useMediaQuery } from "./components/ui";
 
 /** Pages of the app shell. Later tasks add more (overview, tool pages). */
-export type Page = "senders" | "all";
+export type Page = "senders" | "all" | "cleanup" | "insights";
 
-export const PAGES: readonly Page[] = ["senders", "all"];
+export const PAGES: readonly Page[] = ["senders", "all", "cleanup", "insights"];
+/** The phone / tablet tab pages: lists of tools. The sidebar shows the same
+ *  items, so from 1024 px these routes fall back to the default page. */
+export const TAB_PAGES: readonly Page[] = ["cleanup", "insights"];
+export const isTabPage = (p: Page): boolean => TAB_PAGES.includes(p);
 export const DEFAULT_PAGE: Page = "senders";
 
 /** `#/senders` -> "senders"; anything else (empty, unknown) -> null. */
@@ -38,8 +42,8 @@ export function useNav(initial: Page = DEFAULT_PAGE): [Page, (p: Page) => void] 
   return [page, setPage];
 }
 
-/** From here the sidebar replaces the header, Tools menu and Junk / Trash
- *  links (Tailwind `lg`). Below it the old header stays. */
+/** From here the sidebar is the navigation (Tailwind `lg`); below it the
+ *  top bar and the bottom tab bar are. */
 export const SIDEBAR_QUERY = "(min-width: 1024px)";
 export const SIDEBAR_W = 244;
 

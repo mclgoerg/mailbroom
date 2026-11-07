@@ -1,14 +1,15 @@
 import { Archive, BarChart3, BellOff, ChevronDown, ChevronsUpDown, ClipboardList,
   Copy, Download, Eye, FolderInput, Info, Layers, LayoutGrid, ListChecks, Mail, Monitor, Moon, Paperclip, Pencil, Plus,
   MoreHorizontal, Power,
-  ScrollText, Search, Settings as SettingsIcon, ShieldAlert, Sparkles, Star, Sun,
-  Trash2, User, Wand2, Wrench, X }
+  RefreshCw, ScrollText, Search, Settings as SettingsIcon, ShieldAlert, Sparkles, Star, Sun,
+  Trash2, User, Wand2, X }
   from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api, downloadFile, errorText, noticeParams,
   setAccount as apiSetAccount, undoLabel, withAccount } from "./api";
 import { Sidebar, type SidebarTool } from "./components/Sidebar";
-import { useNav, useSidebar } from "./nav";
+import { isTabPage, useNav, useSidebar } from "./nav";
+import { TabBar, ToolList, ToolRow } from "./components/TabBar";
 import { AuditLogPanel } from "./components/AuditLogPanel";
 import { DetailPanel } from "./components/DetailPanel";
 import { Login } from "./components/Login";
@@ -37,7 +38,7 @@ import { AccountAvatar, BarButton, BulkBar, Button,
   choiceDialog, confirmDialog, EmptyState, ensureAiAck, FILTER_ROW, Input, isModalOpen, LINK,
   Menu, MenuDivider, MenuGroup, MenuHeading, MenuItem, Notice, ProgressBar,
   promptDialog, Segmented, Select, Spinner, useAppearance, useMediaQuery, useToast,
-  type ToastVariant } from "./components/ui";
+  type ToastVariant, useBulkBarHeight } from "./components/ui";
 import { nowMs } from "./clock";
 import { demoHint, setDemo, useDemo } from "./demoMode";
 import { t } from "./i18n";
@@ -105,20 +106,39 @@ export default function App() {
   // `#/all` page (sidebar from 1024 px, the 5th segment below).
   const wide = useSidebar();
   const compactSelect = useMediaQuery("(width < 80rem)");
-  const [page, setPage] = useNav(
+  const [navPage, setPage] = useNav(
     localStorage.getItem("pmc_view") === "mails" ? "all" : "senders");
+  // The Clean up / Insights tab pages only exist below 1024 px (the sidebar
+  // holds the same items): from there their routes show the default page.
+  const page = wide && isTabPage(navPage) ? "senders" : navPage;
+  const toolPage = isTabPage(page);
   const flat = page === "all";
   // Pages the app itself switched (it resets its own state); a hash change
   // from outside (back / forward) gets the same reset below.
   const pageByApp = useRef(false);
   const lastPage = useRef(page);
   const setFlat = (v: boolean) => {
-    if (v !== flat) pageByApp.current = true;
+    // Also from a tool page (Space map / Trackers hand over to the list).
+    if ((v ? "all" : "senders") !== page) pageByApp.current = true;
     setPage(v ? "all" : "senders");
   };
   useEffect(() => {
     localStorage.setItem("pmc_view", flat ? "mails" : "groups");
   }, [flat]);
+  // Phone top bar: sticky; translucent and compact once the page scrolled
+  // (body is the scroll container). Publishes --topbar-h for the table head.
+  const [scrolled, setScrolled] = useState(false);
+  const [topEl, setTopEl] = useState<HTMLElement | null>(null);
+  const topRef = useMemo(() => ({ current: topEl }), [topEl]);
+  useBulkBarHeight(topRef, !wide && !!topEl, "--topbar-h");
+  useEffect(() => {
+    if (wide) return;
+    const b = document.body;
+    const on = () => setScrolled(b.scrollTop > 8);
+    on();
+    b.addEventListener("scroll", on, { passive: true });
+    return () => b.removeEventListener("scroll", on);
+  }, [wide]);
   const [filter, setFilter] = useState("");
   // Sort field + direction survive reloads; every field has a natural
   // default direction (name A→Z, everything else biggest/newest first)
@@ -1479,7 +1499,7 @@ export default function App() {
         filterRef.current?.focus();
         return;
       }
-      if (flat || !groups.length) return;
+      if (flat || toolPage || !groups.length) return;
       if (e.key === "j" || e.key === "ArrowDown") {
         e.preventDefault();
         move(Math.min(focusRef.current + 1, groups.length - 1));
@@ -1715,14 +1735,18 @@ export default function App() {
 
   // Sidebar: a page change resets selection and detail like a grouping change.
   const goPage = (p: typeof page) => {
-    if (p === page) return;
-    pageByApp.current = true;
+    // Against the URL's page: on `#/cleanup` at >= 1024 the sidebar's
+    // Senders only rewrites the URL (the shown page is Senders already).
+    if (p === navPage) return;
+    if (p !== page) {
+      pageByApp.current = true;
+      setSelectMode(false);
+      setSelected(new Set());
+      setFocusIdx(-1);
+      cancelFollow();
+      setDetail(null);
+    }
     setPage(p);
-    setSelected(new Set());
-    setSelectMode(false);
-    setFocusIdx(-1);
-    cancelFollow();
-    setDetail(null);
   };
   const openTool = (tool: SidebarTool) => ({
     search: () => setSearchOpen(true),
@@ -1743,10 +1767,11 @@ export default function App() {
   // The profile menu: the header trigger below 1024, the sidebar's account
   // switcher from there (same items).
   const profileMenu = (
-    <Menu label={t("menu.profile")}
+    <Menu label={t("menu.account_switch", { name: account })}
       {...(wide ? { variant: "quiet" as const, align: "left" as const,
-        label: t("menu.account_switch", { name: account }),
-        className: "w-full", triggerClass: "w-full justify-start" } : {})}
+        className: "w-full", triggerClass: "w-full justify-start" }
+        : { variant: "quiet" as const, icon: true as const,
+          triggerClass: "coarse:size-11" })}
       trigger={wide ? (
         <span className="flex w-full min-w-0 items-center gap-2.5 text-left">
           <AccountAvatar name={account || "?"} className="shrink-0" />
@@ -1765,21 +1790,16 @@ export default function App() {
           <ChevronsUpDown size={16} aria-hidden
             className="shrink-0 text-faint" />
         </span>
-      ) : multiAccount
-        ? <span className="inline-flex items-center gap-1.5">
-            <AccountAvatar name={account} />
-            <span className="max-w-24 truncate" title={account}>
-              {account}
-            </span>
-            {auth.is_admin && auth.mode === "oidc"
-              ? <Star size={14} className="shrink-0" /> : null}
-            <ChevronDown size={14} className="shrink-0 text-faint" />
-          </span>
-        : <span className="inline-flex items-center gap-0.5">
-            <User size={18} />
-            {auth.is_admin && auth.mode === "oidc"
-              && <Star size={14} />}
-          </span>}>
+      ) : (
+        // The top bar's account button: just the avatar (a person icon
+        // before an account name exists), so it never widens the bar.
+        <span className="inline-flex items-center gap-0.5">
+          {account ? <AccountAvatar name={account} size="md" />
+            : <User size={18} />}
+          {auth.is_admin && auth.mode === "oidc"
+            && <Star size={14} aria-hidden />}
+        </span>
+      )}>
       {multiAccount && (
         <>
           <MenuGroup label={t("menu.accounts")}>
@@ -1829,6 +1849,12 @@ export default function App() {
         <SettingsIcon size={16} className="mr-1 inline align-text-bottom" />
         {t("Settings")}
       </MenuItem>
+      {!wide && (
+        <MenuItem onClick={() => setAuditOpen(true)}>
+          <ScrollText size={16} className="mr-1 inline align-text-bottom" />
+          {t("nav.activity")}
+        </MenuItem>
+      )}
       {auth.mode !== "none" && (
         <MenuItem onClick={async () => {
           try { await api.logout(); } catch { /* session gone */ }
@@ -1881,9 +1907,8 @@ export default function App() {
       {selectLabel}
     </Button>
   );
-  // Acts on the current grouping, so only the sender pages carry it (below
-  // 1024 the Tools menu still holds the same two entries).
-  const moreMenu = wide && (
+  // Acts on the current grouping, so only the sender pages carry it.
+  const moreMenu = (
     <Menu variant="secondary" icon label={t("menu.more")}
       trigger={<MoreHorizontal size={18} aria-hidden />}>
       {(aiEnabled || demo) && (
@@ -1917,41 +1942,41 @@ export default function App() {
           duplicates: state?.status !== "done",
           space: state?.status !== "done" }} />
     )}
-    <div className="mx-auto max-w-6xl p-3 xl:max-w-360 pb-[calc(var(--bulkbar-h,0px)+0.75rem)]
-      sm:p-5 sm:pb-[calc(var(--bulkbar-h,0px)+1.25rem)]">
-      {!wide && <header className="mb-2 flex items-center gap-3 md:mb-4">
-        <h1 className="type-title flex items-center gap-2">
-          <img src={`${import.meta.env.BASE_URL}icon.svg`} alt=""
-            width="32" height="32" className="shrink-0" />
-          Inboxrake
-        </h1>
-        <span className="ml-auto flex items-center gap-2">
-          {state?.junk_count != null && state.junk_count > 0 && (
-            <Button variant="quiet" size="sm"
-              className="inline-flex items-center gap-1 whitespace-nowrap
-                text-muted hover:text-body"
-              title={t("junk.browse")}
-              aria-label={t("junk.open_label", { n: state.junk_count })}
-              onClick={() => setFoldersOpen("junk")}>
-              <ShieldAlert size={14} />
-              <span className="hidden md:inline">{t("role.junk")}</span>
-              {state.junk_count}
-            </Button>
+    <div className="mx-auto max-w-6xl p-3 xl:max-w-360 pb-[calc(var(--bulkbar-h,0px)+var(--tabbar-h,0px)+0.75rem)]
+      sm:p-5 sm:pb-[calc(var(--bulkbar-h,0px)+var(--tabbar-h,0px)+1.25rem)]">
+      {/* Below 1024: the phone / tablet top bar - large page title (+ when
+          it was scanned), Search all mail, Scan and the account menu. The
+          tab bar at the bottom replaces the Tools menu and the Junk / Trash
+          links. */}
+      {!wide && <header ref={setTopEl}
+        className={`sticky top-0 z-(--z-bulkbar) -mx-3 mb-2 flex items-center
+          gap-1 border-b px-3 sm:-mx-5 sm:px-5 md:mb-4
+          ${scrolled ? "bar-glass" : "border-transparent bg-surface"}`}>
+        <div className="min-w-0 flex-1">
+          <h1 className={`truncate ${scrolled ? "type-title"
+            : "type-largetitle"}`}>
+            {t(page === "cleanup" ? "tools.group_cleanup"
+              : page === "insights" ? "tools.group_insights"
+              : flat ? "nav.all_mail" : "nav.senders")}
+          </h1>
+          {!toolPage && !!scannedAgo && !scrolled && (
+            <div className="type-meta text-muted">
+              {t("scan.age", { ago: scannedAgo })}
+            </div>
           )}
-          {state?.trash_count != null && state.trash_count > 0 && (
-            <Button variant="quiet" size="sm"
-              className="inline-flex items-center gap-1 whitespace-nowrap
-                text-muted hover:text-body"
-              title={t("trash.browse")}
-              aria-label={t("trash.open_label", { n: state.trash_count })}
-              onClick={() => setFoldersOpen("trash")}>
-              <Trash2 size={14} />
-              <span className="hidden md:inline">{t("role.trash")}</span>
-              {state.trash_count}
-            </Button>
-          )}
-          {profileMenu}
-        </span>
+        </div>
+        <Button variant="quiet" size="icon" label={t("Search all mails")}
+          className="coarse:size-11"
+          onClick={() => setSearchOpen(true)}><Search size={18} /></Button>
+        {!toolPage && !cfg?.setup_needed && (
+          <Button variant="quiet" size="icon" label={t("Scan")}
+            className="coarse:size-11" onClick={startScan}
+            disabled={scanning || aiRunning || deleting || attsRunning
+              || unsubRunning}>
+            {scanning ? <Spinner /> : <RefreshCw size={18} />}
+          </Button>
+        )}
+        {profileMenu}
       </header>}
 
       {updateAvailable && (
@@ -1966,6 +1991,7 @@ export default function App() {
         </div>
       )}
 
+      {!toolPage && (<>
       {mode === "smart" && !flat && smartHelp && <Notice className="mb-2"
         onClose={() => { setSmartHelp(false); localStorage.setItem("pmc_smart_help_seen", "1"); }}>
         {t("smart.first_use")}
@@ -2011,82 +2037,13 @@ export default function App() {
               {t("scan.age", { ago: scannedAgo })}
             </span>
           )}
-          {!wide && <Button variant="secondary" size="icon" label={t("Search all mails")}
-            onClick={() => setSearchOpen(true)}><Search size={18} /></Button>}
-          {!wide && <Menu variant="secondary" trigger={<>
-              <Wrench size={16} aria-hidden /> {t("Tools")}
-              <ChevronDown size={16} aria-hidden className="text-muted" />
-            </>}>
-            <MenuGroup label={t("tools.group_cleanup")}>
-              <MenuItem disabled={triageDisabled}
-                onClick={() => setTriageOpen(true)} sub={t("triage.menu_sub")}>
-                <Layers size={16} className="mr-1 inline align-text-bottom" />
-                {t("triage.menu")}
-              </MenuItem>
-              <MenuItem onClick={() => setRulesOpen(true)}>
-                <ClipboardList size={16} className="mr-1 inline align-text-bottom" />
-                {t("Rules")}
-              </MenuItem>
-              <MenuItem disabled={state?.status !== "done"}
-                onClick={() => setDupsOpen(true)}>
-                <Copy size={16} className="mr-1 inline align-text-bottom" />
-                {t("Duplicates")}
-              </MenuItem>
-              <MenuItem onClick={() => setAttsOpen(true)}>
-                <Paperclip size={16} className="mr-1 inline align-text-bottom" />
-                {t("Attachments")}
-              </MenuItem>
-              <MenuItem onClick={() => setFoldersOpen("junk")}>
-                <ShieldAlert size={16} className="mr-1 inline align-text-bottom" />
-                {t("fp.menu")}
-              </MenuItem>
-            </MenuGroup>
-            <MenuGroup label={t("tools.group_insights")}>
-              <MenuItem onClick={() => setStatsOpen(true)}>
-                <BarChart3 size={16} className="mr-1 inline align-text-bottom" />
-                {t("Statistics")}
-              </MenuItem>
-              <MenuItem disabled={state?.status !== "done"}
-                onClick={() => setSpaceOpen(true)}>
-                <LayoutGrid size={16} className="mr-1 inline align-text-bottom" />
-                {t("space.title")}
-              </MenuItem>
-              <MenuItem onClick={() => setWrappedOpen(true)}>
-                <Sparkles size={16} className="mr-1 inline align-text-bottom" />
-                {t("wrapped.menu")}
-              </MenuItem>
-              <MenuItem onClick={() => setTrackersOpen(true)}>
-                <Eye size={16} className="mr-1 inline align-text-bottom" />
-                {t("tracker.menu")}
-              </MenuItem>
-              <MenuItem onClick={() => setAuditOpen(true)}>
-                <ScrollText size={16} className="mr-1 inline align-text-bottom" />
-                {t("Audit Log")}
-              </MenuItem>
-            </MenuGroup>
-            <MenuGroup label={t("tools.group_ai")}>
-              {(aiEnabled || demo) && (
-                <MenuItem onClick={() => reviewWithAi()}
-                  sub={demo ? demoHint() : undefined}
-                  disabled={demo || scanning || aiRunning
-                    || state?.status !== "done"}>
-                  <Wand2 size={16} className="mr-1 inline align-text-bottom" />
-                  {t("AI review")}
-                </MenuItem>
-              )}
-              <MenuItem onClick={() => downloadFile(api.exportUrl(mode))}
-                sub={t("export.csv_tip")}>
-                <Download size={16} className="mr-1 inline align-text-bottom" />
-                {t("export.csv")}
-              </MenuItem>
-            </MenuGroup>
-          </Menu>}
           {cfg?.setup_needed ? (
             // no account yet: the primary action is the setup card's
             <Button onClick={() => setWizard({ mode: "first" })}>
               {t("wizard.setup_btn")}</Button>
           ) : (
-            <Button variant="secondary" onClick={startScan}
+            // Below 1024 the Scan icon lives in the top bar.
+            wide && <Button variant="secondary" onClick={startScan}
               disabled={scanning || aiRunning || deleting || attsRunning
                 || unsubRunning}>
               {scanning ? <Spinner /> : t("Scan")}
@@ -2334,6 +2291,7 @@ export default function App() {
             </Button>
           } />
       )}
+      </>)}
 
       {/* 2 px strip overlaid on the gap under the toolbar while a job runs
           (takes no space, so it never shifts the layout). */}
@@ -2346,7 +2304,7 @@ export default function App() {
           </div>
         )}
       </div>
-      <div className="mb-1 flex min-h-5 items-center justify-between gap-2
+      {!toolPage && <div className="mb-1 flex min-h-5 items-center justify-between gap-2
         type-meta text-muted">
         <div>{statusLine()}</div>
         {(state?.undo.length ?? 0) > 0 && !deleting && (
@@ -2375,7 +2333,7 @@ export default function App() {
             )}
           </span>
         )}
-      </div>
+      </div>}
       {state?.notice && state.notice.key !== "cached_verdicts"
         && state.notice.key !== "restored"
         && state.notice.key !== "restored_rescan" && (
@@ -2393,8 +2351,51 @@ export default function App() {
         </Notice>
       )}
 
+      {/* The Clean up / Insights tab pages (below 1024): today's panels. */}
+      {toolPage && (page === "cleanup" ? (
+        <ToolList label={t("tools.group_cleanup")}>
+          <ToolRow icon={<Layers size={18} aria-hidden />}
+            label={t("triage.menu")} sub={t("triage.menu_sub")}
+            disabled={triageDisabled} onClick={() => openTool("triage")} />
+          <ToolRow icon={<Copy size={18} aria-hidden />}
+            label={t("Duplicates")} disabled={state?.status !== "done"}
+            onClick={() => openTool("duplicates")} />
+          <ToolRow icon={<Paperclip size={18} aria-hidden />}
+            label={t("Attachments")} onClick={() => openTool("attachments")} />
+          <ToolRow icon={<ClipboardList size={18} aria-hidden />}
+            label={t("Rules")} onClick={() => openTool("rules")} />
+          <ToolRow icon={<ShieldAlert size={18} aria-hidden />}
+            label={t("role.junk")} count={state?.junk_count}
+            onClick={() => openTool("junk")} />
+          <ToolRow icon={<Trash2 size={18} aria-hidden />}
+            label={t("role.trash")} count={state?.trash_count}
+            onClick={() => openTool("trash")} />
+          {(aiEnabled || demo) && (
+            <ToolRow icon={<Wand2 size={18} aria-hidden />}
+              label={t("AI review")} sub={demo ? demoHint() : undefined}
+              disabled={demo || scanning || aiRunning
+                || state?.status !== "done"}
+              onClick={() => reviewWithAi()} />
+          )}
+        </ToolList>
+      ) : (
+        <ToolList label={t("tools.group_insights")}>
+          <ToolRow icon={<BarChart3 size={18} aria-hidden />}
+            label={t("Statistics")} onClick={() => openTool("stats")} />
+          <ToolRow icon={<LayoutGrid size={18} aria-hidden />}
+            label={t("space.title")} disabled={state?.status !== "done"}
+            onClick={() => openTool("space")} />
+          <ToolRow icon={<Sparkles size={18} aria-hidden />}
+            label={t("wrapped.menu")} onClick={() => openTool("wrapped")} />
+          <ToolRow icon={<Eye size={18} aria-hidden />}
+            label={t("tracker.menu")} onClick={() => openTool("trackers")} />
+          <ToolRow icon={<ScrollText size={18} aria-hidden />}
+            label={t("nav.activity")} onClick={() => openTool("activity")} />
+        </ToolList>
+      ))}
+
       {/* First-run onboarding: no credentials or no scan yet. */}
-      {cfg && (state?.status === "idle" || state?.status === "error")
+      {!toolPage && cfg && (state?.status === "idle" || state?.status === "error")
         && allGroups.length === 0
         && !scanning && (
         <div className="mx-auto my-10 max-w-md rounded-card border border-line
@@ -2444,7 +2445,7 @@ export default function App() {
         </div>
       )}
 
-      {flat ? (
+      {toolPage ? null : flat ? (
         state && (
           <AllMailsView key={state.account} state={state}
             onChanged={refresh} toolbarSlot={toolbarSlot} />
@@ -2607,6 +2608,7 @@ export default function App() {
         />
       )}
       {wizardEl}
+      {!wide && <TabBar page={page} onPage={goPage} />}
       {settingsOpen && cfg && (
         <SettingsModal
           cfg={cfg}
